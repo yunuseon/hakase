@@ -1,0 +1,26 @@
+body {
+    background-color: #fafafa;
+    min-height: 100%;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    margin: 0;
+}
+
+
+html {
+    height: 100%;
+  }
+  
+canvas {
+    display: block;
+    margin: auto;
+    padding: 0px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    box-shadow: 0px 2px 12px -2px rgba(0, 0, 0, 0.15);
+}
