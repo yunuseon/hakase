@@ -1,4 +1,4 @@
-import { animationFrames, BehaviorSubject, concat, of, Subject } from 'rxjs';
+import { animationFrames, BehaviorSubject, combineLatest, concat, fromEvent, of, Subject } from 'rxjs';
 import { map, repeat, scan, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import './styles.css';
@@ -6,8 +6,6 @@ import './styles.css';
 const paneParams = {
   height: 640,
   width: 640,
-
-  duration: 5,
 
   dimension: 32,
   gapModifier: 0.1,
@@ -20,7 +18,12 @@ const paneParams = {
   color4: '#EEEEEE',
 };
 
+const timelineParams = {
+  duration: 5
+}
+
 type PaneParams = typeof paneParams;
+type TimelineParams = typeof timelineParams;
 
 const projectX = (width: number, normalizedX: number) => (width / 2) * (1 + normalizedX);
 const projectY = (height: number, normalizedY: number) => (1 - normalizedY) * (height / 2);
@@ -81,45 +84,74 @@ const init = () => {
     throw new Error('Please check why canvas does not have a 2d render context');
   }
 
+  const playheadInput = document.getElementById('playhead') as HTMLInputElement;
+
   const controlSubject = new BehaviorSubject<Partial<PaneParams>>({});
-  const updateParam = <T extends keyof PaneParams>(key: T, value: PaneParams[T]) => controlSubject.next({ [key]: value });
+  const updatePaneParam = <T extends keyof PaneParams>(key: T, value: PaneParams[T]) => controlSubject.next({ [key]: value });
+  
+  const timelineSubject = new BehaviorSubject<Partial<PaneParams>>({});
+  const updateTimelineParam = <T extends keyof TimelineParams>(key: T, value: TimelineParams[T]) => timelineSubject.next({ [key]: value });
 
   const controlPane = new Pane();
 
-  controlPane.addInput(paneParams, 'duration', { min: 0, max: 60, step: 0.1 }).on('change', ({ value }) => updateParam('duration', value));
+  controlPane.addInput(timelineParams, 'duration', { min: 0, max: 60, step: 0.1 }).on('change', ({ value }) => updateTimelineParam('duration', value));
 
   const dimensionFolder = controlPane.addFolder({ title: 'Dimension' });
-  dimensionFolder.addInput(paneParams, 'height', { min: 64, max: 1280, step: 1 }).on('change', ({ value }) => updateParam('height', value));
-  dimensionFolder.addInput(paneParams, 'width', { min: 64, max: 1280, step: 1 }).on('change', ({ value }) => updateParam('width', value));
+  dimensionFolder.addInput(paneParams, 'height', { min: 64, max: 1280, step: 1 }).on('change', ({ value }) => updatePaneParam('height', value));
+  dimensionFolder.addInput(paneParams, 'width', { min: 64, max: 1280, step: 1 }).on('change', ({ value }) => updatePaneParam('width', value));
 
   const sketchFolder = controlPane.addFolder({ title: 'Sketch' });
-  sketchFolder.addInput(paneParams, 'gapModifier', { min: 0.01, max: 1, step: 0.01 }).on('change', ({ value }) => updateParam('gapModifier', value));
-  sketchFolder.addInput(paneParams, 'depthScalar', { min: 0.01, max: 2, step: 0.01 }).on('change', ({ value }) => updateParam('depthScalar', value));
-  sketchFolder.addInput(paneParams, 'baseSize', { min: 1, max: 20, step: 1 }).on('change', ({ value }) => updateParam('baseSize', value));
-  sketchFolder.addInput(paneParams, 'dimension', { min: 1, max: 128, step: 1 }).on('change', ({ value }) => updateParam('dimension', value));
+  sketchFolder.addInput(paneParams, 'gapModifier', { min: 0.01, max: 1, step: 0.01 }).on('change', ({ value }) => updatePaneParam('gapModifier', value));
+  sketchFolder.addInput(paneParams, 'depthScalar', { min: 0.01, max: 2, step: 0.01 }).on('change', ({ value }) => updatePaneParam('depthScalar', value));
+  sketchFolder.addInput(paneParams, 'baseSize', { min: 1, max: 20, step: 1 }).on('change', ({ value }) => updatePaneParam('baseSize', value));
+  sketchFolder.addInput(paneParams, 'dimension', { min: 1, max: 128, step: 1 }).on('change', ({ value }) => updatePaneParam('dimension', value));
 
   const colorFolder = controlPane.addFolder({ title: 'Colors' });
-  colorFolder.addInput(paneParams, 'color1').on('change', ({ value }) => updateParam('color1', value));
-  colorFolder.addInput(paneParams, 'color2').on('change', ({ value }) => updateParam('color2', value));
-  colorFolder.addInput(paneParams, 'color3').on('change', ({ value }) => updateParam('color3', value));
-  colorFolder.addInput(paneParams, 'color4').on('change', ({ value }) => updateParam('color4', value));
+  colorFolder.addInput(paneParams, 'color1').on('change', ({ value }) => updatePaneParam('color1', value));
+  colorFolder.addInput(paneParams, 'color2').on('change', ({ value }) => updatePaneParam('color2', value));
+  colorFolder.addInput(paneParams, 'color3').on('change', ({ value }) => updatePaneParam('color3', value));
+  colorFolder.addInput(paneParams, 'color4').on('change', ({ value }) => updatePaneParam('color4', value));
 
   const values$ = controlSubject.pipe(
     scan((acc, curr) => ({ ...acc, ...curr }), paneParams)
   );
+  
+  const timeline$ = timelineSubject.pipe(
+    scan((acc, curr) => ({ ...acc, ...curr }), timelineParams)
+  );
 
-  values$.pipe(
-    switchMap(values => values.duration === 0 ?
-      of([values, 1] as const) :
+  const t$ = timeline$.pipe(
+    switchMap(({duration}) => duration === 0 ?
+      of(1) :
       animationFrames().pipe(
-        map(({ elapsed }) => Math.min(elapsed / (values.duration * 1000), 1)),
-        map(x => x),
+        map(({ elapsed }) => Math.min(elapsed / (duration * 1000), 1)),
         takeWhile(playhead => playhead < 1),
-        map(playhead => [values, playhead] as const),
         repeat()
       )
     )
-  ).subscribe(([values, playhead]) => {
+  );
+
+  const playheadValue$ = concat(
+    of(playheadInput.value),
+    fromEvent(playheadInput, "change").pipe(
+      map(event => event.target as HTMLInputElement),
+      map(target => target.value)
+    )
+  ).pipe(
+    map(inputValue => Number(inputValue) / 100)
+  );
+
+  const playhead$ = combineLatest([
+    playheadValue$,
+    t$,
+  ]).pipe(
+    map(([playhead, t]) => (t + playhead) % 1)
+  );
+
+  combineLatest([
+    values$,
+    playhead$
+  ]).subscribe(([values, playhead]) => {
     canvas.height = values.height;
     canvas.width = values.width;
 
@@ -140,7 +172,7 @@ const init = () => {
             y: y * ((t + r) / 2),
             z: r
           }
-        );
+        );  
       }
     }
   });
