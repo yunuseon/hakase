@@ -1,5 +1,5 @@
 import { animationFrames, BehaviorSubject, combineLatest, concat, fromEvent, of, Subject } from 'rxjs';
-import { map, repeat, scan, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
+import { filter, map, repeat, scan, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import './styles.css';
 
@@ -73,6 +73,8 @@ const projectVector = ({ x, y, z }: Vector, params: PaneParams) => {
   };
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 const init = () => {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement;
   if (!canvas) {
@@ -84,11 +86,41 @@ const init = () => {
     throw new Error('Please check why canvas does not have a 2d render context');
   }
 
-  const playheadInput = document.getElementById('playhead') as HTMLInputElement;
+  const slider = document.getElementById('slider');
+  if (!slider) {
+    throw new Error('Slider');
+  }
+
+  const indicator = slider.querySelector('.slider-indicator') as HTMLElement | null;
+  if (!indicator) {
+    throw new Error('Indicator');
+  }
+
+  const sliderValueChanges$ = fromEvent<MouseEvent>(slider, 'mousedown').pipe(
+    switchMap(initialEvent =>
+      concat(
+        of(initialEvent),
+        fromEvent<MouseEvent>(document, 'mousemove').pipe(
+          takeUntil(fromEvent(document, 'mouseup'))
+        )
+      )
+    ),
+    map(({ clientX }) => {
+      const { left, width } = slider.getBoundingClientRect();
+      return clamp((clientX - left) / width, 0, 1);
+    }),
+  );
+
+  const sliderValue$ = concat(
+    of(0.33),
+    sliderValueChanges$
+  ).pipe(
+    tap(percentage => indicator.style.width = `${(percentage * 100).toFixed()}%`)
+  );
 
   const controlSubject = new BehaviorSubject<Partial<PaneParams>>({});
   const updatePaneParam = <T extends keyof PaneParams>(key: T, value: PaneParams[T]) => controlSubject.next({ [key]: value });
-  
+
   const timelineSubject = new BehaviorSubject<Partial<PaneParams>>({});
   const updateTimelineParam = <T extends keyof TimelineParams>(key: T, value: TimelineParams[T]) => timelineSubject.next({ [key]: value });
 
@@ -115,13 +147,13 @@ const init = () => {
   const values$ = controlSubject.pipe(
     scan((acc, curr) => ({ ...acc, ...curr }), paneParams)
   );
-  
+
   const timeline$ = timelineSubject.pipe(
     scan((acc, curr) => ({ ...acc, ...curr }), timelineParams)
   );
 
   const t$ = timeline$.pipe(
-    switchMap(({duration}) => duration === 0 ?
+    switchMap(({ duration }) => duration === 0 ?
       of(1) :
       animationFrames().pipe(
         map(({ elapsed }) => Math.min(elapsed / (duration * 1000), 1)),
@@ -131,15 +163,7 @@ const init = () => {
     )
   );
 
-  const playheadValue$ = concat(
-    of(playheadInput.value),
-    fromEvent(playheadInput, "change").pipe(
-      map(event => event.target as HTMLInputElement),
-      map(target => target.value)
-    )
-  ).pipe(
-    map(inputValue => Number(inputValue) / 100)
-  );
+  const playheadValue$ = sliderValue$;
 
   const playhead$ = combineLatest([
     playheadValue$,
@@ -172,7 +196,7 @@ const init = () => {
             y: y * ((t + r) / 2),
             z: r
           }
-        );  
+        );
       }
     }
   });
