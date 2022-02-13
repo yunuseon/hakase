@@ -1,5 +1,5 @@
-import { animationFrames, BehaviorSubject, combineLatest, concat, fromEvent, of, Subject } from 'rxjs';
-import { filter, map, repeat, scan, switchMap, takeUntil, takeWhile, tap } from 'rxjs/operators';
+import { animationFrames, animationFrameScheduler, BehaviorSubject, combineLatest, concat, defer, fromEvent, of, Subject, timer } from 'rxjs';
+import { bufferTime, distinctUntilChanged, filter, map, reduce, repeat, scan, shareReplay, switchMap, takeUntil, takeWhile, tap, throttleTime, windowTime } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import './styles.css';
 
@@ -33,10 +33,6 @@ interface Vector {
   y: number;
   z: number;
 }
-
-const draw = (context: CanvasRenderingContext2D, width: number, height: number): void => {
-
-};
 
 const drawVector = (context: CanvasRenderingContext2D, params: PaneParams, { x, y, z }: Vector) => {
   const projectV = projectVector({ x, y, z }, params);
@@ -76,10 +72,13 @@ const projectVector = ({ x, y, z }: Vector, params: PaneParams) => {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const init = () => {
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-  if (!canvas) {
-    throw new Error('Could not find canvas in document');
+  const canvasContainer = document.getElementById('canvas-container') as HTMLElement | null;
+  if (!canvasContainer) {
+    throw new Error('Could not find canvas container in document');
   }
+
+  const canvas = document.createElement('canvas');
+  canvasContainer.appendChild(canvas);
 
   const context = canvas.getContext('2d', { alpha: false });
   if (!context) {
@@ -152,25 +151,47 @@ const init = () => {
     scan((acc, curr) => ({ ...acc, ...curr }), timelineParams)
   );
 
-  const t$ = timeline$.pipe(
+  const frame$ = timeline$.pipe(
     switchMap(({ duration }) => duration === 0 ?
       of(1) :
       animationFrames().pipe(
-        map(({ elapsed }) => Math.min(elapsed / (duration * 1000), 1)),
-        takeWhile(playhead => playhead < 1),
-        repeat()
+        map(({ elapsed }) => (elapsed % (duration * 1000)) / (duration * 1000))
       )
     )
   );
 
-  const playheadValue$ = sliderValue$;
-
   const playhead$ = combineLatest([
-    playheadValue$,
-    t$,
+    sliderValue$,
+    frame$,
   ]).pipe(
     map(([playhead, t]) => (t + playhead) % 1)
   );
+
+  const fps$ = defer(() => {
+    const getFpsCounter = () => {
+      const fpsCounter = Array.from(canvasContainer.getElementsByTagName('hks-fps-counter'))[0];
+      if (fpsCounter) return fpsCounter;
+
+      return null;
+    };
+
+    const createFpsCounter = () => {
+      const newFpsCounter = document.createElement('hks-fps-counter')
+      canvasContainer.appendChild(newFpsCounter);
+
+      return newFpsCounter;
+    };
+
+    const fpsCounter = getFpsCounter() ?? createFpsCounter();
+
+    return frame$.pipe(
+      bufferTime(1000),
+      map(frames => frames.length),
+      tap(fps => fpsCounter.innerHTML = `${fps} fps`)
+    );
+  });
+
+  fps$.subscribe();
 
   combineLatest([
     values$,

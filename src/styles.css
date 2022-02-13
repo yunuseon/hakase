@@ -14,6 +14,20 @@ html {
     height: 100%;
 }
 
+#canvas-container {
+    position: relative;
+}
+
+hks-fps-counter {
+    position: absolute;
+    bottom: 0;
+    right: 8px;
+    transform: translateY(calc(100% + 8px));
+    color: red;
+    font-size: 16px;
+    font-family: monospace;
+}
+
 canvas {
     display: block;
     margin: auto;
