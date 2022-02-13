@@ -157,7 +157,8 @@ const init = () => {
       animationFrames().pipe(
         map(({ elapsed }) => (elapsed % (duration * 1000)) / (duration * 1000))
       )
-    )
+    ),
+    shareReplay(1)
   );
 
   const playhead$ = combineLatest([
