@@ -95,6 +95,37 @@ const init = () => {
     throw new Error('Indicator');
   }
 
+  const circleSlider = document.getElementById('circle-slider');
+  if (!circleSlider) {
+    throw Error('Could not find circle');
+  }
+
+  const circleIndicator = document.getElementById('circle-indicator');
+  if (!circleIndicator) {
+    throw Error('Could not find circle indicator');
+  }
+
+  const { width: indicatorWidth, height: indicatorHeight } = circleIndicator.getBoundingClientRect();
+  const { width: circleWidth, height: circleHeight } = circleSlider.getBoundingClientRect();
+
+  const indicatorRadiusX = indicatorWidth / 2;
+  const indicatorRadiusY = indicatorHeight / 2;
+
+  const circleRadiusX = circleWidth / 2;
+  const circleRadiusY = circleHeight / 2;
+
+  const progressCircleSlider = (p: number) => {
+    const angle = (((p * 360) - 90) * Math.PI) / 180;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+
+    const x = circleRadiusX - indicatorRadiusX + (dx * circleRadiusX);
+    const y = circleRadiusY - indicatorRadiusY + (dy * circleRadiusY);
+
+    circleIndicator.style.left = `${x}px`;
+    circleIndicator.style.top = `${y}px`;
+  };
+
   const sliderValueChanges$ = fromEvent<MouseEvent>(slider, 'mousedown').pipe(
     switchMap(initialEvent =>
       concat(
@@ -160,7 +191,10 @@ const init = () => {
         )
       ),
     )),
-    tap(percentage => indicator.style.width = `${(percentage * 100).toFixed()}%`),
+    tap(percentage => {
+      progressCircleSlider(percentage);
+      indicator.style.width = `${(percentage * 100).toFixed()}%`
+    }),
     shareReplay(1)
   );
 
@@ -182,7 +216,7 @@ const init = () => {
     const fpsCounter = getFpsCounter() ?? createFpsCounter();
 
     return frame$.pipe(
-      bufferTime(1000),
+      bufferTime(1000, animationFrameScheduler),
       map(frames => frames.length),
       tap(fps => fpsCounter.innerHTML = `${fps} fps`)
     );

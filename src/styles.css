@@ -99,3 +99,21 @@ canvas {
     top: 0;
     width: 12px;
 }
+
+.circle-slider {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    border: 2px solid grey;
+    border-radius: 100%;
+    box-sizing: border-box;
+}
+
+.circle-indicator {
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    background: red;
+    border-radius: 100%;
+    cursor: pointer;
+}
