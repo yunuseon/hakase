@@ -1,5 +1,5 @@
-import { animationFrames, animationFrameScheduler, BehaviorSubject, combineLatest, concat, defer, fromEvent, of, Subject, timer } from 'rxjs';
-import { bufferTime, distinctUntilChanged, filter, map, reduce, repeat, scan, shareReplay, switchMap, takeUntil, takeWhile, tap, throttleTime, windowTime } from 'rxjs/operators';
+import { animationFrames, animationFrameScheduler, BehaviorSubject, combineLatest, concat, defer, fromEvent, merge, of, Subject, timer } from 'rxjs';
+import { bufferTime, distinctUntilChanged, filter, map, reduce, repeat, repeatWhen, scan, shareReplay, switchMap, takeUntil, takeWhile, tap, throttleTime, windowTime } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import './styles.css';
 
@@ -111,10 +111,10 @@ const init = () => {
   );
 
   const sliderValue$ = concat(
-    of(0.33),
+    of(0),
     sliderValueChanges$
   ).pipe(
-    tap(percentage => indicator.style.width = `${(percentage * 100).toFixed()}%`)
+    shareReplay(1)
   );
 
   const controlSubject = new BehaviorSubject<Partial<PaneParams>>({});
@@ -151,21 +151,17 @@ const init = () => {
     scan((acc, curr) => ({ ...acc, ...curr }), timelineParams)
   );
 
-  const frame$ = timeline$.pipe(
-    switchMap(({ duration }) => duration === 0 ?
-      of(1) :
-      animationFrames().pipe(
-        map(({ elapsed }) => (elapsed % (duration * 1000)) / (duration * 1000))
-      )
-    ),
+  const frame$ = sliderValue$.pipe(
+    switchMap(sliderValue => timeline$.pipe(
+      switchMap(({ duration }) => duration === 0 ?
+        of(sliderValue) :
+        animationFrames().pipe(
+          map(({ elapsed }) => (sliderValue + (elapsed % (duration * 1000)) / (duration * 1000)) % 1)
+        )
+      ),
+    )),
+    tap(percentage => indicator.style.width = `${(percentage * 100).toFixed()}%`),
     shareReplay(1)
-  );
-
-  const playhead$ = combineLatest([
-    sliderValue$,
-    frame$,
-  ]).pipe(
-    map(([playhead, t]) => (t + playhead) % 1)
   );
 
   const fps$ = defer(() => {
@@ -196,7 +192,7 @@ const init = () => {
 
   combineLatest([
     values$,
-    playhead$
+    frame$
   ]).subscribe(([values, playhead]) => {
     canvas.height = values.height;
     canvas.width = values.width;
