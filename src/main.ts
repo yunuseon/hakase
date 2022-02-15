@@ -164,8 +164,10 @@ const init = () => {
 
   const sliderValue$ = concat(
     of(0),
-    // sliderValueChanges$
-    indicatorChanges$
+    merge(
+      sliderValueChanges$,
+      indicatorChanges$
+    )
   ).pipe(
     shareReplay(1)
   );
