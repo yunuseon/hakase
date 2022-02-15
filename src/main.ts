@@ -19,7 +19,7 @@ const paneParams = {
 };
 
 const timelineParams = {
-  duration: 5
+  duration: 0
 }
 
 type PaneParams = typeof paneParams;
@@ -126,6 +126,27 @@ const init = () => {
     circleIndicator.style.top = `${y}px`;
   };
 
+  const indicatorChanges$ = fromEvent<MouseEvent>(circleSlider, 'mousedown').pipe(
+    switchMap(initialEvent =>
+      concat(
+        of(initialEvent),
+        fromEvent<MouseEvent>(document, 'mousemove').pipe(
+          takeUntil(fromEvent(document, 'mouseup'))
+        )
+      )
+    ),
+    map(({ clientX, clientY }) => {
+      const { left, width, top, height } = circleSlider.getBoundingClientRect();
+
+      const pivotX = left + (width / 2);
+      const pivotY = top + (height / 2);
+
+      const deltaX = pivotX - clientX;
+      const deltaY = pivotY - clientY;
+      return (Math.atan2(deltaY, deltaX) / (2 * Math.PI) + 0.75) % 1;
+    }),
+  );
+
   const sliderValueChanges$ = fromEvent<MouseEvent>(slider, 'mousedown').pipe(
     switchMap(initialEvent =>
       concat(
@@ -143,7 +164,8 @@ const init = () => {
 
   const sliderValue$ = concat(
     of(0),
-    sliderValueChanges$
+    // sliderValueChanges$
+    indicatorChanges$
   ).pipe(
     shareReplay(1)
   );
