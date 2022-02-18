@@ -1,5 +1,5 @@
-import { animationFrames, animationFrameScheduler, BehaviorSubject, combineLatest, concat, defer, fromEvent, merge, of, Subject, timer } from 'rxjs';
-import { bufferTime, distinctUntilChanged, filter, map, reduce, repeat, repeatWhen, scan, shareReplay, switchMap, takeUntil, takeWhile, tap, throttleTime, windowTime } from 'rxjs/operators';
+import { animationFrames, animationFrameScheduler, BehaviorSubject, combineLatest, concat, defer, fromEvent, merge, of, range, Subject, timer } from 'rxjs';
+import { bufferTime, concatMap, distinctUntilChanged, filter, map, mergeMap, reduce, repeat, repeatWhen, scan, shareReplay, switchMap, takeUntil, takeWhile, tap, throttleTime, windowTime } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import './styles.css';
 
@@ -19,7 +19,7 @@ const paneParams = {
 };
 
 const timelineParams = {
-  duration: 0
+  duration: 1
 }
 
 type PaneParams = typeof paneParams;
@@ -71,6 +71,29 @@ const projectVector = ({ x, y, z }: Vector, params: PaneParams) => {
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
+const draw = (context: CanvasRenderingContext2D, paneParam: PaneParams, playhead: number): void => {
+  context.fillStyle = paneParam.color1;
+  context.fillRect(0, 0, paneParam.width, paneParam.height);
+
+  for (let i = -paneParam.dimension; i < paneParam.dimension; i++) {
+    for (let j = -paneParam.dimension; j < paneParam.dimension; j++) {
+      const x = i / paneParam.dimension;
+      const y = j / paneParam.dimension;
+      const r = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)) / Math.sqrt(2);
+      const t = Math.sin(2 * (r + playhead) * Math.PI);
+
+      drawVector(context,
+        paneParam,
+        {
+          x: x,
+          y: y * ((t + r) / 2),
+          z: r
+        }
+      );
+    }
+  }
+}
+
 const init = () => {
   const canvasContainer = document.getElementById('canvas-container') as HTMLElement | null;
   if (!canvasContainer) {
@@ -104,6 +127,12 @@ const init = () => {
   if (!circleIndicator) {
     throw Error('Could not find circle indicator');
   }
+
+  const frames = document.getElementById('timeline');
+  if (!frames) {
+    throw Error('Could not find timeline');
+  }
+
 
   const { width: indicatorWidth, height: indicatorHeight } = circleIndicator.getBoundingClientRect();
   const { width: circleWidth, height: circleHeight } = circleSlider.getBoundingClientRect();
@@ -248,6 +277,43 @@ const init = () => {
 
   fps$.subscribe();
 
+  const fps = 24;
+  const timelineFrame$ = timeline$.pipe(
+    map(timeline => timeline.duration),
+    distinctUntilChanged(),
+    map(duration => Math.ceil(duration * fps)),
+    switchMap(frameCount => {
+      frames.innerHTML = '';
+      return range(0, frameCount).pipe(
+        map(frame => frame / frameCount)
+      );
+    }),
+    map(playhead => {
+      const c = document.createElement('canvas');
+      c.className = 'frame';
+      const ctx = c.getContext('2d');
+      if (!ctx) throw Error('Could not get context');
+
+      return {
+        canvas: c,
+        context: ctx,
+        playhead: playhead
+      };
+    }),
+    shareReplay()
+  );
+
+  timelineFrame$.subscribe(({ canvas }) => frames.appendChild(canvas));
+  timelineFrame$.pipe(
+    mergeMap(({ canvas, context, playhead }) => values$.pipe(
+      tap(values => {
+        canvas.height = values.height;
+        canvas.width = values.width;
+        draw(context, values, playhead);
+      })
+    ))
+  ).subscribe();
+
   combineLatest([
     values$,
     frame$
@@ -255,26 +321,7 @@ const init = () => {
     canvas.height = values.height;
     canvas.width = values.width;
 
-    context.fillStyle = values.color1;
-    context.fillRect(0, 0, values.width, values.height);
-
-    for (let i = -values.dimension; i < values.dimension; i++) {
-      for (let j = -values.dimension; j < values.dimension; j++) {
-        const x = i / values.dimension;
-        const y = j / values.dimension;
-        const r = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)) / Math.sqrt(2);
-        const t = Math.sin(2 * (r + playhead) * Math.PI);
-
-        drawVector(context,
-          values,
-          {
-            x: x,
-            y: y * ((t + r) / 2),
-            z: r
-          }
-        );
-      }
-    }
+    draw(context, values, playhead);
   });
 };
 
