@@ -1,26 +1,35 @@
 {
-    "name": "rxjsanimate",
+    "name": "hakase",
     "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
+    "private": true,
+    "type": "module",
+    "description": "An RxJS-driven canvas sketchbook: scrub or loop a playhead through generative sketches.",
+    "author": "Yunus Öztürk",
+    "license": "ISC",
+    "engines": {
+        "node": ">=20.19.0"
+    },
     "scripts": {
-        "build": "npx webpack --config webpack.config.js --mode production",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "dev": "vite",
+        "build": "npm run typecheck && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
     },
     "dependencies": {
-        "rxjs": "7.0.0",
-        "tweakpane": "^3.1.10"
+        "rxjs": "^7.8.2",
+        "tweakpane": "^4.0.5"
     },
-    "author": "",
-    "license": "ISC",
     "devDependencies": {
-        "@tweakpane/core": "^1.0.8",
-        "css-loader": "^5.2.2",
-        "html-webpack-plugin": "^5.3.1",
-        "mini-css-extract-plugin": "^1.4.1",
-        "ts-loader": "^8.1.0",
-        "typescript": "^4.2.4",
-        "webpack": "^5.33.2",
-        "webpack-cli": "^4.6.0"
+        "@eslint/js": "^10.0.1",
+        "@tweakpane/core": "^2.0.5",
+        "eslint": "^10.9.1",
+        "prettier": "^3.6.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.68.0",
+        "vite": "^8.2.2"
     }
 }

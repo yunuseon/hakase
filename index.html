@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="An RxJS-driven canvas sketchbook: scrub or loop a playhead through generative sketches."
+        />
+        <title>hakase — RxJS Animate</title>
+    </head>
+
+    <body>
+        <main id="stage">
+            <div id="canvas-container">
+                <div id="slider" class="slider">
+                    <div class="slider-indicator"></div>
+                </div>
+            </div>
+
+            <div id="circle-slider" class="circle-slider">
+                <div id="circle-indicator" class="circle-indicator"></div>
+            </div>
+        </main>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

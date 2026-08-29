@@ -1,17 +1,29 @@
-body {
-    background-color: rgb(36, 36, 34);
-    min-height: 100%;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    margin: 0;
+:root {
+    --backdrop: rgb(36, 36, 34);
+    --track: grey;
+    --indicator: white;
+    --accent: red;
 }
 
 html {
     height: 100%;
+}
+
+body {
+    background-color: var(--backdrop);
+    margin: 0;
+    min-height: 100%;
+    height: 100%;
+}
+
+#stage {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    height: 100%;
+    width: 100%;
 }
 
 #canvas-container {
@@ -23,7 +35,7 @@ hks-fps-counter {
     bottom: 0;
     right: 8px;
     transform: translateY(calc(100% + 8px));
-    color: red;
+    color: var(--accent);
     font-size: 16px;
     font-family: monospace;
 }
@@ -31,25 +43,35 @@ hks-fps-counter {
 canvas {
     display: block;
     margin: auto;
-    padding: 0px;
+    padding: 0;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    box-shadow: 0px 2px 12px -2px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 12px -2px rgb(0 0 0 / 0.15);
+}
+
+/* Shared by both sliders: never let a drag turn into a text selection or a
+   scroll gesture. */
+.slider,
+.circle-slider {
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    /* Never let the flex row squash a slider — the circle must stay circular. */
+    flex: none;
 }
 
 .slider {
     box-sizing: border-box;
-    cursor: pointer;
     height: 30px;
     width: 200px;
-    margin: 0 6px;
     outline: none;
     position: relative;
 }
 
-.slider:before {
-    background-color: grey;
+.slider::before {
+    background-color: var(--track);
     border-radius: 1px;
     bottom: 0;
     content: '';
@@ -67,33 +89,32 @@ canvas {
     left: 0;
     position: absolute;
     top: 0;
+    pointer-events: none;
 }
 
-.slider-indicator:before {
-    background-color: white;
+.slider-indicator::before {
+    background-color: var(--indicator);
     border-radius: 1px;
     bottom: 0;
     content: '';
     display: block;
     height: 2px;
     left: 0;
-    margin-bottom: auto;
-    margin-top: auto;
+    margin-block: auto;
     position: absolute;
     right: 0;
     top: 0;
 }
 
-.slider-indicator:after {
-    background-color: rgb(36, 36, 34);
+.slider-indicator::after {
+    background-color: var(--backdrop);
     border-radius: 1px;
-    border: 1px solid white;
+    border: 1px solid var(--indicator);
     bottom: 0;
     content: '';
     display: block;
     height: 12px;
-    margin-bottom: auto;
-    margin-top: auto;
+    margin-block: auto;
     position: absolute;
     right: -6px;
     top: 0;
@@ -104,16 +125,18 @@ canvas {
     position: relative;
     width: 200px;
     height: 200px;
-    border: 2px solid grey;
+    border: 2px solid var(--track);
     border-radius: 100%;
     box-sizing: border-box;
 }
 
 .circle-indicator {
     position: absolute;
+    top: 0;
+    left: 0;
     height: 16px;
     width: 16px;
-    background: red;
+    background: var(--accent);
     border-radius: 100%;
-    cursor: pointer;
+    pointer-events: none;
 }
