@@ -21,8 +21,11 @@ void main() {
     int i = gl_VertexID / n - uDimension;
     int j = gl_VertexID % n - uDimension;
 
+    // Cell centres, not cell corners: (i + 0.5) / d keeps the lattice symmetric
+    // about the origin. Plain i / d spans [-1, 1) and shifts everything half a
+    // step, clipping the outermost row and column against the canvas edge.
     float d = float(uDimension);
-    vec3 v = formula(float(i) / d, float(j) / d, uPlayhead);
+    vec3 v = formula((float(i) + 0.5) / d, (float(j) + 0.5) / d, uPlayhead);
 
     gl_Position = vec4(v.x, v.y, 0.0, 1.0);
 

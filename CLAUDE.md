@@ -146,9 +146,11 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
   would someone make a change that looks correct and silently breaks? If not,
   delete it. Documenting what a function does is not a trap — names and types
   carry that, and a pipeline needing prose to be followed should be restructured
-  instead. Exactly three pass in `src/` today: the Tweakpane teardown in
-  `controls.ts`, the `defer` self-reference in `rx.ts`, and `geometry$` gating the
-  redraw in `view/sketch.ts`. Keep the count that low.
+  instead. Five pass in `src/` today: the Tweakpane teardown in `controls.ts`,
+  the `defer` self-reference in `rx.ts`, `prepared$` gating the redraw in
+  `view/sketch.ts`, and in `sketch.vert` the `formula` prototype and the `+ 0.5`
+  cell-centring. Every one of them marks something a reasonable person would
+  delete or "simplify" into a bug. Keep the count that low.
 
 ## Adding a formula
 
