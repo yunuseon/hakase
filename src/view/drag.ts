@@ -1,8 +1,8 @@
 import { concat, merge, type Observable, of } from 'rxjs';
-import { filter, switchMap, takeUntil, tap } from 'rxjs/operators';
+import { filter, map, pairwise, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { fromElementEvent$ } from '../lib/rx.ts';
 
-export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
+const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =>
     fromElementEvent$(element, 'pointerdown').pipe(
         filter(event => event.isPrimary && event.button === 0),
 
@@ -10,7 +10,7 @@ export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
             initial.preventDefault();
             element.setPointerCapture(initial.pointerId);
         }),
-        switchMap(initial => {
+        map(initial => {
             const samePointer = (event: PointerEvent) => event.pointerId === initial.pointerId;
 
             const end$ = merge(
@@ -26,4 +26,26 @@ export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
                 ),
             );
         }),
+    );
+
+export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
+    gestures$(element).pipe(switchMap(gesture => gesture));
+
+export type Delta = {
+    readonly dx: number;
+    readonly dy: number;
+};
+
+// Pairing must stay inside the gesture, or each drag starts with a jump.
+export const pointerDelta$ = (element: HTMLElement): Observable<Delta> =>
+    gestures$(element).pipe(
+        switchMap(gesture =>
+            gesture.pipe(
+                pairwise(),
+                map(([from, to]) => ({
+                    dx: to.clientX - from.clientX,
+                    dy: to.clientY - from.clientY,
+                })),
+            ),
+        ),
     );

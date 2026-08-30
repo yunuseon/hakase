@@ -37,3 +37,10 @@ export const timelineParams = {
 };
 
 export type TimelineParams = typeof timelineParams;
+
+export type CanvasSize = {
+    readonly width: number;
+    readonly height: number;
+};
+
+export type PanelParams = Omit<SketchParams, 'width' | 'height'>;

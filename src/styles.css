@@ -1,55 +1,44 @@
-/* Page-level only. Everything a component draws lives in that component's own
-   stylesheet, adopted into its shadow root. */
-
 :root {
-    --backdrop: rgb(36, 36, 34);
-    --track: grey;
-    --indicator: white;
-    --accent: red;
+    --backdrop: rgb(22, 22, 21);
+    --panel: rgb(30, 30, 28);
+    --header: rgb(38, 38, 35);
+    --surface: rgb(18, 18, 17);
+    --edge: rgb(58, 58, 55);
+    --edge-strong: rgb(86, 86, 82);
+
+    --label: rgb(150, 150, 144);
+    --muted: rgb(105, 105, 100);
+    --track: rgb(120, 120, 115);
+    --indicator: rgb(235, 235, 230);
+    --accent: rgb(255, 82, 68);
+    --highlight: rgb(0, 173, 181);
+
+    --gutter: 6px;
+    --terminal-width: clamp(19rem, 24vw, 26rem);
+    --controls-width: 17rem;
+    --hks-dial-size: 10rem;
 }
 
-html {
-    height: 100%;
+html,
+body {
+    block-size: 100%;
 }
 
 body {
     background-color: var(--backdrop);
+    color: var(--indicator);
     margin: 0;
-    min-height: 100%;
-    height: 100%;
+    overflow: hidden;
+    font-family: monospace;
 }
 
-/* Both side panels float over the stage, so the sketch stays centred in the
-   window rather than in the space left between them. */
-hks-formula-editor {
+/* Anchored by its bottom edge so expanding grows the box upward, not off-screen. */
+#controls {
     position: fixed;
-    top: 8px;
-    left: 8px;
-    z-index: 1;
-}
-
-#stage {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
-    height: 100%;
-    width: 100%;
-}
-
-.stack {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* Centred so the fixed editor cannot cover it. The panel overlapping the canvas
-   is harmless; overlapping a control swallows its pointerdown. */
-hks-linear-slider {
-    align-self: center;
-}
-
-hks-fps-counter {
-    align-self: flex-end;
+    inset-block-end: var(--gutter);
+    inset-inline-end: var(--gutter);
+    z-index: 50;
+    inline-size: var(--controls-width);
+    max-block-size: calc(100vh - 2 * var(--gutter));
+    overflow: auto;
 }

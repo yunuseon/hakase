@@ -51,6 +51,14 @@ nvm use && npm install && npm run dev
 | `npm run lint` / `lint:fix`       | ESLint (type-aware)                                      |
 | `npm run format` / `format:check` | Prettier                                                 |
 
+The windows drag by their title bar, resize by their corner grip, raise on click,
+and remember where you left them. Resizing the sketch window resizes the sketch — that is the only way to set its size, so there are no width/height controls in the panel.
+
+The interface is laid out as a small desktop tool: thin-bordered windows for the
+formula terminal, the sketch and the playhead dial, with the parameter pane
+floating collapsed in the corner. The canvas is the subject — everything else is
+chrome around it.
+
 ## How it fits together
 
 Everything is a stream, and `main.ts` is only the graph:
@@ -80,11 +88,16 @@ scrub left off.
 
 ## Writing a formula
 
-The panel on the left is a live GLSL editor with syntax highlighting. Type into it and the shader is
+The formula terminal is a live GLSL editor with syntax highlighting. It comes in
+two styles, switchable from the button in its title bar: **floating** as a window
+among the others, or **docked** Quake-style to the top edge — `alt+t` shows and
+hides it, `alt+d` docks and undocks it, and `esc` closes it. Type into it and the shader is
 recompiled (debounced); the sketch updates without a reload. A formula that does
 not compile shows the driver's message with **line numbers rebased onto your own
 text**, and the canvas keeps drawing the last one that worked rather than going
-blank. The `formula` dropdown on the right seeds the editor with a built-in.
+blank. The parameter pane floats at the bottom right, collapsed to its title bar —
+click it and it opens upward. Its `formula` dropdown seeds the editor with a
+built-in.
 
 ## Adding a formula
 

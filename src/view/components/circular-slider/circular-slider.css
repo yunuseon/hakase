@@ -1,19 +1,16 @@
 :host {
-    display: block;
-    position: relative;
-    width: 200px;
-    height: 200px;
     cursor: pointer;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
-    flex: none;
 }
 
 .track {
-    position: absolute;
-    inset: 0;
-    border: 2px solid var(--track);
+    position: relative;
+    block-size: 100%;
+    aspect-ratio: 1;
+    align-self: center;
+    border: 1px solid var(--track);
     border-radius: 100%;
     box-sizing: border-box;
 }
@@ -22,8 +19,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    height: 16px;
-    width: 16px;
+    block-size: 12px;
+    inline-size: 12px;
     background: var(--accent);
     border-radius: 100%;
     pointer-events: none;

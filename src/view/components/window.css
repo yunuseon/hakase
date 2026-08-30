@@ -1,0 +1,112 @@
+:host {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-block-size: 0;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    font-family: monospace;
+}
+
+.title {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--label);
+    background: var(--header);
+    border-block-end: 1px solid var(--edge);
+    user-select: none;
+    cursor: grab;
+}
+
+.title:active {
+    cursor: grabbing;
+}
+
+.handle {
+    position: absolute;
+    touch-action: none;
+    --band: 8px;
+    --corner: 14px;
+}
+
+.handle--n,
+.handle--s {
+    inset-inline: 0;
+    block-size: var(--band);
+    cursor: ns-resize;
+}
+
+.handle--e,
+.handle--w {
+    inset-block: 0;
+    inline-size: var(--band);
+    cursor: ew-resize;
+}
+
+.handle--n {
+    inset-block-start: calc(var(--band) / -2);
+}
+
+.handle--s {
+    inset-block-end: calc(var(--band) / -2);
+}
+
+.handle--w {
+    inset-inline-start: calc(var(--band) / -2);
+}
+
+.handle--e {
+    inset-inline-end: calc(var(--band) / -2);
+}
+
+/* Corners are declared after the edges, so they win where the two overlap. */
+.handle--ne,
+.handle--nw,
+.handle--se,
+.handle--sw {
+    inline-size: var(--corner);
+    block-size: var(--corner);
+}
+
+.handle--nw {
+    inset-block-start: calc(var(--band) / -2);
+    inset-inline-start: calc(var(--band) / -2);
+    cursor: nwse-resize;
+}
+
+.handle--se {
+    inset-block-end: calc(var(--band) / -2);
+    inset-inline-end: calc(var(--band) / -2);
+    cursor: nwse-resize;
+}
+
+.handle--ne {
+    inset-block-start: calc(var(--band) / -2);
+    inset-inline-end: calc(var(--band) / -2);
+    cursor: nesw-resize;
+}
+
+.handle--sw {
+    inset-block-end: calc(var(--band) / -2);
+    inset-inline-start: calc(var(--band) / -2);
+    cursor: nesw-resize;
+}
+
+.body {
+    flex: 1;
+    min-block-size: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+}

@@ -1,25 +1,29 @@
 import { combineLatest, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, pairwise, tap } from 'rxjs/operators';
-import { styleSheet } from '../../../lib/dom.ts';
+import { map, pairwise, tap } from 'rxjs/operators';
+import { requireChild, styleSheet } from '../../../lib/dom.ts';
+import windowCss from '../window.css?inline';
 import { devicePixelRatio$ } from '../../../lib/rx.ts';
+import type { LayoutAction, Placement } from '../../../model/layout.ts';
 import type { SketchParams } from '../../../model/params.ts';
-import {
-    applyGeometry,
-    createSurface,
-    type Surface,
-    type SurfaceGeometry,
-} from '../../gl/surface.ts';
+import { frameActions$, place } from '../window-frame.ts';
+import { applyGeometry, createSurface, type Surface } from '../../gl/surface.ts';
 import { drawFrame, prepare, toPalette, type Sketch } from '../../gl/sketch-program.ts';
 import css from './sketch.css?inline';
 
+const chrome = styleSheet(windowCss);
 const sheet = styleSheet(css);
 
-const sameGeometry = (a: SurfaceGeometry, b: SurfaceGeometry): boolean =>
-    a.width === b.width && a.height === b.height && a.ratio === b.ratio;
+const TEMPLATE = `
+    <div class="title"><span>sketch</span></div>
+    <div class="body">
+        <div class="viewport"><slot name="status"></slot></div>
+    </div>
+`;
 
 export class HksSketch extends HTMLElement {
-    /** The formula stage compiles into this context; the element owns the canvas. */
     readonly gl: WebGL2RenderingContext;
+
+    readonly frame$: Observable<LayoutAction>;
 
     private readonly surface: Surface;
 
@@ -27,9 +31,11 @@ export class HksSketch extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [chrome, sheet];
+        shadow.innerHTML = TEMPLATE;
 
-        this.surface = createSurface(shadow);
+        this.surface = createSurface(requireChild(shadow, '.viewport'));
+        this.frame$ = frameActions$(this, shadow, 'sketch');
         this.gl = this.surface.gl;
     }
 
@@ -37,27 +43,22 @@ export class HksSketch extends HTMLElement {
         params$: Observable<SketchParams>,
         playhead$: Observable<number>,
         sketch$: Observable<Sketch>,
+        placement$: Observable<Placement>,
     ): Observable<void> {
-        const geometry$ = combineLatest([params$, devicePixelRatio$]).pipe(
-            map(([{ width, height }, ratio]) => ({ width, height, ratio })),
-            distinctUntilChanged(sameGeometry),
-            tap(geometry => {
-                applyGeometry(this.surface, geometry);
-            }),
-        );
-
-        // Everything the playhead does not affect, derived and uploaded once per
-        // change rather than once per frame. It is a dependency of the frame
-        // below, not a step inside it: resizing clears the buffer and a new
-        // shader loses its uniforms, so both have to force a redraw.
-        const prepared$ = combineLatest([params$, sketch$, geometry$]).pipe(
-            map(([params, sketch, geometry]) => ({
+        // One chain: geometry as its own stream made a diamond that drew twice.
+        const prepared$ = combineLatest([params$, sketch$, devicePixelRatio$]).pipe(
+            map(([params, sketch, ratio]) => ({
                 params,
                 sketch,
+                ratio,
                 palette: toPalette(params),
-                ratio: geometry.ratio,
             })),
-            tap(({ sketch, params, palette, ratio }) => {
+            tap(({ params, sketch, ratio, palette }) => {
+                applyGeometry(this.surface, {
+                    width: params.width,
+                    height: params.height,
+                    ratio,
+                });
                 prepare(this.surface.gl, sketch, params, palette, ratio);
             }),
         );
@@ -68,8 +69,6 @@ export class HksSketch extends HTMLElement {
             }),
         );
 
-        // Each shader is released once a newer one has replaced it, or editing
-        // leaks a compiled program per recompile.
         const retired$ = sketch$.pipe(
             pairwise(),
             tap(([replaced]) => {
@@ -77,7 +76,13 @@ export class HksSketch extends HTMLElement {
             }),
         );
 
-        return merge(frames$, retired$).pipe(map(() => undefined));
+        const placed$ = placement$.pipe(
+            tap(placement => {
+                place(this, placement);
+            }),
+        );
+
+        return merge(frames$, retired$, placed$).pipe(map(() => undefined));
     }
 }
 

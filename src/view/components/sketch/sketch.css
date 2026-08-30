@@ -1,9 +1,23 @@
 :host {
-    display: block;
+    flex: none;
+    border-color: var(--edge-strong);
+}
+
+.viewport {
+    position: relative;
+    display: flex;
     line-height: 0;
+    background: var(--surface);
+    border: 1px solid var(--edge);
 }
 
 canvas {
     display: block;
-    box-shadow: 0 2px 12px -2px rgb(0 0 0 / 0.15);
+}
+
+::slotted(hks-fps-counter) {
+    position: absolute;
+    inset-block-end: 4px;
+    inset-inline-start: 6px;
+    pointer-events: none;
 }

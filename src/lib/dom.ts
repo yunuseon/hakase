@@ -38,10 +38,27 @@ export const requireElement = <T extends HTMLElement>(
     return element;
 };
 
-/** Built once per component module and shared by every instance of it. */
 export const styleSheet = (css: string): CSSStyleSheet => {
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(css);
 
     return sheet;
 };
+
+export const isTextEntry = (event: KeyboardEvent): boolean =>
+    event
+        .composedPath()
+        .some(
+            target => target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement,
+        );
+
+export type Viewport = {
+    readonly width: number;
+    readonly height: number;
+};
+
+// `innerWidth` reads 0 in an embedded frame before layout; floor it once, here.
+export const viewportSize = (): Viewport => ({
+    width: Math.max(window.innerWidth, 960),
+    height: Math.max(window.innerHeight, 600),
+});

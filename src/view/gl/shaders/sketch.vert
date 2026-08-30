@@ -12,8 +12,7 @@ uniform float uPixelRatio;
 out float vDepth;
 out float vPointSize;
 
-// Function prototype, not dead code: the selected formula's definition is
-// concatenated after this file, which is why there is no body here.
+// Function prototype, not dead code: the formula is concatenated after this file.
 vec3 formula(float x, float y, float t);
 
 void main() {
@@ -21,9 +20,7 @@ void main() {
     int i = gl_VertexID / n - uDimension;
     int j = gl_VertexID % n - uDimension;
 
-    // Cell centres, not cell corners: (i + 0.5) / d keeps the lattice symmetric
-    // about the origin. Plain i / d spans [-1, 1) and shifts everything half a
-    // step, clipping the outermost row and column against the canvas edge.
+    // Cell centres: plain i / d spans [-1, 1) and shifts the lattice half a step.
     float d = float(uDimension);
     vec3 v = formula((float(i) + 0.5) / d, (float(j) + 0.5) / d, uPlayhead);
 

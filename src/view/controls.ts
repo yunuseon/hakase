@@ -6,12 +6,12 @@ import { formulas } from '../model/formulas/registry.ts';
 import {
     sketchParams,
     timelineParams,
-    type SketchParams,
+    type PanelParams,
     type TimelineParams,
 } from '../model/params.ts';
 
 export interface Controls {
-    readonly sketch$: Observable<SketchParams>;
+    readonly sketch$: Observable<PanelParams>;
     readonly timeline$: Observable<TimelineParams>;
     dispose(): void;
 }
@@ -42,20 +42,16 @@ const formulaOptions: Record<string, string> = Object.fromEntries(
     Object.entries(formulas).map(([name, { label }]) => [label, name]),
 );
 
-export const createControls = (): Controls => {
-    const pane = new Pane({ title: 'hakase' });
+export const createControls = (container: HTMLElement): Controls => {
+    const pane = new Pane({ container, title: 'hakase', expanded: false });
 
     const timeline$ = combineLatest({
         duration: bind$(pane, timelineParams, 'duration', { min: 0, max: 60, step: 0.1 }),
     }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
-    const dimension = pane.addFolder({ title: 'Dimension' });
     const sketch = pane.addFolder({ title: 'Sketch' });
     const colors = pane.addFolder({ title: 'Colors' });
 
     const sketch$ = combineLatest({
-        height: bind$(dimension, sketchParams, 'height', { min: 64, max: 1280, step: 1 }),
-        width: bind$(dimension, sketchParams, 'width', { min: 64, max: 1280, step: 1 }),
-
         formula: bind$(sketch, sketchParams, 'formula', { options: formulaOptions }),
         gapModifier: bind$(sketch, sketchParams, 'gapModifier', { min: 0.01, max: 1, step: 0.01 }),
         depthScalar: bind$(sketch, sketchParams, 'depthScalar', { min: 0.01, max: 2, step: 0.01 }),

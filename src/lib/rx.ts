@@ -17,6 +17,21 @@ export const fromElementEvent$ = <K extends keyof HTMLElementEventMap>(
         };
     });
 
+export const fromDocumentEvent$ = <K extends keyof DocumentEventMap>(
+    type: K,
+): Observable<DocumentEventMap[K]> =>
+    new Observable<DocumentEventMap[K]>(subscriber => {
+        const listener = (event: DocumentEventMap[K]) => {
+            subscriber.next(event);
+        };
+
+        document.addEventListener(type, listener);
+
+        return () => {
+            document.removeEventListener(type, listener);
+        };
+    });
+
 export const observeResize$ = (...elements: Element[]): Observable<void> =>
     new Observable<void>(subscriber => {
         const observer = new ResizeObserver(() => {
@@ -32,8 +47,7 @@ export const observeResize$ = (...elements: Element[]): Observable<void> =>
         };
     });
 
-// defer is load-bearing: it resolves the self-reference at subscribe time, and
-// a media query can only ask about one ratio, so the stream must re-arm itself.
+// defer is load-bearing: it resolves the self-reference, which re-arms the query.
 export const devicePixelRatio$: Observable<number> = defer(() => {
     const ratio = window.devicePixelRatio;
     const query = window.matchMedia(`(resolution: ${ratio}dppx)`);

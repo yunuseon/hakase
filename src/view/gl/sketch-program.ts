@@ -4,8 +4,7 @@ import { createProgram, type ProgramResult } from './program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
 
-// The formula is spliced after the prelude, so the driver numbers the user's
-// first line as line PRELUDE_LINES + 1. Reporting that raw is useless.
+// The formula is spliced after the prelude, so driver line numbers need rebasing.
 const PRELUDE_LINES = vertexSource.split('\n').length;
 
 const NULL_TERMINATOR = /\0/g;
@@ -92,7 +91,6 @@ const setColor = (
     gl.uniform3f(location, r, g, b);
 };
 
-/** Everything that only changes when the params, shader or geometry change. */
 export const prepare = (
     gl: WebGL2RenderingContext,
     { program, uniforms }: Sketch,
@@ -114,7 +112,6 @@ export const prepare = (
     gl.clearColor(palette.low.r, palette.low.g, palette.low.b, 1);
 };
 
-/** The per-frame path: one uniform, one clear, one draw. */
 export const drawFrame = (
     gl: WebGL2RenderingContext,
     { uniforms }: Sketch,
