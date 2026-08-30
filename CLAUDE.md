@@ -157,6 +157,14 @@ the deltas. Pairing has to happen _inside_ the gesture; pairing the flattened
 stream would make the first move of each drag jump from wherever the last one
 ended.
 
+**A gesture starts on the element and ends on the document.** `pointerdown` is
+the element's, but the moves and the `pointerup`/`pointercancel` that close it are
+the document's, filtered by `pointerId`. `setPointerCapture` is an optimisation,
+not the mechanism — it is wrapped in a `try`, so if it ever fails and the ends are
+watched on the element, the release lands somewhere else, `takeUntil` never fires
+and the gesture stays open forever. The window then resizes on hover the next time
+you cross that border, with no button held. Do not move those listeners back.
+
 **The sketch's frame _is_ its canvas size.** Its grip emits an ordinary `resize`
 like every other window, and `main.ts` reads the canvas dimensions back out of
 `frames.sketch`, so the size persists with the rest of the layout and needs no

@@ -1,6 +1,6 @@
 import { concat, merge, type Observable, of } from 'rxjs';
 import { filter, map, pairwise, switchMap, takeUntil, tap } from 'rxjs/operators';
-import { fromElementEvent$ } from '../lib/rx.ts';
+import { fromDocumentEvent$, fromElementEvent$ } from '../lib/rx.ts';
 
 const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =>
     fromElementEvent$(element, 'pointerdown').pipe(
@@ -18,17 +18,16 @@ const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =
         map(initial => {
             const samePointer = (event: PointerEvent) => event.pointerId === initial.pointerId;
 
+            // On the document, not the element: setPointerCapture can fail, and then a
+            // release anywhere else never ends the gesture — the next hover keeps dragging.
             const end$ = merge(
-                fromElementEvent$(element, 'pointerup'),
-                fromElementEvent$(element, 'pointercancel'),
+                fromDocumentEvent$('pointerup'),
+                fromDocumentEvent$('pointercancel'),
             ).pipe(filter(samePointer));
 
             return concat(
                 of(initial),
-                fromElementEvent$(element, 'pointermove').pipe(
-                    filter(samePointer),
-                    takeUntil(end$),
-                ),
+                fromDocumentEvent$('pointermove').pipe(filter(samePointer), takeUntil(end$)),
             );
         }),
     );
