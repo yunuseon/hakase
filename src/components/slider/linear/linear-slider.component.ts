@@ -10,6 +10,7 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = `
     <div class="track"><div class="indicator"></div></div>
+    <slot name="controls"></slot>
 `;
 
 const indicatorWidth = (value: number): string => `${(value * 100).toFixed(3)}%`;

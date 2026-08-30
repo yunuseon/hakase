@@ -1,5 +1,13 @@
 import { EMPTY, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, scan, shareReplay, startWith, switchMap } from 'rxjs/operators';
+import {
+    distinctUntilChanged,
+    map,
+    scan,
+    share,
+    shareReplay,
+    startWith,
+    switchMap,
+} from 'rxjs/operators';
 import './styles.css';
 import { compileFormula$ } from './components/sketch/compile.ts';
 import { formulas } from './components/sketch/formulas/registry.ts';
@@ -13,8 +21,8 @@ import type { AppState, Program, ProgramId } from './program.ts';
 import { editor, formulaProgram } from './programs/formula.program.ts';
 import { dial, playheadProgram } from './programs/playhead.program.ts';
 import { sketch, sketchProgram } from './programs/sketch.program.ts';
-import { timeline, timelineProgram } from './programs/timeline.program.ts';
-import { createPlayhead$ } from './shared/playhead.ts';
+import { timeline, timelineProgram, transport } from './programs/timeline.program.ts';
+import { createPlayhead$, isPlaying$ } from './shared/playhead.ts';
 
 const programs: readonly Program[] = [
     formulaProgram,
@@ -59,15 +67,29 @@ const bootstrap = () => {
             distinctUntilChanged(sameFrame),
         );
 
-    const playhead$ = createPlayhead$([timeline.changes$, dial.changes$], controls.timeline$).pipe(
-        shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const commands$ = transport.commands$.pipe(share());
+
+    const playing$ = isPlaying$(commands$).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+    const playhead$ = createPlayhead$(
+        [timeline.changes$, dial.changes$],
+        commands$,
+        playing$,
+        controls.timeline$,
+    ).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
     const preset$ = controls.formula$.pipe(map(name => formulas[name].source));
+
+    const duration$ = controls.timeline$.pipe(
+        map(({ duration }) => duration),
+        distinctUntilChanged(),
+    );
 
     const state: AppState = {
         frame$,
         playhead$,
+        playing$,
+        duration$,
         preset$,
         panel$: controls.sketch$,
         compiled$: compileFormula$(sketch.gl, merge(preset$, editor.changes$)).pipe(

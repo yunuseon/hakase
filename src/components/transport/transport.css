@@ -1,0 +1,48 @@
+:host {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 22px;
+    block-size: 18px;
+    padding: 0;
+    color: var(--label);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.key:hover {
+    color: var(--indicator);
+    border-color: var(--track);
+}
+
+.key:active {
+    background: var(--edge);
+}
+
+.key:focus-visible {
+    outline: 1px solid var(--indicator);
+    outline-offset: 1px;
+}
+
+.clock {
+    margin-inline-start: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--label);
+    user-select: none;
+}
+
+svg {
+    inline-size: 12px;
+    block-size: 12px;
+    fill: currentColor;
+}

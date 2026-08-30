@@ -1,8 +1,13 @@
 :host {
     display: flex;
     flex-direction: column;
+    gap: 6px;
     block-size: 100%;
     min-block-size: 0;
+}
+
+::slotted(hks-transport) {
+    flex: none;
 }
 
 .track {

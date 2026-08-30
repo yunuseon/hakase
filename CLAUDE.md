@@ -359,6 +359,36 @@ that tears the row out of the panel.` If it needs a paragraph, the paragraph
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
+## The timeline transport
+
+The timeline window is a progress bar with play/pause and stop, and it is the
+worked example of the Program layer: `timeline.program.ts` composes
+`hks-linear-slider` with `hks-transport` through the slider's `controls` slot,
+the way `sketch.program.ts` slots the fps counter. Neither component knows about
+the other.
+
+The button emits **`toggle`**, not `play` or `pause`. A component that had to
+choose between the two would need to know whether it is playing, which is state,
+which components do not hold — so the fold owns the flip and `connect$(playing$)`
+only swaps the glyph.
+
+**Pausing must not need to read the playhead back.** That would close a cycle
+where none is required. Instead `playing$` folds the commands _alone_, and the
+position folds seeks plus frame _deltas_ gated by `playing$`:
+
+- `isPlaying$` — commands only, so it cannot depend on position.
+- position — `scan` over `seek` (a scrub, or `stop` seeking 0) and `advance`
+  (`ms` since the previous frame, while playing). Pausing simply stops the
+  advances, and the accumulator already holds where it got to.
+
+Deltas rather than `elapsed` are load-bearing: `animationFrames()` restarts its
+clock on every subscription, so resuming with `elapsed` would jump the playhead
+back to the offset it started from. That is what `pairwise()` is doing there.
+
+`duration: 0` no longer means paused — the button does that now — so
+`timelineParams.duration` seeds at 8 seconds. The reducer still guards against 0,
+which now means only "a loop of no length cannot advance".
+
 ## The formula editor
 
 The editor is the same contract as a slider: `changes$` out (debounced text),

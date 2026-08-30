@@ -36,7 +36,7 @@ export const sketchParams: SketchParams & { formula: FormulaName } = {
 };
 
 export const timelineParams = {
-    duration: 0,
+    duration: 8,
 };
 
 export type TimelineParams = typeof timelineParams;

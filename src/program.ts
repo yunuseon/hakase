@@ -11,6 +11,8 @@ export const PROGRAM_IDS: readonly ProgramId[] = ['formula', 'sketch', 'timeline
 export type AppState = {
     readonly frame$: (id: ProgramId) => Observable<Frame>;
     readonly playhead$: Observable<number>;
+    readonly playing$: Observable<boolean>;
+    readonly duration$: Observable<number>;
     readonly panel$: Observable<PanelParams>;
     readonly preset$: Observable<string>;
     readonly compiled$: Observable<SketchResult>;

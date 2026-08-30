@@ -20,7 +20,7 @@ export type LayoutAction = WindowGesture & { readonly id: ProgramId };
 export const defaultLayout = ({ width, height }: Viewport): Layout => {
     const gutter = 6;
     const editorWidth = Math.min(360, Math.round(width * 0.26));
-    const timelineHeight = 76;
+    const timelineHeight = 108;
     const dialSize = 200;
 
     const editorHeight = height - timelineHeight - 3 * gutter;
