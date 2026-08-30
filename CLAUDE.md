@@ -399,8 +399,19 @@ which now means only "a loop of no length cannot advance".
 
 ## The formula editor
 
-The editor is the same contract as a slider: `changes$` out (debounced text),
-`connect$` in (preset text to display, error text to show). It deliberately never
+The editor is a small IDE, not a console: a preset picker above the source, the
+highlighted textarea, and the compiler's message below. Its sources are
+`changes$` (debounced text) and `selections$` (the chosen preset); `connect$`
+takes the preset text to display and the error text to show.
+
+**The picker's options are handed in, never imported.** `presets()` takes a plain
+`{ value, label }[]` and `formula.program.ts` builds it from the registry, because
+a component reaching into `components/sketch/` would break the layering. That also
+keeps the editor a text editor: it knows nothing about GLSL formulas, only about a
+list of named things it can be asked to show. `selections$` is a `defer`, so the
+initial value is read after `presets()` has filled the list rather than at
+construction, and `isFormulaName` narrows the picked string at the point `main.ts`
+looks it up — a `<select>` can hold anything, so it is checked rather than cast. It deliberately never
 echoes the user's own typing back into the textarea — only preset selections —
 because writing the value back would reset the caret on every keystroke.
 
@@ -435,8 +446,8 @@ above the implementations, so a formula can annotate itself without importing th
 registry that imports it. `components/sketch/formulas/registry.ts` is the single
 source of truth for selectable sketch
 functions: one entry carries the key, the label, and the function. `FormulaName`
-is `keyof typeof formulas`, so an entry automatically becomes a legal
-`SketchParams.formula`, a dropdown option, and a shader the view can build. Do not add a
+is `keyof typeof formulas`, so an entry automatically becomes an option in the
+editor's picker and a shader the view can build. Do not add a
 parallel list of names or labels anywhere — that is the thing this shape exists
 to prevent.
 

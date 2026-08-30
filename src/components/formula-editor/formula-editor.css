@@ -8,6 +8,36 @@
     font-size: 12px;
 }
 
+.bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.caption {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--label);
+}
+
+.preset {
+    font: inherit;
+    font-size: 11px;
+    padding: 1px 4px;
+    color: var(--label);
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.preset:hover {
+    color: var(--indicator);
+    border-color: var(--track);
+}
+
 .editor {
     position: relative;
     flex: 1;

@@ -1,5 +1,3 @@
-import type { FormulaName } from '../components/sketch/formulas/registry.ts';
-
 export type CanvasSize = {
     readonly width: number;
     readonly height: number;
@@ -19,11 +17,10 @@ export type PanelParams = {
 
 export type SketchParams = CanvasSize & PanelParams;
 
-export const sketchParams: SketchParams & { formula: FormulaName } = {
+export const sketchParams: SketchParams = {
     height: 640,
     width: 640,
 
-    formula: 'ripple',
     dimension: 32,
     gapModifier: 0.1,
     depthScalar: 1,

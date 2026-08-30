@@ -5,8 +5,9 @@ you can scrub with a linear or a circular slider, or let loop on a timer. Every
 parameter is live-editable through a [Tweakpane](https://tweakpane.github.io/docs/)
 panel, and the whole thing is wired together with RxJS streams.
 
-The sketch that ships with it is a radial ripple — a lattice of dots displaced by
-a sine wave travelling outwards from the centre.
+It ships with five formulas — **Ripple**, **Spiral**, **Interference**, **Weave**
+and **Rose** — each a lattice of dots displaced by a pure GLSL function of
+position and time, picked from the editor and editable live.
 
 ## Getting started
 
@@ -102,32 +103,36 @@ window like every other. Type into it and the shader is
 recompiled (debounced); the sketch updates without a reload. A formula that does
 not compile shows the driver's message with **line numbers rebased onto your own
 text**, and the canvas keeps drawing the last one that worked rather than going
-blank. The parameter pane floats at the bottom right, collapsed to its title bar —
-click it and it opens upward. Its `formula` dropdown seeds the editor with a
-built-in.
+blank. Its preset picker seeds the source with a built-in formula. The parameter pane
+floats at the bottom right, collapsed to its title bar — click it and it opens
+upward.
 
 ## Adding a formula
 
-A _formula_ is the pure function that displaces the lattice — it is what the
-`formula` dropdown in the panel selects. Adding one is a single edit to
+A _formula_ is the pure GLSL function that displaces the lattice. It is a
+`.glsl` file next to a one-line module naming it, and one entry in
 [`src/components/sketch/formulas/registry.ts`](src/components/sketch/formulas/registry.ts):
 
 ```ts
 export const formulas = {
-    ripple: { label: 'Ripple', apply: rippleAt },
-    swirl: { label: 'Swirl', apply: swirlAt },
-} satisfies Record<string, { label: string; apply: Formula }>;
+    ripple,
+    spiral,
+    interference,
+    weave,
+    rose,
+} satisfies Record<string, Formula>;
 ```
 
 That registry is the single source of truth. `FormulaName` is `keyof typeof
-formulas`, so the new key immediately becomes a legal value of
-`SketchParams.formula`, the dropdown builds its options from the labels, and
-the view compiles it into the vertex shader. Nothing else needs touching.
+formulas`, so a new key immediately becomes an option in the editor's picker and
+a shader the sketch can compile. Nothing else needs touching.
 
 A formula is GLSL ES 3.00 defining `vec3 formula(float x, float y, float t)`,
-where `x` and `y` are normalized to [-1, 1] and `t` is the playhead in [0, 1).
-The returned `x`/`y` are clip-space position and `z` is depth, which drives both
-point size and colour. `PI` is predefined.
+where `x` and `y` are the lattice cell centres in [-1, 1) and `t` is the playhead
+in [0, 1). The returned `x`/`y` are clip-space position and `z` is depth, which
+drives both point size and which of the three palette colours is used. `PI` is
+predefined. Keep every use of `t` inside a term of `t * 2.0 * PI` and the loop is
+seamless.
 
 ```glsl
 vec3 formula(float x, float y, float t) {

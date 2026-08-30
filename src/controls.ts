@@ -1,8 +1,7 @@
 import { combineLatest, Observable } from 'rxjs';
-import { distinctUntilChanged, shareReplay, startWith } from 'rxjs/operators';
+import { shareReplay, startWith } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import type { BindingParams, ContainerApi, TpChangeEvent } from '@tweakpane/core';
-import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { ProgramId } from './program.ts';
 import {
     sketchParams,
@@ -13,7 +12,6 @@ import {
 
 export interface Controls {
     readonly windows$: Observable<ProgramVisibility>;
-    readonly formula$: Observable<FormulaName>;
     readonly sketch$: Observable<PanelParams>;
     readonly timeline$: Observable<TimelineParams>;
     dispose(): void;
@@ -50,10 +48,6 @@ const openByDefault: ProgramVisibility = {
     playhead: true,
 };
 
-const formulaOptions: Record<string, string> = Object.fromEntries(
-    Object.entries(formulas).map(([name, { label }]) => [label, name]),
-);
-
 export const createControls = (container: HTMLElement): Controls => {
     const pane = new Pane({ container, title: 'hakase', expanded: false });
 
@@ -62,11 +56,6 @@ export const createControls = (container: HTMLElement): Controls => {
     }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
     const sketch = pane.addFolder({ title: 'Sketch' });
     const colors = pane.addFolder({ title: 'Colors' });
-
-    const formula$ = bind$(sketch, sketchParams, 'formula', { options: formulaOptions }).pipe(
-        distinctUntilChanged(),
-        shareReplay({ bufferSize: 1, refCount: true }),
-    );
 
     const sketch$ = combineLatest({
         gapModifier: bind$(sketch, sketchParams, 'gapModifier', { min: 0.01, max: 1, step: 0.01 }),
@@ -91,7 +80,6 @@ export const createControls = (container: HTMLElement): Controls => {
 
     return {
         windows$,
-        formula$,
         sketch$,
         timeline$,
         dispose: () => {

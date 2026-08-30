@@ -1,7 +1,8 @@
-import { EMPTY, merge, type Observable } from 'rxjs';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     map,
+    mergeMap,
     scan,
     share,
     shareReplay,
@@ -10,7 +11,7 @@ import {
 } from 'rxjs/operators';
 import './styles.css';
 import { compileFormula$ } from './components/sketch/compile.ts';
-import { formulas } from './components/sketch/formulas/registry.ts';
+import { formulas, isFormulaName } from './components/sketch/formulas/registry.ts';
 import { persistLayout$, restoreLayout } from './layout-store.ts';
 import { liveWindow$ } from './live-window.ts';
 import type { Frame } from './components/window/frame.ts';
@@ -78,7 +79,10 @@ const bootstrap = () => {
         controls.timeline$,
     ).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
-    const preset$ = controls.formula$.pipe(map(name => formulas[name].source));
+    const preset$ = editor.selections$.pipe(
+        mergeMap(name => (isFormulaName(name) ? of(formulas[name].source) : EMPTY)),
+        distinctUntilChanged(),
+    );
 
     const duration$ = controls.timeline$.pipe(
         map(({ duration }) => duration),
