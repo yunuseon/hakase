@@ -14,7 +14,6 @@ export const sketchParams = {
 };
 
 export const timelineParams = {
-    /** Loop length in seconds. `0` freezes the playhead on the slider value. */
     duration: 0,
 };
 

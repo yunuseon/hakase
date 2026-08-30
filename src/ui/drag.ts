@@ -1,28 +1,26 @@
-import { concat, fromEvent, merge, type Observable, of } from 'rxjs';
-import { filter, switchMap, takeUntil } from 'rxjs/operators';
+import { concat, merge, type Observable, of } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs/operators';
+import { fromElementEvent$ } from '../lib/rx.ts';
 
-/**
- * Emits the pointerdown that starts a drag followed by every pointermove until
- * the gesture ends. Uses pointer capture, so it works for mouse, touch and pen
- * and keeps tracking even when the pointer leaves the element.
- */
-export const pointerDrag = (element: HTMLElement): Observable<PointerEvent> =>
-    fromEvent<PointerEvent>(element, 'pointerdown').pipe(
+export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
+    fromElementEvent$(element, 'pointerdown').pipe(
         filter(event => event.isPrimary && event.button === 0),
-        switchMap(initial => {
+
+        tap(initial => {
             initial.preventDefault();
             element.setPointerCapture(initial.pointerId);
-
+        }),
+        switchMap(initial => {
             const samePointer = (event: PointerEvent) => event.pointerId === initial.pointerId;
 
             const end$ = merge(
-                fromEvent<PointerEvent>(element, 'pointerup'),
-                fromEvent<PointerEvent>(element, 'pointercancel'),
+                fromElementEvent$(element, 'pointerup'),
+                fromElementEvent$(element, 'pointercancel'),
             ).pipe(filter(samePointer));
 
             return concat(
                 of(initial),
-                fromEvent<PointerEvent>(element, 'pointermove').pipe(
+                fromElementEvent$(element, 'pointermove').pipe(
                     filter(samePointer),
                     takeUntil(end$),
                 ),

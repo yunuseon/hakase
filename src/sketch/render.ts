@@ -15,7 +15,6 @@ const drawCircle = (
     context.fill();
 };
 
-/** Picks a palette entry from the vector's depth. */
 const depthColor = (z: number, params: SketchParams): string => {
     if (z < 0.33) return params.color1;
     if (z < 0.66) return params.color2;
@@ -33,10 +32,6 @@ const drawVector = (
 
 const DIAGONAL = Math.SQRT2;
 
-/**
- * A radial ripple: a square lattice of dots whose vertical offset is driven by a
- * sine wave travelling outwards from the centre. `playhead` is in [0, 1).
- */
 export const renderSketch = (
     context: CanvasRenderingContext2D,
     params: SketchParams,

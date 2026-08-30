@@ -1,0 +1,121 @@
+# hakase — working agreement
+
+## What this project is for
+
+A side project for visual/artsy programming. It is **not** trying to ship
+features. Two things are being explored, and they rank above delivery speed,
+brevity, and feature count:
+
+1. **The orchestration logic, expressed purely in reactive functional style.**
+   This is the point of the project. The sketch on screen is the excuse.
+2. Generative canvas work as the subject matter.
+
+If a change would make the app better but the orchestration less reactive, that
+is a bad trade here. Say so and propose the reactive version instead.
+
+## The prime directive
+
+**All orchestration is declarative dataflow.** State lives in streams, not in
+variables. Concretely, in `src/` outside the drawing kernel:
+
+- **No mutable `let` for application state.** If something has to be remembered
+  between events, that is a stream with `scan`, `distinctUntilChanged`,
+  `combineLatest`, or `withLatestFrom` — not a captured variable.
+- **No `Subject` / `BehaviorSubject` as an event bus.** Adapt external event
+  sources with `fromEvent` / `fromEventPattern` / `new Observable`, with real
+  teardown. A Subject is Rx's imperative escape hatch; reaching for one is a
+  signal the dataflow has not been modelled yet.
+- **One `.subscribe()`, at the edge.** Everything above it is a description of
+  what should happen, not a sequence of things happening. Multiple subscribers
+  to one source is fine; multiple entry points into the app is not.
+- **Side effects go in `tap`, at the end of a pipe**, and only ever _apply_ a
+  value that a pure function already computed. Deriving a value inside a `tap`
+  is the smell.
+- **Pure functions carry the logic.** `offsetFor(geometry, value)`,
+  `valueAt(clientX, ...)`, `renderSketch(context, params, playhead)` — data in,
+  data out, independently testable. The stream decides _when_; the function
+  decides _what_.
+
+### Where this does not apply
+
+`src/sketch/render.ts` is the drawing kernel: a pure function whose body is a
+tight loop over a lattice. Local `let i, j` in there is fine and should stay.
+The rule is about orchestration, not about banning loops.
+
+### The design tension to be aware of
+
+There is a **feedback cycle** in the app: sliders emit values → the playhead
+consumes them → the sliders display the playhead. It is currently cut by having
+each slider expose `changes$` (a source) and `connect(playhead$)` (a view), with
+whoever wires them owning the loop. A slider must never reach for the current
+value itself. If you find a cleaner way to close the cycle, that is a welcome
+change — it is the most interesting open problem here.
+
+## Type safety
+
+**No type assertions in `src/`.** No `as`, no `!`, no `any`, and no explicit type
+argument that the compiler cannot check — `fromEvent<PointerEvent>(el, 'x')` is a
+cast wearing a costume. The count is currently zero; keep it there.
+
+When a value needs narrowing, narrow it at runtime (`instanceof`) rather than
+asserting it. When an external source needs adapting, reach for
+`new Observable<T>(subscriber => ...)`: the callback body type-checks against `T`,
+so the emitted type is verified rather than declared. All three adapters in the
+app work this way — `fromElementEvent$`, `observeResize$`, and `bind$` in
+`controls.ts`.
+
+**No phantom type parameters.** A `<T>` that appears only in a function's return
+type — or in the parameters of a function it returns — has nothing to be inferred
+from at the call site. TypeScript falls back to `unknown` on a good day and `any`
+on a bad one, and `no-unsafe-call` starts firing. `reportFps$` took `<T>` this way
+and now simply takes `Observable<unknown>`, because counting emissions does not
+care about their type.
+
+If a constraint gets in the way, change the shape rather than assert past it.
+`shallowEqual` takes `Record<string, unknown>`, which is why the records it
+compares (`Geometry`, `Offset`, `SurfaceGeometry`) are `type` aliases and not
+`interface`s — only aliases carry the implicit index signature.
+
+## Conventions
+
+- **`$` marks everything in the stream domain.** Streams, parameters and
+  interface members holding one, functions returning one, and operator functions
+  meant for `.pipe()`: `playhead$`, `geometry$`, `scrubs$`, `changes$`,
+  `createPlayhead$`, `observeResize$`, `pointerDrag$`, `bind$`, `Slider.connect$`,
+  `reportFps$`, `toVoid$`, `shareLatest$`.
+- **Nothing outside that domain gets it.** `createLinearSlider`, `createSurface`
+  and `createControls` return plain objects; `clamp`, `wrap01`, `shallowEqual`,
+  `offsetFor` and `renderSketch` are pure helpers.
+- **Do not shadow an RxJS export.** `shareLatest$` is deliberately not named
+  `multicast` — RxJS exports an operator by that name, and a reader who knows it
+  would misread ours.
+- Prefer a bug that _cannot be expressed_ over a bug that is patched. When a
+  stale-value bug shows up, the fix is usually to make the stale thing an input
+  to a `combineLatest`, not to cache it and invalidate by hand.
+- **Comments must guard a trap, or not exist.** The bar: without this comment,
+  would someone make a change that looks correct and silently breaks? If not,
+  delete it. Documenting what a function does is not a trap — names and types
+  carry that, and a pipeline needing prose to be followed should be restructured
+  instead. Exactly three pass in `src/` today: the Tweakpane teardown in
+  `controls.ts`, the `defer` self-reference in `rx.ts`, and `surface$` gating the
+  redraw in `main.ts`. Keep the count that low.
+
+## Tooling
+
+- Node **20.19+**. Do not assume the host has it — `nvm use` reads `.nvmrc`, and
+  Docker is the fallback that needs no local Node at all.
+- `docker compose up dev --build` for the dev server; `npm run docker:build`
+  exports `dist/` via a BuildKit `--output` stage.
+- **Prefer conventional, idiomatic setups over clever ones.** An unusual
+  arrangement will be questioned and should be justified or dropped. If the
+  ecosystem has a standard way to do something, use it.
+- Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`.
+
+## Verifying UI changes
+
+The app must actually be looked at, not just compiled. Note that an embedded /
+hidden browser pane reports `document.hidden === true`, which **throttles
+`requestAnimationFrame` and suppresses `ResizeObserver` delivery entirely**.
+Anything driven by frames or resizes will look broken there. Force a frame with
+a screenshot, then read the DOM — do not conclude the app is broken from a
+timing-based probe alone.

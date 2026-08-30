@@ -1,42 +1,51 @@
-import { combineLatest } from 'rxjs';
-import { shareReplay, tap } from 'rxjs/operators';
+import { combineLatest, merge } from 'rxjs';
+import { distinctUntilChanged, map, shareReplay, tap } from 'rxjs/operators';
 import './styles.css';
 import { requireElementById } from './lib/dom.ts';
+import { devicePixelRatio$, shallowEqual } from './lib/rx.ts';
 import { createPlayhead$ } from './playhead.ts';
-import { createSurface } from './sketch/canvas.ts';
+import { applyGeometry, createSurface } from './sketch/canvas.ts';
 import { renderSketch } from './sketch/render.ts';
 import { createCircularSlider } from './ui/circular-slider.ts';
 import { createControls } from './ui/controls.ts';
-import { reportFps } from './ui/fps-counter.ts';
+import { reportFps$ } from './ui/fps-counter.ts';
 import { createLinearSlider } from './ui/linear-slider.ts';
 
-const bootstrap = (): void => {
+const bootstrap = () => {
     const container = requireElementById('canvas-container');
     const surface = createSurface(container);
 
     const linearSlider = createLinearSlider('slider');
     const circularSlider = createCircularSlider('circle-slider', 'circle-indicator');
-
     const controls = createControls();
 
     const playhead$ = createPlayhead$(
         [linearSlider.changes$, circularSlider.changes$],
         controls.timeline$,
-    ).pipe(
-        tap(value => {
-            linearSlider.render(value);
-            circularSlider.render(value);
+    ).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+    const surface$ = combineLatest([controls.sketch$, devicePixelRatio$]).pipe(
+        map(([{ width, height }, ratio]) => ({ width, height, ratio })),
+        distinctUntilChanged(shallowEqual),
+        tap(geometry => {
+            applyGeometry(surface, geometry);
         }),
-        // Shared so the fps counter and the renderer observe the same frames.
-        shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    playhead$.pipe(reportFps(container)).subscribe();
+    // surface$ is a dependency, not a step: applying geometry clears the canvas,
+    // so every resize has to force a redraw.
+    const sketch$ = combineLatest([controls.sketch$, playhead$, surface$]).pipe(
+        tap(([params, playhead]) => {
+            renderSketch(surface.context, params, playhead);
+        }),
+    );
 
-    combineLatest([controls.sketch$, playhead$]).subscribe(([params, playhead]) => {
-        surface.resize(params.width, params.height);
-        renderSketch(surface.context, params, playhead);
-    });
+    return merge(
+        linearSlider.connect$(playhead$),
+        circularSlider.connect$(playhead$),
+        sketch$,
+        playhead$.pipe(reportFps$(container)),
+    ).subscribe();
 };
 
 bootstrap();
