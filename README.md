@@ -53,28 +53,51 @@ nvm use && npm install && npm run dev
 
 ## How it fits together
 
-Everything is a stream. `main.ts` wires four of them together:
+Everything is a stream, and `main.ts` is only the graph:
 
+```ts
+merge(
+    linearSlider.connect$(playhead$),
+    circularSlider.connect$(playhead$),
+    sketch.connect$(controls.sketch$, playhead$),
+    fpsCounter.connect$(playhead$),
+).subscribe();
 ```
-slider drags ──┐
-               ├─► playhead$ ─┬─► slider.render()   (both sliders follow the playhead)
-timeline$ ─────┘              ├─► fps counter
-                              └─► combineLatest(sketch params) ─► renderSketch()
+
+Three layers, one rule — a view never derives, a model never touches the DOM:
+
+- **`model/`** is pure: the playhead, the ripple maths, projection, slider
+  geometry. No DOM anywhere in it, so it is testable by plain function calls.
+- **`view/`** owns DOM and exposes `connect$(...inputs) => Observable<void>` —
+  streams in, applied views out. Sliders additionally expose `changes$` as a
+  source. Every view has that same shape, so `main.ts` treats them alike.
+- **`lib/`** holds the primitives the other two share: `dom`, `math`, `rx`.
+
+`playhead.ts` owns the only real logic: a scrub sets the position directly; a
+non-zero loop `duration` advances it every animation frame from wherever the last
+scrub left off.
+
+## Adding a formula
+
+A _formula_ is the pure function that displaces the lattice — it is what the
+`formula` dropdown in the panel selects. Adding one is a single edit to
+[`src/model/formulas/registry.ts`](src/model/formulas/registry.ts):
+
+```ts
+export const formulas = {
+    ripple: { label: 'Ripple', apply: rippleAt },
+    swirl: { label: 'Swirl', apply: swirlAt },
+} satisfies Record<string, { label: string; apply: Formula }>;
 ```
 
-- **`playhead.ts`** owns the only piece of real logic: a scrub sets the position
-  directly; a non-zero loop `duration` advances it every animation frame from
-  wherever the last scrub left off.
-- **`ui/`** holds the DOM-facing pieces. Both sliders expose the same `Slider`
-  interface — a `changes$` stream out, a `render(value)` in — so the playhead
-  neither knows nor cares how many controls are attached.
-- **`sketch/`** is pure drawing: `canvas.ts` keeps the backing store in sync with
-  the device pixel ratio so the rest of the code can work in CSS pixels, and
-  `render.ts` draws one frame from `(params, playhead)`.
+That registry is the single source of truth. `FormulaName` is `keyof typeof
+formulas`, so the new key immediately becomes a legal value of
+`SketchParams.formula`, the dropdown builds its options from the labels, and
+`paint` looks the function up by name. Nothing else needs touching.
 
-## Adding a sketch
-
-`renderSketch(context, params, playhead)` in [`src/sketch/render.ts`](src/sketch/render.ts)
-is the only thing that draws. Swap its body, add whatever knobs you want to
-[`src/sketch/params.ts`](src/sketch/params.ts), and expose them in
-[`src/ui/controls.ts`](src/ui/controls.ts).
+A formula is `(x, y, playhead) => Vector` — the `Formula` type in
+[`src/model/formula.ts`](src/model/formula.ts) — where `x` and `y` are normalized
+to [-1, 1] and `playhead` is in [0, 1). Put the implementation in its own file
+under `src/model/formulas/` and annotate it `Formula`, the way `ripple.ts` does,
+so the compiler checks it against the contract. It lives in the model layer, so
+it must stay pure — no canvas, no DOM.

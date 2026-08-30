@@ -1,17 +1,12 @@
 import type { SketchParams } from './params.ts';
+import type { Vector } from './vector.ts';
 
-export interface Vector {
-    x: number;
-    y: number;
-    z: number;
-}
-
-export interface ProjectedVector {
+export type ProjectedVector = {
     x: number;
     y: number;
     w: number;
     h: number;
-}
+};
 
 const projectX = (width: number, normalizedX: number): number => (width / 2) * (1 + normalizedX);
 

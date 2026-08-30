@@ -13,6 +13,25 @@ brevity, and feature count:
 If a change would make the app better but the orchestration less reactive, that
 is a bad trade here. Say so and propose the reactive version instead.
 
+## Layering
+
+Three layers, one rule: **a view never derives, a model never touches the DOM.**
+
+- **`src/model/`** — pure functions and stream derivations. No DOM, no
+  rendering. `playhead`, `ripple`, `projection`, `slider` maths, param types.
+  Testable by calling them.
+- **`src/view/`** — owns a piece of DOM and exposes
+  `connect$(...inputs) => Observable<void>`: streams in, applied views out. It may
+  also expose raw sources (`Slider.changes$`), but the derivation behind them
+  belongs to a model function. Every view has the same shape — sliders, sketch,
+  fps counter, control panel.
+- **`src/main.ts`** — the graph and nothing else. Construct views, derive
+  `playhead$`, `merge` the connections, subscribe once. No `tap`, no DOM, no
+  canvas imports. If something view-shaped is creeping into `main.ts`, it wants
+  to be a view.
+
+`src/lib/` sits underneath all three: `dom`, `math`, `rx` primitives.
+
 ## The prime directive
 
 **All orchestration is declarative dataflow.** State lives in streams, not in
@@ -71,10 +90,13 @@ on a bad one, and `no-unsafe-call` starts firing. `reportFps$` took `<T>` this w
 and now simply takes `Observable<unknown>`, because counting emissions does not
 care about their type.
 
-If a constraint gets in the way, change the shape rather than assert past it.
-`shallowEqual` takes `Record<string, unknown>`, which is why the records it
-compares (`Geometry`, `Offset`, `SurfaceGeometry`) are `type` aliases and not
-`interface`s — only aliases carry the implicit index signature.
+**Equality is exact.** No generic structural comparison — it is untyped, it walks
+string keys, and it silently keeps comparing after someone adds a field. Prefer
+deduplicating on the value you actually apply: both sliders `map` to the finished
+CSS string and then use a bare `distinctUntilChanged()`, so `===` on a string
+matches precisely when the DOM write would be identical. Where a record genuinely
+must be compared, write a named comparator next to it that names every field —
+`sameGeometry` in `view/sketch.ts` is the only one.
 
 ## Conventions
 
@@ -86,6 +108,16 @@ compares (`Geometry`, `Offset`, `SurfaceGeometry`) are `type` aliases and not
 - **Nothing outside that domain gets it.** `createLinearSlider`, `createSurface`
   and `createControls` return plain objects; `clamp`, `wrap01`, `shallowEqual`,
   `offsetFor` and `renderSketch` are pure helpers.
+- **No thin wrappers over RxJS.** If a helper only renames an operator or fixes
+  its arguments — `toVoid$ = map(() => undefined)`, `shareLatest$ = () =>
+shareReplay({...})` — write the operator at the call site instead. It costs a
+  line, and it keeps `lib/rx.ts` to things that genuinely add something: adapters
+  over non-Rx sources (`fromElementEvent$`, `observeResize$`), streams with real
+  behaviour (`devicePixelRatio$`), and pure predicates (`shallowEqual`).
+- **No barrel files.** No `index.ts` re-exporting a folder; name a module for
+  what it contains (`formulas/registry.ts`). Two ESLint rules enforce it — one
+  errors on any `index.*` module, the other on any import ending in `index`. This
+  is not expressible in `tsconfig.json`; TypeScript has no such option.
 - **Do not shadow an RxJS export.** `shareLatest$` is deliberately not named
   `multicast` — RxJS exports an operator by that name, and a reader who knows it
   would misread ours.
@@ -99,6 +131,17 @@ compares (`Geometry`, `Offset`, `SurfaceGeometry`) are `type` aliases and not
   instead. Exactly three pass in `src/` today: the Tweakpane teardown in
   `controls.ts`, the `defer` self-reference in `rx.ts`, and `surface$` gating the
   redraw in `main.ts`. Keep the count that low.
+
+## Adding a formula
+
+The `Formula` contract lives in `src/model/formula.ts`, one level above the
+implementations, so a formula can annotate itself without importing the registry
+that imports it. `src/model/formulas/registry.ts` is the single source of truth for selectable sketch
+functions: one entry carries the key, the label, and the function. `FormulaName`
+is `keyof typeof formulas`, so an entry automatically becomes a legal
+`SketchParams.formula`, a dropdown option, and a `paint` target. Do not add a
+parallel list of names or labels anywhere — that is the thing this shape exists
+to prevent.
 
 ## Tooling
 

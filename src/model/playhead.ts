@@ -1,7 +1,7 @@
 import { animationFrames, concat, merge, type Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
-import { wrap01 } from './lib/math.ts';
-import type { TimelineParams } from './sketch/params.ts';
+import { wrap01 } from '../lib/math.ts';
+import type { TimelineParams } from './params.ts';
 
 export const createPlayhead$ = (
     scrubs$: Observable<number>[],

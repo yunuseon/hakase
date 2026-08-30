@@ -1,5 +1,5 @@
 import { concat, defer, fromEvent, Observable, of } from 'rxjs';
-import { map, switchMap, take } from 'rxjs/operators';
+import { switchMap, take } from 'rxjs/operators';
 
 export const fromElementEvent$ = <K extends keyof HTMLElementEventMap>(
     element: HTMLElement,
@@ -46,10 +46,3 @@ export const devicePixelRatio$: Observable<number> = defer(() => {
         ),
     );
 });
-
-export const shallowEqual = <T extends Record<string, unknown>>(a: T, b: T): boolean => {
-    const keys = Object.keys(a);
-    return keys.length === Object.keys(b).length && keys.every(key => a[key] === b[key]);
-};
-
-export const toVoid$ = map(() => undefined);

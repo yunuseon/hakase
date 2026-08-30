@@ -1,0 +1,39 @@
+import type { FormulaName } from './formulas/registry.ts';
+
+export type SketchParams = {
+    height: number;
+    width: number;
+
+    formula: FormulaName;
+    dimension: number;
+    gapModifier: number;
+    depthScalar: number;
+    baseSize: number;
+
+    color1: string;
+    color2: string;
+    color3: string;
+    color4: string;
+};
+
+export const sketchParams: SketchParams = {
+    height: 640,
+    width: 640,
+
+    formula: 'ripple',
+    dimension: 32,
+    gapModifier: 0.1,
+    depthScalar: 1,
+    baseSize: 5,
+
+    color1: '#222831',
+    color2: '#393e46',
+    color3: '#00ADB5',
+    color4: '#EEEEEE',
+};
+
+export const timelineParams = {
+    duration: 0,
+};
+
+export type TimelineParams = typeof timelineParams;
