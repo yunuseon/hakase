@@ -44,13 +44,13 @@ const reducePlayhead = (at: number, action: PlayheadAction): number => {
 };
 
 export const createPlayhead$ = (
-    scrubs$: Observable<number>[],
+    scrubs$: Observable<number>,
     commands$: Observable<TransportCommand>,
     playing$: Observable<boolean>,
     timeline$: Observable<TimelineParams>,
 ): Observable<number> => {
     const seeks$ = merge(
-        merge(...scrubs$),
+        scrubs$,
         commands$.pipe(mergeMap(command => (command === 'stop' ? of(0) : EMPTY))),
     ).pipe(map((at): PlayheadAction => ({ kind: 'seek', at })));
 

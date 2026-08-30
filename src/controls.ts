@@ -2,7 +2,6 @@ import { combineLatest, Observable } from 'rxjs';
 import { shareReplay, startWith } from 'rxjs/operators';
 import { Pane } from 'tweakpane';
 import type { BindingParams, ContainerApi, TpChangeEvent } from '@tweakpane/core';
-import type { ProgramId } from './program.ts';
 import {
     sketchParams,
     timelineParams,
@@ -11,7 +10,6 @@ import {
 } from './shared/params.ts';
 
 export interface Controls {
-    readonly windows$: Observable<ProgramVisibility>;
     readonly sketch$: Observable<PanelParams>;
     readonly timeline$: Observable<TimelineParams>;
     dispose(): void;
@@ -39,15 +37,6 @@ const bind$ = <O extends object, K extends keyof O & string>(
     }).pipe(startWith(object[key]));
 };
 
-export type ProgramVisibility = Record<ProgramId, boolean>;
-
-const openByDefault: ProgramVisibility = {
-    formula: true,
-    sketch: true,
-    timeline: true,
-    playhead: true,
-};
-
 export const createControls = (container: HTMLElement): Controls => {
     const pane = new Pane({ container, title: 'hakase', expanded: false });
 
@@ -68,18 +57,7 @@ export const createControls = (container: HTMLElement): Controls => {
         color4: bind$(colors, sketchParams, 'color4'),
     }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
-    const windows = pane.addFolder({ title: 'Windows', expanded: false });
-
-    // Every ProgramId must appear here; the Controls return type is what checks that.
-    const windows$ = combineLatest({
-        formula: bind$(windows, openByDefault, 'formula'),
-        sketch: bind$(windows, openByDefault, 'sketch'),
-        timeline: bind$(windows, openByDefault, 'timeline'),
-        playhead: bind$(windows, openByDefault, 'playhead'),
-    }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
-
     return {
-        windows$,
         sketch$,
         timeline$,
         dispose: () => {

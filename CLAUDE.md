@@ -29,9 +29,9 @@ declares a `vec3 formula(...)` prototype and the selected formula's definition
 is concatenated after it, so the shader file stays valid on its own and the
 splice is a plain string append with no placeholder token.
 
-## The three layers
+## The four layers
 
-Everything our code owns is one of exactly three things, and the whole point is
+Everything our code owns is one of exactly four things, and the whole point is
 that the first two never learn about each other:
 
 1. **Component** — a custom element with a shadow root that owns a piece of DOM.
@@ -39,10 +39,42 @@ that the first two never learn about each other:
 2. **Window** — a component whose content is another component. It owns the frame
    (title bar, drag, the eight resize handles) and knows nothing about what it
    holds.
-3. **Program** — one component paired with the window that holds it, plus how it
-   connects to `AppState`. This is the only layer allowed to know about both, and
-   it is where composition lives: `sketch.program.ts` puts the fps counter in the
-   sketch's `status` slot, which is a decision neither component could make.
+3. **Program** — a _definition_: one component paired with the window that holds
+   it, its dock icon, and how it connects to `AppState`. This is the only layer
+   allowed to know about both, and it is where composition lives:
+   `sketch.program.ts` puts the fps counter in the sketch's `status` slot, which
+   is a decision neither component could make.
+4. **Process** — a _running instance_ of a program. A program is inert data; a
+   process is a live subscription. `liveProcess$` is the whole of it: subscribing
+   calls `program.launch()`, opens a window around the result and starts it;
+   unsubscribing closes the window and takes every listener, rAF loop and GL
+   context with it.
+
+**A program may have many processes at once**, so nothing about a program can be a
+singleton:
+
+- `Program.launch()` is a **factory**, not an element. Two processes need two
+  elements, and one element cannot be in two windows. A module-level
+  `export const sketch = new HksSketch()` is exactly the bug this shape prevents.
+- State keyed by `ProgramId` would collide, so `Desktop` is keyed by `ProcessId`,
+  built from a counter kept _in_ the state so a relaunch never reuses a dead id.
+  Its `processes` array is ordered back to front, so a process's **index is its
+  z-order** and `raise` is a reorder — there is no z-index counter anywhere.
+- Global state cannot be fed by naming instances, because which instances exist
+  changes at runtime. Each process instead emits `AppInput`s — `scrub`,
+  `transport`, `source`, `diagnostic` — and `main.ts` folds whatever the running
+  set happens to produce. That is why two editors drive the same formula and two
+  sketches follow the same playhead.
+- What genuinely is per-process stays per-process: a sketch compiles `source$`
+  into **its own** GL context, so `compiled$` lives in `sketch.program.ts` and
+  never in `AppState`.
+
+**Launching is one action from two places.** The dock and the desktop shortcuts
+both emit a program id; `main.ts` turns it into a single `launch` action carrying
+that program's default `size`, and the reducer cascades each new window by
+`launched % 8` so instance two does not land exactly on instance one. Quitting is
+the window's own close button — ordinary chrome on every window, not a
+per-program affordance.
 
 Programs live in `src/programs/<name>.program.ts` and nowhere else. A component
 folder that grows a file naming a window is the mistake this layer exists to
@@ -52,7 +84,7 @@ prevent — that file is a program, and it belongs one level up.
 import `program.ts`, `layout.ts`, `live-window.ts` or `controls.ts`; the check is
 one grep and it is worth running. This is why `HksWindow` emits an untagged
 `WindowGesture` rather than a `LayoutAction`: the window does not know which
-program it holds, so `liveWindow$` — which is program-layer, at `src/` root — is
+program it holds, so `liveProcess$` — which is program-layer, at `src/` root — is
 what stamps the `id` on. `LayoutAction` is literally `WindowGesture & { id }`.
 
 It is also why the old `layout.ts` had to be cut in two. Frame maths (`moved`,
@@ -105,12 +137,21 @@ next such feature is worth that, it is worth making it work for every window.
 **Nothing is declared in `index.html`** beyond the script tag, and no window is
 mounted by hand. `main.ts` holds nothing but the list of programs, and a window's
 existence is
-a subscription: `liveWindow$` creates the `hks-window` in a `defer` factory and
+a subscription: `liveProcess$` creates the `hks-window` in a `defer` factory and
 removes it in `finalize`, with its views merged in as `ignoreElements` side
-pipelines so one subscription both drives the DOM and reports back. Opening and
-closing is therefore just `switchMap(open => open ? liveWindow$(...) : EMPTY)`
-over the panel's per-window checkbox. Adding a window is one entry in the table;
-nothing else in `main.ts` names it.
+pipelines so one subscription both drives the DOM and reports back. Launching and
+quitting is therefore just
+`switchMap(running => running ? liveProcess$(...) : EMPTY)` over `processes$`,
+which the dock folds from its own clicks. Adding a program is one entry in the
+table; nothing else in `main.ts` names it.
+
+**The dock is chrome, not a program.** It lists every program and lights the ones
+with a process, so it must not itself be launchable — it is mounted once by
+`main.ts` beside the Tweakpane panel. Its tiles are built with
+`createElementNS`, never `innerHTML`: a `Program.icon` is path data on a 24x24
+viewBox, so an icon can never be markup. And it takes `string`s out and back in,
+narrowed by `isProgramId`, because a component may not know what a `ProgramId`
+is.
 
 Do not "improve" this by mounting eagerly and hiding closed windows with CSS.
 The point is that a closed window holds no subscriptions at all — no `rAF` loop,
@@ -363,7 +404,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Twenty-seven of them survive in `src/` today, every one a single line. Treat that
+    Thirty-four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

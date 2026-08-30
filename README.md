@@ -68,14 +68,15 @@ Everything is a stream, and `main.ts` is only the graph:
 const programs = [formulaProgram, sketchProgram, timelineProgram, playheadProgram];
 ```
 
-Each of those is a **program** — one component paired with the window that holds
-it — and a window's whole existence is a subscription — mounted when it is opened, removed when it is
+Each of those is a **program**: a definition pairing one component with the window
+that holds it and its dock icon. A running instance is a **process**, and a
+process's whole existence is a subscription — mounted when it is opened, removed when it is
 closed. `main.ts` builds the streams they read back and subscribes once.
 
 The tree is grouped by component, not by layer, so one folder holds everything
 only that component needs:
 
-- **`programs/`** — one file per window, pairing a component with the window that
+- **`programs/`** — one file per program, pairing a component with the window that
   holds it. The only layer that knows about both; imports only ever point down
   into `components/`, never the other way.
 - **`components/<name>/`** — the custom element (`*.component.ts`, the only file

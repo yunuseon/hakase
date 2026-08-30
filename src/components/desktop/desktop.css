@@ -1,0 +1,58 @@
+:host {
+    display: block;
+}
+
+.board {
+    position: relative;
+    inline-size: 100%;
+    block-size: 100%;
+}
+
+.shortcut {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    inline-size: 72px;
+    padding: 6px 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--label);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.shortcut:hover {
+    color: var(--indicator);
+    background: color-mix(in srgb, var(--panel) 70%, transparent);
+    border-color: var(--edge);
+}
+
+.shortcut:focus-visible {
+    outline: 1px solid var(--indicator);
+    outline-offset: 1px;
+}
+
+.name {
+    font-family: monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+svg {
+    inline-size: 26px;
+    block-size: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

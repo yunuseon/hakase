@@ -18,8 +18,7 @@ const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =
         map(initial => {
             const samePointer = (event: PointerEvent) => event.pointerId === initial.pointerId;
 
-            // On the document, not the element: setPointerCapture can fail, and then a
-            // release anywhere else never ends the gesture — the next hover keeps dragging.
+            // On the document: a release off the element must still end the gesture.
             const end$ = merge(
                 fromDocumentEvent$('pointerup'),
                 fromDocumentEvent$('pointercancel'),

@@ -1,0 +1,70 @@
+:host {
+    display: block;
+}
+
+.tray {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 5px 6px 7px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+}
+
+.tile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 34px;
+    block-size: 34px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.tile:hover {
+    color: var(--indicator);
+    background: var(--header);
+    border-color: var(--edge);
+}
+
+.tile:active {
+    transform: translateY(1px);
+}
+
+.tile:focus-visible {
+    outline: 1px solid var(--indicator);
+    outline-offset: 2px;
+}
+
+.tile.running {
+    color: var(--highlight);
+    background: var(--surface);
+    border-color: var(--edge);
+}
+
+/* The running dot sits below the tile, so it must not widen the row. */
+.tile.running::after {
+    content: '';
+    position: absolute;
+    inset-block-end: -5px;
+    inline-size: 3px;
+    block-size: 3px;
+    border-radius: 50%;
+    background: var(--highlight);
+}
+
+svg {
+    inline-size: 20px;
+    block-size: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

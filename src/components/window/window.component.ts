@@ -1,5 +1,5 @@
 import { merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, tap } from 'rxjs/operators';
+import { distinctUntilChanged, ignoreElements, map, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
@@ -9,7 +9,14 @@ import css from './window.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = `
-    <div class="title"><span class="name"></span></div>
+    <div class="title">
+        <span class="name"></span>
+        <button class="close" type="button" aria-label="quit">
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"/>
+            </svg>
+        </button>
+    </div>
     <div class="body"><slot></slot></div>
 `;
 
@@ -48,6 +55,16 @@ export class HksWindow extends HTMLElement {
             ...RESIZE_EDGES.map(resize),
             fromElementEvent$(this, 'pointerdown').pipe(
                 map((): WindowGesture => ({ kind: 'raise' })),
+            ),
+            // The button sits inside the drag handle; its press must not also drag.
+            fromElementEvent$(requireChild(shadow, '.close'), 'pointerdown').pipe(
+                tap(event => {
+                    event.stopPropagation();
+                }),
+                ignoreElements(),
+            ),
+            fromElementEvent$(requireChild(shadow, '.close'), 'click').pipe(
+                map((): WindowGesture => ({ kind: 'quit' })),
             ),
         );
     }
