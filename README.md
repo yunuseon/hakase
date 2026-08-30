@@ -1,6 +1,6 @@
 # hakase
 
-A small sketchbook for visual/artsy programming: a canvas sketch whose _playhead_
+A small sketchbook for visual/artsy programming: a GPU-rendered sketch whose _playhead_
 you can scrub with a linear or a circular slider, or let loop on a timer. Every
 parameter is live-editable through a [Tweakpane](https://tweakpane.github.io/docs/)
 panel, and the whole thing is wired together with RxJS streams.
@@ -66,8 +66,8 @@ merge(
 
 Three layers, one rule — a view never derives, a model never touches the DOM:
 
-- **`model/`** is pure: the playhead, the ripple maths, projection, slider
-  geometry. No DOM anywhere in it, so it is testable by plain function calls.
+- **`model/`** is pure: the playhead, slider geometry, and the GLSL source of
+  each formula. No DOM and no GPU anywhere in it.
 - **`view/`** owns DOM and exposes `connect$(...inputs) => Observable<void>` —
   streams in, applied views out. Sliders additionally expose `changes$` as a
   source. Every view has that same shape, so `main.ts` treats them alike.
@@ -93,11 +93,23 @@ export const formulas = {
 That registry is the single source of truth. `FormulaName` is `keyof typeof
 formulas`, so the new key immediately becomes a legal value of
 `SketchParams.formula`, the dropdown builds its options from the labels, and
-`paint` looks the function up by name. Nothing else needs touching.
+the view compiles it into the vertex shader. Nothing else needs touching.
 
-A formula is `(x, y, playhead) => Vector` — the `Formula` type in
-[`src/model/formula.ts`](src/model/formula.ts) — where `x` and `y` are normalized
-to [-1, 1] and `playhead` is in [0, 1). Put the implementation in its own file
-under `src/model/formulas/` and annotate it `Formula`, the way `ripple.ts` does,
-so the compiler checks it against the contract. It lives in the model layer, so
-it must stay pure — no canvas, no DOM.
+A formula is GLSL ES 3.00 defining `vec3 formula(float x, float y, float t)`,
+where `x` and `y` are normalized to [-1, 1] and `t` is the playhead in [0, 1).
+The returned `x`/`y` are clip-space position and `z` is depth, which drives both
+point size and colour. `PI` is predefined.
+
+```glsl
+vec3 formula(float x, float y, float t) {
+    float depth = length(vec2(x, y)) / sqrt(2.0);
+    float wave = sin(2.0 * (depth + t) * PI);
+
+    return vec3(x, y * ((wave + depth) / 2.0), depth);
+}
+```
+
+Write it in a `.glsl` file beside `ripple.glsl` and import it with `?raw`. The
+formula is _data_ — a string in the model layer — and the view splices it onto
+`view/gl/shaders/sketch.vert` and compiles it. That is what will let formulas be
+authored at runtime.

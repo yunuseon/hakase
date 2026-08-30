@@ -1,7 +1,8 @@
-export interface Surface {
+export type Surface = {
     readonly canvas: HTMLCanvasElement;
-    readonly context: CanvasRenderingContext2D;
-}
+    readonly gl: WebGL2RenderingContext;
+};
+
 export type SurfaceGeometry = {
     width: number;
     height: number;
@@ -12,21 +13,24 @@ export const createSurface = (container: HTMLElement): Surface => {
     const canvas = document.createElement('canvas');
     container.appendChild(canvas);
 
-    const context = canvas.getContext('2d', { alpha: false });
-    if (!context) {
-        throw new Error('Could not acquire a 2d rendering context for the canvas');
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
+    if (!gl) {
+        throw new Error('This browser does not support WebGL2');
     }
 
-    return { canvas, context };
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    return { canvas, gl };
 };
 
 export const applyGeometry = (
-    { canvas, context }: Surface,
+    { canvas, gl }: Surface,
     { width, height, ratio }: SurfaceGeometry,
 ): void => {
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    gl.viewport(0, 0, canvas.width, canvas.height);
 };

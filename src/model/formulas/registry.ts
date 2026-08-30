@@ -1,8 +1,8 @@
 import type { Formula } from '../formula.ts';
-import { rippleAt } from './ripple.ts';
+import { ripple } from './ripple.ts';
 
 export const formulas = {
-    ripple: { label: 'Ripple', apply: rippleAt },
-} satisfies Record<string, { label: string; apply: Formula }>;
+    ripple,
+} satisfies Record<string, Formula>;
 
 export type FormulaName = keyof typeof formulas;

@@ -8,17 +8,34 @@ brevity, and feature count:
 
 1. **The orchestration logic, expressed purely in reactive functional style.**
    This is the point of the project. The sketch on screen is the excuse.
-2. Generative canvas work as the subject matter.
+2. Generative graphics as the subject matter, rendered on the GPU.
 
 If a change would make the app better but the orchestration less reactive, that
 is a bad trade here. Say so and propose the reactive version instead.
+
+## Rendering
+
+The sketch renders with **WebGL2**, not canvas2d. A formula is GLSL, the lattice
+loop is the vertex shader, and `gl_VertexID` derives each cell's coordinates —
+there are no vertex buffers at all, just one `drawArrays(POINTS, ...)`. This is
+worth 40x at `dimension: 128` (0.96ms against 38.4ms) and makes a million points
+viable, so do not reintroduce a CPU-side draw loop.
+
+**Shaders live in their own files**, never in template literals: `.vert`/`.frag`
+for complete stages under `view/gl/shaders/`, `.glsl` for a formula body under
+`model/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
+`string` type comes from `vite/client` — no plugin and no cast. `sketch.vert`
+declares a `vec3 formula(...)` prototype and the selected formula's definition
+is concatenated after it, so the shader file stays valid on its own and the
+splice is a plain string append with no placeholder token.
 
 ## Layering
 
 Three layers, one rule: **a view never derives, a model never touches the DOM.**
 
 - **`src/model/`** — pure functions and stream derivations. No DOM, no
-  rendering. `playhead`, `ripple`, `projection`, `slider` maths, param types.
+  rendering, no GPU. `playhead`, `slider` maths, param types, and the GLSL
+  source of each formula (shader text is data).
   Testable by calling them.
 - **`src/view/`** — owns a piece of DOM and exposes
   `connect$(...inputs) => Observable<void>`: streams in, applied views out. It may
@@ -27,7 +44,7 @@ Three layers, one rule: **a view never derives, a model never touches the DOM.**
   fps counter, control panel.
 - **`src/main.ts`** — the graph and nothing else. Construct views, derive
   `playhead$`, `merge` the connections, subscribe once. No `tap`, no DOM, no
-  canvas imports. If something view-shaped is creeping into `main.ts`, it wants
+  GL imports. If something view-shaped is creeping into `main.ts`, it wants
   to be a view.
 
 `src/lib/` sits underneath all three: `dom`, `math`, `rx` primitives.
@@ -35,7 +52,7 @@ Three layers, one rule: **a view never derives, a model never touches the DOM.**
 ## The prime directive
 
 **All orchestration is declarative dataflow.** State lives in streams, not in
-variables. Concretely, in `src/` outside the drawing kernel:
+variables. Concretely, everywhere in `src/`:
 
 - **No mutable `let` for application state.** If something has to be remembered
   between events, that is a stream with `scan`, `distinctUntilChanged`,
@@ -51,15 +68,16 @@ variables. Concretely, in `src/` outside the drawing kernel:
   value that a pure function already computed. Deriving a value inside a `tap`
   is the smell.
 - **Pure functions carry the logic.** `offsetFor(geometry, value)`,
-  `valueAt(clientX, ...)`, `renderSketch(context, params, playhead)` — data in,
+  `valueAt(clientX, ...)`, `parseHexColor(hex)` — data in,
   data out, independently testable. The stream decides _when_; the function
   decides _what_.
 
 ### Where this does not apply
 
-`src/sketch/render.ts` is the drawing kernel: a pure function whose body is a
-tight loop over a lattice. Local `let i, j` in there is fine and should stay.
-The rule is about orchestration, not about banning loops.
+The lattice loop now lives in the vertex shader, not in TypeScript, so the old
+carve-out for it is gone. If a tight numeric loop ever comes back, local `let`
+counters inside a pure function are fine — the rule is about orchestration, not
+about banning loops.
 
 ### The design tension to be aware of
 
@@ -107,7 +125,7 @@ must be compared, write a named comparator next to it that names every field —
   `reportFps$`, `toVoid$`, `shareLatest$`.
 - **Nothing outside that domain gets it.** `createLinearSlider`, `createSurface`
   and `createControls` return plain objects; `clamp`, `wrap01`, `shallowEqual`,
-  `offsetFor` and `renderSketch` are pure helpers.
+  `offsetFor` and `parseHexColor` are pure helpers.
 - **No thin wrappers over RxJS.** If a helper only renames an operator or fixes
   its arguments — `toVoid$ = map(() => undefined)`, `shareLatest$ = () =>
 shareReplay({...})` — write the operator at the call site instead. It costs a
@@ -129,8 +147,8 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
   delete it. Documenting what a function does is not a trap — names and types
   carry that, and a pipeline needing prose to be followed should be restructured
   instead. Exactly three pass in `src/` today: the Tweakpane teardown in
-  `controls.ts`, the `defer` self-reference in `rx.ts`, and `surface$` gating the
-  redraw in `main.ts`. Keep the count that low.
+  `controls.ts`, the `defer` self-reference in `rx.ts`, and `geometry$` gating the
+  redraw in `view/sketch.ts`. Keep the count that low.
 
 ## Adding a formula
 
@@ -139,7 +157,7 @@ implementations, so a formula can annotate itself without importing the registry
 that imports it. `src/model/formulas/registry.ts` is the single source of truth for selectable sketch
 functions: one entry carries the key, the label, and the function. `FormulaName`
 is `keyof typeof formulas`, so an entry automatically becomes a legal
-`SketchParams.formula`, a dropdown option, and a `paint` target. Do not add a
+`SketchParams.formula`, a dropdown option, and a shader the view can build. Do not add a
 parallel list of names or labels anywhere — that is the thing this shape exists
 to prevent.
 
