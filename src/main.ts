@@ -14,7 +14,7 @@ import {
 import './styles.css';
 import { HksDesktop } from './components/desktop/desktop.component.ts';
 import { HksDock } from './components/dock/dock.component.ts';
-import { formulas } from './components/sketch/formulas/registry.ts';
+import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Frame } from './components/window/frame.ts';
 import { createControls } from './controls.ts';
 import { persistDesktop$, restoreDesktop } from './desktop-store.ts';
@@ -34,6 +34,7 @@ import {
     type ProcessId,
     type Program,
     type ProgramId,
+    type Source,
 } from './program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
@@ -149,21 +150,49 @@ const bootstrap = () => {
     );
 
     const inputs$ = signals$.pipe(
-        mergeMap(signal => (signal.to === 'app' ? of(signal.input) : EMPTY)),
+        mergeMap(signal => (signal.to === 'app' ? of(signal) : EMPTY)),
         share(),
     );
 
     const commands$ = inputs$.pipe(
-        mergeMap(input => (input.kind === 'transport' ? of(input.command) : EMPTY)),
+        mergeMap(({ input }) => (input.kind === 'transport' ? of(input.command) : EMPTY)),
         share(),
     );
 
     const playing$ = isPlaying$(commands$).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
+    // Keyed by formula: one edit reaches every process showing that formula.
+    const edits$ = inputs$.pipe(
+        mergeMap(({ from, input }) =>
+            input.kind === 'source'
+                ? of({ from, formula: input.formula, text: input.text })
+                : EMPTY,
+        ),
+        scan(
+            (edits, { formula, text, from }): ReadonlyMap<FormulaName, Source> =>
+                new Map(edits).set(formula, { text, from }),
+            new Map<FormulaName, Source>(),
+        ),
+        startWith(new Map<FormulaName, Source>()),
+        // Not refCount: the last reader switching formula must not erase the edits.
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    const diagnostics$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'diagnostic' ? of(input) : EMPTY)),
+        scan(
+            (all, { formula, message }) => new Map(all).set(formula, message),
+            new Map<FormulaName, string | null>(),
+        ),
+        startWith(new Map<FormulaName, string | null>()),
+        // Same: an editor switching formula drops the only subscriber for a moment.
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const state: AppState = {
         playing$,
         playhead$: createPlayhead$(
-            inputs$.pipe(mergeMap(input => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
+            inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
             commands$,
             playing$,
             controls.timeline$,
@@ -172,20 +201,15 @@ const bootstrap = () => {
             map(({ duration }) => duration),
             distinctUntilChanged(),
         ),
-        panel$: controls.sketch$,
-        // Seeded, or a sketch has nothing to compile until an editor happens to run.
-        source$: inputs$.pipe(
-            mergeMap(input => (input.kind === 'source' ? of(input.text) : EMPTY)),
-            startWith(formulas.ripple.source),
-            distinctUntilChanged(),
-            shareReplay({ bufferSize: 1, refCount: true }),
-        ),
-        error$: inputs$.pipe(
-            mergeMap(input => (input.kind === 'diagnostic' ? of(input.message) : EMPTY)),
-            startWith(null),
-            distinctUntilChanged(),
-            shareReplay({ bufferSize: 1, refCount: true }),
-        ),
+        source$: (formula: FormulaName) =>
+            edits$.pipe(
+                map(edits => edits.get(formula) ?? { text: formulas[formula].source, from: null }),
+            ),
+        error$: (formula: FormulaName) =>
+            diagnostics$.pipe(
+                map(all => all.get(formula) ?? null),
+                distinctUntilChanged(),
+            ),
     };
 
     const runningPrograms$ = desktop$.pipe(

@@ -69,6 +69,53 @@ singleton:
   into **its own** GL context, so `compiled$` lives in `sketch.program.ts` and
   never in `AppState`.
 
+**A formula is a document; a sketch is a viewer of one.** Each sketch picks a
+formula by name in its own panel, and `AppState` exposes the text as a _selector_,
+`source$(formula)`, not a stream. `main.ts` folds edits into a `Map` keyed by
+formula name, so editing Rose reaches every sketch showing Rose and no other, and
+two sketches can render different formulas at once. Absent keys fall back to the
+registry, which stays the single source of truth for defaults — the fold starts
+empty rather than seeded, so a formula nobody edited has exactly one definition.
+`error$(formula)` is keyed the same way, so an editor only shows the diagnostics
+of the formula it is editing.
+
+Those two folds are `shareReplay({ refCount: false })`, and that is not
+decoration. An editor's only subscription to `error$` is inside a `switchMap` over
+its selection: with `refCount: true`, switching formula drops the last subscriber
+for an instant and the entire edit and diagnostic history resets. State that
+outlives its readers must not be reference-counted.
+
+**An editor applies everyone's edits except its own.** Two editors on one formula
+stay in step, because the text is one document; but writing an editor's own
+keystrokes back into its textarea resets the caret mid-word. So every source
+carries `from`, the `ProcessId` that wrote it — stamped in `liveProcess$`, which is
+the only place that knows a process's identity — and the editor folds:
+
+```ts
+scan((shown, source, index) => (index === 0 || source.from !== self.id ? source.text : shown), '');
+```
+
+The first value always applies, so selecting a formula shows its current text;
+after that only other processes move it. Comparing the incoming text with the
+textarea instead would look equivalent and is not: `changes$` is debounced, so a
+fast typist has already moved on when their own edit arrives, and the stale text
+would be written over what they are typing. Selecting a formula emits no `source`
+input at all; only typing does.
+
+**Configuration follows the process, not the program.** A sketch's lattice, dot
+size, depth and palette live in `hks-sketch-controls`, slotted into that sketch's
+own window, so two sketches can run the same formula at different densities and
+colours. They were global Tweakpane folders once; the moment a program could run
+twice, a shared panel meant two windows fighting over one set of knobs. What stays
+in the Tweakpane pane is what is genuinely global: `duration`, because the playhead
+is one clock for the whole app. Before adding a knob there, ask whether two
+processes would want different answers — if so it belongs in the window.
+
+The inputs hold their own values, so there is no parameter object to keep in sync:
+`changes$` reads them, `connect$` writes only the numeric readouts back. Those
+settings are deliberately not persisted — the desktop remembers which processes
+exist and where, not how each one is tuned.
+
 **Launching is one action from two places.** The dock and the desktop shortcuts
 both emit a program id; `main.ts` turns it into a single `launch` action carrying
 that program's default `size`, and the reducer cascades each new window by
@@ -112,7 +159,7 @@ exception: it builds its own panel, so `controls.ts` stays a plain factory.
 **A component folder holds everything only that component needs**, whatever layer
 it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
 `formulas/` and its compile stage, because nothing else imports them. Only three
-modules are genuinely shared — `lib/`, `shared/params.ts` and `shared/drag.ts` —
+modules are genuinely shared — `lib/`, `shared/drag.ts` and `shared/playhead.ts` —
 and a module earns `shared/` by having a second importer, not by being general in
 spirit. If you reach into another component's folder, either the thing you want
 belongs in `shared/`, or the two components want to be one.
@@ -258,10 +305,11 @@ belongs to is read from its name instead of its path:
 - **`*.program.ts`** — a `Program`. It lives in `src/programs/` rather than in the
   component folder, so the component never learns that it is in a window, and
   `main.ts` never names a component's inputs. This is also where a program
-  derives what it displays: `AppState` carries app state only — `frame$`,
-  `playhead$`, `panel$`, `preset$`, `compiled$` — and never a stream shaped for
-  one window. If you are tempted to add a sixth field, check first whether one
-  window could derive it from the five.
+  derives what it displays: `AppState` carries app state only — the playhead,
+  transport and the two formula selectors — and never a stream shaped for one
+  window. Before adding a field, check whether one program could derive it
+  instead; `panel$` and a global `source$` both used to live there and both were
+  really one window's business.
 - **`AppState` vs a state type.** `Layout`, `SketchParams` and the like are
   values; `AppState` is the record of _streams_ that carry them, which is why
   every member keeps its `$` and why it is not called `State`. It lives in
@@ -404,7 +452,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Thirty-four of them survive in `src/` today, every one a single line. Treat that
+    Forty-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -462,11 +510,10 @@ method on the canvas element. It _produces_ app state rather than displaying it,
 which is the line: `connect$` connects app state to the UI, and anything that
 derives state instead is a pipeline stage. The element owns the canvas and
 exposes its `gl` for the stage to compile into. Failure is a value, not an
-exception. `main.ts` compiles once into `compiled$` and each window takes what it
-displays: `sketch.program.ts` keeps the successes, `formula.program.ts` maps the
-failures to a message. Because a failure means the sketch's program stream simply
-does not emit, `combineLatest` keeps the last shader that linked and the canvas
-never blanks. Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
+exception. **Each sketch compiles for itself**, into its own GL context, from the
+formula it picked — so failures are per formula, not per app. Because a failure
+means the sketch's program stream simply does not emit, `combineLatest` keeps the
+last shader that linked and the canvas never blanks. Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
 once a newer one has replaced it, so editing does not leak GPU resources — that
 cleanup belongs inside `connect$` rather than in a method of its own, because a
 view's whole public surface is `changes$` out and `connect$` in.

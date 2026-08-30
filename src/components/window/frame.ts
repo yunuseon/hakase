@@ -7,10 +7,12 @@ export type Placement = {
     readonly z: number;
 };
 
-export type Frame = Placement & {
+export type Size = {
     readonly width: number;
     readonly height: number;
 };
+
+export type Frame = Placement & Size;
 
 export type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 

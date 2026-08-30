@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
-import type { Frame } from './components/window/frame.ts';
-import type { CanvasSize, PanelParams } from './shared/params.ts';
+import type { FormulaName } from './components/sketch/formulas/registry.ts';
+import type { Frame, Size } from './components/window/frame.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
 export type ProgramId = 'formula' | 'sketch' | 'timeline' | 'playhead';
@@ -17,17 +17,28 @@ export type ProcessId = string;
 export type AppInput =
     | { readonly kind: 'scrub'; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
-    | { readonly kind: 'source'; readonly text: string }
-    | { readonly kind: 'diagnostic'; readonly message: string | null };
+    | { readonly kind: 'source'; readonly formula: FormulaName; readonly text: string }
+    | {
+          readonly kind: 'diagnostic';
+          readonly formula: FormulaName;
+          readonly message: string | null;
+      };
 
 /** Streams of app state, shared by every process. */
 export type AppState = {
     readonly playhead$: Observable<number>;
     readonly playing$: Observable<boolean>;
     readonly duration$: Observable<number>;
-    readonly panel$: Observable<PanelParams>;
-    readonly source$: Observable<string>;
-    readonly error$: Observable<string | null>;
+    // Selectors, not streams: a formula is a document several processes may show.
+    readonly source$: (formula: FormulaName) => Observable<Source>;
+    readonly error$: (formula: FormulaName) => Observable<string | null>;
+};
+
+/** A formula's current text, and which process last wrote it. */
+export type Source = {
+    readonly text: string;
+    /** null while it is still the registry's own definition. */
+    readonly from: ProcessId | null;
 };
 
 /** The state one process has that its siblings do not. */
@@ -47,7 +58,7 @@ export type Program = {
     readonly kind: 'floating' | 'fitted';
     /** Path data on a 24x24 viewBox: the program's face in the dock and on the desktop. */
     readonly icon: string;
-    readonly size: CanvasSize;
+    readonly size: Size;
     // A factory, not an element: two processes of one program need two elements.
     readonly launch: () => ProcessView;
 };

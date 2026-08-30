@@ -1,5 +1,14 @@
 import { EMPTY, merge, of } from 'rxjs';
-import { ignoreElements, map, mergeMap, shareReplay } from 'rxjs/operators';
+import {
+    distinctUntilChanged,
+    ignoreElements,
+    map,
+    mergeMap,
+    scan,
+    shareReplay,
+    switchMap,
+    withLatestFrom,
+} from 'rxjs/operators';
 import { HksFormulaEditor } from '../components/formula-editor/formula-editor.component.ts';
 import { formulas, isFormulaName } from '../components/sketch/formulas/registry.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -17,17 +26,34 @@ export const formulaProgram: Program = {
 
         return {
             element: editor,
-            run$: ({ error$ }) => {
-                // Replayed: two readers, and the first selection arrives synchronously.
-                const preset$ = editor.selections$.pipe(
-                    mergeMap(name => (isFormulaName(name) ? of(formulas[name].source) : EMPTY)),
+            run$: ({ source$, error$ }, self) => {
+                const chosen$ = editor.selections$.pipe(
+                    mergeMap(name => (isFormulaName(name) ? of(name) : EMPTY)),
+                    distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
+                // Ours would arrive debounced and overwrite what is being typed.
+                const shown$ = chosen$.pipe(
+                    switchMap(name =>
+                        source$(name).pipe(
+                            scan(
+                                (shown, source, index) =>
+                                    index === 0 || source.from !== self.id ? source.text : shown,
+                                '',
+                            ),
+                            distinctUntilChanged(),
+                        ),
+                    ),
+                );
+
                 return merge(
-                    editor.connect$(preset$, error$).pipe(ignoreElements()),
-                    merge(preset$, editor.changes$).pipe(
-                        map((text): AppInput => ({ kind: 'source', text })),
+                    editor
+                        .connect$(shown$, chosen$.pipe(switchMap(name => error$(name))))
+                        .pipe(ignoreElements()),
+                    editor.changes$.pipe(
+                        withLatestFrom(chosen$),
+                        map(([text, formula]): AppInput => ({ kind: 'source', formula, text })),
                     ),
                 );
             },

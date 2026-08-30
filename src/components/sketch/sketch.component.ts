@@ -2,7 +2,7 @@ import { combineLatest, merge, type Observable } from 'rxjs';
 import { map, pairwise, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { devicePixelRatio$ } from '../../lib/rx.ts';
-import type { SketchParams } from '../../shared/params.ts';
+import type { SketchParams } from './params.ts';
 import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
 import { drawFrame, prepare, toPalette, type Sketch } from './gl/sketch-program.ts';
 import css from './sketch.css?inline';
@@ -11,6 +11,7 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = `
     <div class="viewport"><slot name="status"></slot></div>
+    <slot name="controls"></slot>
 `;
 
 export class HksSketch extends HTMLElement {

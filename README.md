@@ -83,8 +83,8 @@ only that component needs:
   that touches the DOM), its CSS adopted into a shadow root
   and its pure siblings. `components/sketch/` owns its own
   `gl/`, `shaders/` and `formulas/`, because nothing else imports them.
-- **`shared/`** — the three modules with more than one importer: sketch params
-  and the pointer-drag gesture.
+- **`shared/`** — the modules with more than one importer: the pointer-drag
+  gesture and the playhead model.
 - **`lib/`** — primitives underneath everything: `dom`, `math`, `rx`, `color`,
   `storage`.
 
@@ -104,9 +104,15 @@ window like every other. Type into it and the shader is
 recompiled (debounced); the sketch updates without a reload. A formula that does
 not compile shows the driver's message with **line numbers rebased onto your own
 text**, and the canvas keeps drawing the last one that worked rather than going
-blank. Its preset picker seeds the source with a built-in formula. The parameter pane
-floats at the bottom right, collapsed to its title bar — click it and it opens
-upward.
+blank. Its preset picker seeds the source with a built-in formula.
+
+Each sketch window carries its own **parameters** strip — which formula it
+renders, plus lattice, dot size, depth and the three palette colours — so two
+sketches can show different formulas, or the same one at different densities and
+colours. The formula text itself is shared: edit Rose in an editor and every
+sketch showing Rose updates — as does any other editor open on Rose — while
+everything else carries on untouched. The floating pane at the bottom right holds only
+what is global to the app: the loop duration.
 
 ## Adding a formula
 

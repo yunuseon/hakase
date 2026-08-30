@@ -3,11 +3,12 @@ import { finalize, ignoreElements, map } from 'rxjs/operators';
 import type { WindowView } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { DesktopAction } from './desktop.ts';
-import type { AppInput, AppState, Program, Self } from './program.ts';
+import type { AppInput, AppState, ProcessId, Program, Self } from './program.ts';
 
 export type ProcessSignal =
     | { readonly to: 'desktop'; readonly action: DesktopAction }
-    | { readonly to: 'app'; readonly input: AppInput };
+    // Stamped here so a process can tell its own edits from everyone else's.
+    | { readonly to: 'app'; readonly from: ProcessId; readonly input: AppInput };
 
 // Two subscriptions mean two processes: defer launches and opens, finalize closes.
 export const liveProcess$ = (
@@ -30,7 +31,9 @@ export const liveProcess$ = (
                     action: { ...gesture, id: self.id },
                 })),
             ),
-            view.run$(state, self).pipe(map((input): ProcessSignal => ({ to: 'app', input }))),
+            view
+                .run$(state, self)
+                .pipe(map((input): ProcessSignal => ({ to: 'app', from: self.id, input }))),
             element.connect$(view$).pipe(ignoreElements()),
         ).pipe(
             finalize(() => {

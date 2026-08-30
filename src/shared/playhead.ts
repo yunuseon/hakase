@@ -10,7 +10,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { wrap01 } from '../lib/math.ts';
-import type { TimelineParams } from './params.ts';
+import type { TimelineParams } from '../controls.ts';
 
 export type TransportCommand = 'toggle' | 'stop';
 

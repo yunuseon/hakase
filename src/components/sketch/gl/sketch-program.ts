@@ -1,5 +1,5 @@
 import { parseHexColor, type Rgb } from '../../../lib/color.ts';
-import type { SketchParams } from '../../../shared/params.ts';
+import type { SketchParams } from '../params.ts';
 import { createProgram, type ProgramResult } from './program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
