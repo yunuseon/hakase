@@ -10,6 +10,32 @@ a sine wave travelling outwards from the centre.
 
 ## Getting started
 
+### With Docker (no local Node needed)
+
+```bash
+docker compose up dev --build
+```
+
+Hot reload on http://localhost:5173.
+
+| Script                   | What it does                                       |
+| ------------------------ | -------------------------------------------------- |
+| `npm run docker:dev`     | Dev server with HMR on :5173                       |
+| `npm run docker:preview` | Builds and serves through nginx on :8080           |
+| `npm run docker:build`   | Exports a production build to `./dist` on the host |
+
+Dependencies live inside the image rather than in a mounted volume, so **after
+changing `package.json` the compose services need `--build`** to pick them up —
+which the scripts above always pass.
+
+Only `src/`, `index.html` and the two config files are mounted. Mounting the whole
+repo would shadow the container's `node_modules` with the host's, and Rolldown and
+esbuild ship platform-specific binaries: a macOS `node_modules` will not run on
+Linux. If you add a top-level file the build needs, add it to the mount list in
+`compose.yaml` too.
+
+### With a local Node
+
 Requires Node **20.19+** (or 22+). The repo ships an `.nvmrc`:
 
 ```bash

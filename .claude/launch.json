@@ -2,6 +2,12 @@
     "version": "0.0.1",
     "configurations": [
         {
+            "name": "hakase-docker",
+            "runtimeExecutable": "docker",
+            "runtimeArgs": ["compose", "up", "dev", "--build"],
+            "port": 5173
+        },
+        {
             "name": "hakase",
             "runtimeExecutable": "npm",
             "runtimeArgs": ["run", "dev", "--", "--no-open"],

@@ -1,0 +1,33 @@
+name: hakase
+
+services:
+    # Vite dev server with HMR: http://localhost:5173
+    dev:
+        build:
+            context: .
+            target: dev
+        init: true
+        environment:
+            # No browser to open in here, and bind mounts do not deliver inotify
+            # events reliably on macOS, so watch by polling.
+            VITE_OPEN: 'false'
+            VITE_POLL: 'true'
+        ports:
+            - '5173:5173'
+        # Only the files the app builds from. Mounting the whole repo would shadow
+        # the container's /app/node_modules with the host's — which on macOS holds
+        # the wrong platform's native binaries.
+        volumes:
+            - ./src:/app/src
+            - ./index.html:/app/index.html
+            - ./vite.config.ts:/app/vite.config.ts
+            - ./tsconfig.json:/app/tsconfig.json
+
+    # Serves a production build through nginx: http://localhost:8080
+    preview:
+        profiles: ['preview']
+        build:
+            context: .
+            target: runtime
+        ports:
+            - '8080:80'

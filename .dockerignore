@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+dist
+.claude
+.DS_Store
+*.local
+Dockerfile
+.dockerignore
+compose.yaml
+README.md

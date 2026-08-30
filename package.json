@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "description": "An RxJS-driven canvas sketchbook: scrub or loop a playhead through generative sketches.",
-    "author": "Yunus Öztürk",
+    "author": "Yunus \u00d6zt\u00fcrk",
     "license": "ISC",
     "engines": {
         "node": ">=20.19.0"
@@ -17,7 +17,10 @@
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "docker:dev": "docker compose up dev --build",
+        "docker:build": "docker build --target export --output type=local,dest=dist .",
+        "docker:preview": "docker compose --profile preview up preview --build"
     },
     "dependencies": {
         "rxjs": "^7.8.2",
@@ -26,6 +29,7 @@
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@tweakpane/core": "^2.0.5",
+        "@types/node": "^22.20.1",
         "eslint": "^10.9.1",
         "prettier": "^3.6.2",
         "typescript": "^5.9.3",
