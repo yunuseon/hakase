@@ -1,0 +1,22 @@
+:host {
+    display: block;
+    line-height: 0;
+}
+
+.viewport {
+    position: relative;
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--edge);
+}
+
+canvas {
+    display: block;
+}
+
+::slotted(hks-fps-counter) {
+    position: absolute;
+    inset-block-end: 4px;
+    inset-inline-start: 6px;
+    pointer-events: none;
+}

@@ -22,34 +22,114 @@ worth 40x at `dimension: 128` (0.96ms against 38.4ms) and makes a million points
 viable, so do not reintroduce a CPU-side draw loop.
 
 **Shaders live in their own files**, never in template literals: `.vert`/`.frag`
-for complete stages under `view/gl/shaders/`, `.glsl` for a formula body under
-`model/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
+for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
+body under `components/sketch/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
 `string` type comes from `vite/client` — no plugin and no cast. `sketch.vert`
 declares a `vec3 formula(...)` prototype and the selected formula's definition
 is concatenated after it, so the shader file stays valid on its own and the
 splice is a plain string append with no placeholder token.
 
+## The three layers
+
+Everything our code owns is one of exactly three things, and the whole point is
+that the first two never learn about each other:
+
+1. **Component** — a custom element with a shadow root that owns a piece of DOM.
+   It knows nothing about windows, about where it sits, or about what else exists.
+2. **Window** — a component whose content is another component. It owns the frame
+   (title bar, drag, the eight resize handles) and knows nothing about what it
+   holds.
+3. **Program** — one component paired with the window that holds it, plus how it
+   connects to `AppState`. This is the only layer allowed to know about both, and
+   it is where composition lives: `sketch.program.ts` puts the fps counter in the
+   sketch's `status` slot, which is a decision neither component could make.
+
+Programs live in `src/programs/<name>.program.ts` and nowhere else. A component
+folder that grows a file naming a window is the mistake this layer exists to
+prevent — that file is a program, and it belongs one level up.
+
+**The dependency arrow only ever points down.** Nothing under `components/` may
+import `program.ts`, `layout.ts`, `live-window.ts` or `controls.ts`; the check is
+one grep and it is worth running. This is why `HksWindow` emits an untagged
+`WindowGesture` rather than a `LayoutAction`: the window does not know which
+program it holds, so `liveWindow$` — which is program-layer, at `src/` root — is
+what stamps the `id` on. `LayoutAction` is literally `WindowGesture & { id }`.
+
+It is also why the old `layout.ts` had to be cut in two. Frame maths (`moved`,
+`resized`, `clampFrame`, `frameFrom`) is program-agnostic and lives in
+`components/window/frame.ts`; the app's actual layout — `Layout` keyed by
+`ProgramId`, `defaultLayout`'s hardcoded four windows, `parseLayout`'s schema —
+is app configuration and lives in `src/layout.ts`. If you find yourself adding a
+`ProgramId` to something under `components/`, that thing is in the wrong folder.
+
 ## Components
 
 `connect$` means one thing: **connect app state to the UI**. A view takes streams
-of state and applies them; anything that derives state belongs in `model/`, or —
-when it genuinely needs the GPU — in a named pipeline stage beside the view, not
-as a method on it. Every component's whole surface is `changes$` out and
+of state and applies them; anything that derives state belongs in a pure sibling
+module, or — when it genuinely needs the GPU — in a named pipeline stage beside
+the component, not as a method on it. Every component's whole surface is `changes$` out and
 `connect$` in, with no exceptions.
 
 Every view our code owns is a **component**: a custom element with a shadow root,
-in a folder of its own under `view/components/<name>/`, holding
-`<name>.component.ts` plus `<name>.css` — imported with Vite's `?inline` and
-adopted once per module via `adoptedStyleSheets`. Everything under
-`view/components/` is a component and nothing else is; `gl/`, `formula.ts`,
-`drag.ts` and `controls.ts` sit beside that folder precisely because they are
-not. There is
-no framework and no second state model — the element is a DOM container, the
-streams stay outside it, and `changes$` / `connect$` are unchanged. Tweakpane is
-the exception: it builds its own panel, so `controls.ts` stays a plain factory.
+in a folder of its own under `components/<name>/`, holding `<name>.component.ts`
+plus `<name>.css` — imported with Vite's `?inline` and adopted once per module via
+`adoptedStyleSheets`. There is no framework and no second state model — the
+element is a DOM container, the streams stay outside it. Tweakpane is the
+exception: it builds its own panel, so `controls.ts` stays a plain factory.
+
+**A component folder holds everything only that component needs**, whatever layer
+it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
+`formulas/` and its compile stage, because nothing else imports them. Only three
+modules are genuinely shared — `lib/`, `shared/params.ts` and `shared/drag.ts` —
+and a module earns `shared/` by having a second importer, not by being general in
+spirit. If you reach into another component's folder, either the thing you want
+belongs in `shared/`, or the two components want to be one.
+
+**A window is a component that holds one other component.** `hks-window` owns the
+frame — title bar, drag, the eight resize handles — and knows
+nothing about what it contains; the content component owns no chrome and does not
+know it is in a window. Keep that line: the moment a content component reaches
+for its own title bar or placement, the two are welded together again and neither
+can be reused. A window's inputs are a `WindowView`: a frame plus a `kind`, either
+`floating` (positioned and sized by its frame) or `fitted` (positioned by its
+frame but sized by its content, which the sketch needs because its frame holds
+canvas dimensions).
+
+**Every window is the same window.** There is no per-window chrome, no mode, and
+no window that another one has to be special-cased around. A feature that only
+one window can use — the terminal's docking was one — buys a branch in
+`WindowView`, a branch in `connect$`, a button in the shared title bar, a state
+reducer, a keyboard map and an `AppState` field, all to serve a single window. If the
+next such feature is worth that, it is worth making it work for every window.
+
+**Nothing is declared in `index.html`** beyond the script tag, and no window is
+mounted by hand. `main.ts` holds nothing but the list of programs, and a window's
+existence is
+a subscription: `liveWindow$` creates the `hks-window` in a `defer` factory and
+removes it in `finalize`, with its views merged in as `ignoreElements` side
+pipelines so one subscription both drives the DOM and reports back. Opening and
+closing is therefore just `switchMap(open => open ? liveWindow$(...) : EMPTY)`
+over the panel's per-window checkbox. Adding a window is one entry in the table;
+nothing else in `main.ts` names it.
+
+Do not "improve" this by mounting eagerly and hiding closed windows with CSS.
+The point is that a closed window holds no subscriptions at all — no `rAF` loop,
+no listeners, no GL draws — which a `display: none` window would.
+
+**The graph has a cycle and it is closed by ordering, not a `Subject`.** Windows
+emit the layout actions that produce their own frames: `actions$` carries
+`LayoutAction`s out of every open window, `layout$` folds them, and `AppState` hands
+the frames back in. Two things make it safe, and both are load-bearing:
+
+- A program's `connect$` is a **function of `AppState`**, called from inside
+  `switchMap` — long after `state` is initialised. Storing finished streams in
+  the table instead would evaluate the cycle at construction time.
+- `startWith(seed)` sits **before** `shareReplay`, so the seed is in the replay
+  buffer before the source is subscribed and the windows mount. A window that
+  subscribes to `layout$` while mounting reads the seed rather than hanging.
 
 The tool is drawn as **windows**: a thin border, a small uppercase title bar, a
-padded body. That chrome lives once in `view/components/window.css` and every
+padded body. That chrome lives once in `components/window/window.css` and every
 component adopts it _before_ its own sheet — `adoptedStyleSheets` takes an array,
 so shared chrome and component specifics stay in separate files. A component that
 is slotted into another window (`hks-linear-slider`, `hks-fps-counter`) unsets the
@@ -64,15 +144,15 @@ not therefore part of its chrome, and the timeline learned that the hard way.
 ## Windows
 
 Windows drag by their title bar, resize from any edge or corner, and raise on
-click. `frameActions$` adds the eight handles itself, so the frame is described
+click. `HksWindow` adds the eight handles itself, so the frame is described
 in one place rather than in four templates; they straddle the border by half
 their width, so grabbing an edge does not demand pixel accuracy. A west or north
 drag moves the window as well as sizing it, and the clamp has to agree — `x`
 shifts by the width the minimum actually allowed, or the far edge creeps while
-you push against the limit. All of that is one pure reducer All of that is one pure reducer — `reduceLayout` in
-`model/layout.ts` — folded over a stream of `LayoutAction`s with `scan`. There is
+you push against the limit. All of that is one pure reducer — `reduceLayout` in
+`layout.ts` — folded over a stream of `LayoutAction`s with `scan`. There is
 no `dragging` flag, no `offsetX`, no z-index counter: depth is read from the
-stacking order, and the per-gesture `pointerDelta$` in `view/drag.ts` supplies
+stacking order, and the per-gesture `pointerDelta$` in `shared/drag.ts` supplies
 the deltas. Pairing has to happen _inside_ the gesture; pairing the flattened
 stream would make the first move of each drag jump from wherever the last one
 ended.
@@ -105,8 +185,7 @@ theme themselves from `--backdrop`, `--track`, `--indicator`, `--accent`.
 and must not take pointer events while closed.** Overlapping the canvas is
 harmless; a panel over a slider swallows its `pointerdown` and the control goes
 dead with no error anywhere. The Tweakpane pane floats bottom-right, collapsed to
-its title bar, and a shut docked terminal sets `pointer-events: none` — both for
-this reason.
+its title bar, for this reason.
 
 The floating pane is anchored by `inset-block-end` with `top` auto, so expanding
 grows the box upward and it opens away from the edge it is pinned to rather than
@@ -114,23 +193,41 @@ off the bottom of the window.
 
 ## Layering
 
-Three layers, one rule: **a view never derives, a model never touches the DOM.**
+One rule, and the folders no longer carry it: **a view never derives, a model
+never touches the DOM.** The tree is grouped by component, so the layer a file
+belongs to is read from its name instead of its path:
 
-- **`src/model/`** — pure functions and stream derivations. No DOM, no
-  rendering, no GPU. `playhead`, `slider` maths, param types, and the GLSL
-  source of each formula (shader text is data).
-  Testable by calling them.
-- **`src/view/`** — owns a piece of DOM and exposes
-  `connect$(...inputs) => Observable<void>`: streams in, applied views out. It may
-  also expose raw sources (`Slider.changes$`), but the derivation behind them
-  belongs to a model function. Every view has the same shape — sliders, sketch,
-  fps counter, control panel.
-- **`src/main.ts`** — the graph and nothing else. Construct views, derive
-  `playhead$`, `merge` the connections, subscribe once. No `tap`, no DOM, no
-  GL imports. If something view-shaped is creeping into `main.ts`, it wants
-  to be a view.
+- **`*.component.ts`** — the only files that touch the DOM. Each owns a piece of
+  it and exposes `connect$(...inputs) => Observable<void>`: streams in, applied
+  views out. It may also expose raw sources (`Slider.changes$`), but the
+  derivation behind them belongs to a pure sibling. Every component has the same
+  shape — sliders, sketch, fps counter, window.
+- **every other file in a component folder** — pure functions and stream
+  derivations. No DOM, no rendering, no GPU: `frame.ts`, `slider.ts`,
+  `slider.ts`, and the GLSL source of each formula (shader text is data).
+  Testable by calling them. `gl/` is the one exception and says so in its name.
+- **`*.program.ts`** — a `Program`. It lives in `src/programs/` rather than in the
+  component folder, so the component never learns that it is in a window, and
+  `main.ts` never names a component's inputs. This is also where a program
+  derives what it displays: `AppState` carries app state only — `frame$`,
+  `playhead$`, `panel$`, `preset$`, `compiled$` — and never a stream shaped for
+  one window. If you are tempted to add a sixth field, check first whether one
+  window could derive it from the five.
+- **`AppState` vs a state type.** `Layout`, `SketchParams` and the like are
+  values; `AppState` is the record of _streams_ that carry them, which is why
+  every member keeps its `$` and why it is not called `State`. It lives in
+  `program.ts` beside `Program` and `ProgramId`: splitting it out again brings
+  back a type-only import cycle, since `Program.connect$` takes an `AppState` and
+  `AppState.frame$` takes a `ProgramId`.
+- **`src/main.ts`** — the graph and nothing else. Build `playhead$`, fold the
+  window actions, hand back an `AppState`, subscribe once. No `tap`, no DOM, no GL
+  imports — `compileFormula$` exists so that the last of those stays true.
 
-`src/lib/` sits underneath all three: `dom`, `math`, `rx` primitives.
+`src/lib/` sits underneath everything: `dom`, `math`, `rx`, `color`, `storage`.
+
+The program layer sits at the `src/` root, above the components it composes:
+`program.ts` (identity and contracts), `layout.ts` (where each program's window
+sits), `layout-store.ts`, `live-window.ts`, `controls.ts`, `main.ts`.
 
 ## The prime directive
 
@@ -197,7 +294,7 @@ deduplicating on the value you actually apply: both sliders `map` to the finishe
 CSS string and then use a bare `distinctUntilChanged()`, so `===` on a string
 matches precisely when the DOM write would be identical. Where a record genuinely
 must be compared, write a named comparator next to it that names every field —
-`sameGeometry` in `view/sketch.ts` is the only one.
+`sameGeometry` in `components/sketch/sketch.component.ts` is the only one.
 
 ## Conventions
 
@@ -230,8 +327,13 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 - **Never let a stream reach a `combineLatest` by two paths.** If A feeds B and
   the pipe combines A and B, every A emission fires twice — once with the stale
   B — and the work downstream doubles silently. Fold the sources into one chain,
-  or one `scan` over a union of actions, instead. Both of the app's diamonds
-  (`params$` -> `geometry$`, and `controls.sketch$` -> `size$`) were exactly this.
+  or one `scan` over a union of actions, instead. Three of these have been found
+  and removed: `params$` -> `geometry$`, `controls.sketch$` -> `size$`, and
+  `formula` sitting in `SketchParams` while also selecting the shader — which put
+  `controls.sketch$` on both inputs of the sketch's `combineLatest`. The last one
+  is why `SketchParams` carries no `formula`: the program is already compiled by
+  the time those values are applied, so naming it there was both dead and a
+  double-draw. `controls.formula$` is a separate output for the same reason.
 - Prefer a bug that _cannot be expressed_ over a bug that is patched. When a
   stale-value bug shows up, the fix is usually to make the stale thing an input
   to a `combineLatest`, not to cache it and invalidate by hand.
@@ -253,7 +355,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Twenty-two of them survive in `src/` today, every one a single line. Treat that
+    Twenty-seven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -264,37 +366,17 @@ The editor is the same contract as a slider: `changes$` out (debounced text),
 echoes the user's own typing back into the textarea — only preset selections —
 because writing the value back would reset the caret on every keystroke.
 
-The terminal has two styles, and the names follow the desktop convention rather
-than the other way round: **`docked`** is pinned to the top edge and slides away
-(Quake-style), **`floating`** is an ordinary window among the others. Getting
-this backwards makes the button lie — a button that says what it will do reads
-as inverted the moment the styles are misnamed.
-
-The button in its title bar switches them, and so do the shortcuts: `alt+t` shows
-and hides a docked panel, `alt+d` docks and undocks, `esc` closes. They are
-matched on `event.code`, not `event.key` — Alt+T reports `†` on macOS, and an
-earlier backquote binding was a dead key reported as `Dead` on a German layout,
-so matching the character means a shortcut that silently does nothing. Avoid
-browser-claimed combinations (`ctrl/cmd` + `j`/`k`/`d`/`l`) and function keys,
-which laptops hide behind `Fn`.
-
-Docking always opens the panel: arriving docked with it shut looks like the
-terminal vanished. Both styles are the _same_ component; only `data-style` and
-the `open` attribute differ, applied by `connect$` from a `TerminalState`. The
-button label and the shortcut hint both come from `dockLabel`, so they cannot
-drift apart. A shut docked panel sets `pointer-events: none`, because an
-invisible panel lying over the controls swallows their `pointerdown`.
-
 Compilation is the middle stage of `inputs -> formula -> render`, so it is a free
-function — `compileFormula$(gl, source$)` in `view/sketch/formula.ts` — and not a
+function — `compileFormula$(gl, source$)` in `components/sketch/compile.ts` — and not a
 method on the canvas element. It _produces_ app state rather than displaying it,
 which is the line: `connect$` connects app state to the UI, and anything that
 derives state instead is a pipeline stage. The element owns the canvas and
 exposes its `gl` for the stage to compile into. Failure is a value, not an
-exception. `main.ts` splits the outcome: successes feed `sketch$`, failures
-feed `error$`. Because a failure means `sketch$` simply does not emit,
-`combineLatest` keeps the last shader that linked and the canvas never blanks.
-Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
+exception. `main.ts` compiles once into `compiled$` and each window takes what it
+displays: `sketch.program.ts` keeps the successes, `formula.program.ts` maps the
+failures to a message. Because a failure means the sketch's program stream simply
+does not emit, `combineLatest` keeps the last shader that linked and the canvas
+never blanks. Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
 once a newer one has replaced it, so editing does not leak GPU resources — that
 cleanup belongs inside `connect$` rather than in a method of its own, because a
 view's whole public surface is `changes$` out and `connect$` in.
@@ -310,9 +392,10 @@ while compilation is debounced; do not merge those two.
 
 ## Adding a formula
 
-The `Formula` contract lives in `src/model/formula.ts`, one level above the
-implementations, so a formula can annotate itself without importing the registry
-that imports it. `src/model/formulas/registry.ts` is the single source of truth for selectable sketch
+The `Formula` contract lives in `components/sketch/formulas/formula.ts`, one level
+above the implementations, so a formula can annotate itself without importing the
+registry that imports it. `components/sketch/formulas/registry.ts` is the single
+source of truth for selectable sketch
 functions: one entry carries the key, the label, and the function. `FormulaName`
 is `keyof typeof formulas`, so an entry automatically becomes a legal
 `SketchParams.formula`, a dropdown option, and a shader the view can build. Do not add a

@@ -1,114 +1,81 @@
-import { combineLatest, EMPTY, merge, of } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, scan, shareReplay, startWith } from 'rxjs/operators';
+import { EMPTY, merge, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, scan, shareReplay, startWith, switchMap } from 'rxjs/operators';
 import './styles.css';
-import { requireElement, requireElementById, viewportSize } from './lib/dom.ts';
-import { formulas } from './model/formulas/registry.ts';
-import {
-    clampToViewport,
-    defaultLayout,
-    reduceLayout,
-    type Placement,
-    type WindowId,
-} from './model/layout.ts';
-import type { CanvasSize, SketchParams } from './model/params.ts';
-import { createPlayhead$ } from './model/playhead.ts';
-import { initialTerminal, reduceTerminal, type TerminalAction } from './model/terminal.ts';
-import { HksCircularSlider } from './view/components/circular-slider/circular-slider.component.ts';
-import { HksFormulaEditor } from './view/components/formula-editor/formula-editor.component.ts';
-import { HksFpsCounter } from './view/components/fps-counter/fps-counter.component.ts';
-import { HksLinearSlider } from './view/components/linear-slider/linear-slider.component.ts';
-import { HksSketch } from './view/components/sketch/sketch.component.ts';
-import { createControls } from './view/controls.ts';
-import { compileFormula$ } from './view/formula.ts';
-import { persistLayout$, restoreLayout } from './view/layout-store.ts';
-import { terminalActions$ } from './view/shortcuts.ts';
-const sameSize = (a: CanvasSize, b: CanvasSize): boolean =>
-    a.width === b.width && a.height === b.height;
+import { compileFormula$ } from './components/sketch/compile.ts';
+import { formulas } from './components/sketch/formulas/registry.ts';
+import { persistLayout$, restoreLayout } from './layout-store.ts';
+import { liveWindow$ } from './live-window.ts';
+import type { Frame } from './components/window/frame.ts';
+import { clampToViewport, defaultLayout, reduceLayout } from './layout.ts';
+import { createControls } from './controls.ts';
+import { viewportSize } from './lib/dom.ts';
+import type { AppState, Program, ProgramId } from './program.ts';
+import { editor, formulaProgram } from './programs/formula.program.ts';
+import { dial, playheadProgram } from './programs/playhead.program.ts';
+import { sketch, sketchProgram } from './programs/sketch.program.ts';
+import { timeline, timelineProgram } from './programs/timeline.program.ts';
+import { createPlayhead$ } from './shared/playhead.ts';
 
-const sameFrame = (a: Placement & { width: number; height: number }, b: typeof a): boolean =>
+const programs: readonly Program[] = [
+    formulaProgram,
+    sketchProgram,
+    timelineProgram,
+    playheadProgram,
+];
+
+const sameFrame = (a: Frame, b: Frame): boolean =>
     a.x === b.x && a.y === b.y && a.z === b.z && a.width === b.width && a.height === b.height;
 
 const bootstrap = () => {
-    const linearSlider = requireElement(document, 'hks-linear-slider', HksLinearSlider);
-    const circularSlider = requireElement(document, 'hks-circular-slider', HksCircularSlider);
-    const editor = requireElement(document, 'hks-formula-editor', HksFormulaEditor);
-    const sketch = requireElement(document, 'hks-sketch', HksSketch);
-    const fpsCounter = requireElement(document, 'hks-fps-counter', HksFpsCounter);
+    const panel = document.createElement('aside');
+    panel.id = 'controls';
+    document.body.append(panel);
+    const controls = createControls(panel);
 
-    const controls = createControls(requireElementById('controls'));
-
-    const playhead$ = createPlayhead$(
-        [linearSlider.changes$, circularSlider.changes$],
-        controls.timeline$,
-    ).pipe(shareReplay({ bufferSize: 1, refCount: true }));
-
-    const preset$ = controls.sketch$.pipe(
-        map(({ formula }) => formulas[formula].source),
-        distinctUntilChanged(),
-    );
-
-    const terminal$ = merge(
-        terminalActions$,
-        editor.styleToggles$.pipe(map((): TerminalAction => ({ kind: 'switch' }))),
-    ).pipe(
-        scan(reduceTerminal, initialTerminal),
-        startWith(initialTerminal),
-        shareReplay({ bufferSize: 1, refCount: true }),
+    const actions$ = merge(
+        ...programs.map(program =>
+            controls.windows$.pipe(
+                map(visibility => visibility[program.id]),
+                distinctUntilChanged(),
+                switchMap(open => (open ? liveWindow$(program, state) : EMPTY)),
+            ),
+        ),
     );
 
     const viewport = viewportSize();
     const restored = restoreLayout();
     const seed = restored === null ? defaultLayout(viewport) : clampToViewport(restored, viewport);
 
-    const layout$ = merge(
-        editor.frame$,
-        sketch.frame$,
-        linearSlider.frame$,
-        circularSlider.frame$,
-    ).pipe(
+    const layout$ = actions$.pipe(
         scan(reduceLayout, seed),
+        // Emitted into the replay buffer before the windows mount and read it back.
         startWith(seed),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const frameOf = (id: WindowId) =>
+    const frame$ = (id: ProgramId): Observable<Frame> =>
         layout$.pipe(
             map(layout => layout.frames[id]),
             distinctUntilChanged(sameFrame),
         );
 
-    const size$ = frameOf('sketch').pipe(
-        map(({ width, height }) => ({ width, height })),
-        distinctUntilChanged(sameSize),
-    );
-
-    const params$ = combineLatest([controls.sketch$, size$]).pipe(
-        map(([panel, size]): SketchParams => ({ ...panel, ...size })),
+    const playhead$ = createPlayhead$([timeline.changes$, dial.changes$], controls.timeline$).pipe(
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const source$ = merge(preset$, editor.changes$);
+    const preset$ = controls.formula$.pipe(map(name => formulas[name].source));
 
-    const compiled$ = compileFormula$(sketch.gl, source$).pipe(
-        shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const state: AppState = {
+        frame$,
+        playhead$,
+        preset$,
+        panel$: controls.sketch$,
+        compiled$: compileFormula$(sketch.gl, merge(preset$, editor.changes$)).pipe(
+            shareReplay({ bufferSize: 1, refCount: true }),
+        ),
+    };
 
-    // On failure sketch$ does not emit, so the canvas keeps the last shader.
-    const sketch$ = compiled$.pipe(
-        mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
-        shareReplay({ bufferSize: 1, refCount: true }),
-    );
-
-    const error$ = compiled$.pipe(map(result => (result.ok ? null : result.message)));
-
-    return merge(
-        linearSlider.connect$(playhead$, frameOf('timeline')),
-        circularSlider.connect$(playhead$, frameOf('playhead')),
-        editor.connect$(preset$, error$, terminal$, frameOf('terminal')),
-        sketch.connect$(params$, playhead$, sketch$, frameOf('sketch')),
-        fpsCounter.connect$(playhead$),
-        persistLayout$(layout$),
-    ).subscribe();
+    return persistLayout$(layout$).subscribe();
 };
 
 bootstrap();

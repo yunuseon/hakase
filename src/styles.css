@@ -14,7 +14,6 @@
     --highlight: rgb(0, 173, 181);
 
     --gutter: 6px;
-    --terminal-width: clamp(19rem, 24vw, 26rem);
     --controls-width: 17rem;
     --hks-dial-size: 10rem;
 }

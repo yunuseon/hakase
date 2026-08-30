@@ -55,7 +55,7 @@ The windows drag by their title bar, resize by their corner grip, raise on click
 and remember where you left them. Resizing the sketch window resizes the sketch — that is the only way to set its size, so there are no width/height controls in the panel.
 
 The interface is laid out as a small desktop tool: thin-bordered windows for the
-formula terminal, the sketch and the playhead dial, with the parameter pane
+formula editor, the sketch and the playhead dial, with the parameter pane
 floating collapsed in the corner. The canvas is the subject — everything else is
 chrome around it.
 
@@ -64,34 +64,41 @@ chrome around it.
 Everything is a stream, and `main.ts` is only the graph:
 
 ```ts
-merge(
-    linearSlider.connect$(playhead$),
-    circularSlider.connect$(playhead$),
-    sketch.connect$(controls.sketch$, playhead$),
-    fpsCounter.connect$(playhead$),
-).subscribe();
+const programs = [formulaProgram, sketchProgram, timelineProgram, playheadProgram];
 ```
 
-Three layers, one rule — a view never derives, a model never touches the DOM:
+Each of those is a **program** — one component paired with the window that holds
+it — and a window's whole existence is a subscription — mounted when it is opened, removed when it is
+closed. `main.ts` builds the streams they read back and subscribes once.
 
-- **`model/`** is pure: the playhead, slider geometry, and the GLSL source of
-  each formula. No DOM and no GPU anywhere in it.
-- **`view/`** is custom elements — one folder each, with their own CSS adopted
-  into a shadow root — exposing `connect$(...inputs) => Observable<void>` —
-  streams in, applied views out. Sliders additionally expose `changes$` as a
-  source. Every view has that same shape, so `main.ts` treats them alike.
-- **`lib/`** holds the primitives the other two share: `dom`, `math`, `rx`.
+The tree is grouped by component, not by layer, so one folder holds everything
+only that component needs:
 
-`playhead.ts` owns the only real logic: a scrub sets the position directly; a
+- **`programs/`** — one file per window, pairing a component with the window that
+  holds it. The only layer that knows about both; imports only ever point down
+  into `components/`, never the other way.
+- **`components/<name>/`** — the custom element (`*.component.ts`, the only file
+  that touches the DOM), its CSS adopted into a shadow root
+  and its pure siblings. `components/sketch/` owns its own
+  `gl/`, `shaders/` and `formulas/`, because nothing else imports them.
+- **`shared/`** — the three modules with more than one importer: sketch params
+  and the pointer-drag gesture.
+- **`lib/`** — primitives underneath everything: `dom`, `math`, `rx`, `color`,
+  `storage`.
+
+One rule survives the flattening: a component never derives, a pure module never
+touches the DOM. Every component exposes `connect$(...inputs) => Observable<void>`
+— streams in, applied views out — and sliders additionally expose `changes$` as a
+source, so `main.ts` treats them all alike.
+
+`shared/playhead.ts` owns the only real logic: a scrub sets the position directly; a
 non-zero loop `duration` advances it every animation frame from wherever the last
 scrub left off.
 
 ## Writing a formula
 
-The formula terminal is a live GLSL editor with syntax highlighting. It comes in
-two styles, switchable from the button in its title bar: **floating** as a window
-among the others, or **docked** Quake-style to the top edge — `alt+t` shows and
-hides it, `alt+d` docks and undocks it, and `esc` closes it. Type into it and the shader is
+The formula editor is a live GLSL editor with syntax highlighting, in an ordinary
+window like every other. Type into it and the shader is
 recompiled (debounced); the sketch updates without a reload. A formula that does
 not compile shows the driver's message with **line numbers rebased onto your own
 text**, and the canvas keeps drawing the last one that worked rather than going
@@ -103,7 +110,7 @@ built-in.
 
 A _formula_ is the pure function that displaces the lattice — it is what the
 `formula` dropdown in the panel selects. Adding one is a single edit to
-[`src/model/formulas/registry.ts`](src/model/formulas/registry.ts):
+[`src/components/sketch/formulas/registry.ts`](src/components/sketch/formulas/registry.ts):
 
 ```ts
 export const formulas = {
@@ -133,5 +140,5 @@ vec3 formula(float x, float y, float t) {
 
 Write it in a `.glsl` file beside `ripple.glsl` and import it with `?raw`. The
 formula is _data_ — a string in the model layer — and the view splices it onto
-`view/gl/shaders/sketch.vert` and compiles it. That is what will let formulas be
+`components/sketch/gl/shaders/sketch.vert` and compiles it. That is what will let formulas be
 authored at runtime.

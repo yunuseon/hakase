@@ -1,0 +1,89 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    block-size: 100%;
+    min-block-size: 0;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.editor {
+    position: relative;
+    flex: 1;
+    min-block-size: 6rem;
+}
+
+/* Both layers must lay text out identically or the caret drifts off the glyphs. */
+.highlight,
+.source {
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font: inherit;
+    line-height: 1.45;
+    tab-size: 4;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+.highlight {
+    background: var(--surface);
+    border-color: var(--edge);
+    color: var(--indicator);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.source {
+    background: transparent;
+    color: transparent;
+    caret-color: var(--indicator);
+    overflow: auto;
+    resize: none;
+}
+
+.source:focus {
+    outline: none;
+}
+
+.editor:focus-within .highlight {
+    border-color: var(--track);
+}
+
+.error {
+    margin: 0;
+    padding: 8px;
+    max-block-size: 8rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+}
+
+.token.comment {
+    color: rgb(105 110 115);
+}
+
+.token.keyword {
+    color: #00adb5;
+}
+
+.token.function {
+    color: #eeeeee;
+}
+
+.token.number {
+    color: #d9a066;
+}
+
+.token.operator,
+.token.punctuation {
+    color: rgb(150 155 160);
+}
