@@ -29,6 +29,33 @@ declares a `vec3 formula(...)` prototype and the selected formula's definition
 is concatenated after it, so the shader file stays valid on its own and the
 splice is a plain string append with no placeholder token.
 
+## Components
+
+`connect$` means one thing: **connect app state to the UI**. A view takes streams
+of state and applies them; anything that derives state belongs in `model/`, or —
+when it genuinely needs the GPU — in a named pipeline stage beside the view, not
+as a method on it. Every component's whole surface is `changes$` out and
+`connect$` in, with no exceptions.
+
+Every view our code owns is a **component**: a custom element with a shadow root,
+in a folder of its own under `view/components/<name>/`, holding
+`<name>.component.ts` plus `<name>.css` — imported with Vite's `?inline` and
+adopted once per module via `adoptedStyleSheets`. Everything under
+`view/components/` is a component and nothing else is; `gl/`, `formula.ts`,
+`drag.ts` and `controls.ts` sit beside that folder precisely because they are
+not. There is
+no framework and no second state model — the element is a DOM container, the
+streams stay outside it, and `changes$` / `connect$` are unchanged. Tweakpane is
+the exception: it builds its own panel, so `controls.ts` stays a plain factory.
+
+`src/styles.css` is page-level only: the palette, `#stage` layout, and where the
+floating panels sit. Custom properties cross the shadow boundary, so components
+theme themselves from `--backdrop`, `--track`, `--indicator`, `--accent`.
+
+**A floating panel must never overlap a control.** Overlapping the canvas is
+harmless, but a panel on top of a slider swallows its `pointerdown` and the
+control goes dead with no error anywhere.
+
 ## Layering
 
 Three layers, one rule: **a view never derives, a model never touches the DOM.**
@@ -146,11 +173,41 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
   would someone make a change that looks correct and silently breaks? If not,
   delete it. Documenting what a function does is not a trap — names and types
   carry that, and a pipeline needing prose to be followed should be restructured
-  instead. Five pass in `src/` today: the Tweakpane teardown in `controls.ts`,
-  the `defer` self-reference in `rx.ts`, `prepared$` gating the redraw in
-  `view/sketch.ts`, and in `sketch.vert` the `formula` prototype and the `+ 0.5`
-  cell-centring. Every one of them marks something a reasonable person would
-  delete or "simplify" into a bug. Keep the count that low.
+  instead. The ones that pass mark things a reasonable person would delete or
+  "simplify" into a bug: the `formula` prototype and the `+ 0.5` cell-centring in
+  `sketch.vert`, the Tweakpane teardown in `controls.ts`, the two overlay layers
+  having to share text metrics in `styles.css`. There should be a handful, not a
+  page.
+
+## The formula editor
+
+The editor is the same contract as a slider: `changes$` out (debounced text),
+`connect$` in (preset text to display, error text to show). It deliberately never
+echoes the user's own typing back into the textarea — only preset selections —
+because writing the value back would reset the caret on every keystroke.
+
+Compilation is the middle stage of `inputs -> formula -> render`, so it is a free
+function — `compileFormula$(gl, source$)` in `view/sketch/formula.ts` — and not a
+method on the canvas element. It _produces_ app state rather than displaying it,
+which is the line: `connect$` connects app state to the UI, and anything that
+derives state instead is a pipeline stage. The element owns the canvas and
+exposes its `gl` for the stage to compile into. Failure is a value, not an
+exception. `main.ts` splits the outcome: successes feed `sketch$`, failures
+feed `error$`. Because a failure means `sketch$` simply does not emit,
+`combineLatest` keeps the last shader that linked and the canvas never blanks.
+Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
+once a newer one has replaced it, so editing does not leak GPU resources — that
+cleanup belongs inside `connect$` rather than in a method of its own, because a
+view's whole public surface is `changes$` out and `connect$` in.
+
+The textarea is highlighted by painting a Prism-tokenised `<pre>` behind it and
+making the textarea's own text transparent. That keeps a real `<textarea>`, so
+the caret, native undo, IME and accessibility all still work, and `changes$`
+stays a plain `input` event. The price is that **both layers must lay text out
+identically** — font, line-height, padding, border, wrap — or the caret drifts
+away from the glyphs. Change a text metric on one and you must change the other.
+Highlighting is driven by the raw `input` stream so it repaints per keystroke,
+while compilation is debounced; do not merge those two.
 
 ## Adding a formula
 

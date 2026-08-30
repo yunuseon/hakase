@@ -1,0 +1,30 @@
+:host {
+    display: block;
+    position: relative;
+    width: 200px;
+    height: 200px;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    flex: none;
+}
+
+.track {
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--track);
+    border-radius: 100%;
+    box-sizing: border-box;
+}
+
+.indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 16px;
+    width: 16px;
+    background: var(--accent);
+    border-radius: 100%;
+    pointer-events: none;
+}

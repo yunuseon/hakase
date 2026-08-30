@@ -68,7 +68,8 @@ Three layers, one rule — a view never derives, a model never touches the DOM:
 
 - **`model/`** is pure: the playhead, slider geometry, and the GLSL source of
   each formula. No DOM and no GPU anywhere in it.
-- **`view/`** owns DOM and exposes `connect$(...inputs) => Observable<void>` —
+- **`view/`** is custom elements — one folder each, with their own CSS adopted
+  into a shadow root — exposing `connect$(...inputs) => Observable<void>` —
   streams in, applied views out. Sliders additionally expose `changes$` as a
   source. Every view has that same shape, so `main.ts` treats them alike.
 - **`lib/`** holds the primitives the other two share: `dom`, `math`, `rx`.
@@ -76,6 +77,14 @@ Three layers, one rule — a view never derives, a model never touches the DOM:
 `playhead.ts` owns the only real logic: a scrub sets the position directly; a
 non-zero loop `duration` advances it every animation frame from wherever the last
 scrub left off.
+
+## Writing a formula
+
+The panel on the left is a live GLSL editor with syntax highlighting. Type into it and the shader is
+recompiled (debounced); the sketch updates without a reload. A formula that does
+not compile shows the driver's message with **line numbers rebased onto your own
+text**, and the canvas keeps drawing the last one that worked rather than going
+blank. The `formula` dropdown on the right seeds the editor with a built-in.
 
 ## Adding a formula
 

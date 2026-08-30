@@ -4,6 +4,23 @@ import { createProgram, type ProgramResult } from './program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
 
+// The formula is spliced after the prelude, so the driver numbers the user's
+// first line as line PRELUDE_LINES + 1. Reporting that raw is useless.
+const PRELUDE_LINES = vertexSource.split('\n').length;
+
+const NULL_TERMINATOR = /\0/g;
+const LOG_LOCATION = /^(ERROR|WARNING): \d+:(\d+):/gm;
+
+const readableLog = (log: string, offset: number): string =>
+    log
+        .replace(NULL_TERMINATOR, '')
+        .trimEnd()
+        .replace(
+            LOG_LOCATION,
+            (_match: string, level: string, line: string) =>
+                `${level} line ${Number(line) - offset}:`,
+        );
+
 export type Uniforms = {
     readonly dimension: WebGLUniformLocation | null;
     readonly playhead: WebGLUniformLocation | null;
@@ -28,7 +45,10 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
     const result: ProgramResult = createProgram(gl, `${vertexSource}\n${formula}`, fragmentSource);
 
     if (!result.ok) {
-        return result;
+        return {
+            ok: false,
+            message: readableLog(result.message, result.stage === 'vertex' ? PRELUDE_LINES : 0),
+        };
     }
 
     const { program } = result;

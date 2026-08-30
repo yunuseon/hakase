@@ -5,22 +5,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
             name="description"
-            content="An RxJS-driven canvas sketchbook: scrub or loop a playhead through generative sketches."
+            content="A GPU-rendered sketchbook: scrub or loop a playhead through generative formulas."
         />
         <title>hakase — RxJS Animate</title>
     </head>
 
     <body>
+        <hks-formula-editor></hks-formula-editor>
+
         <main id="stage">
-            <div id="canvas-container">
-                <div id="slider" class="slider">
-                    <div class="slider-indicator"></div>
-                </div>
+            <div class="stack">
+                <hks-linear-slider></hks-linear-slider>
+                <hks-sketch></hks-sketch>
+                <hks-fps-counter></hks-fps-counter>
             </div>
 
-            <div id="circle-slider" class="circle-slider">
-                <div id="circle-indicator" class="circle-indicator"></div>
-            </div>
+            <hks-circular-slider></hks-circular-slider>
         </main>
 
         <script type="module" src="/src/main.ts"></script>

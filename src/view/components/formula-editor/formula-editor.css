@@ -1,0 +1,93 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 340px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.label {
+    color: var(--track);
+}
+
+.editor {
+    position: relative;
+    height: 190px;
+}
+
+/* The highlight layer and the textarea must lay text out identically, or the
+   caret drifts away from the glyphs it is sitting on. Every property that
+   affects text metrics has to be set on both. */
+.highlight,
+.source {
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font: inherit;
+    line-height: 1.45;
+    tab-size: 4;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+.highlight {
+    background: rgb(28 28 26);
+    border-color: rgb(60 60 58);
+    color: var(--indicator);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.source {
+    background: transparent;
+    color: transparent;
+    caret-color: var(--indicator);
+    overflow: auto;
+    resize: none;
+}
+
+.source:focus {
+    outline: none;
+}
+
+.editor:focus-within .highlight {
+    border-color: var(--track);
+}
+
+.error {
+    margin: 0;
+    padding: 8px;
+    max-height: 140px;
+    overflow: auto;
+    white-space: pre-wrap;
+    color: var(--accent);
+    background: rgb(28 28 26);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+}
+
+.token.comment {
+    color: rgb(105 110 115);
+}
+
+.token.keyword {
+    color: #00adb5;
+}
+
+.token.function {
+    color: #eeeeee;
+}
+
+.token.number {
+    color: #d9a066;
+}
+
+.token.operator,
+.token.punctuation {
+    color: rgb(150 155 160);
+}

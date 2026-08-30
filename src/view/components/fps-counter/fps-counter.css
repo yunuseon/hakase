@@ -1,0 +1,7 @@
+:host {
+    display: block;
+    color: var(--accent);
+    font-size: 16px;
+    font-family: monospace;
+    text-align: right;
+}

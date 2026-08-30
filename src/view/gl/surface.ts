@@ -9,9 +9,9 @@ export type SurfaceGeometry = {
     ratio: number;
 };
 
-export const createSurface = (container: HTMLElement): Surface => {
+export const createSurface = (root: ShadowRoot): Surface => {
     const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
+    root.appendChild(canvas);
 
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
     if (!gl) {
