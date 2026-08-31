@@ -12,7 +12,7 @@ const TEMPLATE = `<div class="tray" role="toolbar" aria-label="programs"></div>`
 export type DockItem = {
     readonly id: string;
     readonly title: string;
-    /** Path data on a 24x24 viewBox, stroked rather than filled. */
+    // Path data on a 24x24 viewBox, stroked rather than filled.
     readonly icon: string;
 };
 

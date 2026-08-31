@@ -15,6 +15,8 @@ import './styles.css';
 import { HksDesktop } from './components/desktop/desktop.component.ts';
 import { HksDock } from './components/dock/dock.component.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
+import type { Theme } from './components/sketch/theme.ts';
+import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame } from './components/window/frame.ts';
 import { createControls } from './controls.ts';
 import { persistDesktop$, restoreDesktop } from './desktop-store.ts';
@@ -34,16 +36,18 @@ import {
     type ProcessId,
     type Program,
     type ProgramId,
-    type Source,
+    type Written,
 } from './program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
+import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
 import { createPlayhead$, isPlaying$ } from './shared/playhead.ts';
 
 const programs: readonly Program[] = [
     formulaProgram,
+    themeProgram,
     sketchProgram,
     timelineProgram,
     playheadProgram,
@@ -169,12 +173,25 @@ const bootstrap = () => {
                 : EMPTY,
         ),
         scan(
-            (edits, { formula, text, from }): ReadonlyMap<FormulaName, Source> =>
-                new Map(edits).set(formula, { text, from }),
-            new Map<FormulaName, Source>(),
+            (edits, { formula, text, from }): ReadonlyMap<FormulaName, Written<string>> =>
+                new Map(edits).set(formula, { value: text, from }),
+            new Map<FormulaName, Written<string>>(),
         ),
-        startWith(new Map<FormulaName, Source>()),
+        startWith(new Map<FormulaName, Written<string>>()),
         // Not refCount: the last reader switching formula must not erase the edits.
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    const palettes$ = inputs$.pipe(
+        mergeMap(({ from, input }) =>
+            input.kind === 'theme' ? of({ from, theme: input.theme, value: input.value }) : EMPTY,
+        ),
+        scan(
+            (all, { theme, value, from }): ReadonlyMap<ThemeName, Written<Theme>> =>
+                new Map(all).set(theme, { value, from }),
+            new Map<ThemeName, Written<Theme>>(),
+        ),
+        startWith(new Map<ThemeName, Written<Theme>>()),
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
@@ -203,8 +220,10 @@ const bootstrap = () => {
         ),
         source$: (formula: FormulaName) =>
             edits$.pipe(
-                map(edits => edits.get(formula) ?? { text: formulas[formula].source, from: null }),
+                map(edits => edits.get(formula) ?? { value: formulas[formula].source, from: null }),
             ),
+        theme$: (theme: ThemeName) =>
+            palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         error$: (formula: FormulaName) =>
             diagnostics$.pipe(
                 map(all => all.get(formula) ?? null),

@@ -32,10 +32,10 @@ const slider = (
     </label>
 `;
 
-const swatch = (key: string, label: string, value: string) => `
+const choice = (key: string, label: string) => `
     <label class="row">
         <span class="key">${label}</span>
-        <input class="ink" data-field="${key}" type="color" value="${value}" />
+        <select class="pick" data-pick="${key}" aria-label="${label}"></select>
     </label>
 `;
 
@@ -43,16 +43,11 @@ const TEMPLATE = `
     <details class="panel">
         <summary class="handle">parameters</summary>
         <div class="grid">
-            <label class="row">
-                <span class="key">formula</span>
-                <select class="pick" aria-label="formula"></select>
-            </label>
+            ${choice('formula', 'formula')}
+            ${choice('theme', 'theme')}
             ${slider('dimension', 'lattice', 1, 128, 1, defaultParams.dimension)}
             ${slider('baseSize', 'dot', 1, 20, 1, defaultParams.baseSize)}
             ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultParams.depthScalar)}
-            ${swatch('color1', 'back', defaultParams.color1)}
-            ${swatch('color2', 'mid', defaultParams.color2)}
-            ${swatch('color3', 'fore', defaultParams.color3)}
         </div>
     </details>
 `;
@@ -64,10 +59,10 @@ export type PresetOption = {
 
 export class HksSketchControls extends HTMLElement {
     readonly changes$: Observable<PanelParams>;
-    readonly selections$: Observable<string>;
+    readonly selectedFormula$: Observable<string>;
+    readonly selectedTheme$: Observable<string>;
 
     private readonly shadow: ShadowRoot;
-    private readonly picker: HTMLSelectElement;
 
     constructor() {
         super();
@@ -76,15 +71,19 @@ export class HksSketchControls extends HTMLElement {
         this.shadow.adoptedStyleSheets = [sheet];
         this.shadow.innerHTML = TEMPLATE;
 
-        this.picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
-
         // Deferred: the current option is only known once presets() has filled the list.
-        this.selections$ = defer(() =>
-            concat(
-                of(this.picker.value),
-                fromElementEvent$(this.picker, 'change').pipe(map(() => this.picker.value)),
-            ),
-        );
+        const chosen$ = (key: string): Observable<string> =>
+            defer(() => {
+                const pick = this.pick(key);
+
+                return concat(
+                    of(pick.value),
+                    fromElementEvent$(pick, 'change').pipe(map(() => pick.value)),
+                );
+            });
+
+        this.selectedFormula$ = chosen$('formula');
+        this.selectedTheme$ = chosen$('theme');
 
         const field = (key: string): HTMLInputElement =>
             requireElement(this.shadow, `[data-field="${key}"]`, HTMLInputElement);
@@ -107,24 +106,30 @@ export class HksSketchControls extends HTMLElement {
             dimension: number$('dimension'),
             baseSize: number$('baseSize'),
             depthScalar: number$('depthScalar'),
-            color1: text$('color1'),
-            color2: text$('color2'),
-            color3: text$('color3'),
         });
     }
 
-    presets(options: readonly PresetOption[]): this {
-        this.picker.replaceChildren(
-            ...options.map(({ value, label }) => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = label;
+    presets(formulas: readonly PresetOption[], themes: readonly PresetOption[]): this {
+        const fill = (key: string, options: readonly PresetOption[]) => {
+            this.pick(key).replaceChildren(
+                ...options.map(({ value, label }) => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = label;
 
-                return option;
-            }),
-        );
+                    return option;
+                }),
+            );
+        };
+
+        fill('formula', formulas);
+        fill('theme', themes);
 
         return this;
+    }
+
+    private pick(key: string): HTMLSelectElement {
+        return requireElement(this.shadow, `[data-pick="${key}"]`, HTMLSelectElement);
     }
 
     connect$(params$: Observable<PanelParams>): Observable<void> {

@@ -39,7 +39,7 @@ export const formulaProgram: Program = {
                         source$(name).pipe(
                             scan(
                                 (shown, source, index) =>
-                                    index === 0 || source.from !== self.id ? source.text : shown,
+                                    index === 0 || source.from !== self.id ? source.value : shown,
                                 '',
                             ),
                             distinctUntilChanged(),

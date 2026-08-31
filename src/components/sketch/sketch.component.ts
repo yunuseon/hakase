@@ -3,8 +3,9 @@ import { map, pairwise, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { devicePixelRatio$ } from '../../lib/rx.ts';
 import type { SketchParams } from './params.ts';
+import { buildRamp } from './theme.ts';
 import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
-import { drawFrame, prepare, toPalette, type Sketch } from './gl/sketch-program.ts';
+import { drawFrame, prepare, type Sketch } from './gl/sketch-program.ts';
 import css from './sketch.css?inline';
 
 const sheet = styleSheet(css);
@@ -41,15 +42,15 @@ export class HksSketch extends HTMLElement {
                 params,
                 sketch,
                 ratio,
-                palette: toPalette(params),
+                ramp: buildRamp(params.theme),
             })),
-            tap(({ params, sketch, ratio, palette }) => {
+            tap(({ params, sketch, ratio, ramp }) => {
                 applyGeometry(this.surface, {
                     width: params.width,
                     height: params.height,
                     ratio,
                 });
-                prepare(this.surface.gl, sketch, params, palette, ratio);
+                prepare(this.surface, sketch, params, ramp, ratio);
             }),
         );
 

@@ -1,9 +1,7 @@
 #version 300 es
 precision highp float;
 
-uniform vec3 uColor1;
-uniform vec3 uColor2;
-uniform vec3 uColor3;
+uniform sampler2D uPalette;
 
 in float vDepth;
 in float vPointSize;
@@ -19,7 +17,7 @@ void main() {
         discard;
     }
 
-    vec3 color = vDepth < 0.33 ? uColor1 : (vDepth < 0.66 ? uColor2 : uColor3);
+    vec3 color = texture(uPalette, vec2(clamp(vDepth, 0.0, 1.0), 0.5)).rgb;
 
     fragColor = vec4(color * alpha, alpha);
 }

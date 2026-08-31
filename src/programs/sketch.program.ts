@@ -11,8 +11,10 @@ import {
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { compileFormula$ } from '../components/sketch/compile.ts';
 import { formulas, isFormulaName } from '../components/sketch/formulas/registry.ts';
+import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
+import { sameTheme, type Theme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import type { PanelParams, SketchParams } from '../components/sketch/params.ts';
 import type { Size } from '../components/window/frame.ts';
@@ -33,13 +35,15 @@ export const sketchProgram: Program = {
 
         const controls = new HksSketchControls().presets(
             Object.entries(formulas).map(([value, { label }]) => ({ value, label })),
+            Object.keys(themes).map(value => ({ value, label: value })),
         );
         controls.slot = 'controls';
         sketch.append(fpsCounter, controls);
 
         return {
             element: sketch,
-            run$: ({ playhead$, source$ }, { frame$ }) => {
+            run$: (state, { frame$ }) => {
+                const { playhead$, source$ } = state;
                 // Without the comparator, dragging the window would re-prepare the shader.
                 const size$ = frame$.pipe(
                     map(({ width, height }): Size => ({ width, height })),
@@ -51,15 +55,24 @@ export const sketchProgram: Program = {
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                const params$ = combineLatest([panel$, size$]).pipe(
-                    map(([panel, size]: [PanelParams, Size]): SketchParams => ({
+                const theme$ = controls.selectedTheme$.pipe(
+                    mergeMap(name => (isThemeName(name) ? of(name) : EMPTY)),
+                    distinctUntilChanged(),
+                    switchMap(name => state.theme$(name)),
+                    map(({ value }) => value),
+                    distinctUntilChanged(sameTheme),
+                );
+
+                const params$ = combineLatest([panel$, size$, theme$]).pipe(
+                    map(([panel, size, theme]: [PanelParams, Size, Theme]): SketchParams => ({
                         ...panel,
                         ...size,
+                        theme,
                     })),
                 );
 
                 // This window's choice; the text behind it is shared with whoever matches.
-                const formula$ = controls.selections$.pipe(
+                const formula$ = controls.selectedFormula$.pipe(
                     mergeMap(name => (isFormulaName(name) ? of(name) : EMPTY)),
                     distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
@@ -71,7 +84,7 @@ export const sketchProgram: Program = {
                     formula$.pipe(
                         switchMap(name =>
                             source$(name).pipe(
-                                map(({ text }) => text),
+                                map(({ value }) => value),
                                 distinctUntilChanged(),
                             ),
                         ),

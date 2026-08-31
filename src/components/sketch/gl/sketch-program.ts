@@ -1,5 +1,6 @@
-import { parseHexColor, type Rgb } from '../../../lib/color.ts';
 import type { SketchParams } from '../params.ts';
+import { RAMP_SIZE } from '../theme.ts';
+import type { Surface } from './surface.ts';
 import { createProgram, type ProgramResult } from './program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
@@ -26,9 +27,7 @@ export type Uniforms = {
     readonly depthScalar: WebGLUniformLocation | null;
     readonly baseSize: WebGLUniformLocation | null;
     readonly pixelRatio: WebGLUniformLocation | null;
-    readonly color1: WebGLUniformLocation | null;
-    readonly color2: WebGLUniformLocation | null;
-    readonly color3: WebGLUniformLocation | null;
+    readonly palette: WebGLUniformLocation | null;
 };
 
 export type Sketch = {
@@ -63,39 +62,17 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 depthScalar: at('uDepthScalar'),
                 baseSize: at('uBaseSize'),
                 pixelRatio: at('uPixelRatio'),
-                color1: at('uColor1'),
-                color2: at('uColor2'),
-                color3: at('uColor3'),
+                palette: at('uPalette'),
             },
         },
     };
 };
 
-export type Palette = {
-    readonly low: Rgb;
-    readonly mid: Rgb;
-    readonly high: Rgb;
-};
-
-export const toPalette = ({ color1, color2, color3 }: SketchParams): Palette => ({
-    low: parseHexColor(color1),
-    mid: parseHexColor(color2),
-    high: parseHexColor(color3),
-});
-
-const setColor = (
-    gl: WebGL2RenderingContext,
-    location: WebGLUniformLocation | null,
-    { r, g, b }: Rgb,
-): void => {
-    gl.uniform3f(location, r, g, b);
-};
-
 export const prepare = (
-    gl: WebGL2RenderingContext,
+    { gl, palette }: Surface,
     { program, uniforms }: Sketch,
     params: SketchParams,
-    palette: Palette,
+    ramp: Uint8Array,
     pixelRatio: number,
 ): void => {
     gl.useProgram(program);
@@ -105,11 +82,13 @@ export const prepare = (
     gl.uniform1f(uniforms.baseSize, params.baseSize);
     gl.uniform1f(uniforms.pixelRatio, pixelRatio);
 
-    setColor(gl, uniforms.color1, palette.low);
-    setColor(gl, uniforms.color2, palette.mid);
-    setColor(gl, uniforms.color3, palette.high);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, palette);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RAMP_SIZE, 1, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
+    gl.uniform1i(uniforms.palette, 0);
 
-    gl.clearColor(palette.low.r, palette.low.g, palette.low.b, 1);
+    // The backdrop is the ramp's first entry, so a theme owns the whole canvas.
+    gl.clearColor((ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255, 1);
 };
 
 export const drawFrame = (

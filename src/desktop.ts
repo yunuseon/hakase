@@ -21,9 +21,9 @@ export type Process = {
 };
 
 export type Desktop = {
-    /** Back to front: a process's index in here is its z-order. */
+    // Back to front: a process's index in here is its z-order.
     readonly processes: readonly Process[];
-    /** Monotone, so a relaunch never reuses a dead process's id. */
+    // Monotone, so a relaunch never reuses a dead process's id.
     readonly launched: number;
     readonly shortcuts: Readonly<Record<ProgramId, Point>>;
 };
@@ -86,6 +86,7 @@ export const defaultDesktop = ({ width, height }: Viewport): Desktop => {
         launched: 4,
         shortcuts: {
             formula: { x: column, y: 270 },
+            theme: { x: column, y: 590 },
             sketch: { x: column, y: 350 },
             timeline: { x: column, y: 430 },
             playhead: { x: column, y: 510 },
@@ -221,6 +222,7 @@ export const parseDesktop = (value: unknown): Desktop | null => {
 
     if (!(
         'formula' in shortcuts &&
+        'theme' in shortcuts &&
         'sketch' in shortcuts &&
         'timeline' in shortcuts &&
         'playhead' in shortcuts
@@ -229,17 +231,24 @@ export const parseDesktop = (value: unknown): Desktop | null => {
     }
 
     const formula = pointFrom(shortcuts.formula);
+    const theme = pointFrom(shortcuts.theme);
     const sketch = pointFrom(shortcuts.sketch);
     const timeline = pointFrom(shortcuts.timeline);
     const playhead = pointFrom(shortcuts.playhead);
 
-    if (formula === null || sketch === null || timeline === null || playhead === null) {
+    if (
+        formula === null ||
+        theme === null ||
+        sketch === null ||
+        timeline === null ||
+        playhead === null
+    ) {
         return null;
     }
 
     return {
         processes: processes.filter(process => process !== null),
         launched,
-        shortcuts: { formula, sketch, timeline, playhead },
+        shortcuts: { formula, theme, sketch, timeline, playhead },
     };
 };

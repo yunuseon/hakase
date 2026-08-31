@@ -13,7 +13,7 @@ const TEMPLATE = `<div class="board"></div>`;
 export type Shortcut = {
     readonly id: string;
     readonly title: string;
-    /** Path data on a 24x24 viewBox, stroked rather than filled. */
+    // Path data on a 24x24 viewBox, stroked rather than filled.
     readonly icon: string;
 };
 

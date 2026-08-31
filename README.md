@@ -107,9 +107,13 @@ text**, and the canvas keeps drawing the last one that worked rather than going
 blank. Its preset picker seeds the source with a built-in formula.
 
 Each sketch window carries its own **parameters** strip — which formula it
-renders, plus lattice, dot size, depth and the three palette colours — so two
-sketches can show different formulas, or the same one at different densities and
-colours. The formula text itself is shared: edit Rose in an editor and every
+renders, which theme colours it, plus lattice, dot size and depth — so two
+sketches can show different formulas, or the same one at different densities.
+
+A **theme** is a gradient of one or more colour stops, edited in its own program:
+drag a stop's position, pick its colour, add or drop stops, and choose whether the
+colours blend smoothly or hold as hard bands with no interpolation at all. Themes
+are shared like formulas — retheme `ember` and every sketch wearing it repaints. The formula text itself is shared: edit Rose in an editor and every
 sketch showing Rose updates — as does any other editor open on Rose — while
 everything else carries on untouched. The floating pane at the bottom right holds only
 what is global to the app: the loop duration.

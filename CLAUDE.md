@@ -103,8 +103,8 @@ would be written over what they are typing. Selecting a formula emits no `source
 input at all; only typing does.
 
 **Configuration follows the process, not the program.** A sketch's lattice, dot
-size, depth and palette live in `hks-sketch-controls`, slotted into that sketch's
-own window, so two sketches can run the same formula at different densities and
+size and depth live in `hks-sketch-controls`, slotted into that sketch's own
+window, so two sketches can run the same formula at different densities and
 colours. They were global Tweakpane folders once; the moment a program could run
 twice, a shared panel meant two windows fighting over one set of knobs. What stays
 in the Tweakpane pane is what is genuinely global: `duration`, because the playhead
@@ -452,7 +452,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Forty-two of them survive in `src/` today, every one a single line. Treat that
+    Fifty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -485,6 +485,39 @@ back to the offset it started from. That is what `pairwise()` is doing there.
 `duration: 0` no longer means paused — the button does that now — so
 `timelineParams.duration` seeds at 8 seconds. The reducer still guards against 0,
 which now means only "a loop of no length cannot advance".
+
+## Themes
+
+A **theme** is a document exactly like a formula: named, kept in a registry,
+edited by its own program, and read by sketches through
+`AppState.theme$(name)`. A sketch picks one by name in its own panel, so two
+sketches can wear different themes while a third shares one — and editing a theme
+repaints every sketch showing it. Colours used to be three fields on
+`SketchParams`; they were per-window settings pretending to be render parameters.
+
+A theme is `1..n` stops (`at` in [0, 1], plus a colour) and a `blend`:
+
+- **`smooth`** interpolates between neighbouring stops.
+- **`steps`** does not: each stop's colour holds until the next one. A stop
+  sitting exactly at `1` therefore owns nothing, which is why the built-in
+  `bands` places its three stops at 0, 0.34 and 0.67.
+
+**Both blends are the same texture, filled differently.** `buildRamp` turns a
+theme into a 256-entry RGBA lookup and the fragment shader samples it by depth,
+so the shader never learns what a stop is and `n` stops cost exactly what three
+did. The texture is `NEAREST`-filtered, or the sampler would smear a stepped
+theme across texels and quietly re-introduce the interpolation the mode exists to
+avoid. It belongs to the `Surface`, one per canvas — not to the compiled `Sketch`,
+which is thrown away on every recompile.
+
+`gradientCss` builds the editor's preview bar from the same stops, including the
+doubled positions that make `steps` hard in CSS. Preview and render are two
+readings of one theme; if you change one rule, change both or they will drift.
+
+The editor never edits its own DOM. Add and remove compute a whole new theme from
+the current one and emit it; the rows come back through `connect$`. That keeps the
+component a pure source, and it is why `rows$` rebuilds on a **shape** change
+(stop count or blend) but not on a value the user is currently dragging.
 
 ## The formula editor
 
