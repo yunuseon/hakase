@@ -2,11 +2,11 @@ import { defer, merge, type Observable } from 'rxjs';
 import { finalize, ignoreElements, map } from 'rxjs/operators';
 import type { WindowView } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
-import type { DesktopAction } from './desktop.ts';
 import type { AppInput, AppState, ProcessId, Program, Self } from './program.ts';
+import type { WorkspaceAction } from './workspace.ts';
 
 export type ProcessSignal =
-    | { readonly to: 'desktop'; readonly action: DesktopAction }
+    | { readonly to: 'workspace'; readonly action: WorkspaceAction }
     // Stamped here so a process can tell its own edits from everyone else's.
     | { readonly to: 'app'; readonly from: ProcessId; readonly input: AppInput };
 
@@ -15,19 +15,20 @@ export const liveProcess$ = (
     program: Program,
     self: Self,
     state: AppState,
+    host: HTMLElement,
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
         const element = new HksWindow().label(program.title);
         element.append(view.element);
-        document.body.append(element);
+        host.append(element);
 
         const view$ = self.frame$.pipe(map((frame): WindowView => ({ kind: program.kind, frame })));
 
         return merge(
             element.gestures$.pipe(
                 map((gesture): ProcessSignal => ({
-                    to: 'desktop',
+                    to: 'workspace',
                     action: { ...gesture, id: self.id },
                 })),
             ),

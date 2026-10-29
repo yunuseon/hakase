@@ -10,24 +10,19 @@ import {
     shareReplay,
     startWith,
     takeUntil,
+    withLatestFrom,
 } from 'rxjs/operators';
 import './styles.css';
-import { HksDesktop } from './components/desktop/desktop.component.ts';
-import { HksDock } from './components/dock/dock.component.ts';
+import { zoomLabel } from './components/canvas/camera.ts';
+import { HksCanvas } from './components/canvas/canvas.component.ts';
+import { HksToolbar } from './components/toolbar/toolbar.component.ts';
+import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame } from './components/window/frame.ts';
-import { persistDesktop$, restoreDesktop } from './desktop-store.ts';
-import {
-    clampToViewport,
-    defaultDesktop,
-    reduceDesktop,
-    type Desktop,
-    type DesktopAction,
-    type Process,
-} from './desktop.ts';
 import { viewportSize } from './lib/dom.ts';
+import { viewport$ } from './lib/rx.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import {
     isProgramId,
@@ -43,6 +38,15 @@ import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
 import { createPlayhead$, defaultDuration, isPlaying$ } from './shared/playhead.ts';
+import { toolbarHost$ } from './toolbar-host.ts';
+import { persistWorkspace$, restoreWorkspace } from './workspace-store.ts';
+import {
+    defaultWorkspace,
+    reduceWorkspace,
+    type Process,
+    type Workspace,
+    type WorkspaceAction,
+} from './workspace.ts';
 
 const programs: readonly Program[] = [
     formulaProgram,
@@ -64,57 +68,81 @@ const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
 
 const bootstrap = () => {
-    const surface = new HksDesktop().items(faces);
-    document.body.append(surface);
+    const canvas = new HksCanvas();
+    document.body.append(canvas);
 
-    const dock = new HksDock().items(faces);
-    document.body.append(dock);
+    const toolbar = new HksToolbar().items(faces);
+    toolbar.slot = 'chrome';
+    canvas.append(toolbar);
 
-    const launches$ = merge(dock.activations$, surface.launches$).pipe(
-        mergeMap((id): Observable<DesktopAction> => {
+    const launches$ = toolbar.launches$.pipe(
+        mergeMap(id => {
             const program = isProgramId(id) ? programOf(id) : undefined;
 
-            return program === undefined
-                ? EMPTY
-                : of({
-                      kind: 'launch',
-                      program: program.id,
-                      frame: { x: 60, y: 60, z: 0, ...program.size },
-                  });
+            return program === undefined ? EMPTY : of(program);
         }),
+        withLatestFrom(viewport$),
+        map(([program, viewport]): WorkspaceAction => ({
+            kind: 'launch',
+            program: program.id,
+            size: program.size,
+            viewport,
+        })),
     );
 
-    const shortcutMoves$ = surface.drags$.pipe(
-        mergeMap(({ id, dx, dy }): Observable<DesktopAction> =>
-            isProgramId(id) ? of({ kind: 'shortcut', program: id, dx, dy }) : EMPTY,
+    const zoomSteps$ = merge(toolbar.zooms$, canvas.keys$).pipe(
+        withLatestFrom(viewport$),
+        map(([command, viewport]): WorkspaceAction => ({ kind: 'zoom-step', command, viewport })),
+    );
+
+    const toolbarActions$ = merge(
+        toolbar.placements$.pipe(
+            map((placement): WorkspaceAction => ({ kind: 'place-toolbar', placement })),
+        ),
+        toolbar.retracts$.pipe(map((): WorkspaceAction => ({ kind: 'retract-toolbar' }))),
+        // defer: the toolbar's window is opened from the state this very fold produces.
+        defer(() => toolbarGestures$).pipe(
+            map((gesture): WorkspaceAction => ({ kind: 'toolbar-window', gesture })),
         ),
     );
 
-    const viewport = viewportSize();
-    const restored = restoreDesktop();
-    const seed = restored === null ? defaultDesktop(viewport) : clampToViewport(restored, viewport);
+    const seed = restoreWorkspace() ?? defaultWorkspace(viewportSize());
 
     // defer, or the cycle is evaluated at construction: signals$ is built from this.
-    const desktop$: Observable<Desktop> = merge(
+    const workspace$: Observable<Workspace> = merge(
         launches$,
-        shortcutMoves$,
+        zoomSteps$,
+        canvas.gestures$,
+        toolbarActions$,
         defer(() => signals$).pipe(
-            mergeMap(signal => (signal.to === 'desktop' ? of(signal.action) : EMPTY)),
+            mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
         ),
     ).pipe(
-        scan(reduceDesktop, seed),
+        scan(reduceWorkspace, seed),
         // Emitted into the replay buffer before the processes start and read it back.
         startWith(seed),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const ids$ = desktop$.pipe(
+    const camera$ = workspace$.pipe(
+        map(({ camera }) => camera),
+        distinctUntilChanged(),
+    );
+
+    const toolbarState$ = workspace$.pipe(
+        map(({ toolbar }) => toolbar),
+        distinctUntilChanged(),
+    );
+
+    const toolbarGestures$ = toolbarHost$(toolbar, canvas, toolbarState$);
+
+    const ids$ = workspace$.pipe(
         map(({ processes }) => processes.map(({ id }) => id)),
         distinctUntilChanged(sameIds),
     );
 
     const frame$ = (id: ProcessId): Observable<Frame> =>
-        desktop$.pipe(
+        workspace$.pipe(
             mergeMap(({ processes }) => {
                 const index = processes.findIndex(process => process.id === id);
                 const process = processes[index];
@@ -125,7 +153,7 @@ const bootstrap = () => {
             distinctUntilChanged(sameFrame),
         );
 
-    const appeared$: Observable<Process> = desktop$.pipe(
+    const appeared$: Observable<Process> = workspace$.pipe(
         map(({ processes }) => processes),
         startWith<readonly Process[]>([]),
         pairwise(),
@@ -140,9 +168,12 @@ const bootstrap = () => {
 
             return program === undefined
                 ? EMPTY
-                : liveProcess$(program, { id: process.id, frame$: frame$(process.id) }, state).pipe(
-                      takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))),
-                  );
+                : liveProcess$(
+                      program,
+                      { id: process.id, frame$: frame$(process.id) },
+                      state,
+                      canvas,
+                  ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
     );
@@ -230,21 +261,24 @@ const bootstrap = () => {
             ),
     };
 
-    const runningPrograms$ = desktop$.pipe(
+    const runningPrograms$ = workspace$.pipe(
         map(({ processes }) => [...new Set(processes.map(({ program }) => program))].sort().join()),
         distinctUntilChanged(),
         map(key => new Set(key === '' ? [] : key.split(','))),
     );
 
-    const shortcuts$ = desktop$.pipe(
-        map(({ shortcuts }) => shortcuts),
-        distinctUntilChanged(),
+    const toolbarView$ = toolbarState$.pipe(
+        map((state): ToolbarView =>
+            state.kind === 'docked'
+                ? { placement: state.edge, retracted: state.retracted }
+                : { placement: 'float', retracted: false },
+        ),
     );
 
     return merge(
-        persistDesktop$(desktop$),
-        dock.connect$(runningPrograms$),
-        surface.connect$(shortcuts$),
+        persistWorkspace$(workspace$),
+        canvas.connect$(camera$),
+        toolbar.connect$(runningPrograms$, camera$.pipe(map(zoomLabel)), toolbarView$),
     ).subscribe();
 };
 

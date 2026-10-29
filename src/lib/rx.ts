@@ -1,5 +1,6 @@
 import { concat, defer, fromEvent, Observable, of } from 'rxjs';
-import { switchMap, take } from 'rxjs/operators';
+import { viewportSize, type Viewport } from './dom.ts';
+import { map, shareReplay, startWith, switchMap, take } from 'rxjs/operators';
 
 export const fromElementEvent$ = <K extends keyof HTMLElementEventMap>(
     element: HTMLElement,
@@ -60,3 +61,9 @@ export const devicePixelRatio$: Observable<number> = defer(() => {
         ),
     );
 });
+
+export const viewport$: Observable<Viewport> = fromEvent(window, 'resize').pipe(
+    map(() => viewportSize()),
+    startWith(viewportSize()),
+    shareReplay({ bufferSize: 1, refCount: false }),
+);

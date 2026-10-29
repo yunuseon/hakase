@@ -26,8 +26,8 @@ export type Viewport = {
     readonly height: number;
 };
 
-// `innerWidth` reads 0 in an embedded frame before layout; floor it once, here.
+// `innerWidth` reads 0 in an embedded frame before layout; only that is replaced, not a small screen.
 export const viewportSize = (): Viewport => ({
-    width: Math.max(window.innerWidth, 960),
-    height: Math.max(window.innerHeight, 600),
+    width: window.innerWidth > 0 ? window.innerWidth : 960,
+    height: window.innerHeight > 0 ? window.innerHeight : 600,
 });

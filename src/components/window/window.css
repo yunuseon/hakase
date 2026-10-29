@@ -1,5 +1,5 @@
 :host {
-    position: fixed;
+    position: absolute;
     inset-block-start: 0;
     inset-inline-start: 0;
     display: flex;

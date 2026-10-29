@@ -1,4 +1,3 @@
-import type { Viewport } from '../../lib/dom.ts';
 import { clamp } from '../../lib/math.ts';
 
 export type Placement = {
@@ -40,7 +39,6 @@ const MIN_WIDTH = 180;
 const MIN_HEIGHT = 64;
 // The sketch's frame is its canvas size, so this caps the drawing buffer.
 const MAX_SIDE = 1280;
-const REACHABLE = 80;
 
 export const moved = (frame: Frame, dx: number, dy: number): Frame => ({
     ...frame,
@@ -67,13 +65,6 @@ export const resized = (frame: Frame, edge: ResizeEdge, dx: number, dy: number):
         height,
     };
 };
-
-// Otherwise a window saved off screen has no title bar left to grab.
-export const clampFrame = (frame: Frame, viewport: Viewport): Frame => ({
-    ...frame,
-    x: clamp(frame.x, REACHABLE - frame.width, viewport.width - REACHABLE),
-    y: clamp(frame.y, 0, viewport.height - REACHABLE),
-});
 
 const finite = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null;

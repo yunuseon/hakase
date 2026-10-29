@@ -1,0 +1,313 @@
+:host {
+    --tab: 18px;
+    --inset: 12px;
+
+    position: fixed;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: system-ui, sans-serif;
+    transition: translate 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tray {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 5px;
+    color: var(--label);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    box-shadow: 0 6px 24px var(--shadow);
+    transition: opacity 180ms ease;
+}
+
+.group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.group + .group {
+    padding-inline-start: 5px;
+    margin-inline-start: 3px;
+    border-inline-start: 1px solid var(--edge);
+}
+
+/* Vertical edges stack the tray: the separators turn with it. */
+:host([data-placement='left']),
+:host([data-placement='right']) {
+    flex-direction: row;
+}
+
+:host([data-placement='left']) .tray,
+:host([data-placement='right']) .tray,
+:host([data-placement='left']) .group,
+:host([data-placement='right']) .group {
+    flex-direction: column;
+}
+
+:host([data-placement='left']) .group + .group,
+:host([data-placement='right']) .group + .group {
+    padding-inline-start: 0;
+    margin-inline-start: 0;
+    border-inline-start: none;
+    padding-block-start: 5px;
+    margin-block-start: 3px;
+    border-block-start: 1px solid var(--edge);
+}
+
+:host([data-placement='top']),
+:host([data-placement='bottom']) {
+    flex-direction: column;
+}
+
+:host([data-placement='left']) {
+    inset-inline-start: var(--inset);
+    inset-block-start: 50%;
+    translate: 0 -50%;
+}
+
+:host([data-placement='right']) {
+    inset-inline-end: var(--inset);
+    inset-block-start: 50%;
+    flex-direction: row-reverse;
+    translate: 0 -50%;
+}
+
+:host([data-placement='top']) {
+    inset-block-start: var(--inset);
+    inset-inline-start: 50%;
+    translate: -50% 0;
+}
+
+:host([data-placement='bottom']) {
+    inset-block-end: var(--inset);
+    inset-inline-start: 50%;
+    flex-direction: column-reverse;
+    translate: -50% 0;
+}
+
+/* Slid off the edge by everything but the tab, which stays to bring it back. */
+:host([data-retracted][data-placement='left']) {
+    translate: calc(-100% + var(--tab) - var(--inset)) -50%;
+}
+
+:host([data-retracted][data-placement='right']) {
+    translate: calc(100% - var(--tab) + var(--inset)) -50%;
+}
+
+:host([data-retracted][data-placement='top']) {
+    translate: -50% calc(-100% + var(--tab) - var(--inset));
+}
+
+:host([data-retracted][data-placement='bottom']) {
+    translate: -50% calc(100% - var(--tab) + var(--inset));
+}
+
+/* Hidden, it must not swallow the pointerdown of whatever sits under it. */
+:host([data-retracted]) .tray {
+    opacity: 0;
+    pointer-events: none;
+}
+
+:host([data-placement='float']) {
+    position: static;
+    translate: none;
+}
+
+:host([data-placement='float']) .tray {
+    flex-wrap: wrap;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+:host([data-placement='float']) .tab {
+    display: none;
+}
+
+.key,
+.readout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    block-size: 32px;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+.key {
+    position: relative;
+    inline-size: 32px;
+    list-style: none;
+}
+
+.key::-webkit-details-marker {
+    display: none;
+}
+
+.readout {
+    min-inline-size: 44px;
+    padding-inline: 4px;
+    font:
+        11px/1 ui-monospace,
+        monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.key:hover,
+.readout:hover,
+.menu[open] > .key {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.key:focus-visible,
+.readout:focus-visible,
+.tab:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+.tile.running {
+    color: var(--accent);
+}
+
+.tile.running::after {
+    content: '';
+    position: absolute;
+    inset-block-end: 2px;
+    inline-size: 3px;
+    block-size: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.menu {
+    position: relative;
+}
+
+.places {
+    position: absolute;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 32px);
+    gap: 2px;
+    padding: 5px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px var(--shadow);
+}
+
+:host([data-placement='left']) .places {
+    inset-inline-start: calc(100% + 10px);
+    inset-block-start: 0;
+}
+
+:host([data-placement='right']) .places {
+    inset-inline-end: calc(100% + 10px);
+    inset-block-start: 0;
+}
+
+:host([data-placement='top']) .places,
+:host([data-placement='float']) .places {
+    inset-block-start: calc(100% + 10px);
+    inset-inline-end: 0;
+}
+
+:host([data-placement='bottom']) .places {
+    inset-block-end: calc(100% + 10px);
+    inset-inline-end: 0;
+}
+
+.places .key[data-place] {
+    color: var(--label);
+}
+
+:host([data-placement='top']) [data-place='top'],
+:host([data-placement='bottom']) [data-place='bottom'],
+:host([data-placement='left']) [data-place='left'],
+:host([data-placement='right']) [data-place='right'],
+:host([data-placement='float']) [data-place='float'] {
+    color: var(--accent);
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--tab);
+    block-size: 44px;
+    padding: 0;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+.tab:hover {
+    color: var(--ink);
+}
+
+.tab svg {
+    transition: rotate 220ms ease;
+}
+
+:host([data-placement='top']) .tab,
+:host([data-placement='bottom']) .tab {
+    inline-size: 44px;
+    block-size: var(--tab);
+}
+
+:host([data-placement='right']) .tab svg {
+    rotate: 180deg;
+}
+
+:host([data-placement='top']) .tab svg {
+    rotate: 90deg;
+}
+
+:host([data-placement='bottom']) .tab svg {
+    rotate: -90deg;
+}
+
+:host([data-retracted][data-placement='left']) .tab svg {
+    rotate: 180deg;
+}
+
+:host([data-retracted][data-placement='right']) .tab svg {
+    rotate: 0deg;
+}
+
+:host([data-retracted][data-placement='top']) .tab svg {
+    rotate: -90deg;
+}
+
+:host([data-retracted][data-placement='bottom']) .tab svg {
+    rotate: 90deg;
+}
+
+svg {
+    inline-size: 18px;
+    block-size: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tab svg {
+    inline-size: 14px;
+    block-size: 14px;
+}

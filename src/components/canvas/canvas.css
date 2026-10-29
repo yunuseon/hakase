@@ -1,0 +1,28 @@
+:host {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--canvas);
+    touch-action: none;
+}
+
+.ground {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, var(--grid) 1px, transparent 1.4px);
+    cursor: grab;
+}
+
+.ground:active {
+    cursor: grabbing;
+}
+
+/* Zero-sized, so only its windows take pointer events and the ground stays grabbable. */
+.world {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 0;
+    block-size: 0;
+    transform-origin: 0 0;
+}
