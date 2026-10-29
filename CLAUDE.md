@@ -106,10 +106,20 @@ input at all; only typing does.
 size and depth live in `hks-sketch-controls`, slotted into that sketch's own
 window, so two sketches can run the same formula at different densities and
 colours. They were global Tweakpane folders once; the moment a program could run
-twice, a shared panel meant two windows fighting over one set of knobs. What stays
-in the Tweakpane pane is what is genuinely global: `duration`, because the playhead
-is one clock for the whole app. Before adding a knob there, ask whether two
-processes would want different answers — if so it belongs in the window.
+twice, a shared panel meant two windows fighting over one set of knobs.
+
+**There is no global panel any more.** `duration` was the last knob in Tweakpane,
+and it is genuinely global — the playhead is one clock for the whole app — but
+global state does not need a global widget. It is an `AppInput` like `scrub`: each
+timeline's transport emits `duration`, `main.ts` folds the latest, and every
+timeline reads it back, so two timelines edit one clock. Before adding a knob,
+ask whether two processes would want different answers — if so it belongs in the
+window; if not, it is still an input from a window, folded in `main.ts`.
+
+The duration field commits on `change`, not `input`, so its own value echoing back
+is harmless and needs no `from` stamp: it normalises what was typed (`12.34` reads
+back `12.3`) and never lands mid-keystroke. A field that applied per keystroke
+would need the editor's `from` fold instead.
 
 The inputs hold their own values, so there is no parameter object to keep in sync:
 `changes$` reads them, `connect$` writes only the numeric readouts back. Those
@@ -128,7 +138,7 @@ folder that grows a file naming a window is the mistake this layer exists to
 prevent — that file is a program, and it belongs one level up.
 
 **The dependency arrow only ever points down.** Nothing under `components/` may
-import `program.ts`, `layout.ts`, `live-window.ts` or `controls.ts`; the check is
+import `program.ts`, `layout.ts` or `live-window.ts`; the check is
 one grep and it is worth running. This is why `HksWindow` emits an untagged
 `WindowGesture` rather than a `LayoutAction`: the window does not know which
 program it holds, so `liveProcess$` — which is program-layer, at `src/` root — is
@@ -153,8 +163,7 @@ Every view our code owns is a **component**: a custom element with a shadow root
 in a folder of its own under `components/<name>/`, holding `<name>.component.ts`
 plus `<name>.css` — imported with Vite's `?inline` and adopted once per module via
 `adoptedStyleSheets`. There is no framework and no second state model — the
-element is a DOM container, the streams stay outside it. Tweakpane is the
-exception: it builds its own panel, so `controls.ts` stays a plain factory.
+element is a DOM container, the streams stay outside it.
 
 **A component folder holds everything only that component needs**, whatever layer
 it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
@@ -194,7 +203,7 @@ table; nothing else in `main.ts` names it.
 
 **The dock is chrome, not a program.** It lists every program and lights the ones
 with a process, so it must not itself be launchable — it is mounted once by
-`main.ts` beside the Tweakpane panel. Its tiles are built with
+`main.ts`. Its tiles are built with
 `createElementNS`, never `innerHTML`: a `Program.icon` is path data on a 24x24
 viewBox, so an icon can never be markup. And it takes `string`s out and back in,
 narrowed by `isProgramId`, because a component may not know what a `ProgramId`
@@ -280,12 +289,8 @@ theme themselves from `--backdrop`, `--track`, `--indicator`, `--accent`.
 **A panel that can cover a control must be dismissible and closed by default,
 and must not take pointer events while closed.** Overlapping the canvas is
 harmless; a panel over a slider swallows its `pointerdown` and the control goes
-dead with no error anywhere. The Tweakpane pane floats bottom-right, collapsed to
-its title bar, for this reason.
-
-The floating pane is anchored by `inset-block-end` with `top` auto, so expanding
-grows the box upward and it opens away from the edge it is pinned to rather than
-off the bottom of the window.
+dead with no error anywhere. A sketch's parameters panel is collapsed by default
+for this reason.
 
 ## Layering
 
@@ -324,7 +329,7 @@ belongs to is read from its name instead of its path:
 
 The program layer sits at the `src/` root, above the components it composes:
 `program.ts` (identity and contracts), `layout.ts` (where each program's window
-sits), `layout-store.ts`, `live-window.ts`, `controls.ts`, `main.ts`.
+sits), `layout-store.ts`, `live-window.ts`, `main.ts`.
 
 ## The prime directive
 
@@ -374,9 +379,8 @@ cast wearing a costume. The count is currently zero; keep it there.
 When a value needs narrowing, narrow it at runtime (`instanceof`) rather than
 asserting it. When an external source needs adapting, reach for
 `new Observable<T>(subscriber => ...)`: the callback body type-checks against `T`,
-so the emitted type is verified rather than declared. All three adapters in the
-app work this way — `fromElementEvent$`, `observeResize$`, and `bind$` in
-`controls.ts`.
+so the emitted type is verified rather than declared. The adapters in `lib/rx.ts`
+— `fromElementEvent$`, `fromDocumentEvent$`, `observeResize$` — all work this way.
 
 **No phantom type parameters.** A `<T>` that appears only in a function's return
 type — or in the parameters of a function it returns — has nothing to be inferred
@@ -452,7 +456,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Fifty-nine of them survive in `src/` today, every one a single line. Treat that
+    Sixty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -483,7 +487,7 @@ clock on every subscription, so resuming with `elapsed` would jump the playhead
 back to the offset it started from. That is what `pairwise()` is doing there.
 
 `duration: 0` no longer means paused — the button does that now — so
-`timelineParams.duration` seeds at 8 seconds. The reducer still guards against 0,
+`defaultDuration` seeds at 8 seconds and `parseDuration` rejects anything not above 0. The reducer still guards against 0,
 which now means only "a loop of no length cannot advance".
 
 ## Themes

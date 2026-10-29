@@ -10,18 +10,18 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { wrap01 } from '../lib/math.ts';
-import type { TimelineParams } from '../controls.ts';
 
 export type TransportCommand = 'toggle' | 'stop';
 
-const timeCode = (seconds: number): string => {
-    const whole = Math.floor(seconds);
+export const defaultDuration = 8;
 
-    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+export const elapsedLabel = (at: number, duration: number): string => (at * duration).toFixed(1);
+
+export const parseDuration = (text: string): number | null => {
+    const seconds = Math.round(Number(text) * 10) / 10;
+
+    return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 600) : null;
 };
-
-export const clockLabel = (at: number, duration: number): string =>
-    `${timeCode(at * duration)} / ${timeCode(duration)}`;
 
 // The button cannot know which it means, so the fold owns the flip.
 export const isPlaying$ = (commands$: Observable<TransportCommand>): Observable<boolean> =>
@@ -47,7 +47,7 @@ export const createPlayhead$ = (
     scrubs$: Observable<number>,
     commands$: Observable<TransportCommand>,
     playing$: Observable<boolean>,
-    timeline$: Observable<TimelineParams>,
+    duration$: Observable<number>,
 ): Observable<number> => {
     const seeks$ = merge(
         scrubs$,
@@ -64,8 +64,8 @@ export const createPlayhead$ = (
                   )
                 : EMPTY,
         ),
-        withLatestFrom(timeline$),
-        map(([ms, { duration }]): PlayheadAction => ({ kind: 'advance', ms, duration })),
+        withLatestFrom(duration$),
+        map(([ms, duration]): PlayheadAction => ({ kind: 'advance', ms, duration })),
     );
 
     return merge(seeks$, advances$).pipe(scan(reducePlayhead, 0), startWith(0));

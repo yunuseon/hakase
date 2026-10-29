@@ -32,13 +32,42 @@
     outline-offset: 1px;
 }
 
-.clock {
-    margin-inline-start: 4px;
+.clock,
+.of,
+.unit {
     font-family: monospace;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: var(--label);
     user-select: none;
+}
+
+.clock {
+    margin-inline-start: 4px;
+}
+
+.duration {
+    inline-size: 5ch;
+    padding: 1px 3px;
+    font-family: monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--indicator);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: 2px;
+    appearance: textfield;
+}
+
+.duration::-webkit-inner-spin-button,
+.duration::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.duration:focus-visible {
+    outline: 1px solid var(--indicator);
+    outline-offset: 1px;
 }
 
 svg {

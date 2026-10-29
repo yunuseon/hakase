@@ -25,6 +25,7 @@ export type ProcessId = string;
 export type AppInput =
     | { readonly kind: 'scrub'; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
+    | { readonly kind: 'duration'; readonly seconds: number }
     | { readonly kind: 'source'; readonly formula: FormulaName; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | {

@@ -24,12 +24,10 @@
     },
     "dependencies": {
         "prismjs": "^1.30.0",
-        "rxjs": "^7.8.2",
-        "tweakpane": "^4.0.5"
+        "rxjs": "^7.8.2"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@tweakpane/core": "^2.0.5",
         "@types/node": "^22.20.1",
         "@types/prismjs": "^1.26.6",
         "eslint": "^10.9.1",

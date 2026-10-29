@@ -18,7 +18,6 @@ import { formulas, type FormulaName } from './components/sketch/formulas/registr
 import type { Theme } from './components/sketch/theme.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame } from './components/window/frame.ts';
-import { createControls } from './controls.ts';
 import { persistDesktop$, restoreDesktop } from './desktop-store.ts';
 import {
     clampToViewport,
@@ -43,7 +42,7 @@ import { playheadProgram } from './programs/playhead.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
-import { createPlayhead$, isPlaying$ } from './shared/playhead.ts';
+import { createPlayhead$, defaultDuration, isPlaying$ } from './shared/playhead.ts';
 
 const programs: readonly Program[] = [
     formulaProgram,
@@ -67,11 +66,6 @@ const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
 const bootstrap = () => {
     const surface = new HksDesktop().items(faces);
     document.body.append(surface);
-
-    const panel = document.createElement('aside');
-    panel.id = 'controls';
-    document.body.append(panel);
-    const controls = createControls(panel);
 
     const dock = new HksDock().items(faces);
     document.body.append(dock);
@@ -165,6 +159,14 @@ const bootstrap = () => {
 
     const playing$ = isPlaying$(commands$).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
+    const duration$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'duration' ? of(input.seconds) : EMPTY)),
+        startWith(defaultDuration),
+        distinctUntilChanged(),
+        // Not refCount: closing the last timeline must not reset the clock to the default.
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     // Keyed by formula: one edit reaches every process showing that formula.
     const edits$ = inputs$.pipe(
         mergeMap(({ from, input }) =>
@@ -212,12 +214,9 @@ const bootstrap = () => {
             inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
             commands$,
             playing$,
-            controls.timeline$,
+            duration$,
         ).pipe(shareReplay({ bufferSize: 1, refCount: true })),
-        duration$: controls.timeline$.pipe(
-            map(({ duration }) => duration),
-            distinctUntilChanged(),
-        ),
+        duration$,
         source$: (formula: FormulaName) =>
             edits$.pipe(
                 map(edits => edits.get(formula) ?? { value: formulas[formula].source, from: null }),

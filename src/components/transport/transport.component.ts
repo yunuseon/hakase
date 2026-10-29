@@ -1,8 +1,8 @@
-import { merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, tap } from 'rxjs/operators';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import type { TransportCommand } from '../../shared/playhead.ts';
+import { parseDuration, type TransportCommand } from '../../shared/playhead.ts';
 import css from './transport.css?inline';
 
 const sheet = styleSheet(css);
@@ -18,14 +18,19 @@ const TEMPLATE = `
         <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7"/></svg>
     </button>
     <span class="clock"></span>
+    <span class="of">/</span>
+    <input class="duration" type="number" min="0.1" max="600" step="0.1" aria-label="duration in seconds">
+    <span class="unit">s</span>
 `;
 
 export class HksTransport extends HTMLElement {
     readonly commands$: Observable<TransportCommand>;
+    readonly durations$: Observable<number>;
 
     private readonly toggle: HTMLElement;
     private readonly glyph: SVGPathElement;
     private readonly clock: HTMLElement;
+    private readonly duration: HTMLInputElement;
 
     constructor() {
         super();
@@ -37,6 +42,7 @@ export class HksTransport extends HTMLElement {
         this.toggle = requireChild(shadow, '.toggle');
         this.glyph = requireElement(shadow, '.glyph', SVGPathElement);
         this.clock = requireChild(shadow, '.clock');
+        this.duration = requireElement(shadow, '.duration', HTMLInputElement);
 
         this.commands$ = merge(
             fromElementEvent$(this.toggle, 'click').pipe(map((): TransportCommand => 'toggle')),
@@ -44,9 +50,22 @@ export class HksTransport extends HTMLElement {
                 map((): TransportCommand => 'stop'),
             ),
         );
+
+        // change, not input: input fires per keystroke, and "1" would apply on the way to "12".
+        this.durations$ = fromElementEvent$(this.duration, 'change').pipe(
+            mergeMap(() => {
+                const seconds = parseDuration(this.duration.value);
+
+                return seconds === null ? EMPTY : of(seconds);
+            }),
+        );
     }
 
-    connect$(playing$: Observable<boolean>, clock$: Observable<string>): Observable<void> {
+    connect$(
+        playing$: Observable<boolean>,
+        clock$: Observable<string>,
+        duration$: Observable<number>,
+    ): Observable<void> {
         return merge(
             playing$.pipe(
                 distinctUntilChanged(),
@@ -59,6 +78,13 @@ export class HksTransport extends HTMLElement {
                 distinctUntilChanged(),
                 tap(label => {
                     this.clock.textContent = label;
+                }),
+            ),
+            duration$.pipe(
+                map(seconds => String(seconds)),
+                distinctUntilChanged(),
+                tap(text => {
+                    this.duration.value = text;
                 }),
             ),
         ).pipe(map(() => undefined));

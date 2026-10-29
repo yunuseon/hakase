@@ -14,7 +14,6 @@
     --highlight: rgb(0, 173, 181);
 
     --gutter: 6px;
-    --controls-width: 17rem;
     --hks-dial-size: 10rem;
 }
 
@@ -29,17 +28,6 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: monospace;
-}
-
-/* Anchored by its bottom edge so expanding grows the box upward, not off-screen. */
-#controls {
-    position: fixed;
-    inset-block-end: var(--gutter);
-    inset-inline-end: var(--gutter);
-    z-index: 50;
-    inline-size: var(--controls-width);
-    max-block-size: calc(100vh - 2 * var(--gutter));
-    overflow: auto;
 }
 
 hks-dock {
