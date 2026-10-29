@@ -66,3 +66,8 @@ export const keyZoom = (key: string, modified: boolean): KeyZoom | null => {
 
     return key === '0' ? 'reset' : null;
 };
+
+export const sameVariables = (
+    a: ReadonlyMap<string, string>,
+    b: ReadonlyMap<string, string>,
+): boolean => a.size === b.size && [...a].every(([name, value]) => b.get(name) === value);

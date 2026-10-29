@@ -1,9 +1,9 @@
 import type { Size } from '../window/frame.ts';
 import type { Theme } from './theme.ts';
 
-export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
+export type DrawMode = 'dots' | 'lines' | 'surface';
 
-export type DrawMode = (typeof DRAW_MODES)[number];
+export const DRAW_MODES: readonly DrawMode[] = ['dots', 'lines', 'surface'];
 
 export const isDrawMode = (value: string): value is DrawMode =>
     DRAW_MODES.some(mode => mode === value);

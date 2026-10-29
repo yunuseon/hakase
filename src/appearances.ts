@@ -1,0 +1,70 @@
+import type { Appearance } from './appearance.ts';
+
+export const appearances = {
+    paper: {
+        canvas: '#f4f1ea',
+        grid: '#d3cbbb',
+        panel: '#fcfbf7',
+        well: '#f0ece3',
+        ink: '#2b2824',
+        label: '#5c564d',
+        muted: '#9a9284',
+        rule: '#c9c1b2',
+        edge: '#e4ded2',
+        track: '#b3aa99',
+        accent: '#c8553d',
+        highlight: '#3a7ca5',
+        shadow: '#5a4a32',
+        'code-text': '#2b2824',
+        'code-comment': '#a39b8b',
+        'code-keyword': '#3a7ca5',
+        'code-function': '#8a4f7d',
+        'code-number': '#c8553d',
+    },
+    studio: {
+        canvas: '#ececee',
+        grid: '#c8c8cf',
+        panel: '#ffffff',
+        well: '#f3f3f5',
+        ink: '#1c1c1f',
+        label: '#55555c',
+        muted: '#8e8e96',
+        rule: '#c4c4cb',
+        edge: '#e1e1e6',
+        track: '#a8a8b0',
+        accent: '#2f6fec',
+        highlight: '#2f6fec',
+        shadow: '#1c1c30',
+        'code-text': '#1c1c1f',
+        'code-comment': '#9a9aa3',
+        'code-keyword': '#2f6fec',
+        'code-function': '#9b3fb5',
+        'code-number': '#c2410c',
+    },
+    night: {
+        canvas: '#161615',
+        grid: '#2e2e2c',
+        panel: '#1e1e1c',
+        well: '#121211',
+        ink: '#ebebe6',
+        label: '#969690',
+        muted: '#696964',
+        rule: '#565652',
+        edge: '#3a3a37',
+        track: '#787873',
+        accent: '#ff5244',
+        highlight: '#00adb5',
+        shadow: '#000000',
+        'code-text': '#ebebe6',
+        'code-comment': '#696e73',
+        'code-keyword': '#00adb5',
+        'code-function': '#eeeeee',
+        'code-number': '#d9a066',
+    },
+} satisfies Record<string, Appearance>;
+
+export type AppearanceName = keyof typeof appearances;
+
+export const isAppearanceName = (value: string): value is AppearanceName => value in appearances;
+
+export const defaultLook: AppearanceName = 'paper';

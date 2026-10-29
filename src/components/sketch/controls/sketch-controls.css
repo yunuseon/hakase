@@ -1,27 +1,22 @@
 :host {
     display: block;
-    font-family: monospace;
-    font-size: 10px;
-    line-height: 1.4;
+    font:
+        11px/1.4 system-ui,
+        sans-serif;
     color: var(--label);
 }
 
 .panel {
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-block-start: none;
+    margin-block-start: 6px;
 }
 
-/* The window title bars set the register: small, uppercase, tracked out. */
 .handle {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 2px 6px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--label);
-    background: var(--header);
+    padding: 2px 0;
+    color: var(--muted);
+    background: var(--panel);
     border-block-end: 1px solid transparent;
     cursor: pointer;
     user-select: none;
@@ -46,19 +41,19 @@
 }
 
 .handle:hover {
-    color: var(--indicator);
+    color: var(--ink);
 }
 
 .grid {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    padding: 6px;
+    padding: 6px 0 0;
 }
 
 .row {
     display: grid;
-    grid-template-columns: 3rem 1fr 2.3rem;
+    grid-template-columns: 3.4rem 1fr 2.3rem;
     align-items: center;
     gap: 6px;
 }
@@ -68,14 +63,15 @@
 }
 
 .key {
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     color: var(--muted);
 }
 
 .read {
     text-align: end;
-    color: var(--indicator);
+    color: var(--ink);
+    font:
+        10px ui-monospace,
+        monospace;
     font-variant-numeric: tabular-nums;
 }
 
@@ -92,12 +88,12 @@
 
 .dial::-webkit-slider-runnable-track {
     block-size: 1px;
-    background: var(--edge-strong);
+    background: var(--rule);
 }
 
 .dial::-moz-range-track {
     block-size: 1px;
-    background: var(--edge-strong);
+    background: var(--rule);
 }
 
 .dial::-webkit-slider-thumb {
@@ -106,16 +102,16 @@
     inline-size: 9px;
     block-size: 9px;
     margin-block-start: -4px;
-    background: var(--backdrop);
-    border: 1px solid var(--indicator);
+    background: var(--panel);
+    border: 1px solid var(--ink);
     border-radius: 0;
 }
 
 .dial::-moz-range-thumb {
     inline-size: 7px;
     block-size: 7px;
-    background: var(--backdrop);
-    border: 1px solid var(--indicator);
+    background: var(--panel);
+    border: 1px solid var(--ink);
     border-radius: 0;
 }
 
@@ -130,7 +126,7 @@
 }
 
 .dial:focus-visible {
-    outline: 1px solid var(--edge-strong);
+    outline: 1px solid var(--rule);
     outline-offset: 2px;
 }
 
@@ -151,7 +147,7 @@
 }
 
 .ink:focus-visible {
-    outline: 1px solid var(--edge-strong);
+    outline: 1px solid var(--rule);
     outline-offset: 1px;
 }
 
@@ -171,15 +167,15 @@
     grid-column: 2 / -1;
     inline-size: 100%;
     font: inherit;
-    padding: 0 2px;
-    color: var(--label);
-    background: var(--surface);
+    padding: 2px 4px;
+    color: var(--ink);
+    background: var(--well);
     border: 1px solid var(--edge);
-    border-radius: 0;
+    border-radius: 6px;
     cursor: pointer;
 }
 
 .pick:hover {
-    color: var(--indicator);
+    color: var(--ink);
     border-color: var(--track);
 }

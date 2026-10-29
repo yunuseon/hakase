@@ -1,6 +1,14 @@
 import type { Theme } from '../theme.ts';
 
 export const themes = {
+    paper: {
+        blend: 'smooth',
+        stops: [
+            { at: 0, color: '#f7f4ee' },
+            { at: 0.45, color: '#d8c7a8' },
+            { at: 1, color: '#c8553d' },
+        ],
+    },
     dusk: {
         blend: 'smooth',
         stops: [

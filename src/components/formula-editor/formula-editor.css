@@ -4,8 +4,9 @@
     gap: 6px;
     block-size: 100%;
     min-block-size: 0;
-    font-family: monospace;
-    font-size: 12px;
+    font:
+        12px/1.3 system-ui,
+        sans-serif;
 }
 
 .bar {
@@ -16,25 +17,21 @@
 }
 
 .caption {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--label);
+    color: var(--muted);
 }
 
 .preset {
     font: inherit;
-    font-size: 11px;
-    padding: 1px 4px;
-    color: var(--label);
-    background: var(--surface);
+    padding: 3px 6px;
+    color: var(--ink);
+    background: var(--well);
     border: 1px solid var(--edge);
-    border-radius: 2px;
+    border-radius: 6px;
     cursor: pointer;
 }
 
 .preset:hover {
-    color: var(--indicator);
+    color: var(--ink);
     border-color: var(--track);
 }
 
@@ -53,18 +50,19 @@
     margin: 0;
     padding: 8px;
     border: 1px solid transparent;
-    border-radius: 3px;
-    font: inherit;
-    line-height: 1.45;
+    border-radius: 8px;
+    font:
+        12px/1.45 ui-monospace,
+        monospace;
     tab-size: 4;
     white-space: pre-wrap;
     overflow-wrap: break-word;
 }
 
 .highlight {
-    background: var(--surface);
+    background: var(--well);
     border-color: var(--edge);
-    color: var(--indicator);
+    color: var(--code-text);
     overflow: hidden;
     pointer-events: none;
 }
@@ -72,7 +70,7 @@
 .source {
     background: transparent;
     color: transparent;
-    caret-color: var(--indicator);
+    caret-color: var(--ink);
     overflow: auto;
     resize: none;
 }
@@ -92,28 +90,31 @@
     overflow: auto;
     white-space: pre-wrap;
     color: var(--accent);
-    background: var(--surface);
+    background: var(--well);
     border: 1px solid var(--accent);
-    border-radius: 3px;
+    border-radius: 8px;
+    font:
+        11px/1.4 ui-monospace,
+        monospace;
 }
 
 .token.comment {
-    color: rgb(105 110 115);
+    color: var(--code-comment);
 }
 
 .token.keyword {
-    color: #00adb5;
+    color: var(--code-keyword);
 }
 
 .token.function {
-    color: #eeeeee;
+    color: var(--code-function);
 }
 
 .token.number {
-    color: #d9a066;
+    color: var(--code-number);
 }
 
 .token.operator,
 .token.punctuation {
-    color: rgb(150 155 160);
+    color: var(--muted);
 }

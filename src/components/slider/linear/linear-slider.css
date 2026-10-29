@@ -21,7 +21,7 @@
 }
 
 .track::before {
-    background-color: var(--edge-strong);
+    background-color: var(--rule);
     content: '';
     display: block;
     height: 1px;
@@ -39,7 +39,7 @@
 }
 
 .indicator::before {
-    background-color: var(--indicator);
+    background-color: var(--ink);
     content: '';
     display: block;
     height: 1px;
@@ -49,8 +49,8 @@
 }
 
 .indicator::after {
-    background-color: var(--backdrop);
-    border: 1px solid var(--indicator);
+    background-color: var(--panel);
+    border: 1px solid var(--ink);
     bottom: 0;
     content: '';
     display: block;

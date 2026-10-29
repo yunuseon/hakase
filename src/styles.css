@@ -1,31 +1,10 @@
-:root {
-    --backdrop: rgb(22, 22, 21);
-    --panel: rgb(30, 30, 28);
-    --header: rgb(38, 38, 35);
-    --surface: rgb(18, 18, 17);
-    --edge: rgb(58, 58, 55);
-    --edge-strong: rgb(86, 86, 82);
-
-    --label: rgb(150, 150, 144);
-    --muted: rgb(105, 105, 100);
-    --track: rgb(120, 120, 115);
-    --indicator: rgb(235, 235, 230);
-    --accent: rgb(255, 82, 68);
-    --highlight: rgb(0, 173, 181);
-
-    --gutter: 6px;
-    --hks-dial-size: 10rem;
-}
-
 html,
 body {
     block-size: 100%;
 }
 
 body {
-    background-color: var(--backdrop);
-    color: var(--indicator);
     margin: 0;
     overflow: hidden;
-    font-family: monospace;
+    font-family: system-ui, sans-serif;
 }

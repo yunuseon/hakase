@@ -15,7 +15,6 @@ export type Extent = {
     readonly height: number;
 };
 
-// screen = world * zoom + (x, y)
 export type Camera = Point & {
     readonly zoom: number;
 };

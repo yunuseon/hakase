@@ -1,6 +1,6 @@
 :host {
     display: block;
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
     font-size: 10px;
     color: var(--muted);
     letter-spacing: 0.04em;

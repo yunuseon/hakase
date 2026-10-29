@@ -1,15 +1,18 @@
 import type { Observable } from 'rxjs';
+import type { Appearance } from './appearance.ts';
+import type { AppearanceName } from './appearances.ts';
 import type { FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
-export type ProgramId = 'formula' | 'theme' | 'sketch' | 'timeline' | 'playhead';
+export type ProgramId = 'formula' | 'theme' | 'appearance' | 'sketch' | 'timeline' | 'playhead';
 
 export const PROGRAM_IDS: readonly ProgramId[] = [
     'formula',
     'theme',
+    'appearance',
     'sketch',
     'timeline',
     'playhead',
@@ -28,6 +31,8 @@ export type AppInput =
     | { readonly kind: 'duration'; readonly seconds: number }
     | { readonly kind: 'source'; readonly formula: FormulaName; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
+    | { readonly kind: 'look'; readonly name: AppearanceName }
+    | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
           readonly formula: FormulaName;
@@ -43,6 +48,8 @@ export type AppState = {
     readonly source$: (formula: FormulaName) => Observable<Source>;
     readonly theme$: (theme: ThemeName) => Observable<Written<Theme>>;
     readonly error$: (formula: FormulaName) => Observable<string | null>;
+    readonly look$: Observable<AppearanceName>;
+    readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 
 export type Written<T> = {

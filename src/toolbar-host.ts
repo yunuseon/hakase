@@ -11,7 +11,6 @@ import type { WindowGesture, WindowView } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { ToolbarState } from './workspace.ts';
 
-// The floating toolbar's window, as liveProcess$ is a program's: open on subscribe, close on finalize.
 export const toolbarHost$ = (
     toolbar: HTMLElement,
     canvas: HTMLElement,

@@ -97,7 +97,6 @@ export const sketchProgram: Program = {
                     mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
                 );
 
-                // Zoomed in, the canvas is drawn bigger than its CSS size and must render to match.
                 const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
                     map(([pixelRatio, zoom]) => steppedRatio(pixelRatio, zoom)),
                     distinctUntilChanged(),

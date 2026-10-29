@@ -4,7 +4,14 @@ import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
 import type { Camera } from './camera.ts';
-import { gridOf, keyZoom, wheelGesture, type CanvasGesture, type KeyZoom } from './canvas.ts';
+import {
+    gridOf,
+    keyZoom,
+    sameVariables,
+    wheelGesture,
+    type CanvasGesture,
+    type KeyZoom,
+} from './canvas.ts';
 import css from './canvas.css?inline';
 
 const sheet = styleSheet(css);
@@ -75,8 +82,20 @@ export class HksCanvas extends HTMLElement {
         );
     }
 
-    connect$(camera$: Observable<Camera>): Observable<void> {
+    connect$(
+        camera$: Observable<Camera>,
+        variables$: Observable<ReadonlyMap<string, string>>,
+    ): Observable<void> {
         return merge(
+            // On the host, so every window and the toolbar inherit them across their shadow roots.
+            variables$.pipe(
+                distinctUntilChanged(sameVariables),
+                tap(variables => {
+                    for (const [name, value] of variables) {
+                        this.style.setProperty(name, value);
+                    }
+                }),
+            ),
             camera$.pipe(
                 map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),
                 distinctUntilChanged(),

@@ -33,11 +33,9 @@ import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
 export type Process = {
     readonly id: ProcessId;
     readonly program: ProgramId;
-    // In world units: the camera decides where that lands on screen.
     readonly frame: Frame;
 };
 
-// Floating has no `retracted`: a toolbar in its own window has nothing to slide away.
 export type ToolbarState =
     | { readonly kind: 'docked'; readonly edge: Edge; readonly retracted: boolean }
     | { readonly kind: 'floating'; readonly frame: Frame; readonly lastEdge: Edge };

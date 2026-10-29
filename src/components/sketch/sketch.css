@@ -7,8 +7,9 @@
 .viewport {
     position: relative;
     display: flex;
-    background: var(--surface);
-    border: 1px solid var(--edge);
+    overflow: hidden;
+    background: var(--well);
+    border-radius: 8px;
 }
 
 canvas {

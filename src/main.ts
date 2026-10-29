@@ -9,10 +9,14 @@ import {
     share,
     shareReplay,
     startWith,
+    switchMap,
     takeUntil,
     withLatestFrom,
 } from 'rxjs/operators';
 import './styles.css';
+import { variables, type Appearance } from './appearance.ts';
+import { persistAppearance$, restoreAppearance } from './appearance-store.ts';
+import { appearances, type AppearanceName } from './appearances.ts';
 import { zoomLabel } from './components/canvas/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
@@ -32,6 +36,7 @@ import {
     type ProgramId,
     type Written,
 } from './program.ts';
+import { appearanceProgram } from './programs/appearance.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
@@ -51,6 +56,7 @@ import {
 const programs: readonly Program[] = [
     formulaProgram,
     themeProgram,
+    appearanceProgram,
     sketchProgram,
     timelineProgram,
     playheadProgram,
@@ -239,6 +245,41 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const stored = restoreAppearance();
+
+    const look$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'look' ? of(input.name) : EMPTY)),
+        startWith(stored.look),
+        distinctUntilChanged(),
+        // Not refCount: the look outlives every editor that picked it.
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    const storedLooks: ReadonlyMap<AppearanceName, Written<Appearance>> = new Map(
+        [...stored.edits].map(([name, value]): [AppearanceName, Written<Appearance>] => [
+            name,
+            { value, from: null },
+        ]),
+    );
+
+    const looks$ = inputs$.pipe(
+        mergeMap(({ from, input }) =>
+            input.kind === 'appearance'
+                ? of({ from, name: input.name, value: input.value })
+                : EMPTY,
+        ),
+        scan(
+            (all, { name, value, from }): ReadonlyMap<AppearanceName, Written<Appearance>> =>
+                new Map(all).set(name, { value, from }),
+            storedLooks,
+        ),
+        startWith(storedLooks),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    const appearance$ = (name: AppearanceName): Observable<Written<Appearance>> =>
+        looks$.pipe(map(all => all.get(name) ?? { value: appearances[name], from: null }));
+
     const state: AppState = {
         playing$,
         playhead$: createPlayhead$(
@@ -258,6 +299,8 @@ const bootstrap = () => {
             ),
         theme$: (theme: ThemeName) =>
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
+        look$,
+        appearance$,
         error$: (formula: FormulaName) =>
             diagnostics$.pipe(
                 map(all => all.get(formula) ?? null),
@@ -281,7 +324,17 @@ const bootstrap = () => {
 
     return merge(
         persistWorkspace$(workspace$),
-        canvas.connect$(camera$),
+        persistAppearance$(
+            look$,
+            looks$.pipe(map(all => new Map([...all].map(([name, { value }]) => [name, value])))),
+        ),
+        canvas.connect$(
+            camera$,
+            look$.pipe(
+                switchMap(appearance$),
+                map(({ value }) => variables(value)),
+            ),
+        ),
         toolbar.connect$(runningPrograms$, camera$.pipe(map(zoomLabel)), toolbarView$),
     ).subscribe();
 };

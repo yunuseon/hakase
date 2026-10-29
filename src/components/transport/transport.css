@@ -8,18 +8,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    inline-size: 22px;
-    block-size: 18px;
+    inline-size: 26px;
+    block-size: 22px;
     padding: 0;
     color: var(--label);
     background: transparent;
     border: 1px solid var(--edge);
-    border-radius: 2px;
+    border-radius: 6px;
     cursor: pointer;
 }
 
 .key:hover {
-    color: var(--indicator);
+    color: var(--ink);
     border-color: var(--track);
 }
 
@@ -28,14 +28,14 @@
 }
 
 .key:focus-visible {
-    outline: 1px solid var(--indicator);
+    outline: 1px solid var(--ink);
     outline-offset: 1px;
 }
 
 .clock,
 .of,
 .unit {
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: var(--label);
@@ -49,13 +49,13 @@
 .duration {
     inline-size: 5ch;
     padding: 1px 3px;
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
-    color: var(--indicator);
+    color: var(--ink);
     background: transparent;
     border: 1px solid var(--edge);
-    border-radius: 2px;
+    border-radius: 6px;
     appearance: textfield;
 }
 
@@ -66,7 +66,7 @@
 }
 
 .duration:focus-visible {
-    outline: 1px solid var(--indicator);
+    outline: 1px solid var(--ink);
     outline-offset: 1px;
 }
 
