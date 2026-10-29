@@ -17,9 +17,39 @@ is a bad trade here. Say so and propose the reactive version instead.
 
 The sketch renders with **WebGL2**, not canvas2d. A formula is GLSL, the lattice
 loop is the vertex shader, and `gl_VertexID` derives each cell's coordinates —
-there are no vertex buffers at all, just one `drawArrays(POINTS, ...)`. This is
-worth 40x at `dimension: 128` (0.96ms against 38.4ms) and makes a million points
-viable, so do not reintroduce a CPU-side draw loop.
+there are no vertex buffers at all, just one `drawArrays`. This is worth 40x at
+`dimension: 128` (0.96ms against 38.4ms) and makes a million points viable, so do
+not reintroduce a CPU-side draw loop.
+
+**A draw mode changes the primitive, not the formula.** Each sketch picks `dots`,
+`lines` or `surface` in its own panel. Dots are one vertex per lattice point;
+lines are four per point (edges to the right and upper neighbours, clamped so an
+edge point's missing neighbour collapses to nothing); a surface is six per cell,
+two triangles. `latticePoint` in `sketch.vert` turns `gl_VertexID` into the corner
+it stands for, and `formula` is simply evaluated there, so every formula works in
+every mode and none of them knows which one it is in. `DRAW_MODES`' order is the
+`uMode` integer, matched by `MODE_*` defines in both stages.
+
+**A setting exists only in the mode it affects.** Dot size and depth scale
+`gl_PointSize` and nothing else, so they belong to `dots` alone. `DrawStyle` is a
+union discriminated by `mode`, and only `DotStyle` carries `baseSize` and
+`depthScalar`, so reading them in lines mode is a type error rather than a dead
+slider. The panel follows the type: `draw$` `switchMap`s over the mode, reading a
+mode's own inputs only while it is selected, and `connect$` hides every row whose
+`data-only` names another mode. The inputs keep their values while hidden, so
+switching back to dots restores the size you left. A new mode-specific knob is a
+field on its member of the union plus a `data-only` row, never an optional field
+on all of them.
+
+Only `surface` turns on the depth test, and that is load-bearing: a dot's soft
+edge is translucent but would still write depth, and punch a dark fringe through
+whatever is drawn after it. Triangles are opaque, so they can have it. The
+surface is lit from a flat normal, `cross(dFdx(p), dFdy(p))` of the formula's
+output, which is why the 2D formulas shade as height maps without any change.
+Lighting uses `abs`, because a lattice has no outside. Each corner is evaluated
+on its own, so a surface costs six formula calls per cell; formulas that cover a
+full period (torus, klein, trefoil) show a one-cell seam, because nothing tells
+the lattice to wrap.
 
 **Shaders live in their own files**, never in template literals: `.vert`/`.frag`
 for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
@@ -456,7 +486,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Sixty-three of them survive in `src/` today, every one a single line. Treat that
+    Sixty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

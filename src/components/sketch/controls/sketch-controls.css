@@ -63,6 +63,10 @@
     gap: 6px;
 }
 
+.row[hidden] {
+    display: none;
+}
+
 .key {
     letter-spacing: 0.06em;
     text-transform: uppercase;

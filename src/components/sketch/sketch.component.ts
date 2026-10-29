@@ -56,7 +56,7 @@ export class HksSketch extends HTMLElement {
 
         const frames$ = combineLatest([prepared$, playhead$]).pipe(
             tap(([{ sketch, params }, playhead]) => {
-                drawFrame(this.surface.gl, sketch, params.dimension, playhead);
+                drawFrame(this.surface.gl, sketch, params, playhead);
             }),
         );
 
