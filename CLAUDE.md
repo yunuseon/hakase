@@ -70,7 +70,7 @@ that the first two never learn about each other:
    (title bar, drag, the eight resize handles) and knows nothing about what it
    holds.
 3. **Program** — a _definition_: one component paired with the window that holds
-   it, its dock icon, and how it connects to `AppState`. This is the only layer
+   it, its toolbar icon, and how it connects to `AppState`. This is the only layer
    allowed to know about both, and it is where composition lives:
    `sketch.program.ts` puts the fps counter in the sketch's `status` slot, which
    is a decision neither component could make.
@@ -86,7 +86,7 @@ singleton:
 - `Program.launch()` is a **factory**, not an element. Two processes need two
   elements, and one element cannot be in two windows. A module-level
   `export const sketch = new HksSketch()` is exactly the bug this shape prevents.
-- State keyed by `ProgramId` would collide, so `Desktop` is keyed by `ProcessId`,
+- State keyed by `ProgramId` would collide, so `Workspace` is keyed by `ProcessId`,
   built from a counter kept _in_ the state so a relaunch never reuses a dead id.
   Its `processes` array is ordered back to front, so a process's **index is its
   z-order** and `raise` is a reorder — there is no z-index counter anywhere.
@@ -153,13 +153,14 @@ would need the editor's `from` fold instead.
 
 The inputs hold their own values, so there is no parameter object to keep in sync:
 `changes$` reads them, `connect$` writes only the numeric readouts back. Those
-settings are deliberately not persisted — the desktop remembers which processes
+settings are deliberately not persisted — the workspace remembers which processes
 exist and where, not how each one is tuned.
 
-**Launching is one action from two places.** The dock and the desktop shortcuts
-both emit a program id; `main.ts` turns it into a single `launch` action carrying
-that program's default `size`, and the reducer cascades each new window by
-`launched % 8` so instance two does not land exactly on instance one. Quitting is
+**Launching is one action.** The toolbar emits a program id; `main.ts` turns it
+into a `launch` action carrying that program's default `size` and the current
+viewport, and the reducer centres the window on whatever part of the canvas is in
+view, cascading by `launched % 8` so instance two does not land exactly on
+instance one. Quitting is
 the window's own close button — ordinary chrome on every window, not a
 per-program affordance.
 
@@ -168,17 +169,17 @@ folder that grows a file naming a window is the mistake this layer exists to
 prevent — that file is a program, and it belongs one level up.
 
 **The dependency arrow only ever points down.** Nothing under `components/` may
-import `program.ts`, `layout.ts` or `live-window.ts`; the check is
-one grep and it is worth running. This is why `HksWindow` emits an untagged
-`WindowGesture` rather than a `LayoutAction`: the window does not know which
-program it holds, so `liveProcess$` — which is program-layer, at `src/` root — is
-what stamps the `id` on. `LayoutAction` is literally `WindowGesture & { id }`.
+import `program.ts`, `workspace.ts`, `process.ts`, `toolbar-host.ts` or the
+`appearance*.ts` modules; the check is one grep and it is worth running. This is
+why `HksWindow` emits an untagged `WindowGesture` rather than a `WorkspaceAction`:
+the window does not know which program it holds, so `liveProcess$` — which is
+program-layer, at `src/` root — is what stamps the `id` on.
 
-It is also why the old `layout.ts` had to be cut in two. Frame maths (`moved`,
-`resized`, `clampFrame`, `frameFrom`) is program-agnostic and lives in
-`components/window/frame.ts`; the app's actual layout — `Layout` keyed by
-`ProgramId`, `defaultLayout`'s hardcoded four windows, `parseLayout`'s schema —
-is app configuration and lives in `src/layout.ts`. If you find yourself adding a
+It is also why the layout is cut in two. Frame maths (`moved`, `resized`,
+`frameFrom`) and camera maths (`components/canvas/camera.ts`) are program-agnostic;
+the app's actual workspace — processes keyed by `ProcessId`, the default four
+windows, the toolbar's state, `parseWorkspace`'s schema — is app configuration
+and lives in `src/workspace.ts`. If you find yourself adding a
 `ProgramId` to something under `components/`, that thing is in the wrong folder.
 
 ## Components
@@ -227,40 +228,53 @@ a subscription: `liveProcess$` creates the `hks-window` in a `defer` factory and
 removes it in `finalize`, with its views merged in as `ignoreElements` side
 pipelines so one subscription both drives the DOM and reports back. Launching and
 quitting is therefore just
-`switchMap(running => running ? liveProcess$(...) : EMPTY)` over `processes$`,
-which the dock folds from its own clicks. Adding a program is one entry in the
+`switchMap(running => running ? liveProcess$(...) : EMPTY)` over the processes
+the workspace fold holds. Adding a program is one entry in the
 table; nothing else in `main.ts` names it.
 
-**The dock is chrome, not a program.** It lists every program and lights the ones
-with a process, so it must not itself be launchable — it is mounted once by
-`main.ts`. Its tiles are built with
+**The toolbar is chrome, not a program.** It lists every program and lights the
+ones with a process, so it must not itself be launchable — it is mounted once by
+`main.ts`, in the canvas's `chrome` slot, outside the zoomed layer. Its tiles are
+built with
 `createElementNS`, never `innerHTML`: a `Program.icon` is path data on a 24x24
 viewBox, so an icon can never be markup. And it takes `string`s out and back in,
 narrowed by `isProgramId`, because a component may not know what a `ProgramId`
 is.
+
+It docks to any edge, retracts, or floats. Where it sits is `ToolbarState` in the
+workspace fold, a union in which only `docked` carries `retracted` — a floating
+toolbar has nothing to slide away. Floating is a subscription exactly like a
+process: `toolbarHost$` opens an ordinary `HksWindow` in a `defer`, moves the
+toolbar into it, and in `finalize` moves it back and removes the window. Moving
+rather than rebuilding keeps the toolbar's listeners. That window's `quit` docks
+it back to `lastEdge`, and its deltas are applied as screen pixels, unlike a
+process window's, because the chrome slot is not zoomed. When retracted the tray
+takes no pointer events; only the tab does.
 
 Do not "improve" this by mounting eagerly and hiding closed windows with CSS.
 The point is that a closed window holds no subscriptions at all — no `rAF` loop,
 no listeners, no GL draws — which a `display: none` window would.
 
 **The graph has a cycle and it is closed by ordering, not a `Subject`.** Windows
-emit the layout actions that produce their own frames: `actions$` carries
-`LayoutAction`s out of every open window, `layout$` folds them, and `AppState` hands
-the frames back in. Two things make it safe, and both are load-bearing:
+emit the workspace actions that produce their own frames: `signals$` carries
+`WorkspaceAction`s out of every open window, `workspace$` folds them, and
+`frame$(id)` hands the frames back in. The floating toolbar closes the same kind
+of loop, which is why `toolbarGestures$` also enters the fold through a `defer`. Two things make it safe, and both are load-bearing:
 
 - A program's `connect$` is a **function of `AppState`**, called from inside
   `switchMap` — long after `state` is initialised. Storing finished streams in
   the table instead would evaluate the cycle at construction time.
 - `startWith(seed)` sits **before** `shareReplay`, so the seed is in the replay
   buffer before the source is subscribed and the windows mount. A window that
-  subscribes to `layout$` while mounting reads the seed rather than hanging.
+  subscribes to `workspace$` while mounting reads the seed rather than hanging.
 
-The tool is drawn as **windows**: a thin border, a small uppercase title bar, a
-padded body. That chrome lives once in `components/window/window.css` and every
-component adopts it _before_ its own sheet — `adoptedStyleSheets` takes an array,
-so shared chrome and component specifics stay in separate files. A component that
-is slotted into another window (`hks-linear-slider`, `hks-fps-counter`) unsets the
-frame in its own sheet rather than opting out of the shared one.
+The tool is drawn as **paper-like windows**: one panel colour with no header band,
+a hairline `--edge`, a 12px radius and a soft `--shadow`, a transparent title strip
+with a small lowercase label, and a close button that only shows on hover or
+focus. That chrome lives once in `components/window/window.css`. Interiors follow
+it — `system-ui` for UI text, monospace only for code, readouts and clocks — and
+nest no frames of their own; a well (`--well`, rounded) marks an editable area
+instead of a border.
 
 `hks-sketch` exposes one slot, `status`, for the fps readout in its title bar.
 Slotted children stay in the light DOM, so `main.ts` still finds them with
@@ -270,14 +284,38 @@ not therefore part of its chrome, and the timeline learned that the hard way.
 
 ## Windows
 
+Windows live on an **infinite canvas**. `hks-canvas` holds a `.world` layer
+transformed by a `Camera` (`screen = world * zoom + (x, y)`); windows are
+appended as its light-DOM children, so the transform and the appearance's custom
+properties reach them, and a frame is in world units. Drag the background or
+wheel over it to pan, ctrl/cmd+wheel (a trackpad pinch sends the same) to zoom
+around the pointer, ctrl/cmd `=` `-` `0` from the keyboard, and the toolbar has
+zoom, reset and fit. A plain wheel over a window is left alone, so textareas
+still scroll. The dot grid is a CSS gradient whose size and offset follow the
+camera, coarsened in powers of two as you zoom out — there is no grid DOM.
+
+**Window deltas are divided by zoom in the reducer**, not in the window: the
+pointer moves in screen pixels and the frame is in world units, and doing it in
+`reduceWorkspace` keeps the camera and the frames in one `scan` with no
+`withLatestFrom`. Sliders inside windows read their input through
+`getBoundingClientRect`, which already includes the transform, so they work at any
+zoom; their layout reads `offsetWidth`, which does not, and that is also right.
+
+A sketch renders at `devicePixelRatio * zoom`, stepped to 0.25 by `steppedRatio`
+so a wheel zoom does not reallocate the drawing buffer on every tick, and capped
+at 2048px a side by `cappedRatio`. The program passes in the stepped ratio and the
+component applies the cap, because the size already reaches the component
+through `params$` — passing it in again would be a second path into one
+`combineLatest`.
+
 Windows drag by their title bar, resize from any edge or corner, and raise on
 click. `HksWindow` adds the eight handles itself, so the frame is described
 in one place rather than in four templates; they straddle the border by half
 their width, so grabbing an edge does not demand pixel accuracy. A west or north
 drag moves the window as well as sizing it, and the clamp has to agree — `x`
 shifts by the width the minimum actually allowed, or the far edge creeps while
-you push against the limit. All of that is one pure reducer — `reduceLayout` in
-`layout.ts` — folded over a stream of `LayoutAction`s with `scan`. There is
+you push against the limit. All of that is one pure reducer — `reduceWorkspace`
+in `workspace.ts` — folded over a stream of `WorkspaceAction`s with `scan`. There is
 no `dragging` flag, no `offsetX`, no z-index counter: depth is read from the
 stacking order, and the per-gesture `pointerDelta$` in `shared/drag.ts` supplies
 the deltas. Pairing has to happen _inside_ the gesture; pairing the flattened
@@ -293,28 +331,28 @@ and the gesture stays open forever. The window then resizes on hover the next ti
 you cross that border, with no button held. Do not move those listeners back.
 
 **The sketch's frame _is_ its canvas size.** Its grip emits an ordinary `resize`
-like every other window, and `main.ts` reads the canvas dimensions back out of
-`frames.sketch`, so the size persists with the rest of the layout and needs no
+like every other window, and the sketch program reads the canvas dimensions back
+out of its own `frame$`, so the size persists with the rest of the layout and needs no
 stream of its own. The one asymmetry: that frame's width and height are never
 applied to the element — the window is sized by the canvas it contains, and
 `connect$` takes only a `Placement`.
 
-The layout persists to `localStorage`, debounced: a drag emits on every pointer
-move and storage only needs where it stopped. That is hygiene, not speed — a
-write measures about 2us for a 168-byte payload, so do not go looking for it in a
-profile. A stored layout is untrusted input:
-`parseLayout` rebuilds it field by field and returns null on anything unexpected,
-and `clampToViewport` drags a window that was saved off screen back within reach,
-because otherwise there is no way to grab its title bar again.
+The workspace — processes, camera, toolbar — persists to `localStorage` under
+`hakase.workspace`, debounced: a drag emits on every pointer move and storage only
+needs where it stopped. That is hygiene, not speed — a write measures about 2us
+for a 168-byte payload, so do not go looking for it in a profile. A stored
+workspace is untrusted input: `parseWorkspace` rebuilds it field by field and
+returns null on anything unexpected. There is no clamp any more: on an infinite
+canvas a window saved off screen is one pan or one **fit** away.
 
 `viewportSize()` in `lib/dom.ts` is the only place that knows `innerWidth` reads
-0 in an embedded frame before first layout. Do not sample the window directly —
-a zero viewport seeds every window at the origin with no size, and it silently
-disables the clamp above.
+0 in an embedded frame before first layout, and it replaces only that zero, not a
+small screen — flooring a real size makes fit and launch centre on a point
+outside the window. `viewport$` in `lib/rx.ts` follows resizes; sample it rather
+than the window.
 
-`src/styles.css` is page-level only: the palette, `#stage` layout, and where the
-floating panels sit. Custom properties cross the shadow boundary, so components
-theme themselves from `--backdrop`, `--track`, `--indicator`, `--accent`.
+`src/styles.css` is page-level only: body sizing and the base font. It holds no
+palette — the appearance does, applied on the canvas host.
 
 **A panel that can cover a control must be dismissible and closed by default,
 and must not take pointer events while closed.** Overlapping the canvas is
@@ -345,7 +383,7 @@ belongs to is read from its name instead of its path:
   window. Before adding a field, check whether one program could derive it
   instead; `panel$` and a global `source$` both used to live there and both were
   really one window's business.
-- **`AppState` vs a state type.** `Layout`, `SketchParams` and the like are
+- **`AppState` vs a state type.** `Workspace`, `SketchParams` and the like are
   values; `AppState` is the record of _streams_ that carry them, which is why
   every member keeps its `$` and why it is not called `State`. It lives in
   `program.ts` beside `Program` and `ProgramId`: splitting it out again brings
@@ -358,8 +396,10 @@ belongs to is read from its name instead of its path:
 `src/lib/` sits underneath everything: `dom`, `math`, `rx`, `color`, `storage`.
 
 The program layer sits at the `src/` root, above the components it composes:
-`program.ts` (identity and contracts), `layout.ts` (where each program's window
-sits), `layout-store.ts`, `live-window.ts`, `main.ts`.
+`program.ts` (identity and contracts), `workspace.ts` (processes, camera and
+toolbar, and their reducer), `workspace-store.ts`, `process.ts` (`liveProcess$`),
+`toolbar-host.ts`, `appearance.ts`, `appearances.ts`, `appearance-store.ts`,
+`main.ts`.
 
 ## The prime directive
 
@@ -486,7 +526,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Sixty-nine of them survive in `src/` today, every one a single line. Treat that
+    Eighty-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -552,6 +592,34 @@ The editor never edits its own DOM. Add and remove compute a whole new theme fro
 the current one and emit it; the rows come back through `connect$`. That keeps the
 component a pure source, and it is why `rows$` rebuilds on a **shape** change
 (stop count or blend) but not on a value the user is currently dragging.
+
+## Appearance
+
+The app has a theme of its own, and it is a document exactly like a sketch theme:
+named presets in `appearances.ts` (`paper`, the default, `studio`, `night`),
+edited by the `appearance` program, folded in `main.ts` into a `Map` keyed by
+name. The difference is that the app wears **one at a time**: `look$` is the
+active name, global, picked by `look` inputs from any appearance editor, so two
+editors follow each other.
+
+An `Appearance` is a record of `Token` → `#rrggbb`. Opaque hex only, so every token
+fits an `<input type="color">`; where translucency is wanted (`--shadow`) the CSS
+mixes it with `color-mix`. `appearanceFrom` names every token, so adding one to
+`Token` is a compile error until it is built, and `parseAppearance` falls back per
+token rather than rejecting the whole record — a token added later must not wipe a
+user's stored edits.
+
+**No component knows what an appearance is.** The model lives at the program
+layer; the editor receives its token names through `tokens()` and its presets
+through `presets()`, and the canvas receives a plain `ReadonlyMap` of custom
+properties and sets them on its host, where every window, the toolbar and every
+shadow root below inherit them. That is why the registry is the only definition
+of a colour: there is no palette in `styles.css` to drift from it. The formula
+editor's syntax colours are tokens too (`--code-*`).
+
+Unlike sketch themes, the look and its edits **persist** (`hakase.appearance`):
+the app should look the same when you come back. Both folds are `refCount: false`
+for the same reason the formula edits are.
 
 ## The formula editor
 
