@@ -248,6 +248,10 @@ const bootstrap = () => {
             duration$,
         ).pipe(shareReplay({ bufferSize: 1, refCount: true })),
         duration$,
+        zoom$: camera$.pipe(
+            map(({ zoom }) => zoom),
+            distinctUntilChanged(),
+        ),
         source$: (formula: FormulaName) =>
             edits$.pipe(
                 map(edits => edits.get(formula) ?? { value: formulas[formula].source, from: null }),

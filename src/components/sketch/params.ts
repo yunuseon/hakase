@@ -30,3 +30,13 @@ export const defaultDots: DotStyle = {
     baseSize: 5,
     depthScalar: 1,
 };
+
+const RATIO_STEP = 0.25;
+const MAX_BUFFER = 2048;
+
+// Stepped, or every wheel tick of a zoom reallocates the drawing buffer (~7ms each).
+export const steppedRatio = (pixelRatio: number, zoom: number): number =>
+    Math.max(RATIO_STEP, Math.round((pixelRatio * zoom) / RATIO_STEP) * RATIO_STEP);
+
+export const cappedRatio = (ratio: number, { width, height }: Size): number =>
+    Math.min(ratio, MAX_BUFFER / Math.max(width, height, 1));

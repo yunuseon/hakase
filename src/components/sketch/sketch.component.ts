@@ -1,8 +1,7 @@
 import { combineLatest, merge, type Observable } from 'rxjs';
 import { map, pairwise, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
-import { devicePixelRatio$ } from '../../lib/rx.ts';
-import type { SketchParams } from './params.ts';
+import { cappedRatio, type SketchParams } from './params.ts';
 import { buildRamp } from './theme.ts';
 import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
 import { drawFrame, prepare, type Sketch } from './gl/sketch-program.ts';
@@ -35,13 +34,14 @@ export class HksSketch extends HTMLElement {
         params$: Observable<SketchParams>,
         playhead$: Observable<number>,
         sketch$: Observable<Sketch>,
+        ratio$: Observable<number>,
     ): Observable<void> {
         // One chain: geometry as its own stream made a diamond that drew twice.
-        const prepared$ = combineLatest([params$, sketch$, devicePixelRatio$]).pipe(
+        const prepared$ = combineLatest([params$, sketch$, ratio$]).pipe(
             map(([params, sketch, ratio]) => ({
                 params,
                 sketch,
-                ratio,
+                ratio: cappedRatio(ratio, params),
                 ramp: buildRamp(params.theme),
             })),
             tap(({ params, sketch, ratio, ramp }) => {

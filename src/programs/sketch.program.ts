@@ -16,7 +16,8 @@ import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme, type Theme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
-import type { PanelParams, SketchParams } from '../components/sketch/params.ts';
+import { steppedRatio, type PanelParams, type SketchParams } from '../components/sketch/params.ts';
+import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
@@ -43,7 +44,7 @@ export const sketchProgram: Program = {
         return {
             element: sketch,
             run$: (state, { frame$ }) => {
-                const { playhead$, source$ } = state;
+                const { playhead$, source$, zoom$ } = state;
                 // Without the comparator, dragging the window would re-prepare the shader.
                 const size$ = frame$.pipe(
                     map(({ width, height }): Size => ({ width, height })),
@@ -96,8 +97,14 @@ export const sketchProgram: Program = {
                     mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
                 );
 
+                // Zoomed in, the canvas is drawn bigger than its CSS size and must render to match.
+                const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
+                    map(([pixelRatio, zoom]) => steppedRatio(pixelRatio, zoom)),
+                    distinctUntilChanged(),
+                );
+
                 return merge(
-                    sketch.connect$(params$, playhead$, shader$).pipe(ignoreElements()),
+                    sketch.connect$(params$, playhead$, shader$, ratio$).pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
                     controls.connect$(panel$).pipe(ignoreElements()),
                     compiled$.pipe(
