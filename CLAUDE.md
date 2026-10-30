@@ -413,6 +413,23 @@ follow it — Geist for UI text, Geist Mono for code, readouts and clocks, both 
 well (`--well`, rounded) marks an editable area instead of a border. The design
 these follow is the Claude Design canvas "hakase — modern redesign".
 
+**Every program fills whatever window it is given.** The window body is a flex
+column and each content component sets `block-size: 100%` on its host, so a
+window resized taller or narrower reflows its content instead of leaving it
+parked at the top. Two patterns carry the rest:
+
+- A footer (the task manager's, the todo's) takes `margin-block-start: auto`, so
+  it sits on the window's bottom edge however tall the list above it is.
+- Something that must stay square (the playhead dial) makes its host a size
+  container and sizes itself `min(100cqi, 100cqb)`, so it fits whichever side of
+  the window is shorter rather than following the height out past the sides.
+
+Narrowed to the minimum width (180), every program still fits across; only the
+formula editor's long lines run on, inside its own scrolling code box. Below
+about 150 units of height there is not room for most programs at all, and their
+content runs past the frame — a per-program minimum size would be the fix, not
+clipping, since the floating toolbar's menu has to escape its window.
+
 **Focus is part of a window's slot, not a stream of its own.** `Self.slot$` carries
 `{ frame, focused }` together, because a raise changes both; a `frame$` and a
 `focused$` combined in `liveProcess$` would be the two-paths-into-one-`combineLatest`

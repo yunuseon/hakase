@@ -1,4 +1,10 @@
 :host {
+    /* A size container, so the dial can fit whichever side of the window is shorter. */
+    container-type: size;
+    display: grid;
+    place-items: center;
+    block-size: 100%;
+    min-block-size: 0;
     cursor: pointer;
     touch-action: none;
     user-select: none;
@@ -7,9 +13,8 @@
 
 .track {
     position: relative;
-    block-size: 100%;
+    inline-size: min(100cqi, 100cqb);
     aspect-ratio: 1;
-    align-self: center;
     border: 2px solid var(--edge);
     border-radius: 100%;
     box-sizing: border-box;
