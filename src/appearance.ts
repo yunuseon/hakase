@@ -1,24 +1,4 @@
-export type Token =
-    | 'canvas'
-    | 'grid'
-    | 'panel'
-    | 'well'
-    | 'ink'
-    | 'label'
-    | 'muted'
-    | 'rule'
-    | 'edge'
-    | 'track'
-    | 'accent'
-    | 'highlight'
-    | 'shadow'
-    | 'code-text'
-    | 'code-comment'
-    | 'code-keyword'
-    | 'code-function'
-    | 'code-number';
-
-export const TOKENS: readonly Token[] = [
+export const TOKENS = [
     'canvas',
     'grid',
     'panel',
@@ -37,12 +17,14 @@ export const TOKENS: readonly Token[] = [
     'code-keyword',
     'code-function',
     'code-number',
-];
+] as const;
+
+export type Token = (typeof TOKENS)[number];
 
 // Opaque #rrggbb only, so every token can sit in an <input type="color">.
 export type Appearance = Readonly<Record<Token, string>>;
 
-// Names every field, so a token added to Token is a compile error here until it is built.
+// Names every field, so a token added to TOKENS is a compile error here until it is built.
 export const appearanceFrom = (read: (token: Token) => string): Appearance => ({
     canvas: read('canvas'),
     grid: read('grid'),

@@ -7,16 +7,16 @@ import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
-export type ProgramId = 'formula' | 'theme' | 'appearance' | 'sketch' | 'timeline' | 'playhead';
-
-export const PROGRAM_IDS: readonly ProgramId[] = [
+export const PROGRAM_IDS = [
     'formula',
     'theme',
     'appearance',
     'sketch',
     'timeline',
     'playhead',
-];
+] as const;
+
+export type ProgramId = (typeof PROGRAM_IDS)[number];
 
 export const isProgramId = (value: string): value is ProgramId =>
     PROGRAM_IDS.some(id => id === value);

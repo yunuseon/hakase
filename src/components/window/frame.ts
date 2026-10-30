@@ -13,9 +13,9 @@ export type Size = {
 
 export type Frame = Placement & Size;
 
-export type ResizeEdge = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+export const RESIZE_EDGES = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 
-export const RESIZE_EDGES: readonly ResizeEdge[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'];
+export type ResizeEdge = (typeof RESIZE_EDGES)[number];
 
 export type WindowView = {
     // 'fitted' is sized by its content: the sketch's frame holds canvas dimensions.

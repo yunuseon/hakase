@@ -1,6 +1,6 @@
-export type Edge = 'top' | 'bottom' | 'left' | 'right';
+export const EDGES = ['top', 'bottom', 'left', 'right'] as const;
 
-export const EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
+export type Edge = (typeof EDGES)[number];
 
 export const isEdge = (value: string): value is Edge => EDGES.some(edge => edge === value);
 
@@ -9,9 +9,9 @@ export type Placement = Edge | 'float';
 export const isPlacement = (value: string): value is Placement =>
     value === 'float' || isEdge(value);
 
-export type ZoomCommand = 'in' | 'out' | 'reset' | 'fit';
+export const ZOOM_COMMANDS = ['in', 'out', 'reset', 'fit'] as const;
 
-export const ZOOM_COMMANDS: readonly ZoomCommand[] = ['in', 'out', 'reset', 'fit'];
+export type ZoomCommand = (typeof ZOOM_COMMANDS)[number];
 
 export const isZoomCommand = (value: string): value is ZoomCommand =>
     ZOOM_COMMANDS.some(command => command === value);

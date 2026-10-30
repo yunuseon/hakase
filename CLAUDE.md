@@ -446,6 +446,20 @@ change — it is the most interesting open problem here.
 argument that the compiler cannot check — `fromEvent<PointerEvent>(el, 'x')` is a
 cast wearing a costume. The count is currently zero; keep it there.
 
+**`as const` is the exception, and it is encouraged.** It is not a cast: it asks
+the compiler for the narrowest type of a literal rather than overriding what it
+inferred, so nothing unchecked gets through. Use it for every closed list, and
+derive the union from the list rather than writing both:
+
+```ts
+export const EDGES = ['top', 'bottom', 'left', 'right'] as const;
+export type Edge = (typeof EDGES)[number];
+```
+
+`PROGRAM_IDS`, `TOKENS`, `DRAW_MODES`, `EDGES`, `ZOOM_COMMANDS` and
+`RESIZE_EDGES` all have this shape, so a value is added in one place and the
+type, the guard (`isEdge` and friends) and every exhaustive `switch` follow.
+
 When a value needs narrowing, narrow it at runtime (`instanceof`) rather than
 asserting it. When an external source needs adapting, reach for
 `new Observable<T>(subscriber => ...)`: the callback body type-checks against `T`,
