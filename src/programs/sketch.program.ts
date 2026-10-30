@@ -4,7 +4,6 @@ import {
     ignoreElements,
     map,
     mergeMap,
-    scan,
     shareReplay,
     startWith,
     switchMap,
@@ -13,20 +12,23 @@ import {
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { compileFormula$ } from '../components/sketch/compile.ts';
 import { knobsUsed } from '../components/sketch/gl/sketch-program.ts';
-import { DEFAULT_ORBIT, reduceOrbit } from '../components/sketch/space.ts';
-import { formulas, isFormulaName } from '../components/sketch/formulas/registry.ts';
-import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
+import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
+import { formulas } from '../components/sketch/formulas/registry.ts';
+import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme, type Theme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import {
     centre,
-    type Pointer,
+    panelParams,
+    samePanel,
     steppedRatio,
-    type PanelParams,
+    type Panel,
+    type Pointer,
     type SketchParams,
 } from '../components/sketch/params.ts';
+import { asSketch, controlsView, withControl } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
 
@@ -53,7 +55,7 @@ export const sketchProgram: Program = {
 
         return {
             element: sketch,
-            run$: (state, { slot$ }) => {
+            run$: (state, { slot$, settings$: stored$ }) => {
                 const { playhead$, source$, zoom$ } = state;
                 // Without the comparator, dragging the window would re-prepare the shader.
                 const size$ = slot$.pipe(
@@ -61,13 +63,20 @@ export const sketchProgram: Program = {
                     distinctUntilChanged(sameSize),
                 );
 
-                // Per process: this window's own knobs, not a panel every sketch shares.
-                const panel$ = controls.changes$.pipe(
+                const settings$ = stored$.pipe(
+                    map(asSketch),
+                    distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                const theme$ = controls.selectedTheme$.pipe(
-                    mergeMap(name => (isThemeName(name) ? of(name) : EMPTY)),
+                // samePanel, or every orbit drag would rebuild the theme ramp and re-prepare.
+                const panel$ = settings$.pipe(
+                    map(({ panel }) => panel),
+                    distinctUntilChanged(samePanel),
+                );
+
+                const theme$ = settings$.pipe(
+                    map(({ theme }) => theme),
                     distinctUntilChanged(),
                     switchMap(name => state.theme$(name)),
                     map(({ value }) => value),
@@ -75,16 +84,16 @@ export const sketchProgram: Program = {
                 );
 
                 const params$ = combineLatest([panel$, size$, theme$]).pipe(
-                    map(([panel, size, theme]: [PanelParams, Size, Theme]): SketchParams => ({
-                        ...panel,
+                    map(([panel, size, theme]: [Panel, Size, Theme]): SketchParams => ({
+                        ...panelParams(panel),
                         ...size,
                         theme,
                     })),
                 );
 
                 // This window's choice; the text behind it is shared with whoever matches.
-                const formula$ = controls.selectedFormula$.pipe(
-                    mergeMap(name => (isFormulaName(name) ? of(name) : EMPTY)),
+                const formula$ = settings$.pipe(
+                    map(({ formula }) => formula),
                     distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
@@ -123,14 +132,32 @@ export const sketchProgram: Program = {
                                 sketch.pointers$.pipe(startWith(centre)),
                                 sketch.presses$.pipe(startWith(false), distinctUntilChanged()),
                             ]).pipe(map(([{ x, y }, down]): Pointer => ({ x, y, down }))),
-                            sketch.orbits$.pipe(
-                                scan(reduceOrbit, DEFAULT_ORBIT),
-                                startWith(DEFAULT_ORBIT),
+                            settings$.pipe(
+                                map(({ orbit }) => orbit),
+                                distinctUntilChanged(),
                             ),
                         )
                         .pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
-                    controls.connect$(panel$, shader$.pipe(map(knobsUsed))).pipe(ignoreElements()),
+                    controls
+                        .connect$(settings$.pipe(map(controlsView)), shader$.pipe(map(knobsUsed)))
+                        .pipe(ignoreElements()),
+                    merge(
+                        controls.changes$.pipe(
+                            withLatestFrom(settings$),
+                            map(([change, current]) => withControl(current, change)),
+                        ),
+                        merge(
+                            sketch.orbits$,
+                            controls.resets$.pipe(map((): OrbitAction => ({ kind: 'reset' }))),
+                        ).pipe(
+                            withLatestFrom(settings$),
+                            map(([action, current]) => ({
+                                ...current,
+                                orbit: reduceOrbit(current.orbit, action),
+                            })),
+                        ),
+                    ).pipe(map((settings): AppInput => ({ kind: 'settings', settings }))),
                     compiled$.pipe(
                         withLatestFrom(formula$),
                         map(([result, formula]): AppInput => ({

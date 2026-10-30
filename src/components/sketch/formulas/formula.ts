@@ -37,7 +37,7 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
     },
     {
         term: 'dragging the sketch',
-        text: 'Drag to orbit around the camera target, scroll to move closer or further, and double-click to undo your orbit. A scripted camera keeps moving underneath your orbit. Axes draws x in red, y in green and z in blue, with ticks every 0.5 and the -1 to 1 square at z = 0.',
+        text: 'Drag to orbit around the camera target, scroll to move closer or further, and double-click or press reset view to undo your orbit. A scripted camera keeps moving underneath your orbit. Axes draws x in red, y in green and z in blue, with ticks every 0.5 and the -1 to 1 square at z = 0. Fit decides how that square meets a canvas that is not square: contain shows all of it, cover fills the canvas and crops, stretch fills it squashed.',
     },
     {
         term: 'vec4 formula(...) and .w',

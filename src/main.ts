@@ -15,7 +15,6 @@ import {
 } from 'rxjs/operators';
 import './styles.css';
 import { variables, type Appearance } from './appearance.ts';
-import { persistAppearance$, restoreAppearance } from './appearance-store.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
 import { zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
@@ -26,6 +25,7 @@ import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
+import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
@@ -39,6 +39,8 @@ import {
     type Slot,
     type Task,
     type Written,
+    restored,
+    valuesOf,
 } from './program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
@@ -47,9 +49,9 @@ import { tasksProgram } from './programs/tasks.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
-import { createTransport$, defaultDuration } from './shared/playhead.ts';
+import { createTransport$, type Transport } from './shared/playhead.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
-import { persistWorkspace$, restoreWorkspace } from './workspace-store.ts';
+import { persistState$, restoreState } from './state-store.ts';
 import {
     boxOf,
     defaultWorkspace,
@@ -135,7 +137,8 @@ const bootstrap = () => {
         ),
     );
 
-    const seed = restoreWorkspace() ?? defaultWorkspace(viewportSize());
+    const stored = restoreState();
+    const seed = stored.workspace ?? defaultWorkspace(viewportSize());
 
     // defer, or the cycle is evaluated at construction: signals$ is built from this.
     const workspace$: Observable<Workspace> = merge(
@@ -215,7 +218,14 @@ const bootstrap = () => {
                 ? EMPTY
                 : liveProcess$(
                       program,
-                      { id: process.id, slot$: slot$(process.id) },
+                      {
+                          id: process.id,
+                          slot$: slot$(process.id),
+                          settings$: settings$.pipe(
+                              map(all => all.get(process.id)),
+                              distinctUntilChanged(),
+                          ),
+                      },
                       state,
                       canvas,
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
@@ -228,6 +238,18 @@ const bootstrap = () => {
         share(),
     );
 
+    // Not refCount: a window's settings must outlive the moment between two of its readers.
+    const settings$ = inputs$.pipe(
+        mergeMap(({ from, input }) => (input.kind === 'settings' ? of({ from, input }) : EMPTY)),
+        scan(
+            (all, { from, input }): ReadonlyMap<ProcessId, Settings> =>
+                new Map(all).set(from, input.settings),
+            stored.settings,
+        ),
+        startWith(stored.settings),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const commands$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'transport' ? of(input.command) : EMPTY)),
         share(),
@@ -235,7 +257,7 @@ const bootstrap = () => {
 
     const duration$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'duration' ? of(input.seconds) : EMPTY)),
-        startWith(defaultDuration),
+        startWith(stored.duration),
         distinctUntilChanged(),
         // Not refCount: closing the last timeline must not reset the clock to the default.
         shareReplay({ bufferSize: 1, refCount: false }),
@@ -245,6 +267,17 @@ const bootstrap = () => {
         inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
         commands$,
         duration$,
+        { at: stored.playhead, playing: false, looping: stored.looping },
+    );
+
+    // Where playback last rested: storage need not follow the playhead every frame it runs.
+    const rested$ = transport$.pipe(
+        scan((kept: Transport, now) => (now.playing ? { ...now, at: kept.at } : now), {
+            at: stored.playhead,
+            playing: false,
+            looping: stored.looping,
+        }),
+        distinctUntilChanged((a, b) => a.at === b.at && a.looping === b.looping),
     );
 
     // Keyed by formula: one edit reaches every process showing that formula.
@@ -257,9 +290,9 @@ const bootstrap = () => {
         scan(
             (edits, { formula, text, from }): ReadonlyMap<FormulaName, Written<string>> =>
                 new Map(edits).set(formula, { value: text, from }),
-            new Map<FormulaName, Written<string>>(),
+            restored(stored.formulas),
         ),
-        startWith(new Map<FormulaName, Written<string>>()),
+        startWith(restored(stored.formulas)),
         // Not refCount: the last reader switching formula must not erase the edits.
         shareReplay({ bufferSize: 1, refCount: false }),
     );
@@ -271,9 +304,9 @@ const bootstrap = () => {
         scan(
             (all, { theme, value, from }): ReadonlyMap<ThemeName, Written<Theme>> =>
                 new Map(all).set(theme, { value, from }),
-            new Map<ThemeName, Written<Theme>>(),
+            restored(stored.themes),
         ),
-        startWith(new Map<ThemeName, Written<Theme>>()),
+        startWith(restored(stored.themes)),
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
@@ -288,21 +321,12 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const stored = restoreAppearance();
-
     const look$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'look' ? of(input.name) : EMPTY)),
         startWith(stored.look),
         distinctUntilChanged(),
         // Not refCount: the look outlives every editor that picked it.
         shareReplay({ bufferSize: 1, refCount: false }),
-    );
-
-    const storedLooks: ReadonlyMap<AppearanceName, Written<Appearance>> = new Map(
-        [...stored.edits].map(([name, value]): [AppearanceName, Written<Appearance>] => [
-            name,
-            { value, from: null },
-        ]),
     );
 
     const looks$ = inputs$.pipe(
@@ -314,9 +338,9 @@ const bootstrap = () => {
         scan(
             (all, { name, value, from }): ReadonlyMap<AppearanceName, Written<Appearance>> =>
                 new Map(all).set(name, { value, from }),
-            storedLooks,
+            restored(stored.looks),
         ),
-        startWith(storedLooks),
+        startWith(restored(stored.looks)),
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
@@ -384,10 +408,23 @@ const bootstrap = () => {
     );
 
     return merge(
-        persistWorkspace$(workspace$),
-        persistAppearance$(
-            look$,
-            looks$.pipe(map(all => new Map([...all].map(([name, { value }]) => [name, value])))),
+        persistState$(
+            combineLatest({
+                workspace: workspace$,
+                look: look$,
+                looks: looks$.pipe(map(valuesOf)),
+                formulas: edits$.pipe(map(valuesOf)),
+                themes: palettes$.pipe(map(valuesOf)),
+                duration: duration$,
+                rested: rested$,
+                settings: settings$,
+            }).pipe(
+                map(({ rested, ...parts }) => ({
+                    ...parts,
+                    playhead: rested.at,
+                    looping: rested.looping,
+                })),
+            ),
         ),
         canvas.connect$(
             camera$,

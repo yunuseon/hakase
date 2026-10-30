@@ -85,3 +85,37 @@ export const sameTheme = (a: Theme, b: Theme): boolean =>
 
         return other !== undefined && stop.at === other.at && stop.color === other.color;
     });
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+const stopFrom = (value: unknown): Stop | null => {
+    if (typeof value !== 'object' || value === null || !('at' in value && 'color' in value)) {
+        return null;
+    }
+
+    const { at, color } = value;
+
+    return typeof at === 'number' &&
+        Number.isFinite(at) &&
+        typeof color === 'string' &&
+        HEX.test(color)
+        ? { at: clamp(at, 0, 1), color }
+        : null;
+};
+
+export const parseTheme = (value: unknown): Theme | null => {
+    if (typeof value !== 'object' || value === null || !('stops' in value && 'blend' in value)) {
+        return null;
+    }
+
+    const { stops, blend } = value;
+
+    if ((blend !== 'smooth' && blend !== 'steps') || !Array.isArray(stops)) {
+        return null;
+    }
+
+    const parsed = stops.map(stopFrom);
+    const kept = parsed.filter(stop => stop !== null);
+
+    return kept.length === 0 || kept.length !== parsed.length ? null : { stops: kept, blend };
+};

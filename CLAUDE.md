@@ -48,15 +48,25 @@ script it: beside `formula` it can define `Camera camera(float t)` returning
 return and appends `Camera view(float t)` that calls it, or a default that looks
 straight down -z from `REFERENCE_DISTANCE` with y up — chosen so the z = 0
 plane's -1..1 square exactly fills the shorter side, which is why a flat
-formula still looks flat. TypeScript only supplies `uProjection` (the pure
+formula still looks flat. Each sketch picks a **fit** for
+that square, named after CSS `object-fit`: `contain` (the default, the square
+fits the shorter side and a wide canvas shows more), `cover` (it fills the
+longer side and the overflow is cropped, still undistorted) and `stretch` (x and
+y scaled alike whatever the aspect, so it fills the canvas squashed, like the
+flat sketch used to). `FITS` is a closed list, so a new mode is one entry and a
+case in `scales`. It is purely a projection setting — formulas, the axes and the
+pointer ray all follow it unchanged, because `aim()` reads the scale back out of
+`uProjection`. TypeScript only supplies `uProjection` (the pure
 `projection(aspect)` in `components/sketch/space.ts`, 25° field of view, set in
 `prepare` because it changes only with size) and `uOrbit`. A camera that a
 formula scripts loops with the playhead like everything else, so a shot loops
 seamlessly; the old turntable switch is just one such camera and is gone.
 
-**The viewer's drag sits on top of whatever camera there is.** Each sketch folds
-its own `Orbit` (yaw, pitch, distance) with `scan` over `reduceOrbit` — drag to
-turn, wheel to dolly, double-click to reset — per process and not persisted.
+**The viewer's drag sits on top of whatever camera there is.** Each sketch keeps
+its own `Orbit` (yaw, pitch, distance) in its settings, advanced by `reduceOrbit`:
+drag to turn, wheel to dolly, double-click or the **reset view** button to reset.
+The button is disabled while the orbit is already the default (`sameOrbit`). The
+orbit is saved with the window like every other setting.
 `orbited()` in `sketch.vert` applies it around the camera's target using the
 camera's **own** `up` as the pole, not world y, so a scripted camera with z up
 (terrain's) orbits the right way, and the default camera with no drag is
@@ -231,7 +241,7 @@ would be written over what they are typing. Selecting a formula emits no `source
 input at all; only typing does.
 
 **Configuration follows the process, not the program.** A sketch's lattice, dot
-size and depth live in `hks-sketch-controls`, slotted into that sketch's own
+size and depth are shown by `hks-sketch-controls`, slotted into that sketch's own
 window, so two sketches can run the same formula at different densities and
 colours. They were global Tweakpane folders once; the moment a program could run
 twice, a shared panel meant two windows fighting over one set of knobs.
@@ -249,10 +259,33 @@ is harmless and needs no `from` stamp: it normalises what was typed (`12.34` rea
 back `12.3`) and never lands mid-keystroke. A field that applied per keystroke
 would need the editor's `from` fold instead.
 
-The inputs hold their own values, so there is no parameter object to keep in sync:
-`changes$` reads them, `connect$` writes only the numeric readouts back. Those
-settings are deliberately not persisted — the workspace remembers which processes
-exist and where, not how each one is tuned.
+**A window's settings are app state, keyed by `ProcessId`, and the inputs only
+display them.** They used to live in the `<input>`s themselves, which made the
+DOM a variable nothing could save or restore. Now each program describes what it
+remembers as one member of `Settings` in `src/settings.ts` — `SketchSettings`
+(formula, theme, `Panel`, `Orbit`), the formula editor's and theme editor's
+selection — and emits the whole new value as a `settings` input. `main.ts` folds
+those into one `Map<ProcessId, Settings>`, and each process reads its own back
+through `Self.settings$`. Nothing is stored until a window first changes
+something; until then `asSketch` and friends supply the default, so a default is
+defined once.
+
+That flips the components' contract, and both halves matter:
+
+- **`changes$` reports only what the user did**, never a reading of the inputs —
+  `ControlChange` is a field and a value, emitted from `input`/`change` events.
+  Reading the DOM at subscribe time, as the old `startWith(input.value)` did,
+  would emit the HTML defaults and overwrite the restored settings.
+- **`connect$` writes every value back**, deduplicated per field. A programmatic
+  write raises no event, so there is no loop, and writing the value a thumb is
+  already at is harmless.
+
+The program turns a change into the next settings with `withLatestFrom` over its
+own `settings$` and a pure `withControl`/`reduceOrbit`. The fold is synchronous,
+so the next pointer event already sees the last one applied. `Panel` is flat on
+purpose: `PanelParams.draw` drops dot size in lines mode, and a setting the user
+made must survive switching modes and back. `samePanel` dedupes it before it
+reaches the renderer, or every orbit drag would rebuild the theme ramp.
 
 **Launching is one action.** The toolbar emits a program id; `main.ts` turns it
 into a `launch` action carrying that program's default `size` and the current
@@ -267,8 +300,8 @@ folder that grows a file naming a window is the mistake this layer exists to
 prevent — that file is a program, and it belongs one level up.
 
 **The dependency arrow only ever points down.** Nothing under `components/` may
-import `program.ts`, `workspace.ts`, `process.ts`, `toolbar-host.ts` or the
-`appearance*.ts` modules; the check is one grep and it is worth running. This is
+import `program.ts`, `workspace.ts`, `process.ts`, `toolbar-host.ts`,
+`settings.ts`, `state-store.ts` or the `appearance*.ts` modules; the check is one grep and it is worth running. This is
 why `HksWindow` emits an untagged `WindowGesture` rather than a `WorkspaceAction`:
 the window does not know which program it holds, so `liveProcess$` — which is
 program-layer, at `src/` root — is what stamps the `id` on.
@@ -511,13 +544,31 @@ stream of its own. The one asymmetry: that frame's width and height are never
 applied to the element — the window is sized by the canvas it contains, and
 `connect$` takes only a `Placement`.
 
-The workspace — processes, camera, toolbar — persists to `localStorage` under
-`hakase.workspace`, debounced: a drag emits on every pointer move and storage only
-needs where it stopped. That is hygiene, not speed — a write measures about 2us
-for a 168-byte payload, so do not go looking for it in a profile. A stored
-workspace is untrusted input: `parseWorkspace` rebuilds it field by field and
-returns null on anything unexpected. There is no clamp any more: on an infinite
-canvas a window saved off screen is one pan or one **fit** away.
+**The whole app is one snapshot.** `state-store.ts` writes a single versioned
+`hakase.state`: the workspace (processes, links, camera, toolbar), the look and
+its edits, formula and theme edits, duration, loop, where the playhead last
+rested, and every window's settings. `persistState$` takes one `combineLatest` of
+the folds, each reaching it by exactly one path, debounced: a drag emits on every
+pointer move and storage only needs where it stopped. That is hygiene, not
+speed — a write measures about 2us for a 168-byte payload, so do not go looking
+for it in a profile. `restoreState` reads it once at startup and every fold is
+seeded from it with `startWith`, so restoring is the same mechanism as starting
+fresh. If the key is absent it reads the two keys it replaced, `hakase.workspace`
+and `hakase.appearance`, so an upgrade keeps windows and look.
+
+What is **not** saved is anything derived or momentary: diagnostics (recompiled),
+measured sizes (re-measured), snap drift, the pointer, and whether playback is
+running — a reload never starts moving on its own. The playhead is saved where it
+last **rested**: `rested$` keeps the position from the last moment playback was
+stopped, so a running clock does not keep the debounce from ever settling.
+Settings of closed windows are dropped when written; ids are never reused, so
+nothing could read them.
+
+Every part is untrusted input and parsed on its own, field by field with a
+default for each (`parseWorkspace`, `parseSettings`, `parseTheme`,
+`parseAppearance`), so one bad or outdated part falls back without discarding
+the rest. There is no window clamp any more: on an infinite canvas a window
+saved off screen is one pan or one **fit** away.
 
 `viewportSize()` in `lib/dom.ts` is the only place that knows `innerWidth` reads
 0 in an embedded frame before first layout, and it replaces only that zero, not a
@@ -571,8 +622,9 @@ belongs to is read from its name instead of its path:
 
 The program layer sits at the `src/` root, above the components it composes:
 `program.ts` (identity and contracts), `workspace.ts` (processes, camera and
-toolbar, and their reducer), `workspace-store.ts`, `process.ts` (`liveProcess$`),
-`toolbar-host.ts`, `appearance.ts`, `appearances.ts`, `appearance-store.ts`,
+toolbar, and their reducer), `settings.ts` (what each window remembers),
+`state-store.ts` (the one snapshot), `process.ts` (`liveProcess$`),
+`toolbar-host.ts`, `appearance.ts`, `appearances.ts`,
 `main.ts`.
 
 ## The prime directive
@@ -714,7 +766,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    One hundred and one of them survive in `src/` today, every one a single line. Treat that
+    One hundred and four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -814,9 +866,8 @@ shadow root below inherit them. That is why the registry is the only definition
 of a colour: there is no palette in `styles.css` to drift from it. The formula
 editor's syntax colours are tokens too (`--code-*`).
 
-Unlike sketch themes, the look and its edits **persist** (`hakase.appearance`):
-the app should look the same when you come back. Both folds are `refCount: false`
-for the same reason the formula edits are.
+The look and its edits persist with everything else in `hakase.state`. Both
+folds are `refCount: false` for the same reason the formula edits are.
 
 ## The formula editor
 

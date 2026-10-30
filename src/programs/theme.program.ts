@@ -13,6 +13,7 @@ import type { Theme } from '../components/sketch/theme.ts';
 import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { HksThemeEditor } from '../components/theme-editor/theme-editor.component.ts';
 import type { AppInput, Program } from '../program.ts';
+import { asThemeEditor } from '../settings.ts';
 
 const options = Object.keys(themes).map(value => ({ value, label: value }));
 
@@ -31,8 +32,8 @@ export const themeProgram: Program = {
         return {
             element: editor,
             run$: ({ theme$ }, self) => {
-                const chosen$ = editor.selections$.pipe(
-                    mergeMap(name => (isThemeName(name) ? of(name) : EMPTY)),
+                const chosen$ = self.settings$.pipe(
+                    map(settings => asThemeEditor(settings).theme),
                     distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
@@ -57,7 +58,16 @@ export const themeProgram: Program = {
                 );
 
                 return merge(
-                    editor.connect$(rows$, merge(rows$, editor.changes$)).pipe(ignoreElements()),
+                    editor
+                        .connect$(chosen$, rows$, merge(rows$, editor.changes$))
+                        .pipe(ignoreElements()),
+                    editor.selections$.pipe(
+                        mergeMap(name => (isThemeName(name) ? of(name) : EMPTY)),
+                        map((theme): AppInput => ({
+                            kind: 'settings',
+                            settings: { kind: 'theme', theme },
+                        })),
+                    ),
                     editor.changes$.pipe(
                         withLatestFrom(chosen$),
                         map(([value, theme]): AppInput => ({ kind: 'theme', theme, value })),

@@ -1,4 +1,4 @@
-import { concat, defer, merge, of, type Observable } from 'rxjs';
+import { merge, type Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, tap } from 'rxjs/operators';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-clike.js';
@@ -93,12 +93,8 @@ export class HksFormulaEditor extends HTMLElement {
         this.typed$ = fromElementEvent$(this.source, 'input').pipe(map(() => this.source.value));
         this.changes$ = this.typed$.pipe(debounceTime(250), distinctUntilChanged());
 
-        // Deferred: the current option is only known once presets() has filled the list.
-        this.selections$ = defer(() =>
-            concat(
-                of(this.picker.value),
-                fromElementEvent$(this.picker, 'change').pipe(map(() => this.picker.value)),
-            ),
+        this.selections$ = fromElementEvent$(this.picker, 'change').pipe(
+            map(() => this.picker.value),
         );
     }
 
@@ -135,6 +131,7 @@ export class HksFormulaEditor extends HTMLElement {
     }
 
     connect$(
+        selected$: Observable<string>,
         preset$: Observable<string>,
         about$: Observable<string>,
         error$: Observable<string | null>,
@@ -151,6 +148,12 @@ export class HksFormulaEditor extends HTMLElement {
         const text$ = merge(applied$, this.typed$);
 
         return merge(
+            selected$.pipe(
+                distinctUntilChanged(),
+                tap(value => {
+                    this.picker.value = value;
+                }),
+            ),
             text$.pipe(
                 map(highlight),
                 tap(html => {

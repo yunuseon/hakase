@@ -136,7 +136,7 @@ export const prepare = (
     gl.uniformMatrix4fv(
         uniforms.projection,
         false,
-        projection(params.width / Math.max(params.height, 1)),
+        projection(params.width / Math.max(params.height, 1), params.fit),
     );
     KNOBS.forEach((knob, index) => {
         gl.uniform1f(uniforms.knobs[index] ?? null, params.knobs[knob]);

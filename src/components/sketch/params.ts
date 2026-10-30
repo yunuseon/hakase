@@ -1,4 +1,5 @@
 import type { Size } from '../window/frame.ts';
+import type { Fit } from './space.ts';
 import type { Theme } from './theme.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
@@ -31,7 +32,46 @@ export type PanelParams = {
     readonly draw: DrawStyle;
     readonly knobs: Knobs;
     readonly axes: boolean;
+    readonly fit: Fit;
 };
+
+// Flat, unlike PanelParams: a dot setting must outlive a switch to lines, so it is kept, not dropped.
+export type Panel = {
+    readonly mode: DrawMode;
+    readonly dimension: number;
+    readonly baseSize: number;
+    readonly depthScalar: number;
+    readonly knobs: Knobs;
+    readonly axes: boolean;
+    readonly fit: Fit;
+};
+
+export const sameKnobs = (a: Knobs, b: Knobs): boolean => KNOBS.every(knob => a[knob] === b[knob]);
+
+export const samePanel = (a: Panel, b: Panel): boolean =>
+    a.mode === b.mode &&
+    a.dimension === b.dimension &&
+    a.baseSize === b.baseSize &&
+    a.depthScalar === b.depthScalar &&
+    sameKnobs(a.knobs, b.knobs) &&
+    a.axes === b.axes &&
+    a.fit === b.fit;
+
+export const panelParams = ({
+    mode,
+    dimension,
+    baseSize,
+    depthScalar,
+    knobs,
+    axes,
+    fit,
+}: Panel): PanelParams => ({
+    dimension,
+    draw: mode === 'dots' ? { mode, baseSize, depthScalar } : { mode },
+    knobs,
+    axes,
+    fit,
+});
 
 export type Pointer = {
     readonly x: number;
@@ -71,6 +111,14 @@ export const defaultDots: DotStyle = {
     mode: 'dots',
     baseSize: 5,
     depthScalar: 1,
+};
+
+export const defaultPanel: Panel = {
+    ...defaultDots,
+    dimension: defaultDimension,
+    knobs: { k1: defaultKnob, k2: defaultKnob, k3: defaultKnob, k4: defaultKnob },
+    axes: false,
+    fit: 'contain',
 };
 
 const RATIO_STEP = 0.25;

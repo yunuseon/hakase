@@ -1,38 +1,22 @@
-import { combineLatest, concat, defer, EMPTY, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, startWith, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
+import { DRAW_MODES, KNOBS, defaultPanel, isKnob, type DrawMode } from '../params.ts';
+import { FITS } from '../space.ts';
 import {
-    DRAW_MODES,
-    KNOBS,
-    defaultDimension,
-    defaultDots,
-    defaultKnob,
-    isDrawMode,
-    isKnob,
-    type DrawMode,
-    type DrawStyle,
-    type Knob,
-    type Knobs,
-    type PanelParams,
-} from '../params.ts';
+    FLAGS,
+    NUMERIC_FIELDS,
+    isFlag,
+    isNumericField,
+    numberOf,
+    type ControlChange,
+    type ControlsView,
+    type NumericField,
+} from './controls.ts';
 import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);
-
-type Readout = Readonly<Record<Knob, string>> & {
-    readonly mode: DrawMode;
-    readonly dimension: string;
-    readonly baseSize: string;
-    readonly depthScalar: string;
-};
-
-const sameReadout = (a: Readout, b: Readout): boolean =>
-    a.mode === b.mode &&
-    a.dimension === b.dimension &&
-    a.baseSize === b.baseSize &&
-    a.depthScalar === b.depthScalar &&
-    KNOBS.every(knob => a[knob] === b[knob]);
 
 const slider = (
     key: string,
@@ -68,7 +52,7 @@ const choice = (key: string, label: string) => `
 const modes = DRAW_MODES.map(
     mode => `
         <label class="segment">
-            <input type="radio" name="mode" value="${mode}"${mode === defaultDots.mode ? ' checked' : ''} />
+            <input type="radio" name="mode" value="${mode}"${mode === defaultPanel.mode ? ' checked' : ''} />
             <span>${mode}</span>
         </label>
     `,
@@ -80,10 +64,20 @@ const TEMPLATE = `
         ${choice('theme', 'theme')}
         <div class="segments" role="radiogroup" aria-label="draw mode">${modes}</div>
         ${flag('axes', 'axes')}
-        ${slider('dimension', 'lattice', 1, 128, 1, defaultDimension)}
-        ${slider('baseSize', 'dot', 1, 20, 1, defaultDots.baseSize, 'dots')}
-        ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultDots.depthScalar, 'dots')}
-        ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultKnob)).join('')}
+        <label class="item">
+            <span class="key">fit</span>
+            <select class="pick" data-pick="fit" aria-label="fit">
+                ${FITS.map(fit => `<option value="${fit}">${fit}</option>`).join('')}
+            </select>
+        </label>
+        <button class="item reset" type="button" title="reset camera" aria-label="reset camera" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>
+            <span>reset view</span>
+        </button>
+        ${slider('dimension', 'lattice', 1, 128, 1, defaultPanel.dimension)}
+        ${slider('baseSize', 'dot', 1, 20, 1, defaultPanel.baseSize, 'dots')}
+        ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
+        ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultPanel.knobs[knob])).join('')}
     </div>
 `;
 
@@ -92,12 +86,15 @@ export type PresetOption = {
     readonly label: string;
 };
 
+const readout = (field: NumericField, value: number): string =>
+    field === 'dimension' || field === 'baseSize' ? String(value) : value.toFixed(2);
+
 export class HksSketchControls extends HTMLElement {
-    readonly changes$: Observable<PanelParams>;
-    readonly selectedFormula$: Observable<string>;
-    readonly selectedTheme$: Observable<string>;
+    readonly changes$: Observable<ControlChange>;
+    readonly resets$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
+    private readonly reset: HTMLButtonElement;
 
     constructor() {
         super();
@@ -106,83 +103,46 @@ export class HksSketchControls extends HTMLElement {
         this.shadow.adoptedStyleSheets = [sheet];
         this.shadow.innerHTML = TEMPLATE;
 
-        // Deferred: the current option is only known once presets() has filled the list.
-        const chosen$ = (key: string): Observable<string> =>
-            defer(() => {
-                const pick = this.pick(key);
+        const bar = requireChild(this.shadow, '.bar');
+        this.reset = requireElement(this.shadow, '.reset', HTMLButtonElement);
+        this.resets$ = fromElementEvent$(this.reset, 'click').pipe(map(() => undefined));
 
-                return concat(
-                    of(pick.value),
-                    fromElementEvent$(pick, 'change').pipe(map(() => pick.value)),
-                );
-            });
+        this.changes$ = merge(
+            fromElementEvent$(bar, 'input').pipe(
+                mergeMap(({ target }): Observable<ControlChange> => {
+                    const field =
+                        target instanceof HTMLInputElement ? target.dataset['field'] : undefined;
 
-        this.selectedFormula$ = chosen$('formula');
-        this.selectedTheme$ = chosen$('theme');
+                    return target instanceof HTMLInputElement &&
+                        field !== undefined &&
+                        isNumericField(field)
+                        ? of({ field, value: Number(target.value) })
+                        : EMPTY;
+                }),
+            ),
+            fromElementEvent$(bar, 'change').pipe(
+                mergeMap(({ target }): Observable<ControlChange> => {
+                    if (target instanceof HTMLSelectElement) {
+                        const pick = target.dataset['pick'];
 
-        const field = (key: string): HTMLInputElement =>
-            requireElement(this.shadow, `[data-field="${key}"]`, HTMLInputElement);
+                        return pick === 'formula' || pick === 'theme' || pick === 'fit'
+                            ? of({ field: pick, value: target.value })
+                            : EMPTY;
+                    }
 
-        // Deferred: the seed is whatever the input holds when someone subscribes.
-        const text$ = (key: string): Observable<string> =>
-            defer(() => {
-                const input = field(key);
+                    if (target instanceof HTMLInputElement && target.name === 'mode') {
+                        return of({ field: 'mode', value: target.value });
+                    }
 
-                return fromElementEvent$(input, 'input').pipe(
-                    map(() => input.value),
-                    startWith(input.value),
-                );
-            });
+                    const flag =
+                        target instanceof HTMLInputElement ? target.dataset['flag'] : undefined;
 
-        const number$ = (key: string): Observable<number> =>
-            text$(key).pipe(map(value => Number(value)));
-
-        const segments = requireChild(this.shadow, '.segments');
-        // Deferred like the pickers: the checked radio is read when someone subscribes.
-        const mode$ = defer(() =>
-            fromElementEvent$(segments, 'change').pipe(
-                map(() => this.checkedMode()),
-                startWith(this.checkedMode()),
+                    return target instanceof HTMLInputElement && flag !== undefined && isFlag(flag)
+                        ? of({ field: flag, value: target.checked })
+                        : EMPTY;
+                }),
             ),
         );
-
-        // switchMap: a mode's own fields are read only while it is selected, and keep their values.
-        const draw$: Observable<DrawStyle> = mode$.pipe(
-            mergeMap(mode => (isDrawMode(mode) ? of(mode) : EMPTY)),
-            switchMap(mode =>
-                mode === 'dots'
-                    ? combineLatest({
-                          mode: of(mode),
-                          baseSize: number$('baseSize'),
-                          depthScalar: number$('depthScalar'),
-                      })
-                    : of({ mode }),
-            ),
-        );
-
-        const knobs$: Observable<Knobs> = combineLatest({
-            k1: number$('k1'),
-            k2: number$('k2'),
-            k3: number$('k3'),
-            k4: number$('k4'),
-        });
-
-        const checked$ = (key: string): Observable<boolean> =>
-            defer(() => {
-                const box = requireElement(this.shadow, `[data-flag="${key}"]`, HTMLInputElement);
-
-                return fromElementEvent$(box, 'change').pipe(
-                    map(() => box.checked),
-                    startWith(box.checked),
-                );
-            });
-
-        this.changes$ = combineLatest({
-            dimension: number$('dimension'),
-            draw: draw$,
-            knobs: knobs$,
-            axes: checked$('axes'),
-        });
     }
 
     presets(formulas: readonly PresetOption[], themes: readonly PresetOption[]): this {
@@ -204,20 +164,70 @@ export class HksSketchControls extends HTMLElement {
         return this;
     }
 
-    private checkedMode(): string {
-        const checked = this.shadow.querySelector('input[name="mode"]:checked');
-
-        return checked instanceof HTMLInputElement ? checked.value : '';
-    }
-
     private pick(key: string): HTMLSelectElement {
         return requireElement(this.shadow, `[data-pick="${key}"]`, HTMLSelectElement);
     }
 
+    // Writes every value back: the fold owns them, so a programmatic write raises no event to loop on.
     connect$(
-        params$: Observable<PanelParams>,
+        view$: Observable<ControlsView>,
         knobs$: Observable<readonly string[]>,
     ): Observable<void> {
+        const picks$ = (['formula', 'theme', 'fit'] as const).map(key =>
+            view$.pipe(
+                map(view => view[key]),
+                distinctUntilChanged(),
+                tap(value => {
+                    this.pick(key).value = value;
+                }),
+            ),
+        );
+
+        const numbers$ = NUMERIC_FIELDS.map(field =>
+            view$.pipe(
+                map(view => numberOf(view, field)),
+                distinctUntilChanged(),
+                tap(value => {
+                    requireElement(this.shadow, `[data-field="${field}"]`, HTMLInputElement).value =
+                        String(value);
+                    requireElement(
+                        this.shadow,
+                        `[data-read="${field}"]`,
+                        HTMLOutputElement,
+                    ).textContent = readout(field, value);
+                }),
+            ),
+        );
+
+        const mode$ = view$.pipe(
+            map(({ mode }) => mode),
+            distinctUntilChanged(),
+            tap(mode => {
+                for (const radio of this.shadow.querySelectorAll('input[name="mode"]')) {
+                    if (radio instanceof HTMLInputElement) {
+                        radio.checked = radio.value === mode;
+                    }
+                }
+
+                for (const row of this.shadow.querySelectorAll('[data-only]')) {
+                    if (row instanceof HTMLElement) {
+                        row.hidden = row.dataset['only'] !== mode;
+                    }
+                }
+            }),
+        );
+
+        const flags$ = FLAGS.map(flag =>
+            view$.pipe(
+                map(view => view[flag]),
+                distinctUntilChanged(),
+                tap(on => {
+                    requireElement(this.shadow, `[data-flag="${flag}"]`, HTMLInputElement).checked =
+                        on;
+                }),
+            ),
+        );
+
         const shown$ = knobs$.pipe(
             map(knobs => knobs.join()),
             distinctUntilChanged(),
@@ -232,36 +242,17 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        const readouts$ = params$.pipe(
-            map(({ dimension, draw, knobs }): Readout => ({
-                k1: knobs.k1.toFixed(2),
-                k2: knobs.k2.toFixed(2),
-                k3: knobs.k3.toFixed(2),
-                k4: knobs.k4.toFixed(2),
-                mode: draw.mode,
-                dimension: String(dimension),
-                baseSize: draw.mode === 'dots' ? String(draw.baseSize) : '',
-                depthScalar: draw.mode === 'dots' ? draw.depthScalar.toFixed(2) : '',
-            })),
-            distinctUntilChanged(sameReadout),
-            tap(({ mode, ...texts }) => {
-                for (const row of this.shadow.querySelectorAll('[data-only]')) {
-                    if (row instanceof HTMLElement) {
-                        row.hidden = row.dataset.only !== mode;
-                    }
-                }
-
-                for (const [key, text] of Object.entries(texts)) {
-                    requireElement(
-                        this.shadow,
-                        `[data-read="${key}"]`,
-                        HTMLOutputElement,
-                    ).textContent = text;
-                }
+        const turned$ = view$.pipe(
+            map(({ turned }) => turned),
+            distinctUntilChanged(),
+            tap(turned => {
+                this.reset.disabled = !turned;
             }),
         );
 
-        return merge(readouts$, shown$).pipe(map(() => undefined));
+        return merge(...picks$, ...numbers$, ...flags$, mode$, shown$, turned$).pipe(
+            map(() => undefined),
+        );
     }
 }
 

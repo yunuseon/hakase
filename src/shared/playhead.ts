@@ -79,6 +79,7 @@ export const createTransport$ = (
     scrubs$: Observable<number>,
     commands$: Observable<TransportCommand>,
     duration$: Observable<number>,
+    initial: Transport = initialTransport,
 ): Observable<Transport> => {
     const transport$: Observable<Transport> = merge(
         scrubs$.pipe(map((at): TransportAction => ({ kind: 'seek', at }))),
@@ -100,8 +101,8 @@ export const createTransport$ = (
             map(([ms, duration]): TransportAction => ({ kind: 'advance', ms, duration })),
         ),
     ).pipe(
-        scan(reduceTransport, initialTransport),
-        startWith(initialTransport),
+        scan(reduceTransport, initial),
+        startWith(initial),
         // Not refCount: closing the last timeline must not rewind or unloop the clock.
         shareReplay({ bufferSize: 1, refCount: false }),
     );

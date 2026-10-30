@@ -1,5 +1,5 @@
-import { concat, defer, EMPTY, merge, of, type Observable } from 'rxjs';
-import { map, mergeMap, tap } from 'rxjs/operators';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { gradientCss, ordered, type Blend, type Stop, type Theme } from '../sketch/theme.ts';
@@ -58,13 +58,7 @@ export class HksThemeEditor extends HTMLElement {
         const picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
         const body = requireChild(this.shadow, '.body');
 
-        // Deferred: the current option is only known once presets() has filled the list.
-        this.selections$ = defer(() =>
-            concat(
-                of(picker.value),
-                fromElementEvent$(picker, 'change').pipe(map(() => picker.value)),
-            ),
-        );
+        this.selections$ = fromElementEvent$(picker, 'change').pipe(map(() => picker.value));
 
         // Nothing here edits the DOM: rows only ever change by way of connect$.
         this.changes$ = merge(
@@ -105,8 +99,20 @@ export class HksThemeEditor extends HTMLElement {
         return this;
     }
 
-    connect$(rows$: Observable<Theme>, gradient$: Observable<Theme>): Observable<void> {
+    connect$(
+        selected$: Observable<string>,
+        rows$: Observable<Theme>,
+        gradient$: Observable<Theme>,
+    ): Observable<void> {
+        const picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
+
         return merge(
+            selected$.pipe(
+                distinctUntilChanged(),
+                tap(value => {
+                    picker.value = value;
+                }),
+            ),
             rows$.pipe(tap(theme => this.render(theme))),
             gradient$.pipe(
                 map(gradientCss),

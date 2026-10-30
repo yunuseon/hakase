@@ -24,6 +24,9 @@ export const REFERENCE_DISTANCE = 1 / Math.tan(FOV / 2);
 
 export const DEFAULT_ORBIT: Orbit = { yaw: 0, pitch: 0, distance: REFERENCE_DISTANCE };
 
+export const sameOrbit = (a: Orbit, b: Orbit): boolean =>
+    a.yaw === b.yaw && a.pitch === b.pitch && a.distance === b.distance;
+
 export const reduceOrbit = (orbit: Orbit, action: OrbitAction): Orbit => {
     switch (action.kind) {
         case 'turn':
@@ -51,10 +54,30 @@ export const reduceOrbit = (orbit: Orbit, action: OrbitAction): Orbit => {
 };
 
 // Column-major, as uniformMatrix4fv expects without transposing.
-export const projection = (aspect: number): Float32Array => {
+export const FITS = ['contain', 'cover', 'stretch'] as const;
+
+export type Fit = (typeof FITS)[number];
+
+export const isFit = (value: string): value is Fit => FITS.some(fit => fit === value);
+
+const scales = (fit: Fit, aspect: number): readonly [number, number] => {
+    const wide = aspect >= 1;
+
+    switch (fit) {
+        case 'contain':
+            return wide ? [1 / aspect, 1] : [1, aspect];
+        case 'cover':
+            return wide ? [1, aspect] : [1 / aspect, 1];
+        case 'stretch':
+            return [1, 1];
+    }
+};
+
+export const projection = (aspect: number, fit: Fit): Float32Array => {
     const focal = 1 / Math.tan(FOV / 2);
-    const sx = aspect >= 1 ? focal / aspect : focal;
-    const sy = aspect >= 1 ? focal : focal * aspect;
+    const [x, y] = scales(fit, aspect);
+    const sx = focal * x;
+    const sy = focal * y;
     const depth = (FAR + NEAR) / (NEAR - FAR);
     const offset = (2 * FAR * NEAR) / (NEAR - FAR);
 

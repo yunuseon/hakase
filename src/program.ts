@@ -5,6 +5,7 @@ import type { FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
+import type { Settings } from './settings.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
 export const PROGRAM_IDS = [
@@ -35,6 +36,7 @@ export type AppInput =
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
+    | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
@@ -75,6 +77,12 @@ export type Written<T> = {
 
 export type Source = Written<string>;
 
+export const restored = <K, V>(values: ReadonlyMap<K, V>): ReadonlyMap<K, Written<V>> =>
+    new Map([...values].map(([key, value]): [K, Written<V>] => [key, { value, from: null }]));
+
+export const valuesOf = <K, V>(written: ReadonlyMap<K, Written<V>>): ReadonlyMap<K, V> =>
+    new Map([...written].map(([key, { value }]): [K, V] => [key, value]));
+
 // One stream, not frame$ beside focused$: a raise changes both, and two would fire twice.
 export type Slot = {
     readonly frame: Frame;
@@ -84,6 +92,8 @@ export type Slot = {
 export type Self = {
     readonly id: ProcessId;
     readonly slot$: Observable<Slot>;
+    // undefined until this process first changes a setting; each program supplies its own default.
+    readonly settings$: Observable<Settings | undefined>;
 };
 
 export type ProcessView = {

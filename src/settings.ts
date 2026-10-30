@@ -1,0 +1,169 @@
+import {
+    withChange,
+    type ControlChange,
+    type ControlsView,
+} from './components/sketch/controls/controls.ts';
+import { isFormulaName, type FormulaName } from './components/sketch/formulas/registry.ts';
+import {
+    DRAW_MODES,
+    defaultPanel,
+    isDrawMode,
+    type Knob,
+    type Knobs,
+    type Panel,
+} from './components/sketch/params.ts';
+import {
+    DEFAULT_ORBIT,
+    isFit,
+    sameOrbit,
+    type Fit,
+    type Orbit,
+} from './components/sketch/space.ts';
+import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
+import { clamp } from './lib/math.ts';
+
+export type SketchSettings = {
+    readonly kind: 'sketch';
+    readonly formula: FormulaName;
+    readonly theme: ThemeName;
+    readonly panel: Panel;
+    readonly orbit: Orbit;
+};
+
+export type FormulaEditorSettings = {
+    readonly kind: 'formula';
+    readonly formula: FormulaName;
+};
+
+export type ThemeEditorSettings = {
+    readonly kind: 'theme';
+    readonly theme: ThemeName;
+};
+
+export type Settings = SketchSettings | FormulaEditorSettings | ThemeEditorSettings;
+
+export const defaultSketch: SketchSettings = {
+    kind: 'sketch',
+    formula: 'ripple',
+    theme: 'paper',
+    panel: defaultPanel,
+    orbit: DEFAULT_ORBIT,
+};
+
+export const defaultFormulaEditor: FormulaEditorSettings = { kind: 'formula', formula: 'ripple' };
+
+export const defaultThemeEditor: ThemeEditorSettings = { kind: 'theme', theme: 'paper' };
+
+export const asSketch = (settings: Settings | undefined): SketchSettings =>
+    settings?.kind === 'sketch' ? settings : defaultSketch;
+
+export const asFormulaEditor = (settings: Settings | undefined): FormulaEditorSettings =>
+    settings?.kind === 'formula' ? settings : defaultFormulaEditor;
+
+export const asThemeEditor = (settings: Settings | undefined): ThemeEditorSettings =>
+    settings?.kind === 'theme' ? settings : defaultThemeEditor;
+
+export const controlsView = ({ formula, theme, panel, orbit }: SketchSettings): ControlsView => ({
+    ...panel,
+    formula,
+    theme,
+    turned: !sameOrbit(orbit, DEFAULT_ORBIT),
+});
+
+export const withControl = (sketch: SketchSettings, change: ControlChange): SketchSettings => {
+    if (change.field === 'formula') {
+        return isFormulaName(change.value) ? { ...sketch, formula: change.value } : sketch;
+    }
+
+    if (change.field === 'theme') {
+        return isThemeName(change.value) ? { ...sketch, theme: change.value } : sketch;
+    }
+
+    return { ...sketch, panel: withChange(sketch.panel, change) };
+};
+
+const finite = (value: unknown, fallback: number, min: number, max: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? clamp(value, min, max) : fallback;
+
+const field = (value: object, key: string): unknown =>
+    Object.entries(value).find(([name]) => name === key)?.[1];
+
+const knobsFrom = (value: unknown): Knobs => {
+    const stored = typeof value === 'object' && value !== null ? value : {};
+    const knob = (name: Knob): number =>
+        finite(field(stored, name), defaultPanel.knobs[name], 0, 1);
+
+    return { k1: knob('k1'), k2: knob('k2'), k3: knob('k3'), k4: knob('k4') };
+};
+
+const fitFrom = (panel: object): Fit => {
+    const fit = field(panel, 'fit');
+
+    return typeof fit === 'string' && isFit(fit) ? fit : defaultPanel.fit;
+};
+
+// Field by field with a default for each, so a setting added later never discards the rest.
+const panelFrom = (value: unknown): Panel => {
+    if (typeof value !== 'object' || value === null) {
+        return defaultPanel;
+    }
+
+    const mode = field(value, 'mode');
+
+    return {
+        mode: typeof mode === 'string' && isDrawMode(mode) ? mode : DRAW_MODES[0],
+        dimension: Math.round(finite(field(value, 'dimension'), defaultPanel.dimension, 1, 128)),
+        baseSize: finite(field(value, 'baseSize'), defaultPanel.baseSize, 1, 20),
+        depthScalar: finite(field(value, 'depthScalar'), defaultPanel.depthScalar, 0.01, 2),
+        knobs: knobsFrom(field(value, 'knobs')),
+        axes: field(value, 'axes') === true,
+        fit: fitFrom(value),
+    };
+};
+
+const orbitFrom = (value: unknown): Orbit => {
+    if (typeof value !== 'object' || value === null) {
+        return DEFAULT_ORBIT;
+    }
+
+    return {
+        yaw: finite(field(value, 'yaw'), DEFAULT_ORBIT.yaw, -1e6, 1e6),
+        pitch: finite(field(value, 'pitch'), DEFAULT_ORBIT.pitch, -Math.PI / 2, Math.PI / 2),
+        distance: finite(field(value, 'distance'), DEFAULT_ORBIT.distance, 1, 30),
+    };
+};
+
+const formulaFrom = (value: unknown): FormulaName | null =>
+    typeof value === 'string' && isFormulaName(value) ? value : null;
+
+const themeFrom = (value: unknown): ThemeName | null =>
+    typeof value === 'string' && isThemeName(value) ? value : null;
+
+export const parseSettings = (value: unknown): Settings | null => {
+    if (typeof value !== 'object' || value === null) {
+        return null;
+    }
+
+    switch (field(value, 'kind')) {
+        case 'sketch':
+            return {
+                kind: 'sketch',
+                formula: formulaFrom(field(value, 'formula')) ?? defaultSketch.formula,
+                theme: themeFrom(field(value, 'theme')) ?? defaultSketch.theme,
+                panel: panelFrom(field(value, 'panel')),
+                orbit: orbitFrom(field(value, 'orbit')),
+            };
+        case 'formula':
+            return {
+                kind: 'formula',
+                formula: formulaFrom(field(value, 'formula')) ?? defaultFormulaEditor.formula,
+            };
+        case 'theme':
+            return {
+                kind: 'theme',
+                theme: themeFrom(field(value, 'theme')) ?? defaultThemeEditor.theme,
+            };
+        default:
+            return null;
+    }
+};

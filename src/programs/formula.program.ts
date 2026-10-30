@@ -13,6 +13,7 @@ import { HksFormulaEditor } from '../components/formula-editor/formula-editor.co
 import { FORMULA_GUIDE } from '../components/sketch/formulas/formula.ts';
 import { formulas, isFormulaName } from '../components/sketch/formulas/registry.ts';
 import type { AppInput, Program } from '../program.ts';
+import { asFormulaEditor } from '../settings.ts';
 
 const options = Object.entries(formulas).map(([value, { label }]) => ({ value, label }));
 
@@ -28,8 +29,8 @@ export const formulaProgram: Program = {
         return {
             element: editor,
             run$: ({ source$, error$ }, self) => {
-                const chosen$ = editor.selections$.pipe(
-                    mergeMap(name => (isFormulaName(name) ? of(name) : EMPTY)),
+                const chosen$ = self.settings$.pipe(
+                    map(settings => asFormulaEditor(settings).formula),
                     distinctUntilChanged(),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
@@ -51,11 +52,19 @@ export const formulaProgram: Program = {
                 return merge(
                     editor
                         .connect$(
+                            chosen$,
                             shown$,
                             chosen$.pipe(map(name => formulas[name].summary)),
                             chosen$.pipe(switchMap(name => error$(name))),
                         )
                         .pipe(ignoreElements()),
+                    editor.selections$.pipe(
+                        mergeMap(name => (isFormulaName(name) ? of(name) : EMPTY)),
+                        map((formula): AppInput => ({
+                            kind: 'settings',
+                            settings: { kind: 'formula', formula },
+                        })),
+                    ),
                     editor.changes$.pipe(
                         withLatestFrom(chosen$),
                         map(([text, formula]): AppInput => ({ kind: 'source', formula, text })),
