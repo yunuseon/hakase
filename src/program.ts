@@ -5,6 +5,7 @@ import type { FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
+import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
@@ -16,6 +17,7 @@ export const PROGRAM_IDS = [
     'timeline',
     'playhead',
     'tasks',
+    'todo',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -37,6 +39,7 @@ export type AppInput =
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
     | { readonly kind: 'settings'; readonly settings: Settings }
+    | { readonly kind: 'todo'; readonly command: TodoCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
@@ -66,6 +69,7 @@ export type AppState = {
     readonly error$: (formula: FormulaName) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
     readonly tasks$: Observable<readonly Task[]>;
+    readonly todos$: Observable<readonly Todo[]>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 

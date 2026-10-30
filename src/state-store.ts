@@ -4,6 +4,7 @@ import { parseAppearance, type Appearance } from './appearance.ts';
 import { appearances, defaultLook, isAppearanceName, type AppearanceName } from './appearances.ts';
 import { isFormulaName, type FormulaName } from './components/sketch/formulas/registry.ts';
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
+import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
 import { clamp } from './lib/math.ts';
@@ -29,6 +30,7 @@ export type Snapshot = {
     readonly playhead: number;
     readonly looping: boolean;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
+    readonly todos: TodoList;
 };
 
 export type Restored = Omit<Snapshot, 'workspace'> & {
@@ -95,6 +97,7 @@ const fresh: Restored = {
     playhead: 0,
     looping: true,
     settings: new Map(),
+    todos: emptyTodos,
 };
 
 const legacy = (): Restored => {
@@ -125,6 +128,7 @@ export const restoreState = (): Restored => {
         playhead: numberFrom(field(stored, 'playhead'), 0, 0, 1),
         looping: field(stored, 'looping') !== false,
         settings: settingsFrom(field(stored, 'settings')),
+        todos: parseTodos(field(stored, 'todos')),
     };
 };
 
@@ -142,6 +146,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         playhead: snapshot.playhead,
         looping: snapshot.looping,
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
+        todos: snapshot.todos,
     };
 };
 

@@ -446,6 +446,32 @@ it emits `close-others` with no id, and the fold keeps the process `from` stampe
 on, so the manager never has to name itself. Its count comes from the program,
 which knows `self.id`, rather than from the row count, which would include it.
 
+**The todo list is a document every todo window shares**, like a formula's text:
+`hks-todo` emits `TodoCommand`s (`add`, `toggle`, `remove`, `clear-done`), `main.ts`
+folds them with the pure `reduceTodos` into one `TodoList`, and every todo window
+reads `AppState.todos$` back. Item ids come from a counter kept in the list
+(`made`), like `launched` for processes, so a deleted item's id is never reused.
+The list is saved in the snapshot. The draft in the input box is the one piece
+of state the component keeps to itself — it is not app state, and it is cleared
+after a submit. **Read it and clear it from one shared listener** (`submitted$`,
+`share()`d): with two `submit` listeners, one reading and one clearing, the
+order is subscription order, and deferring the clear does not save it — on a
+real key press the browser runs microtasks between listeners, so an `asap` clear
+lands before the read. A scripted `requestSubmit()` does not, which is why only
+real typing showed the bug: test input with real events.
+
+**Rows reorder by dragging their grip.** `drags$` is one shared gesture stream —
+`moving`, then `dropped` or `cancelled` — read twice: `connect$` paints the
+indicator from it (the dragged row fades, a line marks the drop) and `commands$`
+turns a drop into `{ kind: 'move', id, to }`. Nothing in the list moves until the
+drop, so the rows' midpoints stay put for the whole drag and `dropIndex` simply
+counts how many of the _other_ rows sit above the pointer. That is why `to`
+counts positions in the list without the moved item, and why `reduceTodos`
+removes it before inserting. The gesture ends on the document, filtered by
+`pointerId`, for the same reason the window's do; a cancel moves nothing.
+There is no keyboard reorder yet: the list is rebuilt on every change, so a
+focused grip would lose focus after one step.
+
 **The navigator** (`hks-navigator`, bottom right, in the chrome slot) holds the zoom
 controls and a minimap. `minimapOf` in `navigator.ts` maps every window frame and
 the visible world rect into a fixed box with one uniform scale; the component only
@@ -547,7 +573,7 @@ applied to the element — the window is sized by the canvas it contains, and
 **The whole app is one snapshot.** `state-store.ts` writes a single versioned
 `hakase.state`: the workspace (processes, links, camera, toolbar), the look and
 its edits, formula and theme edits, duration, loop, where the playhead last
-rested, and every window's settings. `persistState$` takes one `combineLatest` of
+rested, every window's settings, and the todo list. `persistState$` takes one `combineLatest` of
 the folds, each reaching it by exactly one path, debounced: a drag emits on every
 pointer move and storage only needs where it stopped. That is hygiene, not
 speed — a write measures about 2us for a 168-byte payload, so do not go looking
@@ -766,7 +792,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    One hundred and four of them survive in `src/` today, every one a single line. Treat that
+    One hundred and eleven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -25,6 +25,7 @@ import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
+import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
@@ -46,6 +47,7 @@ import { appearanceProgram } from './programs/appearance.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
+import { todoProgram } from './programs/todo.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -71,6 +73,7 @@ const programs: readonly Program[] = [
     timelineProgram,
     playheadProgram,
     tasksProgram,
+    todoProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -250,6 +253,14 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    // Not refCount: the list outlives every todo window, and all of them show the same one.
+    const todos$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'todo' ? of(input.command) : EMPTY)),
+        scan(reduceTodos, stored.todos),
+        startWith(stored.todos),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const commands$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'transport' ? of(input.command) : EMPTY)),
         share(),
@@ -373,6 +384,7 @@ const bootstrap = () => {
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         look$,
         appearance$,
+        todos$: todos$.pipe(map(({ items }) => items)),
         tasks$: workspace$.pipe(
             map(({ processes }) =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
@@ -418,6 +430,7 @@ const bootstrap = () => {
                 duration: duration$,
                 rested: rested$,
                 settings: settings$,
+                todos: todos$,
             }).pipe(
                 map(({ rested, ...parts }) => ({
                     ...parts,
