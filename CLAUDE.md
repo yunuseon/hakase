@@ -722,8 +722,17 @@ for the same reason the formula edits are.
 
 ## The formula editor
 
-The editor is a small IDE, not a console: a preset picker above the source, the
-highlighted textarea, and the compiler's message below. Its sources are
+The editor is a small IDE, not a console: a one-paragraph summary of the chosen
+formula, a collapsed "How formulas work" reference, the highlighted textarea, the
+compiler's message, and a footer with the compile status on the left and the
+preset picker on the right.
+
+**The documentation is data the program hands in**, like the presets: each
+`Formula` carries a `summary`, and `FORMULA_GUIDE` in `formula.ts` explains the
+contract (`x`, `y`, `t`, the returned `.xy` and `.z`). The editor renders them
+with `guide()` and the `about$` input and still knows nothing about GLSL. The
+guide describes what `sketch.vert` passes in and reads back, so a change to that
+contract is a change to the guide. Its sources are
 `changes$` (debounced text) and `selections$` (the chosen preset); `connect$`
 takes the preset text to display and the error text to show.
 
@@ -767,7 +776,8 @@ The `Formula` contract lives in `components/sketch/formulas/formula.ts`, one lev
 above the implementations, so a formula can annotate itself without importing the
 registry that imports it. `components/sketch/formulas/registry.ts` is the single
 source of truth for selectable sketch
-functions: one entry carries the key, the label, and the function. `FormulaName`
+functions: one entry carries the key, the label, a `summary` the editor shows
+beside it, and the function. `FormulaName`
 is `keyof typeof formulas`, so an entry automatically becomes an option in the
 editor's picker and a shader the view can build. Do not add a
 parallel list of names or labels anywhere — that is the thing this shape exists
