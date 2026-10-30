@@ -4,13 +4,17 @@ float height(float x, float y) {
         + 0.03 * sin(11.0 * PI * (x + y));
 }
 
-vec3 formula(float x, float y, float t) {
-    // Reversed so the near rows are drawn last and sit on top of the far ones.
-    float row = -y;
-    float range = 2.05 - 1.3 * row;
-    float lens = 1.4 / range;
-    float ground = x * range * 0.75;
-    float h = height(ground, row + 2.0 * t);
+vec4 formula(float x, float y, float t) {
+    // 2.0 * t, not t: the ground repeats every 2 units, so a loop of the playhead flies one full repeat.
+    float h = height(x, y + 2.0 * t);
 
-    return vec3(ground * lens, (h - 0.6) * lens + 0.3, clamp(0.15 + lens * 0.55 * (0.7 + 2.0 * h), 0.0, 1.0));
+    return vec4(x, y, h * (1.0 + 3.0 * k1), 0.35 + 0.65 * clamp(0.5 + 3.0 * h, 0.0, 1.0));
+}
+
+// Low over the ground and looking across it, with z as up: the hills are height, not depth.
+Camera camera(float t) {
+    float sway = 0.25 * sin(t * 2.0 * PI);
+    vec3 eye = vec3(sway, -2.8, 0.7 + 0.8 * k2);
+
+    return Camera(eye, vec3(sway * 0.5, 0.3, 0.0), vec3(0.0, 0.0, 1.0));
 }

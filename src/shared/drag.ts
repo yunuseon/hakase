@@ -2,9 +2,12 @@ import { concat, merge, type Observable, of } from 'rxjs';
 import { filter, map, pairwise, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { fromDocumentEvent$, fromElementEvent$ } from '../lib/rx.ts';
 
-const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =>
+const gestures$ = (
+    element: HTMLElement,
+    accepts: (start: PointerEvent) => boolean,
+): Observable<Observable<PointerEvent>> =>
     fromElementEvent$(element, 'pointerdown').pipe(
-        filter(event => event.isPrimary && event.button === 0),
+        filter(event => event.isPrimary && event.button === 0 && accepts(event)),
 
         tap(initial => {
             initial.preventDefault();
@@ -31,8 +34,12 @@ const gestures$ = (element: HTMLElement): Observable<Observable<PointerEvent>> =
         }),
     );
 
-export const pointerDrag$ = (element: HTMLElement): Observable<PointerEvent> =>
-    gestures$(element).pipe(switchMap(gesture => gesture));
+const always = (): boolean => true;
+
+export const pointerDrag$ = (
+    element: HTMLElement,
+    accepts: (start: PointerEvent) => boolean = always,
+): Observable<PointerEvent> => gestures$(element, accepts).pipe(switchMap(gesture => gesture));
 
 export type Delta = {
     readonly dx: number;
@@ -40,8 +47,11 @@ export type Delta = {
 };
 
 // Pairing must stay inside the gesture, or each drag starts with a jump.
-export const pointerDelta$ = (element: HTMLElement): Observable<Delta> =>
-    gestures$(element).pipe(
+export const pointerDelta$ = (
+    element: HTMLElement,
+    accepts: (start: PointerEvent) => boolean = always,
+): Observable<Delta> =>
+    gestures$(element, accepts).pipe(
         switchMap(gesture =>
             gesture.pipe(
                 pairwise(),

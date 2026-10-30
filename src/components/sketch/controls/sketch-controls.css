@@ -155,3 +155,18 @@
     outline-offset: 2px;
     border-radius: 4px;
 }
+
+.toggle {
+    cursor: pointer;
+}
+
+.switch {
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.switch:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 2px;
+}

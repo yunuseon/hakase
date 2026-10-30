@@ -5,11 +5,14 @@ precision highp int;
 
 #define MODE_DOTS 0
 #define MODE_SURFACE 2
+#define PASS_AXES 1
 
 uniform sampler2D uPalette;
 uniform int uMode;
+uniform int uPass;
 
-in float vDepth;
+in vec4 vColor;
+in float vTint;
 in float vPointSize;
 in vec3 vPosition;
 
@@ -46,13 +49,20 @@ float shading() {
 }
 
 void main() {
+    if (uPass == PASS_AXES) {
+        fragColor = vec4(vColor.rgb * vColor.a, vColor.a);
+
+        return;
+    }
+
     float alpha = coverage();
 
-    if (alpha <= 0.0) {
+    // Half, not zero: a discarded fragment writes no depth, and a faint edge that did would cut a fringe.
+    if (alpha < 0.5) {
         discard;
     }
 
-    vec3 color = texture(uPalette, vec2(clamp(vDepth, 0.0, 1.0), 0.5)).rgb * shading();
+    vec3 color = texture(uPalette, vec2(clamp(vTint, 0.0, 1.0), 0.5)).rgb * shading();
 
     fragColor = vec4(color * alpha, alpha);
 }

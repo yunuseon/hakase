@@ -41,15 +41,113 @@ switching back to dots restores the size you left. A new mode-specific knob is a
 field on its member of the union plus a `data-only` row, never an optional field
 on all of them.
 
-Only `surface` turns on the depth test, and that is load-bearing: a dot's soft
-edge is translucent but would still write depth, and punch a dark fringe through
-whatever is drawn after it. Triangles are opaque, so they can have it. The
-surface is lit from a flat normal, `cross(dFdx(p), dFdy(p))` of the formula's
-output, which is why the 2D formulas shade as height maps without any change.
-Lighting uses `abs`, because a lattice has no outside. Each corner is evaluated
-on its own, so a surface costs six formula calls per cell; formulas that cover a
-full period (torus, klein, trefoil) show a one-cell seam, because nothing tells
-the lattice to wrap.
+**The sketch is a real 3D space.** A formula returns a point, not a screen
+position, and the camera is computed **in the shader**, because a formula may
+script it: beside `formula` it can define `Camera camera(float t)` returning
+`Camera(eye, target, up)`. `adapterFor` detects it the way it detects a `vec4`
+return and appends `Camera view(float t)` that calls it, or a default that looks
+straight down -z from `REFERENCE_DISTANCE` with y up — chosen so the z = 0
+plane's -1..1 square exactly fills the shorter side, which is why a flat
+formula still looks flat. TypeScript only supplies `uProjection` (the pure
+`projection(aspect)` in `components/sketch/space.ts`, 25° field of view, set in
+`prepare` because it changes only with size) and `uOrbit`. A camera that a
+formula scripts loops with the playhead like everything else, so a shot loops
+seamlessly; the old turntable switch is just one such camera and is gone.
+
+**The viewer's drag sits on top of whatever camera there is.** Each sketch folds
+its own `Orbit` (yaw, pitch, distance) with `scan` over `reduceOrbit` — drag to
+turn, wheel to dolly, double-click to reset — per process and not persisted.
+`orbited()` in `sketch.vert` applies it around the camera's target using the
+camera's **own** `up` as the pole, not world y, so a scripted camera with z up
+(terrain's) orbits the right way, and the default camera with no drag is
+reproduced exactly. `lookAt` falls back to an arbitrary side vector when the
+camera looks straight along `up`, rather than producing NaN.
+
+The **axes** switch draws x red, y green, z blue, ticks every 0.5 and the -1..1
+square at z = 0. It is a second `drawArrays` of the **same program** with
+`uPass` set to `PASS_AXES`, not a program of its own: the view comes from the
+formula's camera, so a separate program would have to be compiled per formula
+with every uniform set twice. `axisVertex` derives each line from
+`gl_VertexID`, so `AXIS_VERTICES` in `sketch-program.ts` must match its tables.
+
+Dot size is perspective: `uReference / w`, raised to `3 × depth`, so the depth
+slider is now an exaggeration of nearness. It is measured against the _default_
+distance, not the current one, or dollying in would never grow the dots. A
+pinch over a sketch is ctrl+wheel and is left to the canvas zoom.
+
+**The depth test is on in every mode**, which is load-bearing: points live in
+space, so what is in front is decided by real depth. A dot's soft edge is the
+trap — a translucent fragment still writes depth and punches a fringe through
+whatever is drawn after it — so the fragment shader discards below half
+coverage. Dots are a little crisper for it. The surface is lit from a flat
+normal, `cross(dFdx(p), dFdy(p))` of the formula's output, and lighting uses
+`abs`, because a lattice has no outside. Each corner is evaluated on its own, so
+a surface costs six formula calls per cell; formulas that cover a full period
+(torus, klein, trefoil) show a one-cell seam, because nothing tells the lattice
+to wrap.
+
+The formulas that used to project themselves (torus, klein, trefoil, bloom,
+terrain) no longer do: they return the shape and leave the camera to the
+camera. Trefoil and terrain are the worked examples of `camera()`: the knot holds
+still while its camera circles it, and the terrain's camera hangs low with z as
+up and looks across the hills.
+
+**A formula has more to work with than its arguments.** Three things reach it
+besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads them:
+
+- **Knobs** `k1`–`k4`, plain `float` uniforms in [0, 1], set by four sliders in
+  each sketch's own parameter bar. They are `PanelParams.knobs`, per process like
+  every other setting, so two sketches of one formula can sit at different
+  settings. They are four uniforms rather than one `vec4` behind `#define`s,
+  because a macro named `k1` would turn a user's own `float k1` into a baffling
+  syntax error.
+
+    **A sketch shows only the knobs its formula reads**, and it asks the compiler
+    rather than the text: the linker drops any uniform nothing reads, so
+    `knobsUsed` keeps the knobs whose location is not null. A regex over the source
+    would be fooled by comments, by a `k1` that only feeds dead code, and by a
+    local that shadows the uniform. It follows `shader$`, the last program that
+    linked, so a broken edit leaves the rows as they were, and typing `k3` into a
+    formula brings its slider up as soon as the edit compiles. A hidden row keeps
+    its value.
+
+- **The pointer, in world space.** TypeScript sends only the mouse's clip-space
+  position (`uPointer`, from `pointerAt`) and whether it is pressed; the vertex
+  shader turns that into what a formula reads, because only the shader knows the
+  camera a formula may script. `aim()` inverts the projection for that one
+  screen point to get a ray (`pointerOrigin`, `pointerDirection`) and intersects
+  it with z = 0 to get `pointer`, a `vec2` on the ground, so a 2D formula's
+  `pointer - vec2(x, y)` stays under the cursor at any camera angle. A ray that
+  misses the ground aims at a point `HORIZON` away instead of infinity, with
+  `pointerOnGround` at 0; there is no memory of the last hit, because shader
+  globals do not outlive a draw. `pointerDistance(p)` is a prelude helper for
+  3D shapes. These are **globals filled in `main()`**, not uniforms, and
+  `camera()` runs before `aim()`, so a camera that reads the pointer sees it
+  unset — aiming needs the camera, and that order cannot be flipped.
+
+    **Shift-drag is a press**, `pointerDown`; a plain drag still orbits. Both
+    gestures come from the same `pointerdown`, split by an `accepts` predicate
+    that `pointerDelta$` and `pointerDrag$` in `shared/drag.ts` now take, so the
+    press never also turns the camera. Moving the mouse is a fourth input to the
+    frame `combineLatest`, so it redraws a paused sketch without re-preparing it.
+
+- **A tint.** A formula may be declared `vec4 formula(...)` and return a fourth
+  value that picks the theme colour by itself; depth then only sizes dots and
+  orders the surface. `sketch.vert` declares `vec4 point(...)`, and `adapterFor`
+  appends the matching definition after the formula: a `vec3` formula gets its
+  depth copied into the tint, so every existing formula is unchanged. The
+  adapter goes **after** the formula so error line numbers still match the
+  editor's.
+
+The examples split the three apart: `lens` uses only `pointer`; `peaks` and
+`flow` use only a tint (a sum's sign, a heading); `vortex` and `magnet` use both,
+plus knobs. `FORMULA_GUIDE` documents them.
+
+**A tint near 0 is invisible.** The ramp's first entry is also the canvas
+backdrop, so low tints fade into it, and on `paper` everything below about 0.5 is
+pale. The examples keep their tints in roughly 0.3 to 1 with
+`0.65 + 0.35 * sin(...)` rather than `fract(...)`, which also avoids a hard colour
+seam where the fraction wraps.
 
 **Shaders live in their own files**, never in template literals: `.vert`/`.frag`
 for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
@@ -616,7 +714,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Eighty-seven of them survive in `src/` today, every one a single line. Treat that
+    One hundred and one of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

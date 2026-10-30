@@ -4,19 +4,29 @@ import {
     ignoreElements,
     map,
     mergeMap,
+    scan,
     shareReplay,
+    startWith,
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { compileFormula$ } from '../components/sketch/compile.ts';
+import { knobsUsed } from '../components/sketch/gl/sketch-program.ts';
+import { DEFAULT_ORBIT, reduceOrbit } from '../components/sketch/space.ts';
 import { formulas, isFormulaName } from '../components/sketch/formulas/registry.ts';
 import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme, type Theme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
-import { steppedRatio, type PanelParams, type SketchParams } from '../components/sketch/params.ts';
+import {
+    centre,
+    type Pointer,
+    steppedRatio,
+    type PanelParams,
+    type SketchParams,
+} from '../components/sketch/params.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
 
@@ -103,9 +113,24 @@ export const sketchProgram: Program = {
                 );
 
                 return merge(
-                    sketch.connect$(params$, playhead$, shader$, ratio$).pipe(ignoreElements()),
+                    sketch
+                        .connect$(
+                            params$,
+                            playhead$,
+                            shader$,
+                            ratio$,
+                            combineLatest([
+                                sketch.pointers$.pipe(startWith(centre)),
+                                sketch.presses$.pipe(startWith(false), distinctUntilChanged()),
+                            ]).pipe(map(([{ x, y }, down]): Pointer => ({ x, y, down }))),
+                            sketch.orbits$.pipe(
+                                scan(reduceOrbit, DEFAULT_ORBIT),
+                                startWith(DEFAULT_ORBIT),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
-                    controls.connect$(panel$).pipe(ignoreElements()),
+                    controls.connect$(panel$, shader$.pipe(map(knobsUsed))).pipe(ignoreElements()),
                     compiled$.pipe(
                         withLatestFrom(formula$),
                         map(([result, formula]): AppInput => ({

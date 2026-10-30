@@ -16,10 +16,52 @@ export type DotStyle = {
 
 export type DrawStyle = DotStyle | { readonly mode: Exclude<DrawMode, 'dots'> };
 
+export const KNOBS = ['k1', 'k2', 'k3', 'k4'] as const;
+
+export type Knob = (typeof KNOBS)[number];
+
+export const isKnob = (value: string): value is Knob => KNOBS.some(knob => knob === value);
+
+export type Knobs = Readonly<Record<Knob, number>>;
+
+export const defaultKnob = 0.5;
+
 export type PanelParams = {
     readonly dimension: number;
     readonly draw: DrawStyle;
+    readonly knobs: Knobs;
+    readonly axes: boolean;
 };
+
+export type Pointer = {
+    readonly x: number;
+    readonly y: number;
+    readonly down: boolean;
+};
+
+export const centre: Pointer = { x: 0, y: 0, down: false };
+
+export const pointerAt = (
+    clientX: number,
+    clientY: number,
+    {
+        left,
+        top,
+        width,
+        height,
+    }: {
+        readonly left: number;
+        readonly top: number;
+        readonly width: number;
+        readonly height: number;
+    },
+): Omit<Pointer, 'down'> => ({
+    x: width === 0 ? 0 : ((clientX - left) / width) * 2 - 1,
+    y: height === 0 ? 0 : 1 - ((clientY - top) / height) * 2,
+});
+
+export const samePointer = (a: Pointer, b: Pointer): boolean =>
+    a.x === b.x && a.y === b.y && a.down === b.down;
 
 export type SketchParams = Size & PanelParams & { readonly theme: Theme };
 

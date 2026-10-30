@@ -2,6 +2,11 @@ import type { Formula } from './formula.ts';
 import { bloom } from './bloom.ts';
 import { interference } from './interference.ts';
 import { klein } from './klein.ts';
+import { magnet } from './magnet.ts';
+import { lens } from './lens.ts';
+import { vortex } from './vortex.ts';
+import { peaks } from './peaks.ts';
+import { flow } from './flow.ts';
 import { ripple } from './ripple.ts';
 import { rose } from './rose.ts';
 import { spiral } from './spiral.ts';
@@ -21,6 +26,11 @@ export const formulas = {
     trefoil,
     bloom,
     terrain,
+    magnet,
+    lens,
+    vortex,
+    peaks,
+    flow,
 } satisfies Record<string, Formula>;
 
 export type FormulaName = keyof typeof formulas;

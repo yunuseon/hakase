@@ -1,21 +1,26 @@
-import { combineLatest, concat, defer, EMPTY, of, type Observable } from 'rxjs';
+import { combineLatest, concat, defer, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, startWith, switchMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
 import {
     DRAW_MODES,
+    KNOBS,
     defaultDimension,
     defaultDots,
+    defaultKnob,
     isDrawMode,
+    isKnob,
     type DrawMode,
     type DrawStyle,
+    type Knob,
+    type Knobs,
     type PanelParams,
 } from '../params.ts';
 import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);
 
-type Readout = {
+type Readout = Readonly<Record<Knob, string>> & {
     readonly mode: DrawMode;
     readonly dimension: string;
     readonly baseSize: string;
@@ -26,7 +31,8 @@ const sameReadout = (a: Readout, b: Readout): boolean =>
     a.mode === b.mode &&
     a.dimension === b.dimension &&
     a.baseSize === b.baseSize &&
-    a.depthScalar === b.depthScalar;
+    a.depthScalar === b.depthScalar &&
+    KNOBS.every(knob => a[knob] === b[knob]);
 
 const slider = (
     key: string,
@@ -37,11 +43,18 @@ const slider = (
     value: number,
     only: DrawMode | null = null,
 ) => `
-    <label class="item"${only === null ? '' : ` data-only="${only}"`}>
+    <label class="item"${only === null ? '' : ` data-only="${only}"`}${isKnob(key) ? ` data-knob="${key}" hidden` : ''}>
         <span class="key">${label}</span>
         <input class="dial" data-field="${key}" type="range"
                min="${min}" max="${max}" step="${step}" value="${value}" />
         <output class="read" data-read="${key}"></output>
+    </label>
+`;
+
+const flag = (key: string, label: string) => `
+    <label class="item toggle">
+        <input class="switch" data-flag="${key}" type="checkbox" />
+        <span class="key">${label}</span>
     </label>
 `;
 
@@ -66,9 +79,11 @@ const TEMPLATE = `
         ${choice('formula', 'formula')}
         ${choice('theme', 'theme')}
         <div class="segments" role="radiogroup" aria-label="draw mode">${modes}</div>
+        ${flag('axes', 'axes')}
         ${slider('dimension', 'lattice', 1, 128, 1, defaultDimension)}
         ${slider('baseSize', 'dot', 1, 20, 1, defaultDots.baseSize, 'dots')}
         ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultDots.depthScalar, 'dots')}
+        ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultKnob)).join('')}
     </div>
 `;
 
@@ -145,7 +160,29 @@ export class HksSketchControls extends HTMLElement {
             ),
         );
 
-        this.changes$ = combineLatest({ dimension: number$('dimension'), draw: draw$ });
+        const knobs$: Observable<Knobs> = combineLatest({
+            k1: number$('k1'),
+            k2: number$('k2'),
+            k3: number$('k3'),
+            k4: number$('k4'),
+        });
+
+        const checked$ = (key: string): Observable<boolean> =>
+            defer(() => {
+                const box = requireElement(this.shadow, `[data-flag="${key}"]`, HTMLInputElement);
+
+                return fromElementEvent$(box, 'change').pipe(
+                    map(() => box.checked),
+                    startWith(box.checked),
+                );
+            });
+
+        this.changes$ = combineLatest({
+            dimension: number$('dimension'),
+            draw: draw$,
+            knobs: knobs$,
+            axes: checked$('axes'),
+        });
     }
 
     presets(formulas: readonly PresetOption[], themes: readonly PresetOption[]): this {
@@ -177,9 +214,30 @@ export class HksSketchControls extends HTMLElement {
         return requireElement(this.shadow, `[data-pick="${key}"]`, HTMLSelectElement);
     }
 
-    connect$(params$: Observable<PanelParams>): Observable<void> {
-        return params$.pipe(
-            map(({ dimension, draw }): Readout => ({
+    connect$(
+        params$: Observable<PanelParams>,
+        knobs$: Observable<readonly string[]>,
+    ): Observable<void> {
+        const shown$ = knobs$.pipe(
+            map(knobs => knobs.join()),
+            distinctUntilChanged(),
+            tap(joined => {
+                const used = joined.split(',');
+
+                for (const row of this.shadow.querySelectorAll('[data-knob]')) {
+                    if (row instanceof HTMLElement) {
+                        row.hidden = !used.includes(row.dataset['knob'] ?? '');
+                    }
+                }
+            }),
+        );
+
+        const readouts$ = params$.pipe(
+            map(({ dimension, draw, knobs }): Readout => ({
+                k1: knobs.k1.toFixed(2),
+                k2: knobs.k2.toFixed(2),
+                k3: knobs.k3.toFixed(2),
+                k4: knobs.k4.toFixed(2),
                 mode: draw.mode,
                 dimension: String(dimension),
                 baseSize: draw.mode === 'dots' ? String(draw.baseSize) : '',
@@ -201,8 +259,9 @@ export class HksSketchControls extends HTMLElement {
                     ).textContent = text;
                 }
             }),
-            map(() => undefined),
         );
+
+        return merge(readouts$, shown$).pipe(map(() => undefined));
     }
 }
 
