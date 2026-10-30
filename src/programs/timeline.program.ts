@@ -19,14 +19,16 @@ export const timelineProgram: Program = {
 
         return {
             element: slider,
-            run$: ({ playhead$, playing$, duration$ }) => {
+            run$: ({ playhead$, playing$, looping$, duration$ }) => {
                 const clock$ = combineLatest([playhead$, duration$]).pipe(
                     map(([at, duration]) => elapsedLabel(at, duration)),
                 );
 
                 return merge(
                     slider.connect$(playhead$).pipe(ignoreElements()),
-                    transport.connect$(playing$, clock$, duration$).pipe(ignoreElements()),
+                    transport
+                        .connect$(playing$, looping$, clock$, duration$)
+                        .pipe(ignoreElements()),
                     slider.changes$.pipe(map((at): AppInput => ({ kind: 'scrub', at }))),
                     transport.commands$.pipe(
                         map((command): AppInput => ({ kind: 'transport', command })),

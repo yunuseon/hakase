@@ -42,6 +42,7 @@ export type AppInput =
 export type AppState = {
     readonly playhead$: Observable<number>;
     readonly playing$: Observable<boolean>;
+    readonly looping$: Observable<boolean>;
     readonly duration$: Observable<number>;
     readonly zoom$: Observable<number>;
     // Selectors, not streams: a formula is a document several processes may show.

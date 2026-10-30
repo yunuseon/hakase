@@ -34,6 +34,17 @@
     background: color-mix(in srgb, var(--ink) 85%, var(--panel));
 }
 
+.key.loop {
+    inline-size: 28px;
+    block-size: 28px;
+    color: var(--muted);
+    border-color: transparent;
+}
+
+.key.loop[aria-pressed='true'] {
+    color: var(--accent);
+}
+
 .key:active {
     transform: scale(0.96);
 }
@@ -87,4 +98,11 @@ svg {
     inline-size: 12px;
     block-size: 12px;
     fill: currentColor;
+}
+
+.ring {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
 }

@@ -583,14 +583,23 @@ choose between the two would need to know whether it is playing, which is state,
 which components do not hold — so the fold owns the flip and `connect$(playing$)`
 only swaps the glyph.
 
-**Pausing must not need to read the playhead back.** That would close a cycle
-where none is required. Instead `playing$` folds the commands _alone_, and the
-position folds seeks plus frame _deltas_ gated by `playing$`:
+**Looping is on by default, and turning it off closes a cycle on purpose.** The
+loop button emits **`loop`**, a third `TransportCommand` that the fold flips just
+like `toggle`. With looping off, reaching the end must pause, and pausing is a
+fact about position. So play state and position can no longer be two folds where
+one never reads the other. They are one `Transport = { at, playing, looping }`,
+folded by `reduceTransport` over three kinds of action:
 
-- `isPlaying$` — commands only, so it cannot depend on position.
-- position — `scan` over `seek` (a scrub, or `stop` seeking 0) and `advance`
-  (`ms` since the previous frame, while playing). Pausing simply stops the
-  advances, and the accumulator already holds where it got to.
+- `command` — `toggle`, `stop`, `loop`. Playing again from the end restarts at 0.
+- `seek` — a scrub.
+- `advance` — `ms` since the previous frame. It wraps while looping and clamps
+  to 1 and pauses otherwise.
+
+The frames are gated by that same fold's `playing`, so `createTransport$` reads
+itself through a `defer`, the same ordering trick as the workspace cycle. Pausing
+at the end therefore also stops the `rAF` loop. `playhead$`, `playing$` and
+`looping$` in `AppState` are projections of the one stream. It is
+`refCount: false`, so closing the last timeline does not rewind the clock.
 
 Deltas rather than `elapsed` are load-bearing: `animationFrames()` restarts its
 clock on every subscription, so resuming with `elapsed` would jump the playhead

@@ -44,7 +44,7 @@ import { playheadProgram } from './programs/playhead.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
-import { createPlayhead$, defaultDuration, isPlaying$ } from './shared/playhead.ts';
+import { createTransport$, defaultDuration } from './shared/playhead.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
 import { persistWorkspace$, restoreWorkspace } from './workspace-store.ts';
 import {
@@ -211,14 +211,18 @@ const bootstrap = () => {
         share(),
     );
 
-    const playing$ = isPlaying$(commands$).pipe(shareReplay({ bufferSize: 1, refCount: true }));
-
     const duration$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'duration' ? of(input.seconds) : EMPTY)),
         startWith(defaultDuration),
         distinctUntilChanged(),
         // Not refCount: closing the last timeline must not reset the clock to the default.
         shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    const transport$ = createTransport$(
+        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
+        commands$,
+        duration$,
     );
 
     // Keyed by formula: one edit reaches every process showing that formula.
@@ -298,13 +302,18 @@ const bootstrap = () => {
         looks$.pipe(map(all => all.get(name) ?? { value: appearances[name], from: null }));
 
     const state: AppState = {
-        playing$,
-        playhead$: createPlayhead$(
-            inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
-            commands$,
-            playing$,
-            duration$,
-        ).pipe(shareReplay({ bufferSize: 1, refCount: true })),
+        playhead$: transport$.pipe(
+            map(({ at }) => at),
+            distinctUntilChanged(),
+        ),
+        playing$: transport$.pipe(
+            map(({ playing }) => playing),
+            distinctUntilChanged(),
+        ),
+        looping$: transport$.pipe(
+            map(({ looping }) => looping),
+            distinctUntilChanged(),
+        ),
         duration$,
         zoom$: camera$.pipe(
             map(({ zoom }) => zoom),

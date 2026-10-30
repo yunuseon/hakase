@@ -17,6 +17,9 @@ const TEMPLATE = `
     <button class="key stop" type="button" aria-label="stop">
         <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7"/></svg>
     </button>
+    <button class="key loop" type="button" aria-label="loop" aria-pressed="true">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path class="ring" d="M9.5 4.5 A4 4 0 1 0 10 7"/><path d="M7.5 2.5 L10 4.8 L10.6 1.6 Z"/></svg>
+    </button>
     <span class="clock"></span>
     <span class="of">/</span>
     <input class="duration" type="number" min="0.1" max="600" step="0.1" aria-label="duration in seconds">
@@ -29,6 +32,7 @@ export class HksTransport extends HTMLElement {
 
     private readonly toggle: HTMLElement;
     private readonly glyph: SVGPathElement;
+    private readonly loop: HTMLElement;
     private readonly clock: HTMLElement;
     private readonly duration: HTMLInputElement;
 
@@ -41,6 +45,7 @@ export class HksTransport extends HTMLElement {
 
         this.toggle = requireChild(shadow, '.toggle');
         this.glyph = requireElement(shadow, '.glyph', SVGPathElement);
+        this.loop = requireChild(shadow, '.loop');
         this.clock = requireChild(shadow, '.clock');
         this.duration = requireElement(shadow, '.duration', HTMLInputElement);
 
@@ -49,6 +54,7 @@ export class HksTransport extends HTMLElement {
             fromElementEvent$(requireChild(shadow, '.stop'), 'click').pipe(
                 map((): TransportCommand => 'stop'),
             ),
+            fromElementEvent$(this.loop, 'click').pipe(map((): TransportCommand => 'loop')),
         );
 
         // change, not input: input fires per keystroke, and "1" would apply on the way to "12".
@@ -63,6 +69,7 @@ export class HksTransport extends HTMLElement {
 
     connect$(
         playing$: Observable<boolean>,
+        looping$: Observable<boolean>,
         clock$: Observable<string>,
         duration$: Observable<number>,
     ): Observable<void> {
@@ -72,6 +79,13 @@ export class HksTransport extends HTMLElement {
                 tap(playing => {
                     this.glyph.setAttribute('d', playing ? PAUSE : PLAY);
                     this.toggle.setAttribute('aria-label', playing ? 'pause' : 'play');
+                }),
+            ),
+            looping$.pipe(
+                map(looping => String(looping)),
+                distinctUntilChanged(),
+                tap(pressed => {
+                    this.loop.setAttribute('aria-pressed', pressed);
                 }),
             ),
             clock$.pipe(
