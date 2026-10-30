@@ -1,4 +1,5 @@
 import {
+    centredOn,
     centreOf,
     fitted,
     IDENTITY,
@@ -59,6 +60,8 @@ export type WorkspaceAction =
     | { readonly kind: 'place-toolbar'; readonly placement: Placement }
     | { readonly kind: 'retract-toolbar' }
     | { readonly kind: 'toggle-minimap' }
+    | { readonly kind: 'close-others'; readonly keep: ProcessId }
+    | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
     | (WindowGesture & { readonly id: ProcessId });
 
@@ -222,11 +225,27 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
             return { ...workspace, minimap: !workspace.minimap };
         case 'toolbar-window':
             return { ...workspace, toolbar: toolbarGesture(workspace.toolbar, action.gesture) };
+        case 'close-others':
+            return {
+                ...workspace,
+                processes: workspace.processes.filter(({ id }) => id === action.keep),
+            };
         case 'quit':
             return {
                 ...workspace,
                 processes: workspace.processes.filter(({ id }) => id !== action.id),
             };
+        case 'reveal': {
+            const raised = reduceWorkspace(workspace, { kind: 'raise', id: action.id });
+            const shown = raised.processes.at(-1);
+
+            return shown === undefined || shown.id !== action.id
+                ? workspace
+                : {
+                      ...raised,
+                      camera: centredOn(workspace.camera, shown.frame, action.viewport),
+                  };
+        }
         case 'raise': {
             const raised = workspace.processes.find(({ id }) => id === action.id);
 
@@ -355,4 +374,25 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         toolbar,
         minimap,
     };
+};
+
+export type Listed = {
+    readonly process: Process;
+    readonly ordinal: number;
+    readonly focused: boolean;
+};
+
+// numeric: ids are `${program}-${launched}`, and "sketch-10" must sort after "sketch-9".
+const byLaunch = (a: Process, b: Process): number =>
+    a.id.localeCompare(b.id, undefined, { numeric: true });
+
+export const listed = (processes: readonly Process[]): readonly Listed[] => {
+    const front = processes.at(-1)?.id;
+
+    return [...processes].sort(byLaunch).map((process, index, sorted) => ({
+        process,
+        ordinal:
+            sorted.slice(0, index).filter(({ program }) => program === process.program).length + 1,
+        focused: process.id === front,
+    }));
 };

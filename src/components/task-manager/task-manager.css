@@ -1,0 +1,155 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 500 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: auto;
+    min-block-size: 0;
+}
+
+.empty {
+    margin: auto;
+    color: var(--muted);
+}
+
+.rows:not(:empty) + .empty {
+    display: none;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: 9px;
+}
+
+.row:hover {
+    background: var(--well);
+}
+
+button {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: -2px;
+}
+
+.jump {
+    flex: 1;
+    gap: 10px;
+    min-inline-size: 0;
+    block-size: 32px;
+    padding: 0 8px;
+    text-align: start;
+}
+
+.name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row[data-focused] .jump {
+    color: var(--ink);
+}
+
+.row[data-focused] .jump svg:first-child {
+    color: var(--accent);
+}
+
+.jump svg:last-child,
+.close {
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.row:hover .jump svg:last-child,
+.row:hover .close,
+.row:focus-within .jump svg:last-child,
+.row:focus-within .close {
+    opacity: 1;
+}
+
+.jump:hover {
+    color: var(--ink);
+}
+
+.close {
+    justify-content: center;
+    flex: none;
+    inline-size: 28px;
+    block-size: 28px;
+    color: var(--muted);
+}
+
+.close:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--rule) 30%, transparent);
+}
+
+svg {
+    flex: none;
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.close svg {
+    inline-size: 14px;
+    block-size: 14px;
+}
+
+.foot {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-block-start: 8px;
+    margin-block-start: auto;
+    border-block-start: 1px solid var(--edge);
+}
+
+.count {
+    color: var(--muted);
+}
+
+.close-all {
+    block-size: 28px;
+    padding: 0 10px;
+    color: var(--ink);
+    background: var(--well);
+}
+
+.close-all:hover {
+    background: color-mix(in srgb, var(--rule) 30%, var(--well));
+}
+
+.close-all:disabled {
+    color: var(--muted);
+    background: transparent;
+    cursor: default;
+}

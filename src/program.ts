@@ -14,6 +14,7 @@ export const PROGRAM_IDS = [
     'sketch',
     'timeline',
     'playhead',
+    'tasks',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -32,12 +33,24 @@ export type AppInput =
     | { readonly kind: 'source'; readonly formula: FormulaName; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
+    | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
+    | { readonly kind: 'close-others' }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
           readonly formula: FormulaName;
           readonly message: string | null;
       };
+
+export type TaskCommand = 'reveal' | 'close';
+
+export type Task = {
+    readonly id: ProcessId;
+    readonly title: string;
+    readonly icon: string;
+    readonly ordinal: number;
+    readonly focused: boolean;
+};
 
 export type AppState = {
     readonly playhead$: Observable<number>;
@@ -50,6 +63,7 @@ export type AppState = {
     readonly theme$: (theme: ThemeName) => Observable<Written<Theme>>;
     readonly error$: (formula: FormulaName) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
+    readonly tasks$: Observable<readonly Task[]>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 

@@ -76,4 +76,14 @@ export const fitted = (rects: readonly Rect[], viewport: Extent): Camera => {
     };
 };
 
+export const centredOn = (camera: Camera, rect: Rect, viewport: Extent): Camera => {
+    const zoom = Math.min(camera.zoom, fitted([rect], viewport).zoom);
+
+    return {
+        zoom,
+        x: viewport.width / 2 - (rect.x + rect.width / 2) * zoom,
+        y: viewport.height / 2 - (rect.y + rect.height / 2) * zoom,
+    };
+};
+
 export const zoomLabel = ({ zoom }: Camera): string => `${Math.round(zoom * 100)}%`;

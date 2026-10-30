@@ -1,4 +1,4 @@
-import { EMPTY, of, type Observable, merge } from 'rxjs';
+import { EMPTY, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
@@ -89,8 +89,8 @@ export class HksToolbar extends HTMLElement {
                 tile.type = 'button';
                 tile.className = 'key tile';
                 tile.dataset['program'] = id;
-                tile.title = title;
-                tile.setAttribute('aria-label', title);
+                tile.title = `new ${title}`;
+                tile.setAttribute('aria-label', `new ${title}`);
 
                 // Built as nodes, not markup: an icon is path data, never HTML.
                 const svg = document.createElementNS(SVG, 'svg');
@@ -109,47 +109,27 @@ export class HksToolbar extends HTMLElement {
         return this;
     }
 
-    connect$(
-        running$: Observable<ReadonlySet<string>>,
-        view$: Observable<ToolbarView>,
-    ): Observable<void> {
-        return merge(
-            running$.pipe(
-                tap(running => {
-                    for (const tile of this.programs.children) {
-                        const id =
-                            tile instanceof HTMLElement ? tile.dataset['program'] : undefined;
-                        const active = id !== undefined && running.has(id);
-
-                        tile.classList.toggle('running', active);
-                        tile.setAttribute('aria-pressed', String(active));
-                    }
-                }),
-            ),
-            view$.pipe(
-                distinctUntilChanged(sameToolbarView),
-                tap(({ placement, retracted }) => {
-                    this.dataset['placement'] = placement;
-                    for (const choice of this.menu.querySelectorAll('[data-place]')) {
-                        choice.setAttribute(
-                            'aria-checked',
-                            String(
-                                choice instanceof HTMLElement &&
-                                    choice.dataset['place'] === placement,
-                            ),
-                        );
-                    }
-                    this.toggleAttribute('data-retracted', retracted);
-                    this.tab.setAttribute(
-                        'aria-label',
-                        retracted ? 'show toolbar' : 'hide toolbar',
+    connect$(view$: Observable<ToolbarView>): Observable<void> {
+        return view$.pipe(
+            distinctUntilChanged(sameToolbarView),
+            tap(({ placement, retracted }) => {
+                this.dataset['placement'] = placement;
+                for (const choice of this.menu.querySelectorAll('[data-place]')) {
+                    choice.setAttribute(
+                        'aria-checked',
+                        String(
+                            choice instanceof HTMLElement && choice.dataset['place'] === placement,
+                        ),
                     );
-                    this.tab.title = retracted ? 'show toolbar' : 'hide toolbar';
-                    // The menu chose this placement; leaving it open would cover the tray.
-                    this.menu.open = false;
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                }
+                this.toggleAttribute('data-retracted', retracted);
+                this.tab.setAttribute('aria-label', retracted ? 'show toolbar' : 'hide toolbar');
+                this.tab.title = retracted ? 'show toolbar' : 'hide toolbar';
+                // The menu chose this placement; leaving it open would cover the tray.
+                this.menu.open = false;
+            }),
+            map(() => undefined),
+        );
     }
 }
 

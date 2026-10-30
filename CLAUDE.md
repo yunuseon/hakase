@@ -233,8 +233,9 @@ quitting is therefore just
 the workspace fold holds. Adding a program is one entry in the
 table; nothing else in `main.ts` names it.
 
-**The toolbar is chrome, not a program.** It lists every program and lights the
-ones with a process, so it must not itself be launchable — it is mounted once by
+**The toolbar is chrome, not a program.** Its tiles only launch: a program can
+run any number of times, so "this program is running" says nothing worth lighting
+up. The toolbar must not itself be launchable — it is mounted once by
 `main.ts`, in the canvas's `chrome` slot, outside the zoomed layer. Its tiles are
 built with
 `createElementNS`, never `innerHTML`: a `Program.icon` is path data on a 24x24
@@ -296,6 +297,21 @@ textarea, with the same font, line height and padding as the other two, and all
 three use `white-space: pre`: with wrapping on, a long line would take two rows
 and every number after it would sit one row too high. The gutter follows the
 textarea's `scrollTop` on the same `scroll` event the highlight does.
+
+**What is open is a program's business: the task manager.** `tasks` is an
+ordinary program whose component, `hks-task-manager`, lists one row per process,
+labelled per program in launch order (`sketch 2` is the second sketch open) by
+`listed` in `workspace.ts`, with the frontmost marked. `AppState.tasks$` carries
+the list with each program's title and icon already resolved, because a program
+cannot import the table it is in. A row emits a `task` input, `reveal` or
+`close`, and `main.ts` routes it into the workspace fold — `close` is the same
+`quit` the window's own button sends, and `reveal` raises the window and centres
+the camera on it in one reducer step, shrinking the zoom only if it would not
+fit. Closing the task manager from its own list is fine: its row is just a
+process like the others. The footer's **Close all** closes every _other_ window:
+it emits `close-others` with no id, and the fold keeps the process `from` stamped
+on, so the manager never has to name itself. Its count comes from the program,
+which knows `self.id`, rather than from the row count, which would include it.
 
 **The navigator** (`hks-navigator`, bottom right, in the chrome slot) holds the zoom
 controls and a minimap. `minimapOf` in `navigator.ts` maps every window frame and

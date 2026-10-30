@@ -36,11 +36,13 @@ import {
     type Program,
     type ProgramId,
     type Slot,
+    type Task,
     type Written,
 } from './program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
+import { tasksProgram } from './programs/tasks.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -49,6 +51,7 @@ import { toolbarHost$ } from './toolbar-host.ts';
 import { persistWorkspace$, restoreWorkspace } from './workspace-store.ts';
 import {
     defaultWorkspace,
+    listed,
     reduceWorkspace,
     type Process,
     type Workspace,
@@ -62,6 +65,7 @@ const programs: readonly Program[] = [
     sketchProgram,
     timelineProgram,
     playheadProgram,
+    tasksProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -134,6 +138,17 @@ const bootstrap = () => {
         toolbarActions$,
         defer(() => signals$).pipe(
             mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
+        ),
+        defer(() => inputs$).pipe(
+            mergeMap(({ input }) => (input.kind === 'task' ? of(input) : EMPTY)),
+            withLatestFrom(viewport$),
+            map(([{ command, id }, viewport]): WorkspaceAction =>
+                command === 'close' ? { kind: 'quit', id } : { kind: 'reveal', id, viewport },
+            ),
+        ),
+        defer(() => inputs$).pipe(
+            mergeMap(({ from, input }) => (input.kind === 'close-others' ? of(from) : EMPTY)),
+            map((keep): WorkspaceAction => ({ kind: 'close-others', keep })),
         ),
     ).pipe(
         scan(reduceWorkspace, seed),
@@ -327,18 +342,31 @@ const bootstrap = () => {
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         look$,
         appearance$,
+        tasks$: workspace$.pipe(
+            map(({ processes }) =>
+                listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
+                    const program = programOf(process.program);
+
+                    return program === undefined
+                        ? []
+                        : [
+                              {
+                                  id: process.id,
+                                  title: program.title,
+                                  icon: program.icon,
+                                  ordinal,
+                                  focused,
+                              },
+                          ];
+                }),
+            ),
+        ),
         error$: (formula: FormulaName) =>
             diagnostics$.pipe(
                 map(all => all.get(formula) ?? null),
                 distinctUntilChanged(),
             ),
     };
-
-    const runningPrograms$ = workspace$.pipe(
-        map(({ processes }) => [...new Set(processes.map(({ program }) => program))].sort().join()),
-        distinctUntilChanged(),
-        map(key => new Set(key === '' ? [] : key.split(','))),
-    );
 
     const toolbarView$ = toolbarState$.pipe(
         map((state): ToolbarView =>
@@ -361,7 +389,7 @@ const bootstrap = () => {
                 map(({ value }) => variables(value)),
             ),
         ),
-        toolbar.connect$(runningPrograms$, toolbarView$),
+        toolbar.connect$(toolbarView$),
         navigator.connect$(
             combineLatest([workspace$, viewport$]).pipe(
                 map(([{ processes, camera }, viewport]) =>
