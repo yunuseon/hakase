@@ -222,7 +222,8 @@ one window can use — the terminal's docking was one — buys a branch in
 reducer, a keyboard map and an `AppState` field, all to serve a single window. If the
 next such feature is worth that, it is worth making it work for every window.
 
-**Nothing is declared in `index.html`** beyond the script tag, and no window is
+**Nothing is declared in `index.html`** beyond the script tag and the favicon link
+(`public/favicon.svg`, a rippled dot lattice with a dark variant), and no window is
 mounted by hand. `main.ts` holds nothing but the list of programs, and a window's
 existence is
 a subscription: `liveProcess$` creates the `hks-window` in a `defer` factory and
