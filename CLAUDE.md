@@ -284,9 +284,10 @@ these follow is the Claude Design canvas "hakase — modern redesign".
 `focused$` combined in `liveProcess$` would be the two-paths-into-one-`combineLatest`
 bug, firing once with the stale half.
 
-`hks-sketch` exposes two slots, both laid over its canvas: `status` for the fps
-readout, top left, and `controls` for the parameter bar, bottom centre. Covering
-the drawing is harmless; that is why the bar may sit on it permanently. Draw mode
+`hks-sketch` exposes two slots: `status` for the fps readout, laid over the canvas
+top left, and `controls` for the parameter bar, **below** the canvas. The bar sat
+over the drawing once and was in the way of the one thing a sketch exists to show;
+only a readout that small may cover it. Draw mode
 is a three-way radio group, still real `<input type="radio">`s, so the keyboard and
 the `change` event behave as a native control.
 

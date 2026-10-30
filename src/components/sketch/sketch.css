@@ -1,6 +1,7 @@
 :host {
     display: flex;
     flex-direction: column;
+    gap: 8px;
     line-height: 0;
 }
 
@@ -23,12 +24,7 @@ canvas {
     pointer-events: none;
 }
 
-/* Over the canvas, not under it: covering the drawing is harmless, covering a control is not. */
+/* Below the canvas, never over it: the drawing is the one thing a sketch must not hide. */
 ::slotted(hks-sketch-controls) {
-    position: absolute;
-    inset-inline: 12px;
-    inset-block-end: 12px;
-    display: flex;
-    justify-content: center;
-    pointer-events: none;
+    display: block;
 }

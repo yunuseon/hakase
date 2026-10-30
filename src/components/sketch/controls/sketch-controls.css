@@ -7,15 +7,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
-    gap: 4px 10px;
-    padding: 5px 8px;
-    background: color-mix(in srgb, var(--panel) 84%, transparent);
-    border: 1px solid var(--edge);
-    border-radius: 14px;
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 12%, transparent);
-    backdrop-filter: blur(12px);
-    pointer-events: auto;
+    gap: 4px 12px;
+    padding-inline: 2px;
 }
 
 .item {
