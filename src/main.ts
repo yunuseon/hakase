@@ -21,6 +21,7 @@ import { zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
+import { HksSeams } from './components/seams/seams.component.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
@@ -50,8 +51,10 @@ import { createTransport$, defaultDuration } from './shared/playhead.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
 import { persistWorkspace$, restoreWorkspace } from './workspace-store.ts';
 import {
+    boxOf,
     defaultWorkspace,
     listed,
+    seamsOf,
     reduceWorkspace,
     type Process,
     type Workspace,
@@ -96,6 +99,9 @@ const bootstrap = () => {
     navigator.slot = 'chrome';
     canvas.append(navigator);
 
+    const seams = new HksSeams();
+    canvas.append(seams);
+
     const launches$ = toolbar.launches$.pipe(
         mergeMap(id => {
             const program = isProgramId(id) ? programOf(id) : undefined;
@@ -117,6 +123,7 @@ const bootstrap = () => {
     );
 
     const toolbarActions$ = merge(
+        seams.toggles$.pipe(map(({ a, b }): WorkspaceAction => ({ kind: 'toggle-link', a, b }))),
         toolbar.placements$.pipe(
             map((placement): WorkspaceAction => ({ kind: 'place-toolbar', placement })),
         ),
@@ -390,14 +397,11 @@ const bootstrap = () => {
             ),
         ),
         toolbar.connect$(toolbarView$),
+        seams.connect$(workspace$.pipe(map(seamsOf))),
         navigator.connect$(
             combineLatest([workspace$, viewport$]).pipe(
                 map(([{ processes, camera }, viewport]) =>
-                    minimapOf(
-                        processes.map(({ frame }) => frame),
-                        camera,
-                        viewport,
-                    ),
+                    minimapOf(processes.map(boxOf), camera, viewport),
                 ),
             ),
             camera$.pipe(map(zoomLabel)),

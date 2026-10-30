@@ -1,0 +1,79 @@
+/* Zero-sized at the world origin, so only the pills take pointer events. */
+:host {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    z-index: 100000;
+    inline-size: 0;
+    block-size: 0;
+}
+
+/* The button is the hit area; the pill drawn inside it is much smaller. */
+.seam {
+    --along: 44px;
+    --across: 16px;
+
+    position: absolute;
+    inset-block-start: calc(var(--across) / -2);
+    inset-inline-start: calc(var(--along) / -2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--along);
+    block-size: var(--across);
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.seam[data-vertical] {
+    inset-block-start: calc(var(--along) / -2);
+    inset-inline-start: calc(var(--across) / -2);
+    inline-size: var(--across);
+    block-size: var(--along);
+}
+
+.seam::before {
+    content: '';
+    inline-size: 28px;
+    block-size: 4px;
+    border-radius: 2px;
+    background: var(--muted);
+    opacity: 0.35;
+    transition:
+        opacity 120ms ease,
+        background-color 120ms ease,
+        inline-size 120ms ease,
+        block-size 120ms ease;
+}
+
+.seam[data-vertical]::before {
+    inline-size: 4px;
+    block-size: 28px;
+}
+
+.seam:hover::before {
+    opacity: 0.8;
+}
+
+.seam[data-linked]::before {
+    inline-size: 36px;
+    background: var(--ink);
+    opacity: 0.6;
+}
+
+.seam[data-linked][data-vertical]::before {
+    inline-size: 4px;
+    block-size: 36px;
+}
+
+.seam[data-linked]:hover::before {
+    opacity: 1;
+}
+
+.seam:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 0;
+    border-radius: 8px;
+}

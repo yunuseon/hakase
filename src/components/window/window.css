@@ -12,16 +12,7 @@
     box-shadow:
         0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
         0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
-    transition: box-shadow 160ms ease;
     font-family: var(--font-ui);
-}
-
-/* The frontmost window: a deeper shadow and a faint ring in the accent. */
-:host([data-focused]) {
-    box-shadow:
-        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
-        0 24px 48px color-mix(in srgb, var(--shadow) 16%, transparent),
-        0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .title {

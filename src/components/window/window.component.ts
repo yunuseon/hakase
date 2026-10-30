@@ -1,7 +1,7 @@
 import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$ } from '../../lib/rx.ts';
+import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
 import { RESIZE_EDGES, type ResizeEdge, type WindowGesture, type WindowView } from './frame.ts';
 import css from './window.css?inline';
@@ -69,6 +69,14 @@ export class HksWindow extends HTMLElement {
             ),
             fromElementEvent$(requireChild(shadow, '.close'), 'click').pipe(
                 map((): WindowGesture => ({ kind: 'quit' })),
+            ),
+            // offset*, not getBoundingClientRect: the size in world units, before the zoom.
+            observeResize$(this).pipe(
+                map((): WindowGesture => ({
+                    kind: 'measure',
+                    width: this.offsetWidth,
+                    height: this.offsetHeight,
+                })),
             ),
         );
     }

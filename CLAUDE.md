@@ -273,8 +273,9 @@ of loop, which is why `toolbarGestures$` also enters the fold through a `defer`.
 The tool is drawn as **paper-like windows**: one panel colour with no header band,
 a hairline `--edge`, a 14px radius and a soft `--shadow`, a transparent title strip
 holding the program's icon and its name, and a close button that only shows on
-hover or focus. The frontmost window is **focused**: a deeper shadow and a faint
-accent ring. That chrome lives once in `components/window/window.css`. Interiors
+hover or focus. The frontmost window is **focused**, which the window marks with
+`data-focused` but deliberately does not style — a ring around it was tried and
+removed as noise. That chrome lives once in `components/window/window.css`. Interiors
 follow it — Geist for UI text, Geist Mono for code, readouts and clocks, both as
 `--font-ui` / `--font-mono` from `styles.css` — and nest no frames of their own; a
 well (`--well`, rounded) marks an editable area instead of a border. The design
@@ -363,6 +364,38 @@ stacking order, and the per-gesture `pointerDelta$` in `shared/drag.ts` supplies
 the deltas. Pairing has to happen _inside_ the gesture; pairing the flattened
 stream would make the first move of each drag jump from wherever the last one
 ended.
+
+**Windows snap and attach.** Dragging a window within 10 screen pixels of
+another's edge snaps it flush or aligned, and wherever two windows touch,
+`hks-seams` puts a pill on the middle of the shared edge, oriented along it like
+the iOS drag handle — faint while unattached, longer and in ink once attached —
+inside a larger transparent button that is its hit area. Clicking it toggles the
+link. Linked windows form a group:
+moving one moves all of them, and raising one raises all of them, the dragged one
+on top. Resizing does not propagate, but it is magnetic: a resized edge snaps
+to the edges of the windows it is linked to, so a window stacked under another
+locks to its width. Closing a window closes only that one.
+
+All of it is the one `scan`. `Workspace.links` holds `{ a, b }` pairs, and a group
+is `groupOf`'s connected component, never stored, so it cannot fall out of step.
+`reduceWorkspace` prunes every link whose windows no longer touch after **every**
+action, which is how quitting, resizing apart and a stale stored link all drop
+out with no case of their own. That pruning is also why a pill can
+never be stranded: a link exists only where its seam is drawn.
+
+Snapping has a trap. A move delta applied to an already snapped frame would keep
+snapping back, and the window could only escape with one big jerk. So the reducer
+keeps `drift`, what the last snap held back, and adds it to the next delta;
+pulling away accumulates it until the snap lets go. A drag always begins with a
+`raise`, which clears `drift`, so one drag never inherits another's.
+
+Snapping and seams use `Process.measured`, not the frame: a fitted window's frame
+holds its content's size, so the sketch's frame is smaller than the window you
+see. Every window reports its laid-out size as a `measure` gesture from
+`observeResize$`, read with `offsetWidth`, which is in world units because it
+ignores the zoom transform. `fit`, `reveal` and the minimap read `boxOf` too. A resize grows
+`measured` along with the frame rather than waiting for the next `measure`,
+because the next snap in the same drag reads it before the observer has fired.
 
 **A gesture starts on the element and ends on the document.** `pointerdown` is
 the element's, but the moves and the `pointerup`/`pointercancel` that close it are

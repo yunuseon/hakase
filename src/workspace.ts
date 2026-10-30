@@ -13,14 +13,17 @@ import {
     type Camera,
     type Extent,
     type Point,
+    type Rect,
 } from './shared/camera.ts';
 import type { ZoomCommand } from './components/navigator/navigator.ts';
+import type { SeamView } from './components/seams/seams.ts';
 import { isEdge, type Edge, type Placement } from './components/toolbar/toolbar.ts';
 import {
     frameFrom,
     moved,
     resized,
     type Frame,
+    type ResizeEdge,
     type Size,
     type WindowGesture,
 } from './components/window/frame.ts';
@@ -31,6 +34,19 @@ export type Process = {
     readonly id: ProcessId;
     readonly program: ProgramId;
     readonly frame: Frame;
+    // The window's laid-out size: a fitted window's frame holds its content's size, not its own.
+    readonly measured: Size;
+};
+
+export type Link = {
+    readonly a: ProcessId;
+    readonly b: ProcessId;
+};
+
+type Drift = {
+    readonly id: ProcessId;
+    readonly x: number;
+    readonly y: number;
 };
 
 export type ToolbarState =
@@ -45,6 +61,8 @@ export type Workspace = {
     readonly camera: Camera;
     readonly toolbar: ToolbarState;
     readonly minimap: boolean;
+    readonly links: readonly Link[];
+    readonly drift: Drift | null;
 };
 
 export type WorkspaceAction =
@@ -61,6 +79,7 @@ export type WorkspaceAction =
     | { readonly kind: 'retract-toolbar' }
     | { readonly kind: 'toggle-minimap' }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
+    | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
     | (WindowGesture & { readonly id: ProcessId });
@@ -77,58 +96,56 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
     const editorHeight = Math.max(320, height - timelineHeight - 3 * gutter);
     const sketchX = left + editorWidth + gutter;
 
+    const sized = (process: Omit<Process, 'measured'>): Process => ({
+        ...process,
+        measured: { width: process.frame.width, height: process.frame.height },
+    });
+
     return {
-        processes: [
-            {
-                id: 'formula-1',
-                program: 'formula',
-                frame: { x: left, y: gutter, width: editorWidth, height: editorHeight, z: 0 },
-            },
-            {
-                id: 'sketch-2',
-                program: 'sketch',
-                frame: { x: sketchX, y: gutter, width: 640, height: 640, z: 0 },
-            },
-            {
-                id: 'timeline-3',
-                program: 'timeline',
-                frame: {
-                    x: left,
-                    y: editorHeight + 2 * gutter,
-                    width: editorWidth,
-                    height: timelineHeight,
-                    z: 0,
+        processes: (
+            [
+                {
+                    id: 'formula-1',
+                    program: 'formula',
+                    frame: { x: left, y: gutter, width: editorWidth, height: editorHeight, z: 0 },
                 },
-            },
-            {
-                id: 'playhead-4',
-                program: 'playhead',
-                frame: {
-                    x: sketchX + 640 + 3 * gutter,
-                    y: gutter,
-                    width: dialSize,
-                    height: dialSize + 44,
-                    z: 0,
+                {
+                    id: 'sketch-2',
+                    program: 'sketch',
+                    frame: { x: sketchX, y: gutter, width: 640, height: 640, z: 0 },
                 },
-            },
-        ],
+                {
+                    id: 'timeline-3',
+                    program: 'timeline',
+                    frame: {
+                        x: left,
+                        y: editorHeight + 2 * gutter,
+                        width: editorWidth,
+                        height: timelineHeight,
+                        z: 0,
+                    },
+                },
+                {
+                    id: 'playhead-4',
+                    program: 'playhead',
+                    frame: {
+                        x: sketchX + 640 + 3 * gutter,
+                        y: gutter,
+                        width: dialSize,
+                        height: dialSize + 44,
+                        z: 0,
+                    },
+                },
+            ] satisfies Omit<Process, 'measured'>[]
+        ).map(sized),
         launched: 4,
         camera: IDENTITY,
         toolbar: { kind: 'docked', edge: 'left', retracted: false },
         minimap: false,
+        links: [],
+        drift: null,
     };
 };
-
-const withFrame = (
-    workspace: Workspace,
-    id: ProcessId,
-    next: (frame: Frame) => Frame,
-): Workspace => ({
-    ...workspace,
-    processes: workspace.processes.map(process =>
-        process.id === id ? { ...process, frame: next(process.frame) } : process,
-    ),
-});
 
 const stepped = (workspace: Workspace, command: ZoomCommand, viewport: Extent): Camera => {
     const { camera } = workspace;
@@ -142,10 +159,7 @@ const stepped = (workspace: Workspace, command: ZoomCommand, viewport: Extent): 
         case 'reset':
             return zoomedTo(camera, 1, centre);
         case 'fit':
-            return fitted(
-                workspace.processes.map(({ frame }) => frame),
-                viewport,
-            );
+            return fitted(workspace.processes.map(boxOf), viewport);
     }
 };
 
@@ -178,7 +192,228 @@ const toolbarGesture = (toolbar: ToolbarState, gesture: WindowGesture): ToolbarS
         : toolbar;
 };
 
-export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): Workspace => {
+const SNAP_REACH = 10;
+const TOUCHING = 0.5;
+const MIN_SEAM = 24;
+
+export const boxOf = ({ frame, measured }: Process): Rect => ({
+    x: frame.x,
+    y: frame.y,
+    width: measured.width,
+    height: measured.height,
+});
+
+const overlap = (start: number, end: number, otherStart: number, otherEnd: number): number =>
+    Math.min(end, otherEnd) - Math.max(start, otherStart);
+
+export type Seam = Point & {
+    readonly vertical: boolean;
+};
+
+export const seamBetween = (a: Rect, b: Rect): Seam | null => {
+    const rows = overlap(a.y, a.y + a.height, b.y, b.y + b.height);
+    const columns = overlap(a.x, a.x + a.width, b.x, b.x + b.width);
+    const middleY = Math.max(a.y, b.y) + rows / 2;
+    const middleX = Math.max(a.x, b.x) + columns / 2;
+
+    if (rows >= MIN_SEAM && Math.abs(a.x + a.width - b.x) <= TOUCHING) {
+        return { x: b.x, y: middleY, vertical: true };
+    }
+
+    if (rows >= MIN_SEAM && Math.abs(b.x + b.width - a.x) <= TOUCHING) {
+        return { x: a.x, y: middleY, vertical: true };
+    }
+
+    if (columns >= MIN_SEAM && Math.abs(a.y + a.height - b.y) <= TOUCHING) {
+        return { x: middleX, y: b.y, vertical: false };
+    }
+
+    if (columns >= MIN_SEAM && Math.abs(b.y + b.height - a.y) <= TOUCHING) {
+        return { x: middleX, y: a.y, vertical: false };
+    }
+
+    return null;
+};
+
+const nearest = (offsets: readonly number[], reach: number): number =>
+    offsets.reduce(
+        (best, offset) =>
+            Math.abs(offset) <= reach && Math.abs(offset) < Math.abs(best) ? offset : best,
+        Infinity,
+    );
+
+const snapOffset = (moving: readonly Rect[], fixed: readonly Rect[], reach: number): Point => {
+    const pairs = moving.flatMap(m => fixed.map(f => [m, f] as const));
+
+    const dx = nearest(
+        pairs
+            .filter(([m, f]) => overlap(m.y, m.y + m.height, f.y, f.y + f.height) >= -reach)
+            .flatMap(([m, f]) => [
+                f.x - (m.x + m.width),
+                f.x + f.width - m.x,
+                f.x - m.x,
+                f.x + f.width - (m.x + m.width),
+            ]),
+        reach,
+    );
+    const dy = nearest(
+        pairs
+            .filter(([m, f]) => overlap(m.x, m.x + m.width, f.x, f.x + f.width) >= -reach)
+            .flatMap(([m, f]) => [
+                f.y - (m.y + m.height),
+                f.y + f.height - m.y,
+                f.y - m.y,
+                f.y + f.height - (m.y + m.height),
+            ]),
+        reach,
+    );
+
+    return { x: Number.isFinite(dx) ? dx : 0, y: Number.isFinite(dy) ? dy : 0 };
+};
+
+export const groupOf = (links: readonly Link[], id: ProcessId): ReadonlySet<ProcessId> => {
+    const grown = (group: ReadonlySet<ProcessId>): ReadonlySet<ProcessId> => {
+        const next = new Set(group);
+
+        for (const { a, b } of links) {
+            if (group.has(a)) {
+                next.add(b);
+            }
+
+            if (group.has(b)) {
+                next.add(a);
+            }
+        }
+
+        return next.size === group.size ? group : grown(next);
+    };
+
+    return grown(new Set([id]));
+};
+
+const sameLink = (link: Link, a: ProcessId, b: ProcessId): boolean =>
+    (link.a === a && link.b === b) || (link.a === b && link.b === a);
+
+const touching = (processes: readonly Process[], { a, b }: Link): boolean => {
+    const first = processes.find(({ id }) => id === a);
+    const second = processes.find(({ id }) => id === b);
+
+    return (
+        first !== undefined &&
+        second !== undefined &&
+        seamBetween(boxOf(first), boxOf(second)) !== null
+    );
+};
+
+const toggledLink = (workspace: Workspace, a: ProcessId, b: ProcessId): readonly Link[] =>
+    workspace.links.some(link => sameLink(link, a, b))
+        ? workspace.links.filter(link => !sameLink(link, a, b))
+        : [...workspace.links, { a, b }];
+
+const raisedGroup = (workspace: Workspace, id: ProcessId): readonly Process[] => {
+    const group = groupOf(workspace.links, id);
+    const raised = workspace.processes.filter(process => group.has(process.id));
+
+    return [
+        ...workspace.processes.filter(process => !group.has(process.id)),
+        ...raised.filter(process => process.id !== id),
+        ...raised.filter(process => process.id === id),
+    ];
+};
+
+const movedGroup = (workspace: Workspace, id: ProcessId, dx: number, dy: number): Workspace => {
+    const group = groupOf(workspace.links, id);
+    const drift = workspace.drift?.id === id ? workspace.drift : { x: 0, y: 0 };
+    const x = dx + drift.x;
+    const y = dy + drift.y;
+
+    const moving = workspace.processes
+        .filter(process => group.has(process.id))
+        .map(process => {
+            const box = boxOf(process);
+
+            return { ...box, x: box.x + x, y: box.y + y };
+        });
+    const fixed = workspace.processes.filter(process => !group.has(process.id)).map(boxOf);
+    const snap = snapOffset(moving, fixed, SNAP_REACH / workspace.camera.zoom);
+
+    return {
+        ...workspace,
+        drift: { id, x: -snap.x, y: -snap.y },
+        processes: workspace.processes.map(process =>
+            group.has(process.id)
+                ? { ...process, frame: moved(process.frame, x + snap.x, y + snap.y) }
+                : process,
+        ),
+    };
+};
+
+const resizedToNeighbours = (
+    workspace: Workspace,
+    id: ProcessId,
+    edge: ResizeEdge,
+    dx: number,
+    dy: number,
+): Workspace => {
+    const process = workspace.processes.find(candidate => candidate.id === id);
+
+    if (process === undefined) {
+        return workspace;
+    }
+
+    const drift = workspace.drift?.id === id ? workspace.drift : { x: 0, y: 0 };
+    const x = dx + drift.x;
+    const y = dy + drift.y;
+    const box = boxOf(process);
+    const reach = SNAP_REACH / workspace.camera.zoom;
+    const neighbours = workspace.links
+        .flatMap(({ a, b }) => (a === id ? [b] : b === id ? [a] : []))
+        .flatMap(other => workspace.processes.filter(candidate => candidate.id === other))
+        .map(boxOf);
+
+    const edgeX = edge.includes('e')
+        ? box.x + box.width + x
+        : edge.includes('w')
+          ? box.x + x
+          : null;
+    const edgeY = edge.includes('s')
+        ? box.y + box.height + y
+        : edge.includes('n')
+          ? box.y + y
+          : null;
+    const snapX =
+        edgeX === null
+            ? Infinity
+            : nearest(
+                  neighbours.flatMap(n => [n.x - edgeX, n.x + n.width - edgeX]),
+                  reach,
+              );
+    const snapY =
+        edgeY === null
+            ? Infinity
+            : nearest(
+                  neighbours.flatMap(n => [n.y - edgeY, n.y + n.height - edgeY]),
+                  reach,
+              );
+    const snap = { x: Number.isFinite(snapX) ? snapX : 0, y: Number.isFinite(snapY) ? snapY : 0 };
+
+    const frame = resized(process.frame, edge, x + snap.x, y + snap.y);
+    // Grown with the frame, not left to the next measure: a stale size would misplace the next snap.
+    const measured = {
+        width: process.measured.width + frame.width - process.frame.width,
+        height: process.measured.height + frame.height - process.frame.height,
+    };
+
+    return {
+        ...workspace,
+        drift: { id, x: -snap.x, y: -snap.y },
+        processes: workspace.processes.map(candidate =>
+            candidate.id === id ? { ...candidate, frame, measured } : candidate,
+        ),
+    };
+};
+
+const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
     switch (action.kind) {
         case 'launch': {
             const launched = workspace.launched + 1;
@@ -193,6 +428,7 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
                     {
                         id: `${action.program}-${launched}`,
                         program: action.program,
+                        measured: action.size,
                         frame: {
                             ...action.size,
                             x: Math.round(centre.x - action.size.width / 2 + step),
@@ -230,6 +466,17 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
                 ...workspace,
                 processes: workspace.processes.filter(({ id }) => id === action.keep),
             };
+        case 'toggle-link':
+            return { ...workspace, links: toggledLink(workspace, action.a, action.b) };
+        case 'measure':
+            return {
+                ...workspace,
+                processes: workspace.processes.map(process =>
+                    process.id === action.id
+                        ? { ...process, measured: { width: action.width, height: action.height } }
+                        : process,
+                ),
+            };
         case 'quit':
             return {
                 ...workspace,
@@ -243,42 +490,53 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
                 ? workspace
                 : {
                       ...raised,
-                      camera: centredOn(workspace.camera, shown.frame, action.viewport),
+                      camera: centredOn(workspace.camera, boxOf(shown), action.viewport),
                   };
         }
-        case 'raise': {
-            const raised = workspace.processes.find(({ id }) => id === action.id);
-
-            return raised === undefined
-                ? workspace
-                : {
-                      ...workspace,
-                      processes: [
-                          ...workspace.processes.filter(({ id }) => id !== action.id),
-                          raised,
-                      ],
-                  };
-        }
+        // A drag starts with a raise, so the last drag's drift never carries into this one.
+        case 'raise':
+            return workspace.processes.some(({ id }) => id === action.id)
+                ? { ...workspace, drift: null, processes: raisedGroup(workspace, action.id) }
+                : workspace;
         // Deltas arrive in screen pixels; the frame is in world units.
         case 'move': {
             const { zoom } = workspace.camera;
 
-            return withFrame(workspace, action.id, frame =>
-                moved(frame, action.dx / zoom, action.dy / zoom),
-            );
+            return movedGroup(workspace, action.id, action.dx / zoom, action.dy / zoom);
         }
         case 'resize': {
             const { zoom } = workspace.camera;
 
-            return withFrame(workspace, action.id, frame =>
-                resized(frame, action.edge, action.dx / zoom, action.dy / zoom),
+            return resizedToNeighbours(
+                workspace,
+                action.id,
+                action.edge,
+                action.dx / zoom,
+                action.dy / zoom,
             );
         }
     }
 };
 
+export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): Workspace => {
+    const next = step(workspace, action);
+
+    return { ...next, links: next.links.filter(link => touching(next.processes, link)) };
+};
+
 const finite = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const sizeFrom = (value: unknown): Size | null => {
+    if (typeof value !== 'object' || value === null || !('width' in value && 'height' in value)) {
+        return null;
+    }
+
+    const width = finite(value.width);
+    const height = finite(value.height);
+
+    return width === null || height === null ? null : { width, height };
+};
 
 const processFrom = (value: unknown): Process | null => {
     if (typeof value !== 'object' || value === null) {
@@ -295,7 +553,17 @@ const processFrom = (value: unknown): Process | null => {
         return null;
     }
 
-    return isProgramId(value.program) ? { id: value.id, program: value.program, frame } : null;
+    // Optional: saved before windows were measured, the frame's own size is the best guess.
+    const measured = ('measured' in value ? sizeFrom(value.measured) : null) ?? frame;
+
+    return isProgramId(value.program)
+        ? {
+              id: value.id,
+              program: value.program,
+              frame,
+              measured: { width: measured.width, height: measured.height },
+          }
+        : null;
 };
 
 const cameraFrom = (value: unknown): Camera | null => {
@@ -341,6 +609,16 @@ const toolbarFrom = (value: unknown): ToolbarState | null => {
     return null;
 };
 
+const linkFrom = (value: unknown): Link[] =>
+    typeof value === 'object' &&
+    value !== null &&
+    'a' in value &&
+    'b' in value &&
+    typeof value.a === 'string' &&
+    typeof value.b === 'string'
+        ? [{ a: value.a, b: value.b }]
+        : [];
+
 export const parseWorkspace = (value: unknown): Workspace | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
@@ -367,12 +645,18 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         return null;
     }
 
+    const kept = processes.filter(process => process !== null);
+    const links =
+        'links' in value && Array.isArray(value.links) ? value.links.flatMap(linkFrom) : [];
+
     return {
-        processes: processes.filter(process => process !== null),
+        processes: kept,
         launched,
         camera,
         toolbar,
         minimap,
+        links: links.filter(link => touching(kept, link)),
+        drift: null,
     };
 };
 
@@ -396,3 +680,23 @@ export const listed = (processes: readonly Process[]): readonly Listed[] => {
         focused: process.id === front,
     }));
 };
+
+export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
+    processes.flatMap((first, index) =>
+        processes.slice(index + 1).flatMap(second => {
+            const seam = seamBetween(boxOf(first), boxOf(second));
+
+            return seam === null
+                ? []
+                : [
+                      {
+                          a: first.id,
+                          b: second.id,
+                          x: seam.x,
+                          y: seam.y,
+                          vertical: seam.vertical,
+                          linked: links.some(link => sameLink(link, first.id, second.id)),
+                      },
+                  ];
+        }),
+    );

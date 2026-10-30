@@ -34,7 +34,8 @@ export type WindowGesture =
           readonly dy: number;
       }
     | { readonly kind: 'raise' }
-    | { readonly kind: 'quit' };
+    | { readonly kind: 'quit' }
+    | { readonly kind: 'measure'; readonly width: number; readonly height: number };
 
 const MIN_WIDTH = 180;
 const MIN_HEIGHT = 64;
