@@ -1,3 +1,11 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+:root {
+    --font-ui: 'Geist Variable', system-ui, sans-serif;
+    --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+}
+
 html,
 body {
     block-size: 100%;
@@ -6,5 +14,5 @@ body {
 body {
     margin: 0;
     overflow: hidden;
-    font-family: system-ui, sans-serif;
+    font-family: var(--font-ui);
 }

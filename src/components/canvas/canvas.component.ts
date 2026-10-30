@@ -3,7 +3,7 @@ import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
-import type { Camera } from './camera.ts';
+import type { Camera } from '../../shared/camera.ts';
 import {
     gridOf,
     keyZoom,

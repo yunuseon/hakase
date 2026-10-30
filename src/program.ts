@@ -60,9 +60,15 @@ export type Written<T> = {
 
 export type Source = Written<string>;
 
+// One stream, not frame$ beside focused$: a raise changes both, and two would fire twice.
+export type Slot = {
+    readonly frame: Frame;
+    readonly focused: boolean;
+};
+
 export type Self = {
     readonly id: ProcessId;
-    readonly frame$: Observable<Frame>;
+    readonly slot$: Observable<Slot>;
 };
 
 export type ProcessView = {

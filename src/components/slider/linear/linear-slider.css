@@ -21,43 +21,56 @@
 }
 
 .track::before {
-    background-color: var(--rule);
     content: '';
-    display: block;
-    height: 1px;
-    inset: 0;
-    margin: auto;
     position: absolute;
+    inset-inline: 0;
+    inset-block: 0;
+    block-size: 4px;
+    margin-block: auto;
+    background-color: var(--edge);
+    border-radius: 2px;
+}
+
+/* Ticks at every eighth: a scale to read the loop against, not a snap. */
+.track::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 0;
+    block-size: calc(50% - 6px);
+    background: linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 12.5% 100% repeat-x;
+    border-inline-end: 1px solid var(--rule);
 }
 
 .indicator {
-    height: 100%;
-    left: 0;
     position: absolute;
-    top: 0;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    block-size: 100%;
     pointer-events: none;
 }
 
 .indicator::before {
-    background-color: var(--ink);
     content: '';
-    display: block;
-    height: 1px;
-    inset: 0;
-    margin-block: auto;
     position: absolute;
+    inset: 0;
+    block-size: 4px;
+    margin-block: auto;
+    background-color: var(--accent);
+    border-radius: 2px;
 }
 
 .indicator::after {
-    background-color: var(--panel);
-    border: 1px solid var(--ink);
-    bottom: 0;
     content: '';
-    display: block;
-    height: 9px;
-    margin-block: auto;
     position: absolute;
-    right: -5px;
-    top: 0;
-    width: 9px;
+    inset-block: 0;
+    inset-inline-end: -7px;
+    inline-size: 14px;
+    block-size: 14px;
+    margin-block: auto;
+    background-color: var(--panel);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 2px var(--accent),
+        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
 }

@@ -43,11 +43,11 @@ export const sketchProgram: Program = {
 
         return {
             element: sketch,
-            run$: (state, { frame$ }) => {
+            run$: (state, { slot$ }) => {
                 const { playhead$, source$, zoom$ } = state;
                 // Without the comparator, dragging the window would re-prepare the shader.
-                const size$ = frame$.pipe(
-                    map(({ width, height }): Size => ({ width, height })),
+                const size$ = slot$.pipe(
+                    map(({ frame: { width, height } }): Size => ({ width, height })),
                     distinctUntilChanged(sameSize),
                 );
 

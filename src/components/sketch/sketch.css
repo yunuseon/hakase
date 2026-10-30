@@ -9,7 +9,7 @@
     display: flex;
     overflow: hidden;
     background: var(--well);
-    border-radius: 8px;
+    border-radius: 10px;
 }
 
 canvas {
@@ -18,7 +18,17 @@ canvas {
 
 ::slotted(hks-fps-counter) {
     position: absolute;
-    inset-block-end: 4px;
-    inset-inline-start: 6px;
+    inset-block-start: 10px;
+    inset-inline-start: 10px;
+    pointer-events: none;
+}
+
+/* Over the canvas, not under it: covering the drawing is harmless, covering a control is not. */
+::slotted(hks-sketch-controls) {
+    position: absolute;
+    inset-inline: 12px;
+    inset-block-end: 12px;
+    display: flex;
+    justify-content: center;
     pointer-events: none;
 }

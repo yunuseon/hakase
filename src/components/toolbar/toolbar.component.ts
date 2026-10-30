@@ -2,14 +2,7 @@ import { EMPTY, of, type Observable, merge } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import {
-    isPlacement,
-    isZoomCommand,
-    sameToolbarView,
-    type Placement,
-    type ToolbarView,
-    type ZoomCommand,
-} from './toolbar.ts';
+import { isPlacement, sameToolbarView, type Placement, type ToolbarView } from './toolbar.ts';
 import css from './toolbar.css?inline';
 
 const sheet = styleSheet(css);
@@ -17,26 +10,23 @@ const SVG = 'http://www.w3.org/2000/svg';
 
 const glyph = (d: string) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 
-const place = (value: Placement, label: string, d: string) =>
-    `<button class="key" type="button" data-place="${value}" aria-label="${label}" title="${label}">${glyph(d)}</button>`;
+const place = (value: Placement, label: string, d: string) => `
+    <button class="choice" type="button" role="menuitemradio" data-place="${value}">
+        ${glyph(d)}<span>${label}</span>
+    </button>
+`;
 
 const TEMPLATE = `
-    <div class="tray" role="toolbar" aria-label="tools">
+    <div class="tray" role="toolbar" aria-label="programs">
         <div class="group programs"></div>
-        <div class="group zoom">
-            <button class="key" type="button" data-zoom="out" aria-label="zoom out" title="zoom out">${glyph('M7 12 H17')}</button>
-            <button class="readout" type="button" data-zoom="reset" aria-label="reset zoom" title="reset zoom">100%</button>
-            <button class="key" type="button" data-zoom="in" aria-label="zoom in" title="zoom in">${glyph('M7 12 H17 M12 7 V17')}</button>
-            <button class="key" type="button" data-zoom="fit" aria-label="fit everything" title="fit everything">${glyph('M5 9 V5 H9 M15 5 H19 V9 M19 15 V19 H15 M9 19 H5 V15')}</button>
-        </div>
         <details class="group menu">
-            <summary class="key" aria-label="toolbar position" title="toolbar position">${glyph('M6 6 h.01 M12 6 h.01 M18 6 h.01 M6 12 h.01 M12 12 h.01 M18 12 h.01 M6 18 h.01 M12 18 h.01 M18 18 h.01')}</summary>
-            <div class="places">
-                ${place('top', 'dock top', 'M5 5 H19 M5 9 H19 V19 H5 Z')}
-                ${place('bottom', 'dock bottom', 'M5 19 H19 M5 5 H19 V15 H5 Z')}
-                ${place('left', 'dock left', 'M5 5 V19 M9 5 H19 V19 H9 Z')}
-                ${place('right', 'dock right', 'M19 5 V19 M5 5 H15 V19 H5 Z')}
-                ${place('float', 'own window', 'M4 8 H16 V20 H4 Z M8 4 H20 V16')}
+            <summary class="key" aria-label="toolbar position" title="toolbar position">${glyph('M5 5 H19 V19 H5 Z M10 5 V19')}</summary>
+            <div class="places" role="menu" aria-label="toolbar position">
+                ${place('top', 'Top', 'M5 5 H19 M5 9 H19 V19 H5 Z')}
+                ${place('bottom', 'Bottom', 'M5 19 H19 M5 5 H19 V15 H5 Z')}
+                ${place('left', 'Left', 'M5 5 V19 M9 5 H19 V19 H9 Z')}
+                ${place('right', 'Right', 'M19 5 V19 M5 5 H15 V19 H5 Z')}
+                ${place('float', 'Own window', 'M4 8 H16 V20 H4 Z M8 4 H20 V16')}
             </div>
         </details>
     </div>
@@ -67,12 +57,10 @@ const clicked$ = (element: HTMLElement, key: string): Observable<string> =>
 
 export class HksToolbar extends HTMLElement {
     readonly launches$: Observable<string>;
-    readonly zooms$: Observable<ZoomCommand>;
     readonly placements$: Observable<Placement>;
     readonly retracts$: Observable<void>;
 
     private readonly programs: HTMLElement;
-    private readonly readout: HTMLElement;
     private readonly menu: HTMLDetailsElement;
     private readonly tab: HTMLElement;
 
@@ -83,16 +71,11 @@ export class HksToolbar extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
-        const tray = requireChild(shadow, '.tray');
         this.programs = requireChild(shadow, '.programs');
-        this.readout = requireChild(shadow, '.readout');
         this.menu = requireElement(shadow, '.menu', HTMLDetailsElement);
         this.tab = requireChild(shadow, '.tab');
 
         this.launches$ = clicked$(this.programs, 'program');
-        this.zooms$ = clicked$(tray, 'zoom').pipe(
-            mergeMap(value => (isZoomCommand(value) ? of(value) : EMPTY)),
-        );
         this.placements$ = clicked$(this.menu, 'place').pipe(
             mergeMap(value => (isPlacement(value) ? of(value) : EMPTY)),
         );
@@ -128,7 +111,6 @@ export class HksToolbar extends HTMLElement {
 
     connect$(
         running$: Observable<ReadonlySet<string>>,
-        zoom$: Observable<string>,
         view$: Observable<ToolbarView>,
     ): Observable<void> {
         return merge(
@@ -144,16 +126,19 @@ export class HksToolbar extends HTMLElement {
                     }
                 }),
             ),
-            zoom$.pipe(
-                distinctUntilChanged(),
-                tap(label => {
-                    this.readout.textContent = label;
-                }),
-            ),
             view$.pipe(
                 distinctUntilChanged(sameToolbarView),
                 tap(({ placement, retracted }) => {
                     this.dataset['placement'] = placement;
+                    for (const choice of this.menu.querySelectorAll('[data-place]')) {
+                        choice.setAttribute(
+                            'aria-checked',
+                            String(
+                                choice instanceof HTMLElement &&
+                                    choice.dataset['place'] === placement,
+                            ),
+                        );
+                    }
                     this.toggleAttribute('data-retracted', retracted);
                     this.tab.setAttribute(
                         'aria-label',

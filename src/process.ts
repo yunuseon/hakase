@@ -19,11 +19,13 @@ export const liveProcess$ = (
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
-        const element = new HksWindow().label(program.title);
+        const element = new HksWindow().label(program.title, program.icon);
         element.append(view.element);
         host.append(element);
 
-        const view$ = self.frame$.pipe(map((frame): WindowView => ({ kind: program.kind, frame })));
+        const view$ = self.slot$.pipe(
+            map(({ frame, focused }): WindowView => ({ kind: program.kind, frame, focused })),
+        );
 
         return merge(
             element.gestures$.pipe(

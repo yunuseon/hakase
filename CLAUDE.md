@@ -198,8 +198,9 @@ element is a DOM container, the streams stay outside it.
 
 **A component folder holds everything only that component needs**, whatever layer
 it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
-`formulas/` and its compile stage, because nothing else imports them. Only three
-modules are genuinely shared — `lib/`, `shared/drag.ts` and `shared/playhead.ts` —
+`formulas/` and its compile stage, because nothing else imports them. Only a few
+modules are genuinely shared — `lib/`, `shared/drag.ts`, `shared/playhead.ts` and
+`shared/camera.ts` (the canvas and the navigator both read the camera) —
 and a module earns `shared/` by having a second importer, not by being general in
 spirit. If you reach into another component's folder, either the thing you want
 belongs in `shared/`, or the two components want to be one.
@@ -258,7 +259,7 @@ no listeners, no GL draws — which a `display: none` window would.
 **The graph has a cycle and it is closed by ordering, not a `Subject`.** Windows
 emit the workspace actions that produce their own frames: `signals$` carries
 `WorkspaceAction`s out of every open window, `workspace$` folds them, and
-`frame$(id)` hands the frames back in. The floating toolbar closes the same kind
+`slot$(id)` hands the frames back in. The floating toolbar closes the same kind
 of loop, which is why `toolbarGestures$` also enters the fold through a `defer`. Two things make it safe, and both are load-bearing:
 
 - A program's `connect$` is a **function of `AppState`**, called from inside
@@ -269,14 +270,38 @@ of loop, which is why `toolbarGestures$` also enters the fold through a `defer`.
   subscribes to `workspace$` while mounting reads the seed rather than hanging.
 
 The tool is drawn as **paper-like windows**: one panel colour with no header band,
-a hairline `--edge`, a 12px radius and a soft `--shadow`, a transparent title strip
-with a small lowercase label, and a close button that only shows on hover or
-focus. That chrome lives once in `components/window/window.css`. Interiors follow
-it — `system-ui` for UI text, monospace only for code, readouts and clocks — and
-nest no frames of their own; a well (`--well`, rounded) marks an editable area
-instead of a border.
+a hairline `--edge`, a 14px radius and a soft `--shadow`, a transparent title strip
+holding the program's icon and its name, and a close button that only shows on
+hover or focus. The frontmost window is **focused**: a deeper shadow and a faint
+accent ring. That chrome lives once in `components/window/window.css`. Interiors
+follow it — Geist for UI text, Geist Mono for code, readouts and clocks, both as
+`--font-ui` / `--font-mono` from `styles.css` — and nest no frames of their own; a
+well (`--well`, rounded) marks an editable area instead of a border. The design
+these follow is the Claude Design canvas "hakase — modern redesign".
 
-`hks-sketch` exposes one slot, `status`, for the fps readout in its title bar.
+**Focus is part of a window's slot, not a stream of its own.** `Self.slot$` carries
+`{ frame, focused }` together, because a raise changes both; a `frame$` and a
+`focused$` combined in `liveProcess$` would be the two-paths-into-one-`combineLatest`
+bug, firing once with the stale half.
+
+`hks-sketch` exposes two slots, both laid over its canvas: `status` for the fps
+readout, top left, and `controls` for the parameter bar, bottom centre. Covering
+the drawing is harmless; that is why the bar may sit on it permanently. Draw mode
+is a three-way radio group, still real `<input type="radio">`s, so the keyboard and
+the `change` event behave as a native control.
+
+The formula editor has a line-number gutter. It is a third layer under the
+textarea, with the same font, line height and padding as the other two, and all
+three use `white-space: pre`: with wrapping on, a long line would take two rows
+and every number after it would sit one row too high. The gutter follows the
+textarea's `scrollTop` on the same `scroll` event the highlight does.
+
+**The navigator** (`hks-navigator`, bottom right, in the chrome slot) holds the zoom
+controls and a minimap. `minimapOf` in `navigator.ts` maps every window frame and
+the visible world rect into a fixed box with one uniform scale; the component only
+places those rects. The minimap is closed by default and its open state lives in
+the workspace fold (`toggle-minimap`), for the same reason as every panel that can
+cover a control.
 Slotted children stay in the light DOM, so `main.ts` still finds them with
 `requireElement` and their own shadow roots are untouched. Everything else is a
 window in its own right — a control that belongs to the sketch conceptually is
@@ -289,7 +314,7 @@ transformed by a `Camera` (`screen = world * zoom + (x, y)`); windows are
 appended as its light-DOM children, so the transform and the appearance's custom
 properties reach them, and a frame is in world units. Drag the background or
 wheel over it to pan, ctrl/cmd+wheel (a trackpad pinch sends the same) to zoom
-around the pointer, ctrl/cmd `=` `-` `0` from the keyboard, and the toolbar has
+around the pointer, ctrl/cmd `=` `-` `0` from the keyboard, and the navigator has
 zoom, reset and fit. A plain wheel over a window is left alone, so textareas
 still scroll. The dot grid is a CSS gradient whose size and offset follow the
 camera, coarsened in powers of two as you zoom out — there is no grid DOM.
@@ -540,7 +565,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Eighty-two of them survive in `src/` today, every one a single line. Treat that
+    Eighty-seven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

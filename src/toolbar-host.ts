@@ -23,7 +23,7 @@ export const toolbarHost$ = (
             kind === 'docked'
                 ? EMPTY
                 : defer(() => {
-                      const frame = new HksWindow().label('tools');
+                      const frame = new HksWindow().label('tools', null);
                       frame.slot = 'chrome';
                       toolbar.removeAttribute('slot');
                       frame.append(toolbar);
@@ -32,7 +32,7 @@ export const toolbarHost$ = (
                       const view$ = state$.pipe(
                           mergeMap((state): Observable<WindowView> =>
                               state.kind === 'floating'
-                                  ? of({ kind: 'fitted', frame: state.frame })
+                                  ? of({ kind: 'fitted', frame: state.frame, focused: false })
                                   : EMPTY,
                           ),
                       );

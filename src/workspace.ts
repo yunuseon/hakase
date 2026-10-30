@@ -12,13 +12,9 @@ import {
     type Camera,
     type Extent,
     type Point,
-} from './components/canvas/camera.ts';
-import {
-    isEdge,
-    type Edge,
-    type Placement,
-    type ZoomCommand,
-} from './components/toolbar/toolbar.ts';
+} from './shared/camera.ts';
+import type { ZoomCommand } from './components/navigator/navigator.ts';
+import { isEdge, type Edge, type Placement } from './components/toolbar/toolbar.ts';
 import {
     frameFrom,
     moved,
@@ -47,6 +43,7 @@ export type Workspace = {
     readonly launched: number;
     readonly camera: Camera;
     readonly toolbar: ToolbarState;
+    readonly minimap: boolean;
 };
 
 export type WorkspaceAction =
@@ -61,6 +58,7 @@ export type WorkspaceAction =
     | { readonly kind: 'zoom-step'; readonly command: ZoomCommand; readonly viewport: Extent }
     | { readonly kind: 'place-toolbar'; readonly placement: Placement }
     | { readonly kind: 'retract-toolbar' }
+    | { readonly kind: 'toggle-minimap' }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
     | (WindowGesture & { readonly id: ProcessId });
 
@@ -71,7 +69,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
     const gutter = 16;
     const left = 88;
     const editorWidth = Math.min(360, Math.round(width * 0.26));
-    const timelineHeight = 108;
+    const timelineHeight = 136;
     const dialSize = 200;
     const editorHeight = Math.max(320, height - timelineHeight - 3 * gutter);
     const sketchX = left + editorWidth + gutter;
@@ -114,6 +112,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
         launched: 4,
         camera: IDENTITY,
         toolbar: { kind: 'docked', edge: 'left', retracted: false },
+        minimap: false,
     };
 };
 
@@ -219,6 +218,8 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
                       toolbar: { ...workspace.toolbar, retracted: !workspace.toolbar.retracted },
                   }
                 : workspace;
+        case 'toggle-minimap':
+            return { ...workspace, minimap: !workspace.minimap };
         case 'toolbar-window':
             return { ...workspace, toolbar: toolbarGesture(workspace.toolbar, action.gesture) };
         case 'quit':
@@ -334,6 +335,8 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
     const stored = value.processes;
     const camera = cameraFrom(value.camera);
     const toolbar = toolbarFrom(value.toolbar);
+    // Optional: a workspace saved before the minimap existed still restores, closed.
+    const minimap = 'minimap' in value && value.minimap === true;
 
     if (launched === null || !Array.isArray(stored) || camera === null || toolbar === null) {
         return null;
@@ -350,5 +353,6 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         launched,
         camera,
         toolbar,
+        minimap,
     };
 };

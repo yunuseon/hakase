@@ -12,11 +12,11 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = `
     <div class="bar">
-        <span class="caption">formula</span>
         <select class="preset" aria-label="formula preset"></select>
     </div>
     <div class="editor">
         <pre class="highlight" aria-hidden="true"><code></code></pre>
+        <pre class="gutter" aria-hidden="true"></pre>
         <textarea
             class="source"
             spellcheck="false"
@@ -25,7 +25,11 @@ const TEMPLATE = `
             aria-label="formula source"
         ></textarea>
     </div>
-    <pre class="error" hidden></pre>
+    <div class="status" role="status" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 L10 17 L19 7"/></svg>
+        <span>Compiled</span>
+    </div>
+    <pre class="error" role="alert" hidden></pre>
 `;
 
 const grammar = Prism.languages['glsl'];
@@ -35,6 +39,9 @@ if (!grammar) {
 
 // Without the trailing newline the <pre> lays out one line short of the caret.
 const highlight = (source: string): string => Prism.highlight(`${source}\n`, grammar, 'glsl');
+
+const lineNumbers = (source: string): string =>
+    Array.from({ length: source.split('\n').length }, (_, index) => String(index + 1)).join('\n');
 
 export type PresetOption = {
     readonly value: string;
@@ -50,6 +57,8 @@ export class HksFormulaEditor extends HTMLElement {
     private readonly highlighted: HTMLElement;
     private readonly viewport: HTMLElement;
     private readonly error: HTMLElement;
+    private readonly status: HTMLElement;
+    private readonly gutter: HTMLElement;
     private readonly typed$: Observable<string>;
 
     constructor() {
@@ -64,6 +73,8 @@ export class HksFormulaEditor extends HTMLElement {
         this.viewport = requireChild(shadow, '.highlight');
         this.highlighted = requireChild(this.viewport, 'code');
         this.error = requireChild(shadow, '.error');
+        this.status = requireChild(shadow, '.status');
+        this.gutter = requireChild(shadow, '.gutter');
 
         this.typed$ = fromElementEvent$(this.source, 'input').pipe(map(() => this.source.value));
         this.changes$ = this.typed$.pipe(debounceTime(250), distinctUntilChanged());
@@ -101,16 +112,26 @@ export class HksFormulaEditor extends HTMLElement {
             }),
         );
 
+        const text$ = merge(applied$, this.typed$);
+
         return merge(
-            merge(applied$, this.typed$).pipe(
+            text$.pipe(
                 map(highlight),
                 tap(html => {
                     this.highlighted.innerHTML = html;
                 }),
             ),
+            text$.pipe(
+                map(lineNumbers),
+                distinctUntilChanged(),
+                tap(numbers => {
+                    this.gutter.textContent = numbers;
+                }),
+            ),
             fromElementEvent$(this.source, 'scroll').pipe(
                 tap(() => {
                     this.viewport.scrollTo(this.source.scrollLeft, this.source.scrollTop);
+                    this.gutter.scrollTop = this.source.scrollTop;
                 }),
             ),
             error$.pipe(
@@ -118,6 +139,7 @@ export class HksFormulaEditor extends HTMLElement {
                 tap(message => {
                     this.error.textContent = message ?? '';
                     this.error.hidden = message === null;
+                    this.status.hidden = message !== null;
                 }),
             ),
         ).pipe(map(() => undefined));

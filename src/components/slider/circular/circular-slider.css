@@ -10,7 +10,7 @@
     block-size: 100%;
     aspect-ratio: 1;
     align-self: center;
-    border: 1px solid var(--track);
+    border: 2px solid var(--edge);
     border-radius: 100%;
     box-sizing: border-box;
 }
@@ -19,9 +19,12 @@
     position: absolute;
     top: 0;
     left: 0;
-    block-size: 12px;
-    inline-size: 12px;
-    background: var(--accent);
+    block-size: 16px;
+    inline-size: 16px;
+    box-sizing: border-box;
+    background: var(--panel);
+    border: 3px solid var(--accent);
     border-radius: 100%;
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
     pointer-events: none;
 }

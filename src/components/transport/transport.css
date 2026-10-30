@@ -1,41 +1,52 @@
 :host {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
 }
 
 .key {
     display: flex;
     align-items: center;
     justify-content: center;
-    inline-size: 26px;
-    block-size: 22px;
+    inline-size: 36px;
+    block-size: 36px;
     padding: 0;
     color: var(--label);
     background: transparent;
     border: 1px solid var(--edge);
-    border-radius: 6px;
+    border-radius: 50%;
     cursor: pointer;
+}
+
+.key.toggle {
+    color: var(--panel);
+    background: var(--ink);
+    border-color: var(--ink);
 }
 
 .key:hover {
     color: var(--ink);
-    border-color: var(--track);
+    border-color: var(--rule);
+}
+
+.key.toggle:hover {
+    color: var(--panel);
+    background: color-mix(in srgb, var(--ink) 85%, var(--panel));
 }
 
 .key:active {
-    background: var(--edge);
+    transform: scale(0.96);
 }
 
 .key:focus-visible {
-    outline: 1px solid var(--ink);
-    outline-offset: 1px;
+    outline: 2px solid var(--highlight);
+    outline-offset: 2px;
 }
 
 .clock,
 .of,
 .unit {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: var(--label);
@@ -43,13 +54,15 @@
 }
 
 .clock {
-    margin-inline-start: 4px;
+    margin-inline-start: auto;
+    font-size: 13px;
+    color: var(--ink);
 }
 
 .duration {
     inline-size: 5ch;
     padding: 1px 3px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: var(--ink);

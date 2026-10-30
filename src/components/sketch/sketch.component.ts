@@ -10,8 +10,7 @@ import css from './sketch.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = `
-    <div class="viewport"><slot name="status"></slot></div>
-    <slot name="controls"></slot>
+    <div class="viewport"><slot name="status"></slot><slot name="controls"></slot></div>
 `;
 
 export class HksSketch extends HTMLElement {

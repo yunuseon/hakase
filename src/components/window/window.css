@@ -8,26 +8,57 @@
     min-block-size: 0;
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 12px;
+    border-radius: 14px;
     box-shadow:
         0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
         0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
-    font-family: system-ui, sans-serif;
+    transition: box-shadow 160ms ease;
+    font-family: var(--font-ui);
+}
+
+/* The frontmost window: a deeper shadow and a faint ring in the accent. */
+:host([data-focused]) {
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
+        0 24px 48px color-mix(in srgb, var(--shadow) 16%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .title {
     flex: none;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
-    block-size: 26px;
-    padding-inline: 12px 8px;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    color: var(--muted);
+    block-size: 36px;
+    padding-inline: 14px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--label);
     user-select: none;
     cursor: grab;
+}
+
+.glyph {
+    display: flex;
+}
+
+.glyph:empty {
+    display: none;
+}
+
+.glyph svg {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.name {
+    flex: 1;
+    text-transform: capitalize;
 }
 
 .title:active {
@@ -38,11 +69,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: 24px;
+    block-size: 24px;
     padding: 0;
-    color: var(--muted);
-    background: transparent;
+    color: var(--label);
+    background: var(--well);
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -145,5 +176,5 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 0 12px 12px;
+    padding: 0 8px 8px;
 }

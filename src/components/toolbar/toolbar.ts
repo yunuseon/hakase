@@ -9,13 +9,6 @@ export type Placement = Edge | 'float';
 export const isPlacement = (value: string): value is Placement =>
     value === 'float' || isEdge(value);
 
-export const ZOOM_COMMANDS = ['in', 'out', 'reset', 'fit'] as const;
-
-export type ZoomCommand = (typeof ZOOM_COMMANDS)[number];
-
-export const isZoomCommand = (value: string): value is ZoomCommand =>
-    ZOOM_COMMANDS.some(command => command === value);
-
 export type ToolbarView = {
     readonly placement: Placement;
     readonly retracted: boolean;

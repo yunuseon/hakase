@@ -21,6 +21,7 @@ export type WindowView = {
     // 'fitted' is sized by its content: the sketch's frame holds canvas dimensions.
     readonly kind: 'floating' | 'fitted';
     readonly frame: Frame;
+    readonly focused: boolean;
 };
 
 // Untagged: a window does not know which program it holds, so whoever mounts it names that.

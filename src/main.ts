@@ -1,4 +1,4 @@
-import { defer, EMPTY, merge, of, type Observable } from 'rxjs';
+import { combineLatest, defer, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -17,14 +17,15 @@ import './styles.css';
 import { variables, type Appearance } from './appearance.ts';
 import { persistAppearance$, restoreAppearance } from './appearance-store.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
-import { zoomLabel } from './components/canvas/camera.ts';
+import { zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
+import { HksNavigator } from './components/navigator/navigator.component.ts';
+import { minimapOf } from './components/navigator/navigator.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
-import type { Frame } from './components/window/frame.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
@@ -34,6 +35,7 @@ import {
     type ProcessId,
     type Program,
     type ProgramId,
+    type Slot,
     type Written,
 } from './program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
@@ -67,8 +69,13 @@ const programOf = (id: ProgramId): Program | undefined =>
 
 const faces = programs.map(({ id, title, icon }) => ({ id, title, icon }));
 
-const sameFrame = (a: Frame, b: Frame): boolean =>
-    a.x === b.x && a.y === b.y && a.z === b.z && a.width === b.width && a.height === b.height;
+const sameSlot = ({ frame: a, focused }: Slot, { frame: b, focused: other }: Slot): boolean =>
+    focused === other &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.z === b.z &&
+    a.width === b.width &&
+    a.height === b.height;
 
 const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
@@ -80,6 +87,10 @@ const bootstrap = () => {
     const toolbar = new HksToolbar().items(faces);
     toolbar.slot = 'chrome';
     canvas.append(toolbar);
+
+    const navigator = new HksNavigator();
+    navigator.slot = 'chrome';
+    canvas.append(navigator);
 
     const launches$ = toolbar.launches$.pipe(
         mergeMap(id => {
@@ -96,7 +107,7 @@ const bootstrap = () => {
         })),
     );
 
-    const zoomSteps$ = merge(toolbar.zooms$, canvas.keys$).pipe(
+    const zoomSteps$ = merge(navigator.zooms$, canvas.keys$).pipe(
         withLatestFrom(viewport$),
         map(([command, viewport]): WorkspaceAction => ({ kind: 'zoom-step', command, viewport })),
     );
@@ -106,6 +117,7 @@ const bootstrap = () => {
             map((placement): WorkspaceAction => ({ kind: 'place-toolbar', placement })),
         ),
         toolbar.retracts$.pipe(map((): WorkspaceAction => ({ kind: 'retract-toolbar' }))),
+        navigator.toggles$.pipe(map((): WorkspaceAction => ({ kind: 'toggle-minimap' }))),
         // defer: the toolbar's window is opened from the state this very fold produces.
         defer(() => toolbarGestures$).pipe(
             map((gesture): WorkspaceAction => ({ kind: 'toolbar-window', gesture })),
@@ -147,16 +159,21 @@ const bootstrap = () => {
         distinctUntilChanged(sameIds),
     );
 
-    const frame$ = (id: ProcessId): Observable<Frame> =>
+    const slot$ = (id: ProcessId): Observable<Slot> =>
         workspace$.pipe(
             mergeMap(({ processes }) => {
                 const index = processes.findIndex(process => process.id === id);
                 const process = processes[index];
 
                 // Depth is the position in the list, so raising is a reorder.
-                return process === undefined ? EMPTY : of({ ...process.frame, z: index + 1 });
+                return process === undefined
+                    ? EMPTY
+                    : of({
+                          frame: { ...process.frame, z: index + 1 },
+                          focused: index === processes.length - 1,
+                      });
             }),
-            distinctUntilChanged(sameFrame),
+            distinctUntilChanged(sameSlot),
         );
 
     const appeared$: Observable<Process> = workspace$.pipe(
@@ -176,7 +193,7 @@ const bootstrap = () => {
                 ? EMPTY
                 : liveProcess$(
                       program,
-                      { id: process.id, frame$: frame$(process.id) },
+                      { id: process.id, slot$: slot$(process.id) },
                       state,
                       canvas,
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
@@ -335,7 +352,20 @@ const bootstrap = () => {
                 map(({ value }) => variables(value)),
             ),
         ),
-        toolbar.connect$(runningPrograms$, camera$.pipe(map(zoomLabel)), toolbarView$),
+        toolbar.connect$(runningPrograms$, toolbarView$),
+        navigator.connect$(
+            combineLatest([workspace$, viewport$]).pipe(
+                map(([{ processes, camera }, viewport]) =>
+                    minimapOf(
+                        processes.map(({ frame }) => frame),
+                        camera,
+                        viewport,
+                    ),
+                ),
+            ),
+            camera$.pipe(map(zoomLabel)),
+            workspace$.pipe(map(({ minimap }) => minimap)),
+        ),
     ).subscribe();
 };
 

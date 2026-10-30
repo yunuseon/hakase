@@ -7,9 +7,11 @@ import { RESIZE_EDGES, type ResizeEdge, type WindowGesture, type WindowView } fr
 import css from './window.css?inline';
 
 const sheet = styleSheet(css);
+const SVG = 'http://www.w3.org/2000/svg';
 
 const TEMPLATE = `
     <div class="title">
+        <span class="glyph"></span>
         <span class="name"></span>
         <button class="close" type="button" aria-label="quit">
             <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -21,12 +23,13 @@ const TEMPLATE = `
 `;
 
 const sameView = (a: WindowView, b: WindowView): boolean =>
-    a.kind === b.kind && a.frame === b.frame;
+    a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
 
 export class HksWindow extends HTMLElement {
     readonly gestures$: Observable<WindowGesture>;
 
     private readonly name: HTMLElement;
+    private readonly glyph: HTMLElement;
 
     constructor() {
         super();
@@ -42,6 +45,7 @@ export class HksWindow extends HTMLElement {
         }
 
         this.name = requireChild(shadow, '.name');
+        this.glyph = requireChild(shadow, '.glyph');
 
         const resize = (edge: ResizeEdge) =>
             pointerDelta$(requireChild(shadow, `.handle--${edge}`)).pipe(
@@ -69,8 +73,24 @@ export class HksWindow extends HTMLElement {
         );
     }
 
-    label(title: string): this {
+    // An icon is path data on a 24x24 viewBox, built as nodes so it can never be markup.
+    label(title: string, icon: string | null): this {
         this.name.textContent = title;
+
+        if (icon === null) {
+            this.glyph.replaceChildren();
+
+            return this;
+        }
+
+        const svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+
+        const path = document.createElementNS(SVG, 'path');
+        path.setAttribute('d', icon);
+        svg.append(path);
+        this.glyph.replaceChildren(svg);
 
         return this;
     }
@@ -78,7 +98,8 @@ export class HksWindow extends HTMLElement {
     connect$(view$: Observable<WindowView>): Observable<void> {
         return view$.pipe(
             distinctUntilChanged(sameView),
-            tap(({ kind, frame }) => {
+            tap(({ kind, frame, focused }) => {
+                this.toggleAttribute('data-focused', focused);
                 this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
                 this.style.zIndex = frame.z.toFixed(0);
 

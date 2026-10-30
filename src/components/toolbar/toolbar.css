@@ -1,42 +1,44 @@
 :host {
-    --tab: 18px;
-    --inset: 12px;
+    --tab: 16px;
+    --inset: 16px;
 
     position: fixed;
     z-index: 100;
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-family: system-ui, sans-serif;
+    gap: 6px;
+    font-family: var(--font-ui);
     transition: translate 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .tray {
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 5px;
+    gap: 4px;
+    padding: 6px;
     color: var(--label);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 14px;
-    box-shadow: 0 6px 24px var(--shadow);
+    border-radius: 18px;
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
+        0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
     transition: opacity 180ms ease;
 }
 
 .group {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
 }
 
-.group + .group {
-    padding-inline-start: 5px;
-    margin-inline-start: 3px;
+.menu {
+    position: relative;
+    padding-inline-start: 6px;
+    margin-inline-start: 2px;
     border-inline-start: 1px solid var(--edge);
 }
 
-/* Vertical edges stack the tray: the separators turn with it. */
 :host([data-placement='left']),
 :host([data-placement='right']) {
     flex-direction: row;
@@ -49,13 +51,13 @@
     flex-direction: column;
 }
 
-:host([data-placement='left']) .group + .group,
-:host([data-placement='right']) .group + .group {
+:host([data-placement='left']) .menu,
+:host([data-placement='right']) .menu {
     padding-inline-start: 0;
     margin-inline-start: 0;
     border-inline-start: none;
-    padding-block-start: 5px;
-    margin-block-start: 3px;
+    padding-block-start: 6px;
+    margin-block-start: 2px;
     border-block-start: 1px solid var(--edge);
 }
 
@@ -130,23 +132,19 @@
     display: none;
 }
 
-.key,
-.readout {
+.key {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    block-size: 32px;
+    inline-size: 44px;
+    block-size: 44px;
     padding: 0;
     color: inherit;
     background: transparent;
     border: none;
-    border-radius: 9px;
+    border-radius: 12px;
     cursor: pointer;
-}
-
-.key {
-    position: relative;
-    inline-size: 32px;
     list-style: none;
 }
 
@@ -154,91 +152,97 @@
     display: none;
 }
 
-.readout {
-    min-inline-size: 44px;
-    padding-inline: 4px;
-    font:
-        11px/1 ui-monospace,
-        monospace;
-    font-variant-numeric: tabular-nums;
-}
-
 .key:hover,
-.readout:hover,
 .menu[open] > .key {
     color: var(--ink);
     background: var(--well);
 }
 
 .key:focus-visible,
-.readout:focus-visible,
+.choice:focus-visible,
 .tab:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }
 
 .tile.running {
-    color: var(--accent);
+    color: var(--ink);
+    background: var(--well);
 }
 
 .tile.running::after {
     content: '';
     position: absolute;
-    inset-block-end: 2px;
-    inline-size: 3px;
-    block-size: 3px;
+    inset-block-start: 6px;
+    inset-inline-end: 6px;
+    inline-size: 6px;
+    block-size: 6px;
     border-radius: 50%;
-    background: currentColor;
-}
-
-.menu {
-    position: relative;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--panel);
 }
 
 .places {
     position: absolute;
     z-index: 1;
-    display: grid;
-    grid-template-columns: repeat(5, 32px);
+    display: flex;
+    flex-direction: column;
     gap: 2px;
-    padding: 5px;
+    inline-size: 188px;
+    padding: 6px;
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 12px;
-    box-shadow: 0 6px 24px var(--shadow);
+    border-radius: 14px;
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
+        0 16px 40px color-mix(in srgb, var(--shadow) 16%, transparent);
 }
 
 :host([data-placement='left']) .places {
-    inset-inline-start: calc(100% + 10px);
-    inset-block-start: 0;
+    inset-inline-start: calc(100% + 12px);
+    inset-block-end: 0;
 }
 
 :host([data-placement='right']) .places {
-    inset-inline-end: calc(100% + 10px);
-    inset-block-start: 0;
+    inset-inline-end: calc(100% + 12px);
+    inset-block-end: 0;
 }
 
 :host([data-placement='top']) .places,
 :host([data-placement='float']) .places {
-    inset-block-start: calc(100% + 10px);
+    inset-block-start: calc(100% + 12px);
     inset-inline-end: 0;
 }
 
 :host([data-placement='bottom']) .places {
-    inset-block-end: calc(100% + 10px);
+    inset-block-end: calc(100% + 12px);
     inset-inline-end: 0;
 }
 
-.places .key[data-place] {
+.choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    block-size: 36px;
+    padding: 0 10px;
+    font: 500 13px var(--font-ui);
+    text-align: start;
     color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
 }
 
-:host([data-placement='top']) [data-place='top'],
-:host([data-placement='bottom']) [data-place='bottom'],
-:host([data-placement='left']) [data-place='left'],
-:host([data-placement='right']) [data-place='right'],
-:host([data-placement='float']) [data-place='float'] {
-    color: var(--accent);
+.choice:hover,
+.choice[aria-checked='true'] {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.choice svg {
+    inline-size: 16px;
+    block-size: 16px;
 }
 
 .tab {
@@ -248,10 +252,10 @@
     inline-size: var(--tab);
     block-size: 44px;
     padding: 0;
-    color: var(--muted);
+    color: var(--label);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 9px;
+    border-radius: 8px;
     cursor: pointer;
 }
 
@@ -260,6 +264,9 @@
 }
 
 .tab svg {
+    inline-size: 12px;
+    block-size: 12px;
+    stroke-width: 2;
     transition: rotate 220ms ease;
 }
 
@@ -269,18 +276,7 @@
     block-size: var(--tab);
 }
 
-:host([data-placement='right']) .tab svg {
-    rotate: 180deg;
-}
-
-:host([data-placement='top']) .tab svg {
-    rotate: 90deg;
-}
-
-:host([data-placement='bottom']) .tab svg {
-    rotate: -90deg;
-}
-
+:host([data-placement='right']) .tab svg,
 :host([data-retracted][data-placement='left']) .tab svg {
     rotate: 180deg;
 }
@@ -289,25 +285,22 @@
     rotate: 0deg;
 }
 
-:host([data-retracted][data-placement='top']) .tab svg {
-    rotate: -90deg;
-}
-
+:host([data-placement='top']) .tab svg,
 :host([data-retracted][data-placement='bottom']) .tab svg {
     rotate: 90deg;
 }
 
+:host([data-placement='bottom']) .tab svg,
+:host([data-retracted][data-placement='top']) .tab svg {
+    rotate: -90deg;
+}
+
 svg {
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: 20px;
+    block-size: 20px;
     fill: none;
     stroke: currentColor;
     stroke-width: 1.6;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-
-.tab svg {
-    inline-size: 14px;
-    block-size: 14px;
 }

@@ -1,4 +1,4 @@
-import type { Camera, Point } from './camera.ts';
+import type { Camera, Point } from '../../shared/camera.ts';
 
 export type Grid = {
     readonly size: number;
