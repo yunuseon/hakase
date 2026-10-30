@@ -1,0 +1,98 @@
+/* Zero-sized at the world origin: only labels and corners take the pointer, the ground stays grabbable.
+   No z-index and no transform on the host or a section: either would trap the labels under the windows. */
+:host {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 0;
+    block-size: 0;
+}
+
+.section {
+    position: absolute;
+    box-sizing: border-box;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0 0 0 18px;
+    border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: 22px;
+    background: color-mix(in srgb, var(--accent) 3%, transparent);
+    pointer-events: none;
+}
+
+.label {
+    position: relative;
+    z-index: 99999;
+    display: block;
+    padding: 0 8px;
+    font: 600 15px var(--font-ui);
+    color: color-mix(in srgb, var(--accent) 80%, var(--ink));
+    cursor: grab;
+    pointer-events: auto;
+    user-select: none;
+}
+
+.label:active {
+    cursor: grabbing;
+}
+
+.name {
+    /* As wide as the text, so the border's gap is even on both sides of the name. */
+    field-sizing: content;
+    min-inline-size: 1ch;
+    padding: 2px 0;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: inherit;
+}
+
+.name:not([readonly]) {
+    cursor: text;
+    border-block-end: 1px dashed currentColor;
+}
+
+.remove {
+    /* Out of the flow: the legend's width, and so the gap, is the name alone. */
+    position: absolute;
+    inset-inline-start: 100%;
+    inset-block-start: 50%;
+    translate: 0 -50%;
+    inline-size: 22px;
+    block-size: 22px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
+    color: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.label:hover .remove,
+.remove:focus-visible {
+    opacity: 0.8;
+}
+
+.remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.corner {
+    position: absolute;
+    z-index: 99999;
+    inset-block-end: -6px;
+    inset-inline-end: -6px;
+    inline-size: 18px;
+    block-size: 18px;
+    border-block-end: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    border-inline-end: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    border-end-end-radius: 12px;
+    cursor: nwse-resize;
+    pointer-events: auto;
+}

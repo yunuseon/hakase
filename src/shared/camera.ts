@@ -87,3 +87,58 @@ export const centredOn = (camera: Camera, rect: Rect, viewport: Extent): Camera 
 };
 
 export const zoomLabel = ({ zoom }: Camera): string => `${Math.round(zoom * 100)}%`;
+
+export type Flight = {
+    readonly duration: number;
+    readonly at: (t: number) => Camera;
+};
+
+const RHO = 1.5;
+const MS_PER_UNIT = 650;
+const MIN_FLIGHT_MS = 600;
+const MAX_FLIGHT_MS = 2600;
+
+export const flight = (from: Camera, to: Camera, viewport: Extent): Flight => {
+    const centre = centreOf(viewport);
+    const start = worldAt(from, centre);
+    const end = worldAt(to, centre);
+    const w0 = viewport.width / from.zoom;
+    const w1 = viewport.width / to.zoom;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const u1 = Math.hypot(dx, dy);
+
+    const cameraAt = (x: number, y: number, width: number): Camera => {
+        const zoom = clamp(viewport.width / width, MIN_ZOOM, MAX_ZOOM);
+
+        return { zoom, x: centre.x - x * zoom, y: centre.y - y * zoom };
+    };
+    const duration = (s: number): number => clamp(s * MS_PER_UNIT, MIN_FLIGHT_MS, MAX_FLIGHT_MS);
+
+    if (u1 < 1e-6) {
+        const s = Math.abs(Math.log(w1 / w0)) / RHO;
+
+        return {
+            duration: duration(s),
+            at: t => cameraAt(start.x, start.y, w0 * Math.pow(w1 / w0, t)),
+        };
+    }
+
+    const rho2 = RHO * RHO;
+    const b0 = (w1 * w1 - w0 * w0 + rho2 * rho2 * u1 * u1) / (2 * w0 * rho2 * u1);
+    const b1 = (w1 * w1 - w0 * w0 - rho2 * rho2 * u1 * u1) / (2 * w1 * rho2 * u1);
+    const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
+    const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+    const length = (r1 - r0) / RHO;
+
+    return {
+        duration: duration(length),
+        at: t => {
+            const s = t * length;
+            const u = (w0 / rho2) * (Math.cosh(r0) * Math.tanh(RHO * s + r0) - Math.sinh(r0));
+            const width = (w0 * Math.cosh(r0)) / Math.cosh(RHO * s + r0);
+
+            return cameraAt(start.x + (dx / u1) * u, start.y + (dy / u1) * u, width);
+        },
+    };
+};

@@ -12,8 +12,13 @@ const glyph = (d: string) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path 
 
 const TEMPLATE = `
     <div class="map" aria-hidden="true">
+        <div class="sections"></div>
         <div class="windows"></div>
         <div class="view"></div>
+    </div>
+    <div class="places" aria-label="sections">
+        <div class="list"></div>
+        <button class="add" type="button" data-add title="new section around the view">+ section</button>
     </div>
     <div class="row">
         <button class="key" type="button" data-zoom="out" aria-label="zoom out" title="zoom out">${glyph('M7 12 H17')}</button>
@@ -33,8 +38,12 @@ const place = (element: HTMLElement, { x, y, width, height }: Rect): void => {
 export class HksNavigator extends HTMLElement {
     readonly zooms$: Observable<ZoomCommand>;
     readonly toggles$: Observable<void>;
+    readonly jumps$: Observable<string>;
+    readonly adds$: Observable<void>;
 
     private readonly windows: HTMLElement;
+    private readonly outlines: HTMLElement;
+    private readonly list: HTMLElement;
     private readonly view: HTMLElement;
     private readonly readout: HTMLElement;
     private readonly toggle: HTMLElement;
@@ -47,6 +56,21 @@ export class HksNavigator extends HTMLElement {
         shadow.innerHTML = TEMPLATE;
 
         this.windows = requireChild(shadow, '.windows');
+        this.outlines = requireChild(shadow, '.sections');
+        this.list = requireChild(shadow, '.list');
+
+        this.jumps$ = fromElementEvent$(this.list, 'click').pipe(
+            mergeMap(event => {
+                const button =
+                    event.target instanceof Element ? event.target.closest('[data-jump]') : null;
+                const id = button instanceof HTMLElement ? button.dataset['jump'] : undefined;
+
+                return id === undefined ? EMPTY : of(id);
+            }),
+        );
+        this.adds$ = fromElementEvent$(requireChild(shadow, '.add'), 'click').pipe(
+            map(() => undefined),
+        );
         this.view = requireChild(shadow, '.view');
         this.readout = requireChild(shadow, '.readout');
         this.toggle = requireChild(shadow, '.toggle');
@@ -72,7 +96,29 @@ export class HksNavigator extends HTMLElement {
         return merge(
             map$.pipe(
                 distinctUntilChanged(sameMiniMap),
-                tap(({ windows, view }) => {
+                tap(({ windows, sections, view }) => {
+                    this.outlines.replaceChildren(
+                        ...sections.map(({ name, rect }) => {
+                            const outline = document.createElement('span');
+                            outline.textContent = name;
+                            place(outline, rect);
+
+                            return outline;
+                        }),
+                    );
+                    this.list.replaceChildren(
+                        ...sections.map(({ id, name }) => {
+                            const jump = document.createElement('button');
+                            jump.type = 'button';
+                            jump.className = 'jump';
+                            jump.dataset['jump'] = id;
+                            jump.textContent = name;
+                            jump.title = `fly to ${name}`;
+
+                            return jump;
+                        }),
+                    );
+
                     while (this.windows.children.length < windows.length) {
                         this.windows.append(document.createElement('span'));
                     }

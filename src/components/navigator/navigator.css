@@ -32,6 +32,67 @@
     display: block;
 }
 
+.sections span {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 1px 3px;
+    font: 600 8px/1 var(--font-ui);
+    white-space: nowrap;
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+    border-radius: 4px;
+}
+
+.places {
+    display: none;
+    flex-wrap: wrap;
+    gap: 4px;
+    inline-size: 216px;
+}
+
+:host([data-open]) .places {
+    display: flex;
+}
+
+.list {
+    display: contents;
+}
+
+.jump,
+.add {
+    padding: 4px 9px;
+    font: 500 12px var(--font-ui);
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.jump:hover {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.add {
+    color: var(--muted);
+    background: transparent;
+    border-color: var(--edge);
+}
+
+.add:hover {
+    color: var(--ink);
+}
+
+.jump:focus-visible,
+.add:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
 .windows span,
 .view {
     position: absolute;

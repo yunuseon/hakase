@@ -1,4 +1,4 @@
-import { combineLatest, defer, EMPTY, merge, of, type Observable } from 'rxjs';
+import { animationFrames, combineLatest, defer, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -11,16 +11,19 @@ import {
     startWith,
     switchMap,
     takeUntil,
+    takeWhile,
     withLatestFrom,
 } from 'rxjs/operators';
 import './styles.css';
 import { variables, type Appearance } from './appearance.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
-import { zoomLabel } from './shared/camera.ts';
+import { fitted, flight, zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
 import { HksSeams } from './components/seams/seams.component.ts';
+import { HksSections } from './components/sections/sections.component.ts';
+import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
@@ -59,6 +62,7 @@ import {
     defaultWorkspace,
     listed,
     seamsOf,
+    sectionAction,
     reduceWorkspace,
     type Process,
     type Workspace,
@@ -107,6 +111,9 @@ const bootstrap = () => {
     const seams = new HksSeams();
     canvas.append(seams);
 
+    const sections = new HksSections();
+    canvas.append(sections);
+
     const launches$ = toolbar.launches$.pipe(
         mergeMap(id => {
             const program = isProgramId(id) ? programOf(id) : undefined;
@@ -134,6 +141,13 @@ const bootstrap = () => {
         ),
         toolbar.retracts$.pipe(map((): WorkspaceAction => ({ kind: 'retract-toolbar' }))),
         navigator.toggles$.pipe(map((): WorkspaceAction => ({ kind: 'toggle-minimap' }))),
+        navigator.adds$.pipe(
+            withLatestFrom(viewport$),
+            map(([, viewport]): WorkspaceAction => ({ kind: 'add-section', viewport })),
+        ),
+        sections.gestures$.pipe(map(sectionAction)),
+        // defer: a flight starts from the camera this very fold holds.
+        defer(() => flights$),
         // defer: the toolbar's window is opened from the state this very fold produces.
         defer(() => toolbarGestures$).pipe(
             map((gesture): WorkspaceAction => ({ kind: 'toolbar-window', gesture })),
@@ -168,6 +182,28 @@ const bootstrap = () => {
         // Emitted into the replay buffer before the processes start and read it back.
         startWith(seed),
         shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    const interrupted$ = merge(canvas.gestures$, zoomSteps$);
+
+    const flights$: Observable<WorkspaceAction> = navigator.jumps$.pipe(
+        withLatestFrom(workspace$, viewport$),
+        mergeMap(([id, { sections: all, camera }, viewport]) => {
+            const section = all.find(candidate => candidate.id === id);
+
+            return section === undefined
+                ? EMPTY
+                : of(flight(camera, fitted([section.rect], viewport), viewport));
+        }),
+        switchMap(path =>
+            animationFrames().pipe(
+                map(({ elapsed }) => Math.min(elapsed / path.duration, 1)),
+                takeWhile(t => t < 1, true),
+                map(t => path.at(t * t * (3 - 2 * t))),
+                takeUntil(interrupted$),
+            ),
+        ),
+        map((camera): WorkspaceAction => ({ kind: 'set-camera', camera })),
     );
 
     const camera$ = workspace$.pipe(
@@ -448,10 +484,17 @@ const bootstrap = () => {
         ),
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
+        sections.connect$(
+            workspace$.pipe(
+                map(({ sections: all }) =>
+                    all.map(({ id, name, rect }): SectionView => ({ id, name, ...rect })),
+                ),
+            ),
+        ),
         navigator.connect$(
             combineLatest([workspace$, viewport$]).pipe(
-                map(([{ processes, camera }, viewport]) =>
-                    minimapOf(processes.map(boxOf), camera, viewport),
+                map(([{ processes, sections: all, camera }, viewport]) =>
+                    minimapOf(processes.map(boxOf), all, camera, viewport),
                 ),
             ),
             camera$.pipe(map(zoomLabel)),

@@ -12,19 +12,31 @@ export const MINIMAP: Extent = { width: 216, height: 120 };
 const PADDING = 0.08;
 
 // Pixel rects inside MINIMAP, in the order given: the last one is the frontmost window.
+export type Landmark = {
+    readonly id: string;
+    readonly name: string;
+    readonly rect: Rect;
+};
+
 export type MiniMap = {
     readonly windows: readonly Rect[];
+    readonly sections: readonly Landmark[];
     readonly view: Rect;
 };
 
-export const minimapOf = (windows: readonly Rect[], camera: Camera, viewport: Extent): MiniMap => {
+export const minimapOf = (
+    windows: readonly Rect[],
+    sections: readonly Landmark[],
+    camera: Camera,
+    viewport: Extent,
+): MiniMap => {
     const corner = worldAt(camera, { x: 0, y: 0 });
     const view: Rect = {
         ...corner,
         width: viewport.width / camera.zoom,
         height: viewport.height / camera.zoom,
     };
-    const all = [...windows, view];
+    const all = [...windows, ...sections.map(({ rect }) => rect), view];
 
     const left = Math.min(...all.map(({ x }) => x));
     const top = Math.min(...all.map(({ y }) => y));
@@ -42,14 +54,32 @@ export const minimapOf = (windows: readonly Rect[], camera: Camera, viewport: Ex
         height: Math.max(2, Math.round(rect.height * scale)),
     });
 
-    return { windows: windows.map(place), view: place(view) };
+    return {
+        windows: windows.map(place),
+        sections: sections.map(section => ({ ...section, rect: place(section.rect) })),
+        view: place(view),
+    };
 };
 
 const sameRect = (a: Rect, b: Rect): boolean =>
     a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
+const sameLandmarks = (a: readonly Landmark[], b: readonly Landmark[]): boolean =>
+    a.length === b.length &&
+    a.every((landmark, index) => {
+        const other = b[index];
+
+        return (
+            other !== undefined &&
+            landmark.id === other.id &&
+            landmark.name === other.name &&
+            sameRect(landmark.rect, other.rect)
+        );
+    });
+
 export const sameMiniMap = (a: MiniMap, b: MiniMap): boolean =>
     sameRect(a.view, b.view) &&
+    sameLandmarks(a.sections, b.sections) &&
     a.windows.length === b.windows.length &&
     a.windows.every((rect, index) => {
         const other = b.windows[index];

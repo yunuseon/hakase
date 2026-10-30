@@ -17,6 +17,7 @@ import {
 } from './shared/camera.ts';
 import type { ZoomCommand } from './components/navigator/navigator.ts';
 import type { SeamView } from './components/seams/seams.ts';
+import type { SectionGesture } from './components/sections/sections.ts';
 import { isEdge, type Edge, type Placement } from './components/toolbar/toolbar.ts';
 import {
     frameFrom,
@@ -29,6 +30,12 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
+
+export type Section = {
+    readonly id: string;
+    readonly name: string;
+    readonly rect: Rect;
+};
 
 export type Process = {
     readonly id: ProcessId;
@@ -61,6 +68,7 @@ export type Workspace = {
     readonly camera: Camera;
     readonly toolbar: ToolbarState;
     readonly minimap: boolean;
+    readonly sections: readonly Section[];
     readonly links: readonly Link[];
     readonly drift: Drift | null;
 };
@@ -78,6 +86,22 @@ export type WorkspaceAction =
     | { readonly kind: 'place-toolbar'; readonly placement: Placement }
     | { readonly kind: 'retract-toolbar' }
     | { readonly kind: 'toggle-minimap' }
+    | { readonly kind: 'set-camera'; readonly camera: Camera }
+    | { readonly kind: 'add-section'; readonly viewport: Extent }
+    | {
+          readonly kind: 'move-section';
+          readonly id: string;
+          readonly dx: number;
+          readonly dy: number;
+      }
+    | {
+          readonly kind: 'resize-section';
+          readonly id: string;
+          readonly dx: number;
+          readonly dy: number;
+      }
+    | { readonly kind: 'rename-section'; readonly id: string; readonly name: string }
+    | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
@@ -142,6 +166,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
         camera: IDENTITY,
         toolbar: { kind: 'docked', edge: 'left', retracted: false },
         minimap: false,
+        sections: [],
         links: [],
         drift: null,
     };
@@ -413,6 +438,52 @@ const resizedToNeighbours = (
     };
 };
 
+const SECTION_INSET = 0.12;
+const MIN_SECTION = 160;
+
+export const visibleWorld = (camera: Camera, viewport: Extent): Rect => ({
+    ...worldAt(camera, { x: 0, y: 0 }),
+    width: viewport.width / camera.zoom,
+    height: viewport.height / camera.zoom,
+});
+
+const contains = (rect: Rect, x: number, y: number): boolean =>
+    x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+
+export const holds = (section: Section, process: Process): boolean => {
+    const box = boxOf(process);
+
+    return contains(section.rect, box.x + box.width / 2, box.y + box.height / 2);
+};
+
+const withSection = (
+    workspace: Workspace,
+    id: string,
+    next: (section: Section) => Section,
+): Workspace => ({
+    ...workspace,
+    sections: workspace.sections.map(section => (section.id === id ? next(section) : section)),
+});
+
+// Measured before moving: a member is whatever sat inside when the drag step began.
+const movedSection = (workspace: Workspace, id: string, dx: number, dy: number): Workspace => {
+    const section = workspace.sections.find(candidate => candidate.id === id);
+
+    if (section === undefined) {
+        return workspace;
+    }
+
+    return {
+        ...withSection(workspace, id, current => ({
+            ...current,
+            rect: { ...current.rect, x: current.rect.x + dx, y: current.rect.y + dy },
+        })),
+        processes: workspace.processes.map(process =>
+            holds(section, process) ? { ...process, frame: moved(process.frame, dx, dy) } : process,
+        ),
+    };
+};
+
 const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
     switch (action.kind) {
         case 'launch': {
@@ -457,6 +528,65 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                       toolbar: { ...workspace.toolbar, retracted: !workspace.toolbar.retracted },
                   }
                 : workspace;
+        case 'set-camera':
+            return { ...workspace, camera: action.camera };
+        case 'add-section': {
+            const launched = workspace.launched + 1;
+            const view = visibleWorld(workspace.camera, action.viewport);
+            const inset = Math.min(view.width, view.height) * SECTION_INSET;
+
+            return {
+                ...workspace,
+                launched,
+                sections: [
+                    ...workspace.sections,
+                    {
+                        id: `section-${launched}`,
+                        name: `Section ${workspace.sections.length + 1}`,
+                        rect: {
+                            x: Math.round(view.x + inset),
+                            y: Math.round(view.y + inset),
+                            width: Math.round(view.width - 2 * inset),
+                            height: Math.round(view.height - 2 * inset),
+                        },
+                    },
+                ],
+            };
+        }
+        case 'move-section':
+            return movedSection(
+                workspace,
+                action.id,
+                action.dx / workspace.camera.zoom,
+                action.dy / workspace.camera.zoom,
+            );
+        case 'resize-section':
+            return withSection(workspace, action.id, section => ({
+                ...section,
+                rect: {
+                    ...section.rect,
+                    width: Math.max(
+                        MIN_SECTION,
+                        section.rect.width + action.dx / workspace.camera.zoom,
+                    ),
+                    height: Math.max(
+                        MIN_SECTION,
+                        section.rect.height + action.dy / workspace.camera.zoom,
+                    ),
+                },
+            }));
+        case 'rename-section': {
+            const name = action.name.trim();
+
+            return name === ''
+                ? workspace
+                : withSection(workspace, action.id, section => ({ ...section, name }));
+        }
+        case 'remove-section':
+            return {
+                ...workspace,
+                sections: workspace.sections.filter(({ id }) => id !== action.id),
+            };
         case 'toggle-minimap':
             return { ...workspace, minimap: !workspace.minimap };
         case 'toolbar-window':
@@ -515,6 +645,19 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 action.dy / zoom,
             );
         }
+    }
+};
+
+export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
+    switch (gesture.kind) {
+        case 'move':
+            return { kind: 'move-section', id: gesture.id, dx: gesture.dx, dy: gesture.dy };
+        case 'resize':
+            return { kind: 'resize-section', id: gesture.id, dx: gesture.dx, dy: gesture.dy };
+        case 'rename':
+            return { kind: 'rename-section', id: gesture.id, name: gesture.name };
+        case 'remove':
+            return { kind: 'remove-section', id: gesture.id };
     }
 };
 
@@ -619,6 +762,23 @@ const linkFrom = (value: unknown): Link[] =>
         ? [{ a: value.a, b: value.b }]
         : [];
 
+const sectionFrom = (value: unknown): Section[] => {
+    if (
+        typeof value !== 'object' ||
+        value === null ||
+        !('id' in value && 'name' in value && 'rect' in value)
+    ) {
+        return [];
+    }
+
+    const { id, name, rect } = value;
+    const frame = frameFrom(typeof rect === 'object' && rect !== null ? { z: 0, ...rect } : null);
+
+    return typeof id === 'string' && typeof name === 'string' && frame !== null
+        ? [{ id, name, rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height } }]
+        : [];
+};
+
 export const parseWorkspace = (value: unknown): Workspace | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
@@ -634,6 +794,10 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
     const toolbar = toolbarFrom(value.toolbar);
     // Optional: a workspace saved before the minimap existed still restores, closed.
     const minimap = 'minimap' in value && value.minimap === true;
+    const sections =
+        'sections' in value && Array.isArray(value.sections)
+            ? value.sections.flatMap(sectionFrom)
+            : [];
 
     if (launched === null || !Array.isArray(stored) || camera === null || toolbar === null) {
         return null;
@@ -655,6 +819,7 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         camera,
         toolbar,
         minimap,
+        sections,
         links: links.filter(link => touching(kept, link)),
         drift: null,
     };

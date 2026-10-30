@@ -489,6 +489,44 @@ removes it before inserting. The gesture ends on the document, filtered by
 There is no keyboard reorder yet: the list is rebuilt on every change, so a
 focused grip would lose focus after one step.
 
+**Sections are named borders on the canvas**, for grouping programs by place.
+They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
+and a world `Rect`. **Which windows a section holds is derived, never stored**:
+`holds` asks whether a window's middle lies inside, so dropping a window into a
+section or dragging it out needs no bookkeeping. Dragging a section's label
+moves it and everything it holds in one reducer step (members measured before
+the step); its corner resizes it; double-clicking the name renames it; the ×
+deletes the section and leaves its windows where they are. **+ section** in the
+navigator frames the current view.
+
+`hks-sections` draws them in the world layer, under the windows, and only labels
+and corners take the pointer, so the inside of a section is still ground you can
+pan. Two traps in its CSS: the host and the sections set **no `z-index` and no
+`transform`** — either creates a stacking context, and the labels (which do set
+a high `z-index`) would be trapped under the windows. That is why sections are
+placed with `left`/`top`. And they are updated in place by id, never re-inserted:
+moving a node drops the focus of a name being typed.
+
+The name floats in a gap in the top border, with nothing painted behind it. That
+gap is a real `<fieldset>` and `<legend>`: the browser opens the border around
+the legend, which no background patch could do over the dotted ground. The gap is
+exactly the legend's width, so only the name may set it: the input sizes to its
+text with `field-sizing: content`, and the × is positioned out of the flow
+beside it, or the gap grows lopsided on the × side. The
+rename is read from `change`, and **`change` is not a composed event**, so it
+never leaves the shadow root — it is listened for on an inner `.layer`, not on
+the host where `click`, `dblclick` and the pointer events (all composed) arrive.
+
+**Jumping to a section flies the camera there.** The navigator, with its map
+open, lists the sections; clicking one emits a jump, and `main.ts` turns it into
+a stream of `set-camera` actions. `flight()` in `shared/camera.ts` is van Wijk
+and Nuij's smooth zoom-and-pan: one curve that pulls back, travels and closes in,
+pulling back further the further it goes (`RHO`), with a duration that grows
+with the distance. `animationFrames()` drives it through `switchMap`, so a
+second jump replaces the first, and `takeUntil` any pan, zoom or key ends it, so
+the user can always take the camera back. A flight reads the camera from the
+fold it feeds, so it enters through a `defer` like the toolbar's gestures.
+
 **The navigator** (`hks-navigator`, bottom right, in the chrome slot) holds the zoom
 controls and a minimap. `minimapOf` in `navigator.ts` maps every window frame and
 the visible world rect into a fixed box with one uniform scale; the component only
@@ -809,7 +847,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    One hundred and eleven of them survive in `src/` today, every one a single line. Treat that
+    One hundred and eighteen of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
