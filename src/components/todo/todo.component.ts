@@ -36,11 +36,12 @@ const itemOf = ({ id, text, done }: Todo): HTMLElement => {
     item.dataset['id'] = id;
     item.toggleAttribute('data-done', done);
 
-    const grip = document.createElement('span');
+    const grip = document.createElement('button');
+    grip.type = 'button';
     grip.className = 'grip';
     grip.dataset['grip'] = id;
-    grip.title = 'drag to reorder';
-    grip.setAttribute('aria-hidden', 'true');
+    grip.title = 'drag, or focus and press ↑ ↓, to reorder';
+    grip.setAttribute('aria-label', `move "${text}"; arrow keys reorder`);
 
     const check = document.createElement('input');
     check.type = 'checkbox';
@@ -77,6 +78,7 @@ export class HksTodo extends HTMLElement {
     readonly commands$: Observable<TodoCommand>;
 
     private readonly drags$: Observable<Drag>;
+    private readonly shadow: ShadowRoot;
     private readonly form: HTMLFormElement;
     private readonly submitted$: Observable<string>;
     private readonly items: HTMLElement;
@@ -87,6 +89,7 @@ export class HksTodo extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
+        this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
@@ -156,6 +159,24 @@ export class HksTodo extends HTMLElement {
 
         this.commands$ = merge(
             this.submitted$.pipe(map((text): TodoCommand => ({ kind: 'add', text }))),
+            fromElementEvent$(this.items, 'keydown').pipe(
+                mergeMap((event): Observable<TodoCommand> => {
+                    const id = dataOf(event.target, 'grip');
+                    const step = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+
+                    if (id === undefined || step === 0) {
+                        return EMPTY;
+                    }
+
+                    // Handled here: the canvas would otherwise read the same arrow as a section step.
+                    event.preventDefault();
+                    const index = [...this.items.children].findIndex(
+                        row => row instanceof HTMLElement && row.dataset['id'] === id,
+                    );
+
+                    return index < 0 ? EMPTY : of({ kind: 'move', id, to: index + step });
+                }),
+            ),
             this.drags$.pipe(
                 mergeMap(({ id, to, phase }): Observable<TodoCommand> =>
                     phase === 'dropped' ? of({ kind: 'move', id, to }) : EMPTY,
@@ -186,7 +207,20 @@ export class HksTodo extends HTMLElement {
             todos$.pipe(
                 distinctUntilChanged(sameTodos),
                 tap(todos => {
+                    // Rebuilding drops focus, so a grip moved by the keyboard is focused again afterwards.
+                    const focused = dataOf(this.shadow.activeElement, 'grip');
                     this.items.replaceChildren(...todos.map(itemOf));
+
+                    if (focused !== undefined) {
+                        const grip = this.items.querySelector(
+                            `[data-grip="${CSS.escape(focused)}"]`,
+                        );
+
+                        if (grip instanceof HTMLElement) {
+                            grip.focus();
+                        }
+                    }
+
                     const open = todos.filter(({ done }) => !done).length;
                     this.left.textContent = open === 1 ? '1 left' : `${open} left`;
                     this.clear.disabled = todos.every(({ done }) => !done);
@@ -212,7 +246,14 @@ export class HksTodo extends HTMLElement {
                     }
 
                     const others = rows.filter(row => row.dataset['id'] !== id);
-                    rows.find(row => row.dataset['id'] === id)?.setAttribute('data-dragging', '');
+                    const dragged = rows.find(row => row.dataset['id'] === id);
+                    dragged?.setAttribute('data-dragging', '');
+                    const grip = dragged?.querySelector('.grip');
+
+                    // The press is preventDefaulted, which also cancels the focus a click would give the grip.
+                    if (grip instanceof HTMLElement && grip !== this.shadow.activeElement) {
+                        grip.focus();
+                    }
                     (others[to] ?? others.at(-1))?.setAttribute(
                         to < others.length ? 'data-drop-before' : 'data-drop-after',
                         '',

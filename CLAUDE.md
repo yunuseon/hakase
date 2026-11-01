@@ -548,8 +548,12 @@ counts how many of the _other_ rows sit above the pointer. That is why `to`
 counts positions in the list without the moved item, and why `reduceTodos`
 removes it before inserting. The gesture ends on the document, filtered by
 `pointerId`, for the same reason the window's do; a cancel moves nothing.
-There is no keyboard reorder yet: the list is rebuilt on every change, so a
-focused grip would lose focus after one step.
+The grip is a `<button>`, so it is focusable, and ↑/↓ on it move the row one
+place. The list is rebuilt on every change, so `connect$` reads which grip had
+focus before `replaceChildren` and focuses its replacement after. The keydown is
+`preventDefault`ed because the canvas reads unmodified arrows as section steps
+and skips any key already handled — that `defaultPrevented` check is the whole
+contract between them.
 
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
@@ -964,7 +968,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    One hundred and eighteen of them survive in `src/` today, every one a single line. Treat that
+    One hundred and sixty-six of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
