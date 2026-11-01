@@ -12,6 +12,7 @@ import {
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
 import { defaultBoard, parseBoard, type Board } from './components/board/board.ts';
 import { emptyNotes, parseNotes, type Notes } from './components/note/note.ts';
+import { initialFocus, parseFocus, type Focus } from './components/focus/focus.ts';
 import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
@@ -41,6 +42,7 @@ export type Snapshot = {
     readonly todos: TodoList;
     readonly board: Board;
     readonly notes: Notes;
+    readonly focus: Focus;
     readonly library: Library;
 };
 
@@ -111,6 +113,7 @@ const fresh: Restored = {
     todos: emptyTodos,
     board: defaultBoard,
     notes: emptyNotes,
+    focus: initialFocus,
     library: emptyLibrary,
 };
 
@@ -145,6 +148,7 @@ export const restoreState = (): Restored => {
         todos: parseTodos(field(stored, 'todos')),
         board: parseBoard(field(stored, 'board')),
         notes: parseNotes(field(stored, 'notes')),
+        focus: parseFocus(field(stored, 'focus')),
         library: parseLibrary(field(stored, 'library')),
     };
 };
@@ -166,6 +170,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         todos: snapshot.todos,
         board: snapshot.board,
         notes: snapshot.notes,
+        focus: snapshot.focus,
         library: snapshot.library,
     };
 };

@@ -33,6 +33,8 @@ import { sharedFormulas$ } from './share.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { reduceBoard } from './components/board/board.ts';
 import { reduceNotes } from './components/note/note.ts';
+import { createFocus$, type Focus } from './components/focus/focus.ts';
+import { chime$ } from './chime.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -58,6 +60,7 @@ import { tasksProgram } from './programs/tasks.program.ts';
 import { todoProgram } from './programs/todo.program.ts';
 import { boardProgram } from './programs/board.program.ts';
 import { noteProgram } from './programs/note.program.ts';
+import { focusProgram } from './programs/focus.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -88,6 +91,7 @@ const programs: readonly Program[] = [
     todoProgram,
     boardProgram,
     noteProgram,
+    focusProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -374,6 +378,17 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const focus$ = createFocus$(
+        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'focus' ? of(input.command) : EMPTY))),
+        stored.focus,
+    );
+
+    // Like the playhead: storage keeps where the timer last stood still, or the debounce never settles.
+    const focusRested$ = focus$.pipe(
+        scan((kept: Focus, now) => (now.running ? kept : now), stored.focus),
+        distinctUntilChanged(),
+    );
+
     const library$ = merge(
         inputs$.pipe(
             mergeMap(({ input }) => (input.kind === 'library' ? of(input.command) : EMPTY)),
@@ -521,6 +536,7 @@ const bootstrap = () => {
         todos$: todos$.pipe(map(({ items }) => items)),
         board$,
         notes$,
+        focus$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -557,6 +573,7 @@ const bootstrap = () => {
     );
 
     return merge(
+        chime$(focus$),
         persistState$(
             combineLatest({
                 workspace: workspace$,
@@ -570,6 +587,7 @@ const bootstrap = () => {
                 todos: todos$,
                 board: board$,
                 notes: notes$,
+                focus: focusRested$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({

@@ -641,6 +641,19 @@ textarea holds and is written only when it differs: that is what keeps the caret
 still, without the formula editor's `from` fold. Delete asks first: one click
 arms it for three seconds, a second deletes, both read from one shared `scan`.
 
+**The focus timer is one clock for the whole app**, like the playhead:
+`createFocus$` folds `toggle`, `reset`, `skip` and `length` commands with
+`reduceFocus`, and every focus window reads it back, so two windows show one
+timer and closing them does not stop it (`refCount: false`). It reads itself
+through a `defer` to gate its ticks, as the transport does, and for the same
+reason: a phase that runs out pauses on the next one. The ticks are an
+`interval` of wall-clock deltas, **not `animationFrames()`**, which stop in a
+hidden tab and would freeze the timer exactly when it is not being watched.
+`completed` counts phases that ran out by themselves, so `chime$` (in
+`src/chime.ts`, beside `persistState$`, with the one `tap` that plays it) rings
+for those and not for a skip. It is saved where it last stood still, like the
+playhead, and never restored running.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1222,7 +1235,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and thirty-eight of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and forty-four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
