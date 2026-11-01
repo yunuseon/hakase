@@ -397,6 +397,41 @@ const movedGroup = (workspace: Workspace, id: ProcessId, dx: number, dy: number)
     };
 };
 
+type Side = 'n' | 'e' | 's' | 'w';
+
+// Which side of `box` the other window is attached to, judged as seams are.
+const sideOf = (box: Rect, other: Rect): Side | null => {
+    const rows = overlap(box.y, box.y + box.height, other.y, other.y + other.height);
+    const columns = overlap(box.x, box.x + box.width, other.x, other.x + other.width);
+
+    if (rows > 0 && Math.abs(box.x + box.width - other.x) <= TOUCHING) {
+        return 'e';
+    }
+
+    if (rows > 0 && Math.abs(other.x + other.width - box.x) <= TOUCHING) {
+        return 'w';
+    }
+
+    if (columns > 0 && Math.abs(box.y + box.height - other.y) <= TOUCHING) {
+        return 's';
+    }
+
+    return columns > 0 && Math.abs(other.y + other.height - box.y) <= TOUCHING ? 'n' : null;
+};
+
+const shiftOf = (side: Side, before: Rect, after: Rect): Point => {
+    switch (side) {
+        case 'e':
+            return { x: after.x + after.width - (before.x + before.width), y: 0 };
+        case 'w':
+            return { x: after.x - before.x, y: 0 };
+        case 's':
+            return { x: 0, y: after.y + after.height - (before.y + before.height) };
+        case 'n':
+            return { x: 0, y: after.y - before.y };
+    }
+};
+
 const resizedToNeighbours = (
     workspace: Workspace,
     id: ProcessId,
@@ -416,9 +451,17 @@ const resizedToNeighbours = (
     const y = dy + drift.y;
     const box = boxOf(process);
     const reach = SNAP_REACH / workspace.camera.zoom;
-    const neighbours = workspace.links
+    const partners = workspace.links
         .flatMap(({ a, b }) => (a === id ? [b] : b === id ? [a] : []))
-        .flatMap(other => workspace.processes.filter(candidate => candidate.id === other))
+        .flatMap(other => workspace.processes.filter(candidate => candidate.id === other));
+    // Attached on a side being resized: carried with the edge rather than snapped to, or the edge could never push.
+    const carried = partners.flatMap(partner => {
+        const side = sideOf(box, boxOf(partner));
+
+        return side !== null && edge.includes(side) ? [{ partner, side }] : [];
+    });
+    const neighbours = partners
+        .filter(partner => !carried.some(({ partner: other }) => other.id === partner.id))
         .map(boxOf);
 
     const edgeX = edge.includes('e')
@@ -454,12 +497,33 @@ const resizedToNeighbours = (
         height: process.measured.height + frame.height - process.frame.height,
     };
 
+    const after: Rect = { x: frame.x, y: frame.y, width: measured.width, height: measured.height };
+    // Linked onward from a carried window, but not back through this one, everything moves with it.
+    const others = workspace.links.filter(({ a, b }) => a !== id && b !== id);
+    const shifts = carried.reduce<ReadonlyMap<ProcessId, Point>>((all, { partner, side }) => {
+        const shift = shiftOf(side, box, after);
+
+        return [...groupOf(others, partner.id)].reduce((next, member) => {
+            const before = next.get(member) ?? { x: 0, y: 0 };
+
+            return member === id
+                ? next
+                : new Map(next).set(member, { x: before.x + shift.x, y: before.y + shift.y });
+        }, all);
+    }, new Map());
+
     return {
         ...workspace,
         drift: { id, x: -snap.x, y: -snap.y },
-        processes: workspace.processes.map(candidate =>
-            candidate.id === id ? { ...candidate, frame, measured } : candidate,
-        ),
+        processes: workspace.processes.map(candidate => {
+            const shift = shifts.get(candidate.id);
+
+            return candidate.id === id
+                ? { ...candidate, frame, measured }
+                : shift === undefined
+                  ? candidate
+                  : { ...candidate, frame: moved(candidate.frame, shift.x, shift.y) };
+        }),
     };
 };
 

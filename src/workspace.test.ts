@@ -304,3 +304,75 @@ describe('prune-stores', () => {
         );
     });
 });
+
+describe('resizing an attached edge', () => {
+    const box = (id: string, x: number, y: number, width: number, height: number) => ({
+        id,
+        program: 'todo' as const,
+        store: 'todo',
+        frame: { x, y, width, height, z: 0 },
+        measured: { width, height },
+    });
+    // a | b | c in a row, d under a.
+    const attached = (): History =>
+        startHistory({
+            ...defaultWorkspace(viewport),
+            processes: [
+                box('a', 0, 0, 200, 200),
+                box('b', 200, 0, 200, 200),
+                box('c', 400, 0, 200, 200),
+                box('d', 0, 200, 200, 200),
+            ],
+            links: [
+                { a: 'a', b: 'b' },
+                { a: 'b', b: 'c' },
+                { a: 'a', b: 'd' },
+            ],
+        });
+    const resize = (edge: 'e' | 'w' | 's' | 'se', dx: number, dy: number): WorkspaceAction => ({
+        kind: 'resize',
+        id: 'a',
+        edge,
+        dx,
+        dy,
+        minimum: { width: 100, height: 100 },
+    });
+    const xs = (history: History) =>
+        Object.fromEntries(
+            history.present.processes.map(({ id, frame }) => [id, [frame.x, frame.y, frame.width]]),
+        );
+
+    it('pushes the windows attached on that edge, and everything linked on from them', () => {
+        const history = run(attached(), [resize('e', 50, 0)]);
+
+        expect(xs(history)).toEqual({
+            a: [0, 0, 250],
+            b: [250, 0, 200],
+            c: [450, 0, 200],
+            d: [0, 200, 200],
+        });
+        expect(history.present.links).toHaveLength(3);
+    });
+
+    it('pulls them back when the edge shrinks', () => {
+        expect(xs(run(attached(), [resize('e', -60, 0)])).b).toEqual([140, 0, 200]);
+    });
+
+    it('leaves windows on the other sides where they are', () => {
+        const history = run(attached(), [resize('s', 0, 40)]);
+
+        expect(xs(history)).toMatchObject({ b: [200, 0, 200], d: [0, 240, 200] });
+        expect(history.present.links).toHaveLength(3);
+    });
+
+    it('carries both sides at a corner, each along its own axis', () => {
+        expect(xs(run(attached(), [resize('se', 30, 20)]))).toMatchObject({
+            b: [230, 0, 200],
+            d: [0, 220, 200],
+        });
+    });
+
+    it('stops pushing where the window stops growing', () => {
+        expect(xs(run(attached(), [resize('e', -500, 0)])).b).toEqual([100, 0, 200]);
+    });
+});

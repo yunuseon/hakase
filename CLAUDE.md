@@ -828,9 +828,15 @@ the iOS drag handle — faint while unattached, longer and in ink once attached 
 inside a larger transparent button that is its hit area. Clicking it toggles the
 link. Linked windows form a group:
 moving one moves all of them, and raising one raises all of them, the dragged one
-on top. Resizing does not propagate, but it is magnetic: a resized edge snaps
-to the edges of the windows it is linked to, so a window stacked under another
-locks to its width. Closing a window closes only that one.
+on top. **Resizing an attached edge carries what is attached there**: a linked
+window on the side being resized (`sideOf`, judged as seams are) moves by exactly
+as far as that edge moved, with everything linked on from it but not back
+through the resized window, so growing pushes it and shrinking pulls it and the
+link survives the prune that follows. Those windows are left out of the resize's
+snap targets, or the edge would snap back to the window it is pushing and never
+move. Windows attached on the other sides stay put, and the edge still snaps to
+them, so a window stacked under another locks to its width. Closing a window
+closes only that one.
 
 All of it is the one `scan`. `Workspace.links` holds `{ a, b }` pairs, and a group
 is `groupOf`'s connected component, never stored, so it cannot fall out of step.
@@ -1419,7 +1425,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and thirty-one of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and thirty-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
