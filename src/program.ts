@@ -1,4 +1,5 @@
 import type { Observable } from 'rxjs';
+import type { Phase } from './shared/drag.ts';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { FormulaId, Library, LibraryCommand } from './library.ts';
@@ -30,7 +31,7 @@ export type ProcessId = string;
 
 // Collected from whichever processes run, so feeding app state needs no singleton.
 export type AppInput =
-    | { readonly kind: 'scrub'; readonly at: number }
+    | { readonly kind: 'scrub'; readonly phase: Phase; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
     | { readonly kind: 'duration'; readonly seconds: number }
     | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }

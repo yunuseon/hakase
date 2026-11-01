@@ -10,6 +10,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { wrap01 } from '../lib/math.ts';
+import type { Phase } from './drag.ts';
 
 export type TransportCommand = 'toggle' | 'stop' | 'loop';
 
@@ -27,13 +28,19 @@ export type Transport = {
     readonly at: number;
     readonly playing: boolean;
     readonly looping: boolean;
+    readonly held: boolean;
 };
 
-export const initialTransport: Transport = { at: 0, playing: false, looping: true };
+export type Scrub = {
+    readonly phase: Phase;
+    readonly at: number;
+};
+
+export const initialTransport: Transport = { at: 0, playing: false, looping: true, held: false };
 
 type TransportAction =
     | { readonly kind: 'command'; readonly command: TransportCommand }
-    | { readonly kind: 'seek'; readonly at: number }
+    | { readonly kind: 'scrub'; readonly scrub: Scrub }
     | { readonly kind: 'advance'; readonly ms: number; readonly duration: number };
 
 // The buttons cannot know which they mean, so the fold owns every flip.
@@ -68,25 +75,29 @@ export const reduceTransport = (transport: Transport, action: TransportAction): 
     switch (action.kind) {
         case 'command':
             return command(transport, action.command);
-        case 'seek':
-            return { ...transport, at: action.at };
+        case 'scrub':
+            // A release ends the hold where the pointer last was; where it was let go is not a new seek.
+            return action.scrub.phase === 'release'
+                ? { ...transport, held: false }
+                : { ...transport, at: action.scrub.at, held: true };
         case 'advance':
             return advance(transport, action.ms, action.duration);
     }
 };
 
 export const createTransport$ = (
-    scrubs$: Observable<number>,
+    scrubs$: Observable<Scrub>,
     commands$: Observable<TransportCommand>,
     duration$: Observable<number>,
     initial: Transport = initialTransport,
 ): Observable<Transport> => {
     const transport$: Observable<Transport> = merge(
-        scrubs$.pipe(map((at): TransportAction => ({ kind: 'seek', at }))),
+        scrubs$.pipe(map((scrub): TransportAction => ({ kind: 'scrub', scrub }))),
         commands$.pipe(map((command): TransportAction => ({ kind: 'command', command }))),
         // defer: reaching the end without a loop pauses, so the frames are gated by this fold.
         defer(() => transport$).pipe(
-            map(({ playing }) => playing),
+            // Held is not paused: the frames stop under a pointer and resume from where it lets go.
+            map(({ playing, held }) => playing && !held),
             distinctUntilChanged(),
             // Deltas, not elapsed: pausing then playing must resume, not jump.
             switchMap(playing =>

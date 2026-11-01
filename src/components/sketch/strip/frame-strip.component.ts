@@ -2,7 +2,7 @@ import { combineLatest, merge, type Observable } from 'rxjs';
 import { filter, map, mergeMap, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$, observeResize$ } from '../../../lib/rx.ts';
-import { pointerDrag$ } from '../../../shared/drag.ts';
+import { pointerGesture$, type Phase } from '../../../shared/drag.ts';
 import {
     frameAt,
     markerX,
@@ -66,7 +66,7 @@ export class HksFrameStrip extends HTMLElement {
     readonly zooms$: Observable<string>;
     readonly pinches$: Observable<{ readonly factor: number; readonly x: number }>;
     // x in track pixels, from the left edge of the first tile.
-    readonly seeks$: Observable<number>;
+    readonly seeks$: Observable<{ readonly phase: Phase; readonly x: number }>;
     readonly visible$: Observable<Visible>;
 
     private readonly scroller: HTMLElement;
@@ -109,7 +109,9 @@ export class HksFrameStrip extends HTMLElement {
             return ((clientX - rect.left) * track.offsetWidth) / Math.max(rect.width, 1);
         };
 
-        this.seeks$ = pointerDrag$(track).pipe(map(event => trackX(event.clientX)));
+        this.seeks$ = pointerGesture$(track).pipe(
+            map(({ phase, event }) => ({ phase, x: trackX(event.clientX) })),
+        );
 
         this.pinches$ = fromElementEvent$(this.scroller, 'wheel').pipe(
             filter(event => event.ctrlKey || event.metaKey),

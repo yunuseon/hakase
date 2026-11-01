@@ -1,4 +1,5 @@
 import type { Observable } from 'rxjs';
+import type { Scrub } from '../../shared/playhead.ts';
 import { clamp, TAU, wrap01 } from '../../lib/math.ts';
 
 export type Point = {
@@ -29,6 +30,7 @@ export const ringOffset = (ring: Ring, value: number): Point => {
     };
 };
 
+// A gesture, not a bare value: the fold must know a press is held even while the pointer is still.
 export interface Slider {
-    readonly changes$: Observable<number>;
+    readonly changes$: Observable<Scrub>;
 }

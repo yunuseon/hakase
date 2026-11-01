@@ -29,7 +29,7 @@ export const timelineProgram: Program = {
                     transport
                         .connect$(playing$, looping$, clock$, duration$)
                         .pipe(ignoreElements()),
-                    slider.changes$.pipe(map((at): AppInput => ({ kind: 'scrub', at }))),
+                    slider.changes$.pipe(map((scrub): AppInput => ({ kind: 'scrub', ...scrub }))),
                     transport.commands$.pipe(
                         map((command): AppInput => ({ kind: 'transport', command })),
                     ),

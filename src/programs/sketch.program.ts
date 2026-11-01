@@ -351,8 +351,9 @@ export const sketchProgram: Program = {
                         .pipe(ignoreElements()),
                     strip.seeks$.pipe(
                         withLatestFrom(geometry$),
-                        map(([x, geometry]): AppInput => ({
+                        map(([{ phase, x }, geometry]): AppInput => ({
                             kind: 'scrub',
+                            phase,
                             at: frameAtX(x, geometry) / geometry.frames,
                         })),
                     ),

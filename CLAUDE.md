@@ -1008,14 +1008,25 @@ carve-out for it is gone. If a tight numeric loop ever comes back, local `let`
 counters inside a pure function are fine — the rule is about orchestration, not
 about banning loops.
 
-### The design tension to be aware of
+### The feedback cycle, and how it is closed
 
-There is a **feedback cycle** in the app: sliders emit values → the playhead
-consumes them → the sliders display the playhead. It is currently cut by having
-each slider expose `changes$` (a source) and `connect(playhead$)` (a view), with
-whoever wires them owning the loop. A slider must never reach for the current
-value itself. If you find a cleaner way to close the cycle, that is a welcome
-change — it is the most interesting open problem here.
+Sliders emit → the playhead consumes → the sliders display the playhead. This
+was long the open problem here, and it is closed by the rule every control now
+follows: **a component emits what the user did, a fold owns the value, and
+`connect$` writes it back.** Nothing keeps a copy of the value outside the fold,
+so there is no second owner to fall out of step, and the loop runs through the
+app's one cycle (signals out, state in) rather than a local one. A slider must
+never reach for the current value itself.
+
+**Ownership during a gesture belongs in the fold too.** A slider used to emit
+only positions, on pointer moves, so a thumb held still during playback lost the
+playhead to the clock and it ran on from under the pointer. A control now
+reports the gesture, not just a value: `pointerGesture$` in `shared/drag.ts`
+yields `grab`, `move` and `release`, the latter from the end event the gesture
+already watched for, and a `Scrub` carries its phase all the way to
+`reduceTransport`. Whoever holds the playhead is state, so it is a field of the
+fold (`held`), not a flag in a component. The general lesson: if a value can be
+held, the hold is part of the value's state.
 
 ## Type safety
 
@@ -1117,7 +1128,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and six of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -1142,13 +1153,18 @@ one never reads the other. They are one `Transport = { at, playing, looping }`,
 folded by `reduceTransport` over three kinds of action:
 
 - `command` — `toggle`, `stop`, `loop`. Playing again from the end restarts at 0.
-- `seek` — a scrub.
+- `scrub` — a gesture from a timeline, the playhead dial or a frame strip. A
+  `grab` or `move` seeks and sets `held`; a `release` only clears it, since where
+  the pointer was let go is not a new position.
 - `advance` — `ms` since the previous frame. It wraps while looping and clamps
   to 1 and pauses otherwise.
 
-The frames are gated by that same fold's `playing`, so `createTransport$` reads
+The frames are gated by that same fold's `playing && !held`, so `createTransport$` reads
 itself through a `defer`, the same ordering trick as the workspace cycle. Pausing
-at the end therefore also stops the `rAF` loop. `playhead$`, `playing$` and
+at the end therefore also stops the `rAF` loop, and so does a hold: held is not
+paused, so `playing` stays true and playback resumes from wherever the pointer
+let go, wherever that pointer was (any of the controls above, since they all
+feed the one fold). `playhead$`, `playing$` and
 `looping$` in `AppState` are projections of the one stream. It is
 `refCount: false`, so closing the last timeline does not rewind the clock.
 

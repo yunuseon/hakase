@@ -3,8 +3,9 @@ import { distinctUntilChanged, map, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../../lib/dom.ts';
 import { observeResize$ } from '../../../lib/rx.ts';
 import { angularValue, ringOffset, type Point, type Ring } from '../slider.ts';
-import { pointerDrag$ } from '../../../shared/drag.ts';
+import { pointerGesture$ } from '../../../shared/drag.ts';
 import type { Slider } from '../slider.ts';
+import type { Scrub } from '../../../shared/playhead.ts';
 import css from './circular-slider.css?inline';
 
 const sheet = styleSheet(css);
@@ -17,7 +18,7 @@ const indicatorTransform = ({ x, y }: Point): string =>
     `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`;
 
 export class HksCircularSlider extends HTMLElement implements Slider {
-    readonly changes$: Observable<number>;
+    readonly changes$: Observable<Scrub>;
 
     private readonly track: HTMLElement;
     private readonly indicator: HTMLElement;
@@ -42,10 +43,13 @@ export class HksCircularSlider extends HTMLElement implements Slider {
             })),
         );
 
-        this.changes$ = pointerDrag$(this.track).pipe(
-            map(({ clientX, clientY }) => {
+        this.changes$ = pointerGesture$(this.track).pipe(
+            map(({ phase, event: { clientX, clientY } }) => {
                 const { left, top, width, height } = this.track.getBoundingClientRect();
-                return angularValue(clientX - (left + width / 2), clientY - (top + height / 2));
+                return {
+                    phase,
+                    at: angularValue(clientX - (left + width / 2), clientY - (top + height / 2)),
+                };
             }),
         );
     }

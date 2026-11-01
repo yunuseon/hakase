@@ -17,7 +17,7 @@ export const playheadProgram: Program = {
             run$: ({ playhead$ }) =>
                 merge(
                     dial.connect$(playhead$).pipe(ignoreElements()),
-                    dial.changes$.pipe(map((at): AppInput => ({ kind: 'scrub', at }))),
+                    dial.changes$.pipe(map((scrub): AppInput => ({ kind: 'scrub', ...scrub }))),
                 ),
         };
     },

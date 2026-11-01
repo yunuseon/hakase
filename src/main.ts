@@ -379,10 +379,14 @@ const bootstrap = () => {
     );
 
     const transport$ = createTransport$(
-        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'scrub' ? of(input.at) : EMPTY))),
+        inputs$.pipe(
+            mergeMap(({ input }) =>
+                input.kind === 'scrub' ? of({ phase: input.phase, at: input.at }) : EMPTY,
+            ),
+        ),
         commands$,
         duration$,
-        { at: stored.playhead, playing: false, looping: stored.looping },
+        { at: stored.playhead, playing: false, looping: stored.looping, held: false },
     );
 
     // Where playback last rested: storage need not follow the playhead every frame it runs.
@@ -391,6 +395,7 @@ const bootstrap = () => {
             at: stored.playhead,
             playing: false,
             looping: stored.looping,
+            held: false,
         }),
         distinctUntilChanged((a, b) => a.at === b.at && a.looping === b.looping),
     );
