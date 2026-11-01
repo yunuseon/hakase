@@ -37,7 +37,7 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
     },
     {
         term: 'dragging the sketch',
-        text: 'Drag to orbit around the camera target, scroll to move closer or further, and double-click or press reset view to undo your orbit. A scripted camera keeps moving underneath your orbit. Axes draws x in red, y in green and z in blue, with ticks every 0.5 and the -1 to 1 square at z = 0. Fit decides how that square meets a canvas that is not square: contain shows all of it, cover fills the canvas and crops, stretch fills it squashed.',
+        text: 'Drag to orbit around the camera target, scroll to move closer or further, and double-click or press reset view to undo your orbit. A scripted camera keeps moving underneath your orbit. Axes draws x in red, y in green and z in blue, with ticks every 0.5 and the -1 to 1 square at z = 0. Fit decides how that square meets a canvas that is not square: contain shows all of it, cover fills the canvas and crops, stretch fills it squashed. Lens switches between perspective and orthographic, where parallel lines stay parallel and nearness no longer changes dot size. Trails fades each frame into the next instead of clearing it.',
     },
     {
         term: 'vec4 formula(...) and .w',
@@ -45,7 +45,7 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
     },
     {
         term: 'k1, k2, k3, k4',
-        text: 'Four knobs from 0 to 1, set by the sliders under each sketch. Use them for any number you want to play with live, like sin(x * k1 * 20.0). Every sketch has its own.',
+        text: 'Four knobs from 0 to 1, set by the sliders under each sketch. Use them for any number you want to play with live, like sin(x * k1 * 20.0). Every sketch has its own. Give a knob a motion of 1×, 2×, 4× or 8× per loop and it swings from 0 up to the value of its slider and back, so it animates without any code.',
     },
     {
         term: 'pointer, pointerOnGround',
@@ -58,6 +58,18 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
     {
         term: 'pointerDown',
         text: 'Shift-drag on a sketch to press: pointerDown is 1.0 while pressed and 0.0 otherwise. A plain drag still orbits the camera.',
+    },
+    {
+        term: 'lattice, focus, space',
+        text: 'Three pickers under each sketch reshape a formula without touching its code. Lattice sets where the points are: a grid, rings and spokes, a hex pattern, or a jittered grid. Focus bunches them towards the middle or out to the edges. Space reads what formula returns in another coordinate system: polar wraps it into a disc, cylindrical rolls it into a tube, spherical into a ball. In all three x is the coordinate that goes around.',
+    },
+    {
+        term: 'vec2 lattice(vec2 uv, float index, float count)',
+        text: 'Optional. Define it to place the points yourself: uv is the grid position from -1 to 1, index counts the points from 0 and count is how many there are. What it returns becomes the x and y that formula receives. The lattice picker and focus then have no effect. If your lattice goes all the way around in x, add #define WRAPS so lines and surfaces close the seam.',
+    },
+    {
+        term: 'vec3 space(vec3 p)',
+        text: 'Optional. Define it to map what formula returns to the point that is drawn, for twists, warps or your own coordinate system. The space picker then has no effect.',
     },
     {
         term: 'PI, helpers',

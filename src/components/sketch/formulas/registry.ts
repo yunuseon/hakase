@@ -7,6 +7,8 @@ import { lens } from './lens.ts';
 import { vortex } from './vortex.ts';
 import { peaks } from './peaks.ts';
 import { flow } from './flow.ts';
+import { ribbon } from './ribbon.ts';
+import { sunflower } from './sunflower.ts';
 import { ripple } from './ripple.ts';
 import { rose } from './rose.ts';
 import { spiral } from './spiral.ts';
@@ -31,6 +33,8 @@ export const formulas = {
     vortex,
     peaks,
     flow,
+    sunflower,
+    ribbon,
 } satisfies Record<string, Formula>;
 
 export type FormulaName = keyof typeof formulas;

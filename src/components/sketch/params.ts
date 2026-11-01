@@ -1,5 +1,5 @@
 import type { Size } from '../window/frame.ts';
-import type { Fit } from './space.ts';
+import type { Fit, Lattice, Lens, Space } from './space.ts';
 import type { Theme } from './theme.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
@@ -27,12 +27,30 @@ export type Knobs = Readonly<Record<Knob, number>>;
 
 export const defaultKnob = 0.5;
 
+// Whole numbers only: a knob that swings a whole number of times per loop ends where it began.
+export const CYCLES = [0, 1, 2, 4, 8] as const;
+
+export type Cycles = (typeof CYCLES)[number];
+
+export const isCycles = (value: number): value is Cycles => CYCLES.some(cycles => cycles === value);
+
+export type Motion = Readonly<Record<Knob, Cycles>>;
+
+export const knobAt = (value: number, cycles: Cycles, t: number): number =>
+    cycles === 0 ? value : value * (0.5 - 0.5 * Math.cos(2 * Math.PI * cycles * t));
+
 export type PanelParams = {
     readonly dimension: number;
     readonly draw: DrawStyle;
     readonly knobs: Knobs;
     readonly axes: boolean;
     readonly fit: Fit;
+    readonly lens: Lens;
+    readonly lattice: Lattice;
+    readonly focus: number;
+    readonly space: Space;
+    readonly trails: number;
+    readonly motion: Motion;
 };
 
 // Flat, unlike PanelParams: a dot setting must outlive a switch to lines, so it is kept, not dropped.
@@ -44,6 +62,12 @@ export type Panel = {
     readonly knobs: Knobs;
     readonly axes: boolean;
     readonly fit: Fit;
+    readonly lens: Lens;
+    readonly lattice: Lattice;
+    readonly focus: number;
+    readonly space: Space;
+    readonly trails: number;
+    readonly motion: Motion;
 };
 
 export const sameKnobs = (a: Knobs, b: Knobs): boolean => KNOBS.every(knob => a[knob] === b[knob]);
@@ -55,7 +79,13 @@ export const samePanel = (a: Panel, b: Panel): boolean =>
     a.depthScalar === b.depthScalar &&
     sameKnobs(a.knobs, b.knobs) &&
     a.axes === b.axes &&
-    a.fit === b.fit;
+    a.fit === b.fit &&
+    a.lens === b.lens &&
+    a.lattice === b.lattice &&
+    a.focus === b.focus &&
+    a.space === b.space &&
+    a.trails === b.trails &&
+    KNOBS.every(knob => a.motion[knob] === b.motion[knob]);
 
 export const panelParams = ({
     mode,
@@ -65,12 +95,24 @@ export const panelParams = ({
     knobs,
     axes,
     fit,
+    lens,
+    lattice,
+    focus,
+    space,
+    trails,
+    motion,
 }: Panel): PanelParams => ({
     dimension,
     draw: mode === 'dots' ? { mode, baseSize, depthScalar } : { mode },
     knobs,
     axes,
     fit,
+    lens,
+    lattice,
+    focus,
+    space,
+    trails,
+    motion,
 });
 
 export type Pointer = {
@@ -119,6 +161,12 @@ export const defaultPanel: Panel = {
     knobs: { k1: defaultKnob, k2: defaultKnob, k3: defaultKnob, k4: defaultKnob },
     axes: false,
     fit: 'contain',
+    lens: 'perspective',
+    lattice: 'grid',
+    focus: 1,
+    space: 'cartesian',
+    trails: 0,
+    motion: { k1: 0, k2: 0, k3: 0, k4: 0 },
 };
 
 const RATIO_STEP = 0.25;

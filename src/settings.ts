@@ -7,16 +7,25 @@ import { isFormulaName, type FormulaName } from './components/sketch/formulas/re
 import {
     DRAW_MODES,
     defaultPanel,
+    isCycles,
     isDrawMode,
+    type Cycles,
     type Knob,
     type Knobs,
+    type Motion,
     type Panel,
 } from './components/sketch/params.ts';
 import {
     DEFAULT_ORBIT,
     isFit,
+    isLattice,
+    isLens,
+    isSpace,
     sameOrbit,
     type Fit,
+    type Lattice,
+    type Lens,
+    type Space,
     type Orbit,
 } from './components/sketch/space.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -96,10 +105,39 @@ const knobsFrom = (value: unknown): Knobs => {
     return { k1: knob('k1'), k2: knob('k2'), k3: knob('k3'), k4: knob('k4') };
 };
 
+const latticeFrom = (panel: object): Lattice => {
+    const lattice = field(panel, 'lattice');
+
+    return typeof lattice === 'string' && isLattice(lattice) ? lattice : defaultPanel.lattice;
+};
+
+const spaceFrom = (panel: object): Space => {
+    const space = field(panel, 'space');
+
+    return typeof space === 'string' && isSpace(space) ? space : defaultPanel.space;
+};
+
+const lensFrom = (panel: object): Lens => {
+    const lens = field(panel, 'lens');
+
+    return typeof lens === 'string' && isLens(lens) ? lens : defaultPanel.lens;
+};
+
 const fitFrom = (panel: object): Fit => {
     const fit = field(panel, 'fit');
 
     return typeof fit === 'string' && isFit(fit) ? fit : defaultPanel.fit;
+};
+
+const motionFrom = (value: unknown): Motion => {
+    const stored = typeof value === 'object' && value !== null ? value : {};
+    const cycles = (name: Knob): Cycles => {
+        const count = field(stored, name);
+
+        return typeof count === 'number' && isCycles(count) ? count : 0;
+    };
+
+    return { k1: cycles('k1'), k2: cycles('k2'), k3: cycles('k3'), k4: cycles('k4') };
 };
 
 // Field by field with a default for each, so a setting added later never discards the rest.
@@ -115,9 +153,15 @@ const panelFrom = (value: unknown): Panel => {
         dimension: Math.round(finite(field(value, 'dimension'), defaultPanel.dimension, 1, 128)),
         baseSize: finite(field(value, 'baseSize'), defaultPanel.baseSize, 1, 20),
         depthScalar: finite(field(value, 'depthScalar'), defaultPanel.depthScalar, 0.01, 2),
+        trails: finite(field(value, 'trails'), defaultPanel.trails, 0, 0.97),
         knobs: knobsFrom(field(value, 'knobs')),
+        motion: motionFrom(field(value, 'motion')),
         axes: field(value, 'axes') === true,
         fit: fitFrom(value),
+        lens: lensFrom(value),
+        lattice: latticeFrom(value),
+        focus: finite(field(value, 'focus'), defaultPanel.focus, 0.3, 3),
+        space: spaceFrom(value),
     };
 };
 

@@ -6,10 +6,14 @@ precision highp int;
 #define MODE_DOTS 0
 #define MODE_SURFACE 2
 #define PASS_AXES 1
+#define PASS_FADE 2
+
+const float SMALL_DOT = 6.0;
 
 uniform sampler2D uPalette;
 uniform int uMode;
 uniform int uPass;
+uniform float uFade;
 
 in vec4 vColor;
 in float vTint;
@@ -49,6 +53,13 @@ float shading() {
 }
 
 void main() {
+    if (uPass == PASS_FADE) {
+        // The ramp's first entry is the backdrop, so trails fade into the canvas colour.
+        fragColor = vec4(texture(uPalette, vec2(0.0, 0.5)).rgb * uFade, uFade);
+
+        return;
+    }
+
     if (uPass == PASS_AXES) {
         fragColor = vec4(vColor.rgb * vColor.a, vColor.a);
 
@@ -57,8 +68,9 @@ void main() {
 
     float alpha = coverage();
 
-    // Half, not zero: a discarded fragment writes no depth, and a faint edge that did would cut a fringe.
-    if (alpha < 0.5) {
+    // Half, not zero: a faint edge that wrote depth would cut a fringe. A dot too small to show a fringe
+    // keeps its whole soft edge instead, or a few-pixel dot loses half of itself and all but vanishes.
+    if (alpha < (vPointSize < SMALL_DOT ? 0.02 : 0.5)) {
         discard;
     }
 

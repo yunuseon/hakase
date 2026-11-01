@@ -2,8 +2,8 @@ import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
-import { DRAW_MODES, KNOBS, defaultPanel, isKnob, type DrawMode } from '../params.ts';
-import { FITS } from '../space.ts';
+import { CYCLES, DRAW_MODES, KNOBS, defaultPanel, isKnob, type DrawMode } from '../params.ts';
+import { FITS, LATTICES, LENSES, SPACES } from '../space.ts';
 import {
     FLAGS,
     NUMERIC_FIELDS,
@@ -32,13 +32,29 @@ const slider = (
         <input class="dial" data-field="${key}" type="range"
                min="${min}" max="${max}" step="${step}" value="${value}" />
         <output class="read" data-read="${key}"></output>
+        ${isKnob(key) ? cycles(key) : ''}
     </label>
+`;
+
+const cycles = (knob: string) => `
+    <select class="pick cycles" data-cycles="${knob}" aria-label="${knob} motion" title="swing per loop">
+        ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× / loop`}</option>`).join('')}
+    </select>
 `;
 
 const flag = (key: string, label: string) => `
     <label class="item toggle">
         <input class="switch" data-flag="${key}" type="checkbox" />
         <span class="key">${label}</span>
+    </label>
+`;
+
+const option = (key: string, values: readonly string[]) => `
+    <label class="item">
+        <span class="key">${key}</span>
+        <select class="pick" data-pick="${key}" aria-label="${key}">
+            ${values.map(value => `<option value="${value}">${value}</option>`).join('')}
+        </select>
     </label>
 `;
 
@@ -64,12 +80,11 @@ const TEMPLATE = `
         ${choice('theme', 'theme')}
         <div class="segments" role="radiogroup" aria-label="draw mode">${modes}</div>
         ${flag('axes', 'axes')}
-        <label class="item">
-            <span class="key">fit</span>
-            <select class="pick" data-pick="fit" aria-label="fit">
-                ${FITS.map(fit => `<option value="${fit}">${fit}</option>`).join('')}
-            </select>
-        </label>
+        ${option('fit', FITS)}
+        ${option('lens', LENSES)}
+        ${option('lattice', LATTICES)}
+        ${slider('focus', 'focus', 0.3, 3, 0.05, defaultPanel.focus)}
+        ${option('space', SPACES)}
         <button class="item reset" type="button" title="reset camera" aria-label="reset camera" disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>
             <span>reset view</span>
@@ -77,6 +92,7 @@ const TEMPLATE = `
         ${slider('dimension', 'lattice', 1, 128, 1, defaultPanel.dimension)}
         ${slider('baseSize', 'dot', 1, 20, 1, defaultPanel.baseSize, 'dots')}
         ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
+        ${slider('trails', 'trails', 0, 0.97, 0.01, defaultPanel.trails)}
         ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultPanel.knobs[knob])).join('')}
     </div>
 `;
@@ -122,10 +138,22 @@ export class HksSketchControls extends HTMLElement {
             ),
             fromElementEvent$(bar, 'change').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
+                    const knob =
+                        target instanceof HTMLSelectElement ? target.dataset['cycles'] : undefined;
+
+                    if (target instanceof HTMLSelectElement && knob !== undefined && isKnob(knob)) {
+                        return of({ field: 'cycles', knob, value: Number(target.value) });
+                    }
+
                     if (target instanceof HTMLSelectElement) {
                         const pick = target.dataset['pick'];
 
-                        return pick === 'formula' || pick === 'theme' || pick === 'fit'
+                        return pick === 'formula' ||
+                            pick === 'theme' ||
+                            pick === 'fit' ||
+                            pick === 'lens' ||
+                            pick === 'lattice' ||
+                            pick === 'space'
                             ? of({ field: pick, value: target.value })
                             : EMPTY;
                     }
@@ -173,7 +201,7 @@ export class HksSketchControls extends HTMLElement {
         view$: Observable<ControlsView>,
         knobs$: Observable<readonly string[]>,
     ): Observable<void> {
-        const picks$ = (['formula', 'theme', 'fit'] as const).map(key =>
+        const picks$ = (['formula', 'theme', 'fit', 'lens', 'lattice', 'space'] as const).map(key =>
             view$.pipe(
                 map(view => view[key]),
                 distinctUntilChanged(),
@@ -195,6 +223,20 @@ export class HksSketchControls extends HTMLElement {
                         `[data-read="${field}"]`,
                         HTMLOutputElement,
                     ).textContent = readout(field, value);
+                }),
+            ),
+        );
+
+        const motion$ = KNOBS.map(knob =>
+            view$.pipe(
+                map(({ motion }) => String(motion[knob])),
+                distinctUntilChanged(),
+                tap(value => {
+                    requireElement(
+                        this.shadow,
+                        `[data-cycles="${knob}"]`,
+                        HTMLSelectElement,
+                    ).value = value;
                 }),
             ),
         );
@@ -250,7 +292,7 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        return merge(...picks$, ...numbers$, ...flags$, mode$, shown$, turned$).pipe(
+        return merge(...picks$, ...numbers$, ...flags$, ...motion$, mode$, shown$, turned$).pipe(
             map(() => undefined),
         );
     }

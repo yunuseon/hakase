@@ -16,7 +16,12 @@ export const createSurface = (parent: HTMLElement): Surface => {
     const canvas = document.createElement('canvas');
     parent.appendChild(canvas);
 
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
+    // preserveDrawingBuffer: trails fade the last frame instead of clearing it, so it must survive.
+    const gl = canvas.getContext('webgl2', {
+        alpha: false,
+        antialias: true,
+        preserveDrawingBuffer: true,
+    });
     if (!gl) {
         throw new Error('This browser does not support WebGL2');
     }

@@ -1,5 +1,5 @@
-import { isDrawMode, isKnob, type Panel } from '../params.ts';
-import { isFit } from '../space.ts';
+import { isCycles, isDrawMode, isKnob, type Knob, type Panel } from '../params.ts';
+import { isFit, isLattice, isLens, isSpace } from '../space.ts';
 
 export type ControlsView = Panel & {
     readonly formula: string;
@@ -12,6 +12,8 @@ export const NUMERIC_FIELDS = [
     'dimension',
     'baseSize',
     'depthScalar',
+    'focus',
+    'trails',
     'k1',
     'k2',
     'k3',
@@ -31,9 +33,13 @@ export const isNumericField = (value: string): value is NumericField =>
 
 // Only what the user did, never a reading of the inputs: the fold owns the values, the inputs show them.
 export type ControlChange =
-    | { readonly field: 'formula' | 'theme' | 'mode' | 'fit'; readonly value: string }
+    | {
+          readonly field: 'formula' | 'theme' | 'mode' | 'fit' | 'lens' | 'lattice' | 'space';
+          readonly value: string;
+      }
     | { readonly field: NumericField; readonly value: number }
-    | { readonly field: Flag; readonly value: boolean };
+    | { readonly field: Flag; readonly value: boolean }
+    | { readonly field: 'cycles'; readonly knob: Knob; readonly value: number };
 
 export const numberOf = (view: ControlsView, field: NumericField): number =>
     isKnob(field) ? view.knobs[field] : view[field];
@@ -47,11 +53,23 @@ export const withChange = (panel: Panel, change: ControlChange): Panel => {
             return isDrawMode(change.value) ? { ...panel, mode: change.value } : panel;
         case 'fit':
             return isFit(change.value) ? { ...panel, fit: change.value } : panel;
+        case 'lens':
+            return isLens(change.value) ? { ...panel, lens: change.value } : panel;
+        case 'lattice':
+            return isLattice(change.value) ? { ...panel, lattice: change.value } : panel;
+        case 'space':
+            return isSpace(change.value) ? { ...panel, space: change.value } : panel;
         case 'axes':
             return { ...panel, axes: change.value };
+        case 'cycles':
+            return isCycles(change.value)
+                ? { ...panel, motion: { ...panel.motion, [change.knob]: change.value } }
+                : panel;
         case 'dimension':
         case 'baseSize':
         case 'depthScalar':
+        case 'focus':
+        case 'trails':
             return { ...panel, [change.field]: change.value };
         case 'k1':
         case 'k2':

@@ -1,13 +1,23 @@
 import {
     DRAW_MODES,
     KNOBS,
+    knobAt,
     type DrawMode,
     type Knob,
     type PanelParams,
     type Pointer,
     type SketchParams,
 } from '../params.ts';
-import { orbitUniform, projection, REFERENCE_DISTANCE, type Orbit } from '../space.ts';
+import {
+    LATTICES,
+    LENSES,
+    SPACES,
+    orbitUniform,
+    projection,
+    REFERENCE_DISTANCE,
+    wraps,
+    type Orbit,
+} from '../space.ts';
 import { RAMP_SIZE } from '../theme.ts';
 import type { Surface } from './surface.ts';
 import { createProgram, type ProgramResult } from './program.ts';
@@ -20,6 +30,9 @@ const PRELUDE_LINES = vertexSource.split('\n').length;
 const NULL_TERMINATOR = /\0/g;
 const RETURNS_TINT = /\bvec4\s+formula\s*\(/;
 const SCRIPTS_CAMERA = /\bCamera\s+camera\s*\(/;
+const PLACES_SAMPLES = /\bvec2\s+lattice\s*\(/;
+const MAPS_SPACE = /\bvec3\s+space\s*\(/;
+const DECLARES_WRAP = /^\s*#define\s+WRAPS\b/m;
 
 // Appended after the formula, never before it, or every reported line number would shift.
 export const adapterFor = (formula: string): string =>
@@ -30,6 +43,12 @@ export const adapterFor = (formula: string): string =>
         SCRIPTS_CAMERA.test(formula)
             ? 'Camera view(float t) { return camera(t); }'
             : 'Camera view(float t) { return Camera(vec3(0.0, 0.0, uReference), vec3(0.0), vec3(0.0, 1.0, 0.0)); }',
+        PLACES_SAMPLES.test(formula)
+            ? 'vec2 sampled(vec2 uv, float index, float count) { return lattice(uv, index, count); }'
+            : 'vec2 sampled(vec2 uv, float index, float count) { return builtinLattice(uv); }',
+        MAPS_SPACE.test(formula)
+            ? 'vec3 placed(vec3 p) { return space(p); }'
+            : 'vec3 placed(vec3 p) { return builtinSpace(p); }',
     ].join('\n');
 const LOG_LOCATION = /^(ERROR|WARNING): \d+:(\d+):/gm;
 
@@ -57,12 +76,20 @@ export type Uniforms = {
     readonly projection: WebGLUniformLocation | null;
     readonly orbit: WebGLUniformLocation | null;
     readonly pass: WebGLUniformLocation | null;
+    readonly lens: WebGLUniformLocation | null;
+    readonly fade: WebGLUniformLocation | null;
+    readonly lattice: WebGLUniformLocation | null;
+    readonly space: WebGLUniformLocation | null;
+    readonly focus: WebGLUniformLocation | null;
+    readonly wrap: WebGLUniformLocation | null;
     readonly reference: WebGLUniformLocation | null;
 };
 
 export type Sketch = {
     readonly program: WebGLProgram;
     readonly uniforms: Uniforms;
+    // A formula whose own lattice() or space() goes around x says so with #define WRAPS.
+    readonly wraps: boolean;
 };
 
 export type SketchResult =
@@ -90,6 +117,7 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
         ok: true,
         sketch: {
             program,
+            wraps: DECLARES_WRAP.test(formula),
             uniforms: {
                 dimension: at('uDimension'),
                 mode: at('uMode'),
@@ -104,6 +132,12 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 projection: at('uProjection'),
                 orbit: at('uOrbit'),
                 pass: at('uPass'),
+                lens: at('uLens'),
+                fade: at('uFade'),
+                lattice: at('uLattice'),
+                space: at('uSpace'),
+                focus: at('uFocus'),
+                wrap: at('uWrap'),
                 reference: at('uReference'),
             },
         },
@@ -114,13 +148,19 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
 export const knobsUsed = ({ uniforms }: Sketch): readonly Knob[] =>
     KNOBS.filter((_, index) => (uniforms.knobs[index] ?? null) !== null);
 
+const closesSeam = (
+    { wraps: declared }: Sketch,
+    { lattice, space }: Pick<PanelParams, 'lattice' | 'space'>,
+): boolean => declared || wraps(lattice, space);
+
 export const prepare = (
     { gl, palette }: Surface,
-    { program, uniforms }: Sketch,
+    sketch: Sketch,
     params: SketchParams,
     ramp: Uint8Array,
     pixelRatio: number,
 ): void => {
+    const { program, uniforms } = sketch;
     gl.useProgram(program);
 
     gl.uniform1i(uniforms.dimension, params.dimension);
@@ -133,14 +173,16 @@ export const prepare = (
     }
     gl.uniform1f(uniforms.pixelRatio, pixelRatio);
     gl.uniform1f(uniforms.reference, REFERENCE_DISTANCE);
+    gl.uniform1i(uniforms.lens, LENSES.indexOf(params.lens));
+    gl.uniform1i(uniforms.lattice, LATTICES.indexOf(params.lattice));
+    gl.uniform1i(uniforms.space, SPACES.indexOf(params.space));
+    gl.uniform1f(uniforms.focus, params.focus);
+    gl.uniform1i(uniforms.wrap, closesSeam(sketch, params) ? 1 : 0);
     gl.uniformMatrix4fv(
         uniforms.projection,
         false,
-        projection(params.width / Math.max(params.height, 1), params.fit),
+        projection(params.width / Math.max(params.height, 1), params.fit, params.lens),
     );
-    KNOBS.forEach((knob, index) => {
-        gl.uniform1f(uniforms.knobs[index] ?? null, params.knobs[knob]);
-    });
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, palette);
@@ -151,9 +193,12 @@ export const prepare = (
     gl.clearColor((ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255, 1);
 
     gl.enable(gl.DEPTH_TEST);
+    // Any change of settings starts the trails afresh rather than smearing the old picture into it.
+    gl.clear(gl.COLOR_BUFFER_BIT);
 };
 
-const vertexCount = (mode: DrawMode, dimension: number): number => {
+// A wrapping lattice has one more column of cells: the one that closes the seam.
+const vertexCount = (mode: DrawMode, dimension: number, wrap: boolean): number => {
     const side = 2 * dimension;
 
     switch (mode) {
@@ -162,7 +207,7 @@ const vertexCount = (mode: DrawMode, dimension: number): number => {
         case 'lines':
             return side * side * 4;
         case 'surface':
-            return (side - 1) * (side - 1) * 6;
+            return (wrap ? side : side - 1) * (side - 1) * 6;
     }
 };
 
@@ -179,24 +224,45 @@ const primitive = (gl: WebGL2RenderingContext, mode: DrawMode): number => {
 
 const PASS_LATTICE = 0;
 const PASS_AXES = 1;
-// Must match axisVertex in sketch.vert: 14 for the axes and the z = 0 square, then 12 ticks of two.
-const AXIS_VERTICES = 14 + 12 * 2;
+const PASS_FADE = 2;
+// Must match axisVertex in sketch.vert: 7 lines of 48 pieces of two vertices, then 12 ticks of two.
+const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
 
 export const drawFrame = (
     gl: WebGL2RenderingContext,
-    { uniforms }: Sketch,
-    { draw: { mode }, dimension, axes }: PanelParams,
+    sketch: Sketch,
+    { draw: { mode }, dimension, axes, trails, knobs, motion, lattice, space }: PanelParams,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
 ): void => {
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const { uniforms } = sketch;
+    if (trails > 0) {
+        // Fade towards the backdrop instead of clearing; depth must not keep the fade from covering.
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.disable(gl.DEPTH_TEST);
+        gl.uniform1i(uniforms.pass, PASS_FADE);
+        gl.uniform1f(uniforms.fade, 1 - trails);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.enable(gl.DEPTH_TEST);
+    } else {
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
+
     gl.uniform1f(uniforms.playhead, playhead);
+    // Every frame, not in prepare: a moving knob changes with the playhead, not with its settings.
+    KNOBS.forEach((knob, index) => {
+        gl.uniform1f(uniforms.knobs[index] ?? null, knobAt(knobs[knob], motion[knob], playhead));
+    });
     gl.uniform2f(uniforms.pointer, x, y);
     gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
     gl.uniform3f(uniforms.orbit, ...orbitUniform(orbit));
     gl.uniform1i(uniforms.pass, PASS_LATTICE);
-    gl.drawArrays(primitive(gl, mode), 0, vertexCount(mode, dimension));
+    gl.drawArrays(
+        primitive(gl, mode),
+        0,
+        vertexCount(mode, dimension, closesSeam(sketch, { lattice, space })),
+    );
 
     if (axes) {
         gl.uniform1i(uniforms.pass, PASS_AXES);

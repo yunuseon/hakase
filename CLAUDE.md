@@ -80,16 +80,68 @@ formula's camera, so a separate program would have to be compiled per formula
 with every uniform set twice. `axisVertex` derives each line from
 `gl_VertexID`, so `AXIS_VERTICES` in `sketch-program.ts` must match its tables.
 
-Dot size is perspective: `uReference / w`, raised to `3 × depth`, so the depth
-slider is now an exaggeration of nearness. It is measured against the _default_
-distance, not the current one, or dollying in would never grow the dots. A
-pinch over a sketch is ctrl+wheel and is left to the canvas zoom.
+**The axes are drawn in the formula's space, not the world's.** Every axis point
+goes through `placed()`, the same mapping the lattice's points take, so in polar
+space the x axis is a circle and the square becomes a ring, in spherical the x
+axis is the equator — and a formula's own `space()` bends them too. A mapped
+straight line is only straight at its ends, so each of the seven lines (three
+axes, four sides of the square) is drawn as `AXIS_PIECES` short pieces. In a
+wrapping space the x axis stops at ±1, because past that it would lap itself.
+
+**Lattice and space reshape a formula from either side.** The vertex shader runs
+`index → sampled(uv) → formula → placed(v) → camera`, and both ends are per-sketch
+pickers with an optional formula hook, detected and appended by `adapterFor` like
+`camera()`:
+
+- **Lattice** (`LATTICES`: grid, polar, hex, jitter) decides where the samples
+  are, with **focus** as a power curve that bunches them toward the middle or the
+  edges while keeping their order, so lines and surfaces stay intact. Jitter
+  hashes the integer cell, so it holds still from frame to frame. A formula may
+  define `vec2 lattice(vec2 uv, float index, float count)` to place them itself;
+  `builtinLattice` reads its cell and step from globals that `main()` fills,
+  because the hook's signature has no room for them.
+- **Space** (`SPACES`: cartesian, polar, cylindrical, spherical) reads the
+  returned point in another coordinate system, with x always the coordinate that
+  goes around, so a flat formula wraps without being rewritten. A formula may
+  define `vec3 space(vec3 p)` instead.
+
+**Wrapping closes the seam.** When x goes all the way around (a polar lattice or
+any non-cartesian space, `wraps()`), lines and triangles connect the last
+column back to the first (`uWrap`), and a surface draws one extra column of
+cells, so `vertexCount` takes the wrap too. A custom `lattice()` or `space()` is
+not known to wrap unless the formula says so with `#define WRAPS`, which
+`createSketch` reads into `Sketch.wraps`; without it there is no seam closing. `sunflower` and `ribbon` are the
+worked examples of the two hooks.
+
+A sketch's **lens** is `perspective` or `orthographic` (`LENSES`, its index is
+`uLens`). Orthographic has no distance to shrink with, so `lensScale()` turns the
+viewer's dolly into a zoom of the picture; its rays are parallel and start under
+the cursor, which `aim()` handles; and nearness is the dolly too, not
+`uReference / w`, which would be a constant 4.5 and blow every dot up.
+
+**Trails** fade the last frame into the backdrop instead of clearing it: a third
+pass, `PASS_FADE`, draws one viewport-covering triangle of the ramp's first
+colour at `1 - trails` alpha, with the depth test off so last frame's depth
+cannot keep it from covering. It needs `preserveDrawingBuffer`, set on every
+canvas, or the browser may hand back a cleared buffer. `prepare` clears the
+colour, so changing a setting starts the trails afresh.
+
+**Dot size has two parts that must stay apart.** Zoom scales a dot in
+proportion — `uReference / reach` in perspective, the dolly in orthographic —
+so the dot slider means its value at the camera's target. Depth then
+exaggerates only nearness to that target plane, `(reach / w)` raised to
+`3 × depth` and capped at 3×. Raising the camera's whole distance to that power,
+as it first did, made a zoomed-out sketch's dots shrink to nothing: at distance
+7 with depth 1.37 they were half a pixel. A pinch over a sketch is ctrl+wheel and
+is left to the canvas zoom.
 
 **The depth test is on in every mode**, which is load-bearing: points live in
 space, so what is in front is decided by real depth. A dot's soft edge is the
 trap — a translucent fragment still writes depth and punches a fringe through
 whatever is drawn after it — so the fragment shader discards below half
-coverage. Dots are a little crisper for it. The surface is lit from a flat
+coverage, except for dots under `SMALL_DOT` pixels, too small to show a fringe,
+which would otherwise lose half of themselves and all but vanish. Larger dots
+are a little crisper for it. The surface is lit from a flat
 normal, `cross(dFdx(p), dFdy(p))` of the formula's output, and lighting uses
 `abs`, because a lattice has no outside. Each corner is evaluated on its own, so
 a surface costs six formula calls per cell; formulas that cover a full period
@@ -120,6 +172,13 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     linked, so a broken edit leaves the rows as they were, and typing `k3` into a
     formula brings its slider up as soon as the edit compiles. A hidden row keeps
     its value.
+
+    **A knob can move by itself.** Each one has a motion, `CYCLES` = still, 1, 2,
+    4 or 8 swings per loop, and `knobAt` sweeps it from 0 up to its slider's value
+    and back. Whole numbers only, so a moving knob ends each loop where it began
+    and a loop still loops. The uniforms are set in `drawFrame`, every frame, not
+    in `prepare`, because a moving knob changes with the playhead rather than with
+    its settings.
 
 - **The pointer, in world space.** TypeScript sends only the mouse's clip-space
   position (`uPointer`, from `pointerAt`) and whether it is pressed; the vertex

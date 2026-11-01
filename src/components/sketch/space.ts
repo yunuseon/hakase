@@ -53,7 +53,6 @@ export const reduceOrbit = (orbit: Orbit, action: OrbitAction): Orbit => {
     }
 };
 
-// Column-major, as uniformMatrix4fv expects without transposing.
 export const FITS = ['contain', 'cover', 'stretch'] as const;
 
 export type Fit = (typeof FITS)[number];
@@ -73,15 +72,76 @@ const scales = (fit: Fit, aspect: number): readonly [number, number] => {
     }
 };
 
-export const projection = (aspect: number, fit: Fit): Float32Array => {
-    const focal = 1 / Math.tan(FOV / 2);
+export const LATTICES = ['grid', 'polar', 'hex', 'jitter'] as const;
+
+export type Lattice = (typeof LATTICES)[number];
+
+export const isLattice = (value: string): value is Lattice =>
+    LATTICES.some(lattice => lattice === value);
+
+export const SPACES = ['cartesian', 'polar', 'cylindrical', 'spherical'] as const;
+
+export type Space = (typeof SPACES)[number];
+
+export const isSpace = (value: string): value is Space => SPACES.some(space => space === value);
+
+export const wraps = (lattice: Lattice, space: Space): boolean =>
+    lattice === 'polar' || space !== 'cartesian';
+
+export const LENSES = ['perspective', 'orthographic'] as const;
+
+export type Lens = (typeof LENSES)[number];
+
+export const isLens = (value: string): value is Lens => LENSES.some(lens => lens === value);
+
+// Column-major, as uniformMatrix4fv expects without transposing.
+export const projection = (aspect: number, fit: Fit, lens: Lens): Float32Array => {
     const [x, y] = scales(fit, aspect);
-    const sx = focal * x;
-    const sy = focal * y;
+
+    if (lens === 'orthographic') {
+        // The -1..1 square spans the view as it does at the reference distance in perspective.
+        return new Float32Array([
+            x,
+            0,
+            0,
+            0,
+            0,
+            y,
+            0,
+            0,
+            0,
+            0,
+            -2 / (FAR - NEAR),
+            0,
+            0,
+            0,
+            -(FAR + NEAR) / (FAR - NEAR),
+            1,
+        ]);
+    }
+
+    const focal = 1 / Math.tan(FOV / 2);
     const depth = (FAR + NEAR) / (NEAR - FAR);
     const offset = (2 * FAR * NEAR) / (NEAR - FAR);
 
-    return new Float32Array([sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, depth, -1, 0, 0, offset, 0]);
+    return new Float32Array([
+        focal * x,
+        0,
+        0,
+        0,
+        0,
+        focal * y,
+        0,
+        0,
+        0,
+        0,
+        depth,
+        -1,
+        0,
+        0,
+        offset,
+        0,
+    ]);
 };
 
 // What the shader's orbited() reads: yaw, pitch, and the distance relative to the default.
