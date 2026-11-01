@@ -77,6 +77,7 @@ const statusOf = (event: ExportEvent): ExportStatus => {
 export const sketchProgram: Program = {
     id: 'sketch',
     title: 'sketch',
+    category: 'make',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
     size: { width: 640, height: 820 },
     minimum: { width: 320, height: 420 },

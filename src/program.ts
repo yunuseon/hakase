@@ -143,9 +143,22 @@ export type ProcessView = {
     readonly run$: (state: AppState, self: Self) => Observable<AppInput>;
 };
 
+export const CATEGORIES = [
+    { id: 'make', title: 'Make', icon: 'M4 20 L9.5 9.5 L15 20 Z M14 4 H20 V10 H14 Z' },
+    {
+        id: 'plan',
+        title: 'Plan',
+        icon: 'M5 4 H19 V20 H5 Z M8.5 9 H15.5 M8.5 12.5 H15.5 M8.5 16 H12.5',
+    },
+    { id: 'system', title: 'System', icon: 'M4 7 H20 M4 17 H20 M9 4 V10 M15 14 V20' },
+] as const;
+
+export type CategoryId = (typeof CATEGORIES)[number]['id'];
+
 export type Program = {
     readonly id: ProgramId;
     readonly title: string;
+    readonly category: CategoryId;
     // Path data on a 24x24 viewBox: the program's face in the dock and on the desktop.
     readonly icon: string;
     readonly size: Size;

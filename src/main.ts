@@ -35,7 +35,7 @@ import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
-import { HksToolbar } from './components/toolbar/toolbar.component.ts';
+import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { reduceLibrary, sourceOf, type FormulaId, type LibraryCommand } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
@@ -82,6 +82,7 @@ import {
     type Slot,
     type Task,
     type Written,
+    CATEGORIES,
     restored,
     valuesOf,
 } from './program.ts';
@@ -142,7 +143,12 @@ const programs: readonly Program[] = [
 const programOf = (id: ProgramId): Program | undefined =>
     programs.find(program => program.id === id);
 
-const faces = programs.map(({ id, title, icon }) => ({ id, title, icon }));
+const categories: readonly ToolbarCategory[] = CATEGORIES.map(category => ({
+    ...category,
+    items: programs
+        .filter(program => program.category === category.id)
+        .map(({ id, title, icon }) => ({ id, title, icon })),
+})).filter(({ items }) => items.length > 0);
 
 const sameSlot = ({ frame: a, focused }: Slot, { frame: b, focused: other }: Slot): boolean =>
     focused === other &&
@@ -176,7 +182,7 @@ const bootstrap = () => {
     const canvas = new HksCanvas();
     document.body.append(canvas);
 
-    const toolbar = new HksToolbar().items(faces);
+    const toolbar = new HksToolbar().categories(categories);
     toolbar.slot = 'chrome';
     canvas.append(toolbar);
 

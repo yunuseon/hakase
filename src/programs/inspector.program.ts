@@ -20,6 +20,7 @@ const write = (settings: InspectorSettings): AppInput => ({ kind: 'settings', se
 export const inspectorProgram: Program = {
     id: 'inspector',
     title: 'inspector',
+    category: 'system',
     icon: 'M8.5 4 C5.5 4 6.5 10 4 12 C6.5 14 5.5 20 8.5 20 M15.5 4 C18.5 4 17.5 10 20 12 C17.5 14 18.5 20 15.5 20',
     size: { width: 560, height: 420 },
     minimum: { width: 360, height: 220 },

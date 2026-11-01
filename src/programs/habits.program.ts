@@ -9,6 +9,7 @@ import type { AppInput, Program } from '../program.ts';
 export const habitsProgram: Program = {
     id: 'habits',
     title: 'habits',
+    category: 'plan',
     icon: 'M4 5 H8 V9 H4 Z M10 5 H14 V9 H10 Z M16 5 H20 V9 H16 Z M4 11 H8 V15 H4 Z M10 11 H14 V15 H10 Z M4 17 H8 V21 H4 Z',
     size: { width: 460, height: 260 },
     minimum: { width: 260, height: 180 },

@@ -1,7 +1,7 @@
-import { EMPTY, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$ } from '../../lib/rx.ts';
+import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import { isPlacement, sameToolbarView, type Placement, type ToolbarView } from './toolbar.ts';
 import css from './toolbar.css?inline';
 
@@ -40,6 +40,62 @@ export type ToolbarItem = {
     readonly icon: string;
 };
 
+export type ToolbarCategory = ToolbarItem & {
+    readonly items: readonly ToolbarItem[];
+};
+
+// Built as nodes, not markup: an icon is path data, never HTML.
+const iconOf = (icon: string): SVGSVGElement => {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', icon);
+    svg.append(path);
+
+    return svg;
+};
+
+const categoryOf = ({ title, icon, items }: ToolbarCategory): HTMLElement => {
+    const menu = document.createElement('details');
+    menu.className = 'category';
+
+    const key = document.createElement('summary');
+    key.className = 'key';
+    key.title = title;
+    key.setAttribute('aria-label', title);
+    key.append(iconOf(icon));
+
+    const list = document.createElement('div');
+    list.className = 'places';
+    list.setAttribute('role', 'menu');
+    list.setAttribute('aria-label', title);
+
+    const heading = document.createElement('p');
+    heading.className = 'places-title';
+    heading.textContent = title;
+    list.append(heading);
+
+    for (const item of items) {
+        const choice = document.createElement('button');
+        choice.type = 'button';
+        choice.className = 'choice';
+        choice.dataset['program'] = item.id;
+        choice.setAttribute('role', 'menuitem');
+        choice.title = `new ${item.title}`;
+
+        const label = document.createElement('span');
+        label.textContent = item.title;
+        choice.append(iconOf(item.icon), label);
+        list.append(choice);
+    }
+
+    menu.append(key, list);
+
+    return menu;
+};
+
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
     const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
 
@@ -61,6 +117,8 @@ export class HksToolbar extends HTMLElement {
     readonly retracts$: Observable<void>;
 
     private readonly programs: HTMLElement;
+    private readonly shadow: ShadowRoot;
+    private readonly tray: HTMLElement;
     private readonly menu: HTMLDetailsElement;
     private readonly tab: HTMLElement;
 
@@ -71,6 +129,8 @@ export class HksToolbar extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
+        this.shadow = shadow;
+        this.tray = requireChild(shadow, '.tray');
         this.programs = requireChild(shadow, '.programs');
         this.menu = requireElement(shadow, '.menu', HTMLDetailsElement);
         this.tab = requireChild(shadow, '.tab');
@@ -82,54 +142,69 @@ export class HksToolbar extends HTMLElement {
         this.retracts$ = fromElementEvent$(this.tab, 'click').pipe(map(() => undefined));
     }
 
-    items(items: readonly ToolbarItem[]): this {
-        this.programs.replaceChildren(
-            ...items.map(({ id, title, icon }) => {
-                const tile = document.createElement('button');
-                tile.type = 'button';
-                tile.className = 'key tile';
-                tile.dataset['program'] = id;
-                tile.title = `new ${title}`;
-                tile.setAttribute('aria-label', `new ${title}`);
-
-                // Built as nodes, not markup: an icon is path data, never HTML.
-                const svg = document.createElementNS(SVG, 'svg');
-                svg.setAttribute('viewBox', '0 0 24 24');
-                svg.setAttribute('aria-hidden', 'true');
-
-                const path = document.createElementNS(SVG, 'path');
-                path.setAttribute('d', icon);
-                svg.append(path);
-                tile.append(svg);
-
-                return tile;
-            }),
-        );
+    categories(categories: readonly ToolbarCategory[]): this {
+        this.programs.replaceChildren(...categories.map(categoryOf));
 
         return this;
     }
 
     connect$(view$: Observable<ToolbarView>): Observable<void> {
-        return view$.pipe(
-            distinctUntilChanged(sameToolbarView),
-            tap(({ placement, retracted }) => {
-                this.dataset['placement'] = placement;
-                for (const choice of this.menu.querySelectorAll('[data-place]')) {
-                    choice.setAttribute(
-                        'aria-checked',
-                        String(
-                            choice instanceof HTMLElement && choice.dataset['place'] === placement,
-                        ),
-                    );
+        const menus = (): HTMLDetailsElement[] =>
+            [...this.shadow.querySelectorAll('details')].filter(
+                menu => menu instanceof HTMLDetailsElement,
+            );
+        const closeAll = (except: Element | null = null): void => {
+            for (const menu of menus()) {
+                if (menu !== except) {
+                    menu.open = false;
                 }
-                this.toggleAttribute('data-retracted', retracted);
-                this.tab.setAttribute('aria-label', retracted ? 'show toolbar' : 'hide toolbar');
-                this.tab.title = retracted ? 'show toolbar' : 'hide toolbar';
-                // The menu chose this placement; leaving it open would cover the tray.
-                this.menu.open = false;
-            }),
-            map(() => undefined),
-        );
+            }
+        };
+
+        return merge(
+            // Captured: `toggle` does not bubble. One menu at a time, or two flyouts would overlap.
+            fromElementEvent$(this.tray, 'toggle', { capture: true }).pipe(
+                tap(({ target }) => {
+                    if (target instanceof HTMLDetailsElement && target.open) {
+                        closeAll(target);
+                    }
+                }),
+            ),
+            merge(
+                this.launches$,
+                fromDocumentEvent$('pointerdown').pipe(
+                    filter(event => !event.composedPath().includes(this)),
+                ),
+                fromDocumentEvent$('keydown').pipe(filter(({ key }) => key === 'Escape')),
+            ).pipe(
+                tap(() => {
+                    closeAll();
+                }),
+            ),
+            view$.pipe(
+                distinctUntilChanged(sameToolbarView),
+                tap(({ placement, retracted }) => {
+                    this.dataset['placement'] = placement;
+                    for (const choice of this.menu.querySelectorAll('[data-place]')) {
+                        choice.setAttribute(
+                            'aria-checked',
+                            String(
+                                choice instanceof HTMLElement &&
+                                    choice.dataset['place'] === placement,
+                            ),
+                        );
+                    }
+                    this.toggleAttribute('data-retracted', retracted);
+                    this.tab.setAttribute(
+                        'aria-label',
+                        retracted ? 'show toolbar' : 'hide toolbar',
+                    );
+                    this.tab.title = retracted ? 'show toolbar' : 'hide toolbar';
+                    // The menu chose this placement; leaving it open would cover the tray.
+                    this.menu.open = false;
+                }),
+            ),
+        ).pipe(map(() => undefined));
     }
 }
 

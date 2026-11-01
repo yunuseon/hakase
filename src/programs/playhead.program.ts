@@ -6,6 +6,7 @@ import type { AppInput, Program } from '../program.ts';
 export const playheadProgram: Program = {
     id: 'playhead',
     title: 'playhead',
+    category: 'make',
     icon: 'M12 12 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0 M12 12 L12 4.4',
     size: { width: 200, height: 244 },
     minimum: { width: 140, height: 170 },

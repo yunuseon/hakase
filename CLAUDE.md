@@ -481,7 +481,13 @@ table; nothing else in `main.ts` names it.
 
 **The toolbar is chrome, not a program.** Its tiles only launch: a program can
 run any number of times, so "this program is running" says nothing worth lighting
-up. The toolbar must not itself be launchable — it is mounted once by
+up. **Programs are grouped by `category`** (`CATEGORIES` in `program.ts`: make,
+plan, system), one tile per category opening a flyout of its programs, so the bar
+stays three tiles long however many programs there are. Each flyout is a
+`<details>` like the position menu; one is open at a time (`toggle` does not
+bubble, so the tray listens in the capture phase), and a launch, a click outside
+or Escape closes them. A category's flyout runs along the bar from its own tile,
+not back off the bar's edge as the position menu's does. The toolbar must not itself be launchable — it is mounted once by
 `main.ts`, in the canvas's `chrome` slot, outside the zoomed layer. Its tiles are
 built with
 `createElementNS`, never `innerHTML`: a `Program.icon` is path data on a 24x24
@@ -1383,7 +1389,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and nineteen of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and twenty of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

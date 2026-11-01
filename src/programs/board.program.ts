@@ -6,6 +6,7 @@ import type { AppInput, Program } from '../program.ts';
 export const boardProgram: Program = {
     id: 'board',
     title: 'board',
+    category: 'plan',
     icon: 'M4 4 H8.5 V20 H4 Z M10 4 H14.5 V14 H10 Z M16 4 H20.5 V10 H16 Z',
     size: { width: 720, height: 400 },
     minimum: { width: 260, height: 220 },

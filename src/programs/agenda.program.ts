@@ -21,6 +21,7 @@ const show = (day: string | null): AppInput => ({
 export const agendaProgram: Program = {
     id: 'agenda',
     title: 'agenda',
+    category: 'plan',
     icon: 'M4 6 H20 V20 H4 Z M4 10 H20 M8 3.5 V7.5 M16 3.5 V7.5 M7.5 13 H12.5 V17 H7.5 Z',
     size: { width: 320, height: 460 },
     minimum: { width: 220, height: 260 },
