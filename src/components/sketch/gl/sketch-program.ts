@@ -49,6 +49,7 @@ export const adapterFor = (formula: string): string =>
         MAPS_SPACE.test(formula)
             ? 'vec3 placed(vec3 p) { return space(p); }'
             : 'vec3 placed(vec3 p) { return builtinSpace(p); }',
+        `bool ownSpace() { return ${MAPS_SPACE.test(formula) ? 'true' : 'false'}; }`,
     ].join('\n');
 const LOG_LOCATION = /^(ERROR|WARNING): \d+:(\d+):/gm;
 

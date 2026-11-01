@@ -190,9 +190,22 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
   misses the ground aims at a point `HORIZON` away instead of infinity, with
   `pointerOnGround` at 0; there is no memory of the last hit, because shader
   globals do not outlive a draw. `pointerDistance(p)` is a prelude helper for
-  3D shapes. These are **globals filled in `main()`**, not uniforms, and
-  `camera()` runs before `aim()`, so a camera that reads the pointer sees it
-  unset — aiming needs the camera, and that order cannot be flipped.
+  3D shapes.
+
+    **`pointer` is in the formula's own coordinates**, not the world's. In a
+    non-cartesian space the ray is met with the sheet z = 0 maps to — the ground
+    for polar, a cylinder of `CYLINDER_RADIUS` or a ball of `SPHERE_RADIUS` — and
+    that point is mapped back, so `pointer - vec2(x, y)` stays under the cursor
+    in every built-in space and `lens`, `vortex` and `magnet` needed no change.
+    `pointerOnGround` is 1 when the ray meets that sheet; a miss takes its
+    nearest approach. A formula's own `space()` has no inverse, so the adapter's
+    `ownSpace()` keeps it on the ground point; `pointerDistance(x, y)` measures
+    through `placed()` in the world and works there too, at the cost of assuming
+    z = 0.
+
+    These are **globals filled in `main()`**, not uniforms, and
+    `camera()` runs before `aim()`, so a camera that reads the pointer sees it
+    unset — aiming needs the camera, and that order cannot be flipped.
 
     **Shift-drag is a press**, `pointerDown`; a plain drag still orbits. Both
     gestures come from the same `pointerdown`, split by an `accepts` predicate

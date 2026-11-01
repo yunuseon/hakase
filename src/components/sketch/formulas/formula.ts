@@ -49,11 +49,11 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
     },
     {
         term: 'pointer, pointerOnGround',
-        text: 'Where the mouse ray touches the ground, the z = 0 plane, as a vec2 in the same space as x and y, so it stays under the cursor however the camera turns. When the ray misses the ground it points toward the horizon and pointerOnGround is 0.0 instead of 1.0.',
+        text: 'The point under the mouse as a vec2 in the same coordinates as x and y, so pointer - vec2(x, y) stays under the cursor however the camera turns and whichever space is picked: in polar, cylindrical and spherical space it is read where the mouse meets the shape z = 0 becomes. When the mouse misses it, pointerOnGround is 0.0 instead of 1.0. A formula with its own space() gets the point on the flat ground instead.',
     },
     {
-        term: 'pointerOrigin, pointerDirection, pointerDistance(p)',
-        text: 'The mouse ray itself, for shapes that are not on the ground: it starts at the camera and passes under the cursor. pointerDistance(p) is how far a point is from that ray, so exp(-pow(pointerDistance(p), 2.0) / 0.03) is 1 right under the mouse and fades away from it.',
+        term: 'pointerOrigin, pointerDirection, pointerDistance(p), pointerDistance(x, y)',
+        text: 'The mouse ray itself, for shapes that are not on the ground: it starts at the camera and passes under the cursor. pointerDistance(p) is how far a point is from that ray, so exp(-pow(pointerDistance(p), 2.0) / 0.03) is 1 right under the mouse and fades away from it. pointerDistance(x, y) measures the same for the point x, y after the space has placed it, which also works with a space() of your own.',
     },
     {
         term: 'pointerDown',

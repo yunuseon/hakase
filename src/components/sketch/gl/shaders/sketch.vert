@@ -51,6 +51,15 @@ out vec3 vPosition;
 #define PASS_FADE 2
 #define LENS_ORTHOGRAPHIC 1
 
+#define SPACE_CARTESIAN 0
+#define SPACE_POLAR 1
+#define SPACE_CYLINDRICAL 2
+#define SPACE_SPHERICAL 3
+
+// The radius z = 0 maps to, which is also the sheet the pointer is read on.
+const float CYLINDER_RADIUS = 0.35;
+const float SPHERE_RADIUS = 0.55;
+
 struct Camera {
     vec3 eye;
     vec3 target;
@@ -62,6 +71,7 @@ vec4 point(float x, float y, float t);
 Camera view(float t);
 vec2 sampled(vec2 uv, float index, float count);
 vec3 placed(vec3 p);
+bool ownSpace();
 
 const float PITCH_LIMIT = 1.56;
 
@@ -132,10 +142,50 @@ void aim(Eye e) {
     // A ray that never meets the ground points at the horizon rather than jumping to infinity.
     vec3 hit = pointerOrigin + pointerDirection * (pointerOnGround > 0.5 ? min(along, HORIZON) : HORIZON);
     pointer = hit.xy;
+
+    // A formula's own space() cannot be inverted, so it reads the ground point; cartesian needs no inverse.
+    if (ownSpace() || uSpace == SPACE_CARTESIAN) {
+        return;
+    }
+
+    if (uSpace == SPACE_POLAR) {
+        pointer = vec2(atan(hit.y, hit.x) / PI, 2.0 * length(hit.xy) - 1.0);
+
+        return;
+    }
+
+    // The sheet is a cylinder around y or a ball, so the ray meets a quadratic; a miss takes its nearest approach.
+    bool cylinder = uSpace == SPACE_CYLINDRICAL;
+    vec3 keep = cylinder ? vec3(1.0, 0.0, 1.0) : vec3(1.0);
+    float radius = cylinder ? CYLINDER_RADIUS : SPHERE_RADIUS;
+    vec3 o = pointerOrigin * keep;
+    vec3 d = pointerDirection * keep;
+    float a = max(dot(d, d), 1e-8);
+    float b = dot(o, d);
+    float disc = b * b - a * (dot(o, o) - radius * radius);
+    float near = (-b - sqrt(max(disc, 0.0))) / a;
+    float far = (-b + sqrt(max(disc, 0.0))) / a;
+    float t = disc >= 0.0 && far > 0.0 ? (near > 0.0 ? near : far) : max(-b / a, 0.0);
+    vec3 at = pointerOrigin + pointerDirection * t;
+    pointerOnGround = disc >= 0.0 && far > 0.0 ? 1.0 : 0.0;
+
+    if (cylinder) {
+        pointer = vec2(atan(at.x, at.z) / PI, at.y);
+
+        return;
+    }
+
+    vec3 onBall = normalize(at) * SPHERE_RADIUS;
+    pointer = vec2(atan(onBall.x, onBall.z) / PI, asin(clamp(onBall.y / SPHERE_RADIUS, -1.0, 1.0)) / (PI * 0.5));
 }
 
 float pointerDistance(vec3 p) {
     return length(cross(p - pointerOrigin, pointerDirection));
+}
+
+// In the world, through whatever space the sketch reads its formula in, a formula's own space() included.
+float pointerDistance(float x, float y) {
+    return pointerDistance(placed(vec3(x, y, 0.0)));
 }
 
 const float AXIS_REACH = 1.25;
@@ -225,10 +275,6 @@ ivec2 latticePoint(int id, int side) {
 #define LATTICE_HEX 2
 #define LATTICE_JITTER 3
 
-#define SPACE_POLAR 1
-#define SPACE_CYLINDRICAL 2
-#define SPACE_SPHERICAL 3
-
 // Stable per cell, so a jittered lattice holds still from frame to frame.
 vec2 jitterOf(vec2 cell) {
     return fract(sin(vec2(dot(cell, vec2(12.9898, 78.233)), dot(cell, vec2(39.3468, 11.135)))) * 43758.5453) - 0.5;
@@ -275,7 +321,7 @@ vec3 builtinSpace(vec3 v) {
 
     if (uSpace == SPACE_CYLINDRICAL) {
         float angle = v.x * PI;
-        float radius = 0.35 + 0.5 * v.z;
+        float radius = CYLINDER_RADIUS + 0.5 * v.z;
 
         return vec3(radius * sin(angle), v.y, radius * cos(angle));
     }
@@ -283,7 +329,7 @@ vec3 builtinSpace(vec3 v) {
     if (uSpace == SPACE_SPHERICAL) {
         float longitude = v.x * PI;
         float latitude = v.y * PI * 0.5;
-        float radius = 0.55 + 0.4 * v.z;
+        float radius = SPHERE_RADIUS + 0.4 * v.z;
 
         return radius * vec3(cos(latitude) * sin(longitude), sin(latitude), cos(latitude) * cos(longitude));
     }
