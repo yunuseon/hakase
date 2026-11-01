@@ -667,6 +667,16 @@ every pointer move and the block follows through the fold, so there is no local
 drag state; `laidOut` puts overlapping blocks side by side, derived on every
 render rather than stored.
 
+**Habits are one shared list of ticked days**: each habit keeps the `Day`s it
+was done, sorted and unique, and the window shows the last `WINDOW_DAYS` up to
+today, scrolled so today is in view, with the names pinned. `habitsView` derives
+the grid and each streak from the list and today (`wallClock$` again), so the
+columns move at midnight on their own. A streak counts back from yesterday while
+today is unticked, because the day is not over. The rows share **one CSS grid**
+(`display: contents` on each row): rows that were grids of their own sized their
+first column apart and the day headers drifted off their cells. Deleting a habit
+takes two clicks on the same ×, like a note, because it takes its history with it.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1248,7 +1258,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and fifty of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and fifty-seven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

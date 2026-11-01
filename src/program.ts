@@ -10,6 +10,7 @@ import type { Board, BoardCommand } from './components/board/board.ts';
 import type { NoteCommand, Notes } from './components/note/note.ts';
 import type { Focus, FocusCommand } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
+import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import type { TransportCommand } from './shared/playhead.ts';
@@ -27,6 +28,7 @@ export const PROGRAM_IDS = [
     'note',
     'focus',
     'agenda',
+    'habits',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -54,6 +56,7 @@ export type AppInput =
     | { readonly kind: 'note'; readonly command: NoteCommand }
     | { readonly kind: 'focus'; readonly command: FocusCommand }
     | { readonly kind: 'agenda'; readonly command: AgendaCommand }
+    | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
@@ -89,6 +92,7 @@ export type AppState = {
     readonly notes$: Observable<Notes>;
     readonly focus$: Observable<Focus>;
     readonly agenda$: Observable<Agenda>;
+    readonly habits$: Observable<Habits>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 
