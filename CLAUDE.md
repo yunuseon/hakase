@@ -972,7 +972,12 @@ a **fork** (a branch) for continuing on a copy of this one. The icons carry a
 **The current store's name is an input in its own row**: switching to it would
 do nothing, so a click there renames instead, Enter commits and Escape puts the
 old name back before the blur, so the blur changes nothing. The list is not
-rebuilt while a name has focus, or the rebuild would take the input away. The window
+rebuilt while a name has focus, or the rebuild would take the input away.
+**+ and fork keep the popover open** and focus the new store's name, selected,
+so it can be named at once. Which store is new is read against the binding as it
+was in the **capture** phase: the window's own gesture listener may already have
+applied the add by the time a bubbling listener runs, and waiting for "the next
+binding" then waits forever. The window
 receives them as plain `StoreOption`s and knows nothing else.
 
 ## The command palette
@@ -1350,7 +1355,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and eleven of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and thirteen of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

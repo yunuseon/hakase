@@ -8,6 +8,8 @@ import {
     scan,
     share,
     startWith,
+    switchMap,
+    take,
     tap,
 } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -158,12 +160,9 @@ export class HksWindow extends HTMLElement {
                 filter(({ key }) => key === 'Escape'),
                 map(() => 'close' as const),
             ),
+            // Not after + or fork: the new store's name is focused next, so it can be named straight away.
             fromElementEvent$(popover, 'click').pipe(
-                filter(
-                    ({ target }) =>
-                        dataOf(target, 'bind') !== undefined ||
-                        dataOf(target, 'copy') !== undefined,
-                ),
+                filter(({ target }) => dataOf(target, 'bind') !== undefined),
                 map(() => 'close' as const),
             ),
         ).pipe(
@@ -300,6 +299,30 @@ export class HksWindow extends HTMLElement {
                 tap(open => {
                     popover.hidden = !open;
                     chip.setAttribute('aria-expanded', String(open));
+                }),
+            ),
+            // Captured, so the binding is read before the add is applied, whichever listener runs first.
+            fromElementEvent$(popover, 'click', { capture: true }).pipe(
+                filter(({ target }) => dataOf(target, 'copy') !== undefined),
+                map(() => {
+                    const name = options.querySelector('input.option-name');
+
+                    return name instanceof HTMLInputElement ? name.dataset['rename'] : undefined;
+                }),
+                switchMap(was =>
+                    stores$.pipe(
+                        map(stores => stores?.find(option => option.current)?.id),
+                        filter(id => id !== undefined && id !== was),
+                        take(1),
+                    ),
+                ),
+                tap(() => {
+                    const name = options.querySelector('input.option-name');
+
+                    if (name instanceof HTMLInputElement) {
+                        name.focus();
+                        name.select();
+                    }
                 }),
             ),
             fromElementEvent$(popover, 'keydown').pipe(
