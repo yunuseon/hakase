@@ -33,6 +33,20 @@ export type StoreOption = {
     readonly current: boolean;
 };
 
+export type SwitchItem = {
+    readonly id: string;
+    readonly title: string;
+    readonly icon: string;
+    readonly minimum: Size;
+    readonly current: boolean;
+    readonly stores: readonly StoreOption[] | null;
+};
+
+export type SwitchGroup = {
+    readonly title: string;
+    readonly items: readonly SwitchItem[];
+};
+
 // Untagged: a window does not know which program it holds, so whoever mounts it names that.
 export type WindowGesture =
     | { readonly kind: 'move'; readonly dx: number; readonly dy: number }
@@ -48,7 +62,14 @@ export type WindowGesture =
     | { readonly kind: 'bind-store'; readonly store: string }
     | { readonly kind: 'add-store'; readonly copy: boolean }
     | { readonly kind: 'rename-store'; readonly store: string; readonly name: string }
-    | { readonly kind: 'remove-store'; readonly store: string };
+    | { readonly kind: 'remove-store'; readonly store: string }
+    // The window echoes what it was offered: it does not know what a program is.
+    | {
+          readonly kind: 'replace';
+          readonly program: string;
+          readonly store: string | null;
+          readonly minimum: Size;
+      };
 
 const MIN_WIDTH = 180;
 const MIN_HEIGHT = 64;

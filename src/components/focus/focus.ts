@@ -114,8 +114,12 @@ export type Timers = ReadonlyMap<string, Focus>;
 
 type TimersAction =
     | { readonly kind: 'command'; readonly store: string; readonly command: FocusCommand }
-    | { readonly kind: 'copy'; readonly from: string; readonly to: string }
+    | TimersEvent
     | { readonly kind: 'tick'; readonly ms: number };
+
+type TimersEvent =
+    | { readonly kind: 'copy'; readonly from: string; readonly to: string }
+    | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> };
 
 export const reduceTimers = (timers: Timers, action: TimersAction): Timers => {
     switch (action.kind) {
@@ -135,6 +139,11 @@ export const reduceTimers = (timers: Timers, action: TimersAction): Timers => {
                 ? timers
                 : new Map(timers).set(action.to, { ...source, running: false });
         }
+        case 'keep': {
+            const kept = new Map([...timers].filter(([store]) => action.stores.has(store)));
+
+            return kept.size === timers.size ? timers : kept;
+        }
         case 'tick':
             return [...timers.values()].some(({ running }) => running)
                 ? new Map([...timers].map(([store, focus]) => [store, reduceFocus(focus, action)]))
@@ -144,12 +153,12 @@ export const reduceTimers = (timers: Timers, action: TimersAction): Timers => {
 
 export const createTimers$ = (
     commands$: Observable<{ readonly store: string; readonly command: FocusCommand }>,
-    copies$: Observable<{ readonly from: string; readonly to: string }>,
+    events$: Observable<TimersEvent>,
     initial: Timers,
 ): Observable<Timers> => {
     const timers$: Observable<Timers> = merge(
         commands$.pipe(map((stamped): TimersAction => ({ kind: 'command', ...stamped }))),
-        copies$.pipe(map((copy): TimersAction => ({ kind: 'copy', ...copy }))),
+        events$,
         // defer: a phase that runs out pauses, so the ticks are gated by this fold.
         defer(() => timers$).pipe(
             map(timers => [...timers.values()].some(({ running }) => running)),

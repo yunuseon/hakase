@@ -231,3 +231,76 @@ describe('parseWorkspace stores', () => {
         ]);
     });
 });
+
+describe('replace', () => {
+    const minimum = { width: 200, height: 500 };
+
+    it('swaps a window for another program in place, keeping its frame and depth', () => {
+        const history = run(fresh(), [
+            { kind: 'replace', id: 'sketch-2', program: 'bookmarks', store: null, minimum },
+        ]);
+        const processes = history.present.processes;
+        const index = processes.findIndex(({ id }) => id === 'bookmarks-5');
+        const before = fresh().present.processes.findIndex(({ id }) => id === 'sketch-2');
+
+        expect(index).toBe(before);
+        expect(processes[index]).toMatchObject({ program: 'bookmarks', store: 'store-1' });
+        expect(processes[index]?.frame.width).toBe(640);
+        expect(processes.some(({ id }) => id === 'sketch-2')).toBe(false);
+    });
+
+    it('binds to a chosen store, or the main one, and grows to the new minimum', () => {
+        const main = run(fresh(), [
+            {
+                kind: 'replace',
+                id: 'playhead-4',
+                program: 'bookmarks',
+                store: 'bookmarks',
+                minimum,
+            },
+        ]);
+        const replaced = main.present.processes.find(({ id }) => id === 'bookmarks-5');
+
+        expect(replaced?.store).toBe('bookmarks');
+        expect(replaced?.frame.height).toBe(500);
+    });
+
+    it('binds a program that keeps no state to its main store', () => {
+        const history = run(fresh(), [
+            {
+                kind: 'replace',
+                id: 'timeline-3',
+                program: 'tasks',
+                store: null,
+                minimum: { width: 0, height: 0 },
+            },
+        ]);
+
+        expect(history.present.processes.find(({ id }) => id === 'tasks-5')?.store).toBe('tasks');
+    });
+
+    it('ignores a program that does not exist', () => {
+        const history = run(fresh(), [
+            { kind: 'replace', id: 'sketch-2', program: 'nope', store: null, minimum },
+        ]);
+
+        expect(history.present.processes.map(({ id }) => id)).toEqual(
+            fresh().present.processes.map(({ id }) => id),
+        );
+    });
+});
+
+describe('prune-stores', () => {
+    it('removes every store no window is bound to', () => {
+        const history = run(fresh(), [
+            { kind: 'launch', program: 'bookmarks', size: { width: 300, height: 300 }, viewport },
+            { kind: 'add-store', id: 'bookmarks-5', copy: false },
+            { kind: 'add-store', id: 'bookmarks-5', copy: false },
+            { kind: 'prune-stores' },
+        ]);
+
+        expect(history.present.stores.map(({ id }) => id).sort()).toEqual(
+            ['formula-1', 'playhead', 'sketch-2', 'store-2', 'timeline'].sort(),
+        );
+    });
+});

@@ -55,6 +55,7 @@ export type AppInput =
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
+    | { readonly kind: 'prune' }
     | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'todo'; readonly command: TodoCommand }

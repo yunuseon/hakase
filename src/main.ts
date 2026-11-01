@@ -56,7 +56,9 @@ import {
     inStore,
     perStore$,
     reduceStores,
-    type Copy,
+    mainStore,
+    type StoreEntry,
+    type StoreEvent,
     type StoreAction,
     type StoreId,
 } from './stores.ts';
@@ -70,7 +72,7 @@ import { defaultSketch, type Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
-import type { StoreOption } from './components/window/frame.ts';
+import type { StoreOption, SwitchGroup, SwitchItem } from './components/window/frame.ts';
 import { catalogOf, parseTarget, sameCatalog, type Global } from './inventory.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import {
@@ -290,6 +292,10 @@ const bootstrap = () => {
             ),
         ),
         defer(() => inputs$).pipe(
+            filter(({ input }) => input.kind === 'prune'),
+            map((): WorkspaceAction => ({ kind: 'prune-stores' })),
+        ),
+        defer(() => inputs$).pipe(
             mergeMap(({ from, input }) => (input.kind === 'close-others' ? of(from) : EMPTY)),
             map((keep): WorkspaceAction => ({ kind: 'close-others', keep })),
         ),
@@ -406,6 +412,53 @@ const bootstrap = () => {
                   distinctUntilChanged(sameOptions),
               );
 
+    // A document's main store is always on offer, registered yet or not: it is where its data lives.
+    const withMain = (program: ProgramId, stores: readonly StoreEntry[]): readonly StoreEntry[] => {
+        const own = stores.filter(store => store.program === program);
+
+        return HOLDING[program]?.holds === 'document' && !own.some(({ id }) => id === program)
+            ? [mainStore(program), ...own]
+            : own;
+    };
+
+    const switches$: Observable<readonly SwitchGroup[]> = workspace$.pipe(
+        map(({ processes, stores }) =>
+            stores
+                .map(
+                    ({ id, name }) =>
+                        `${id}:${name}:${processes.filter(p => p.store === id).length}`,
+                )
+                .join('|'),
+        ),
+        distinctUntilChanged(),
+        withLatestFrom(workspace$),
+        map(([, { processes, stores }]) =>
+            CATEGORIES.map((category): SwitchGroup => ({
+                title: category.title,
+                items: programs
+                    .filter(program => program.category === category.id)
+                    .map((program): SwitchItem => ({
+                        id: program.id,
+                        title: program.title,
+                        icon: program.icon,
+                        minimum: program.minimum,
+                        current: false,
+                        stores:
+                            HOLDING[program.id] === null
+                                ? null
+                                : withMain(program.id, stores).map((store): StoreOption => ({
+                                      id: store.id,
+                                      name: store.name,
+                                      colour: colourOf(store.id),
+                                      users: processes.filter(p => p.store === store.id).length,
+                                      current: false,
+                                  })),
+                    })),
+            })).filter(({ items }) => items.length > 0),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
     const appeared$: Observable<Process> = workspace$.pipe(
         map(({ processes }) => processes),
         startWith<readonly Process[]>([]),
@@ -441,6 +494,17 @@ const bootstrap = () => {
                       scoped(binding$(process.id)),
                       canvas,
                       storeOptions$(process),
+                      switches$.pipe(
+                          map(groups =>
+                              groups.map(group => ({
+                                  ...group,
+                                  items: group.items.map(item => ({
+                                      ...item,
+                                      current: item.id === process.program,
+                                  })),
+                              })),
+                          ),
+                      ),
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
@@ -452,21 +516,31 @@ const bootstrap = () => {
     );
 
     // A split-off store is seeded once, from the store it was split from, as it first appears.
-    const copies$: Observable<Copy> = workspace$.pipe(
-        map(({ stores }) => stores),
-        distinctUntilChanged(),
-        pairwise(),
-        mergeMap(([before, after]) =>
-            from(
-                after.flatMap(({ id, copy }) =>
-                    copy === null || before.some(store => store.id === id)
-                        ? []
-                        : [{ from: copy, to: id }],
+    const storeEvents$: Observable<StoreEvent> = merge(
+        workspace$.pipe(
+            map(({ stores }) => stores),
+            distinctUntilChanged(),
+            pairwise(),
+            mergeMap(([before, after]) =>
+                from(
+                    after.flatMap(({ id, copy }): StoreEvent[] =>
+                        copy === null || before.some(store => store.id === id)
+                            ? []
+                            : [{ kind: 'copy', from: copy, to: id }],
+                    ),
                 ),
             ),
         ),
-        share(),
-    );
+        // Bound stores and window ids both: settings of a document program are kept by window.
+        inputs$.pipe(
+            filter(({ input }) => input.kind === 'prune'),
+            withLatestFrom(workspace$),
+            map(([, { processes }]): StoreEvent => ({
+                kind: 'keep',
+                stores: new Set(processes.flatMap(({ id, store }) => [id, store])),
+            })),
+        ),
+    ).pipe(share());
 
     // A program whose store holds settings keys them by store; any other keys them by window.
     const settingsKey = (program: ProgramId, store: StoreId, from: ProcessId): string =>
@@ -485,7 +559,7 @@ const bootstrap = () => {
                     : EMPTY,
             ),
         ),
-        copies$.pipe(map((copy): StoreAction<Settings> => ({ kind: 'copy', ...copy }))),
+        storeEvents$,
     ).pipe(
         scan(
             (all: ReadonlyMap<string, Settings>, action: StoreAction<Settings>) =>
@@ -507,7 +581,7 @@ const bootstrap = () => {
                 input.kind === 'todo' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceTodos,
         emptyTodos,
         stored.todos,
@@ -519,7 +593,7 @@ const bootstrap = () => {
                 input.kind === 'board' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceBoard,
         defaultBoard,
         stored.board,
@@ -531,7 +605,7 @@ const bootstrap = () => {
                 input.kind === 'note' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceNotes,
         emptyNotes,
         stored.notes,
@@ -543,7 +617,7 @@ const bootstrap = () => {
                 input.kind === 'agenda' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceAgenda,
         emptyAgenda,
         stored.agenda,
@@ -555,7 +629,7 @@ const bootstrap = () => {
                 input.kind === 'habit' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceHabits,
         emptyHabits,
         stored.habits,
@@ -567,7 +641,7 @@ const bootstrap = () => {
                 input.kind === 'clock' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceClocks,
         defaultClocks,
         stored.clocks,
@@ -579,7 +653,7 @@ const bootstrap = () => {
                 input.kind === 'bookmark' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         reduceBookmarks,
         defaultBookmarks,
         stored.bookmarks,
@@ -591,7 +665,7 @@ const bootstrap = () => {
                 input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
             ),
         ),
-        copies$,
+        storeEvents$,
         stored.focus,
     );
 
@@ -713,6 +787,23 @@ const bootstrap = () => {
     const appearance$ = (name: AppearanceName): Observable<Written<Appearance>> =>
         looks$.pipe(map(all => all.get(name) ?? { value: appearances[name], from: null }));
 
+    // Which stores hold any data, read as one sorted key so a ticking timer does not churn the catalog.
+    const held$: Observable<ReadonlySet<StoreId>> = combineLatest([
+        todos$,
+        boards$,
+        notes$,
+        timers$,
+        agendas$,
+        habits$,
+        clocks$,
+        bookmarks$,
+    ]).pipe(
+        map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
+        distinctUntilChanged(),
+        map(key => new Set(key === '' ? [] : key.split('\n'))),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
     const state: Omit<AppState, StoreKey> = {
         playhead$: transport$.pipe(
             map(({ at }) => at),
@@ -743,9 +834,9 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
-        catalog$: workspace$.pipe(
-            map(({ stores, processes }) =>
-                catalogOf(stores, processes, program => programOf(program)?.title ?? program),
+        catalog$: combineLatest([workspace$, held$]).pipe(
+            map(([{ stores, processes }, held]) =>
+                catalogOf(stores, processes, program => programOf(program)?.title ?? program, held),
             ),
             // The workspace emits on every pointer move of a drag; the tree changes far less often.
             distinctUntilChanged(sameCatalog),

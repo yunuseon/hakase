@@ -16,12 +16,18 @@ describe('targets', () => {
 });
 
 describe('catalogOf', () => {
-    const catalog = catalogOf(workspace.stores, workspace.processes, program => program);
+    const catalog = catalogOf(
+        workspace.stores,
+        workspace.processes,
+        program => program,
+        new Set(['board']),
+    );
 
-    it('lists every document program by its main store, and settings stores only where they exist', () => {
+    it('lists a main store that holds data, and leaves out empty ones and programs with no stores', () => {
         const titles = catalog.map(({ title }) => title);
 
         expect(titles).toContain('board');
+        expect(titles).not.toContain('todo');
         expect(titles).toContain('sketch');
         expect(titles).not.toContain('theme');
         expect(titles).not.toContain('timeline');

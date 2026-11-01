@@ -110,6 +110,7 @@ export type WorkspaceAction =
     | { readonly kind: 'rename-section'; readonly id: string; readonly name: string }
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
+    | { readonly kind: 'prune-stores' }
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
@@ -590,6 +591,66 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                       ),
                   };
         }
+        case 'replace': {
+            const index = workspace.processes.findIndex(({ id }) => id === action.id);
+            const process = workspace.processes[index];
+            const program = action.program;
+
+            if (process === undefined || !isProgramId(program)) {
+                return workspace;
+            }
+
+            const launched = workspace.launched + 1;
+            const chosen = workspace.stores.find(
+                store => store.id === action.store && store.program === program,
+            );
+            const fresh =
+                chosen === undefined && HOLDING[program] !== null && action.store !== program;
+            const made = fresh ? workspace.made + 1 : workspace.made;
+            const store: StoreEntry =
+                chosen ??
+                (fresh
+                    ? {
+                          id: `store-${made}`,
+                          program,
+                          name: `Store ${made}`,
+                          kept: true,
+                          copy: null,
+                      }
+                    : mainStore(program));
+            const id = `${program}-${launched}`;
+            const frame = {
+                ...process.frame,
+                width: Math.max(process.frame.width, action.minimum.width),
+                height: Math.max(process.frame.height, action.minimum.height),
+            };
+            const renamed = (other: ProcessId): ProcessId => (other === process.id ? id : other);
+
+            // Same place in the list, so the new window keeps the old one's depth.
+            return {
+                ...workspace,
+                launched,
+                made,
+                stores: ensured(workspace.stores, store),
+                processes: workspace.processes.map((other, at) =>
+                    at === index
+                        ? {
+                              id,
+                              program,
+                              store: store.id,
+                              frame,
+                              measured: { width: frame.width, height: frame.height },
+                          }
+                        : other,
+                ),
+                links: workspace.links.map(({ a, b }) => ({ a: renamed(a), b: renamed(b) })),
+            };
+        }
+        case 'prune-stores': {
+            const bound = new Set(workspace.processes.map(({ store }) => store));
+
+            return { ...workspace, stores: workspace.stores.filter(({ id }) => bound.has(id)) };
+        }
         case 'remove-store':
             // Only a store no window uses: removing one under a window would leave it reading nothing.
             return workspace.processes.some(({ store }) => store === action.store)
@@ -1050,6 +1111,8 @@ const stepOf = (action: WorkspaceAction): Step | null => {
         case 'add-store':
         case 'rename-store':
         case 'remove-store':
+        case 'replace':
+        case 'prune-stores':
         case 'add-section':
         case 'rename-section':
         case 'remove-section':

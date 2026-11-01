@@ -48,8 +48,28 @@
 }
 
 .name {
-    flex: 1;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    margin-inline-end: auto;
+    padding: 2px 6px;
+    margin-inline-start: -6px;
+    overflow: hidden;
+    font: inherit;
+    color: inherit;
+    text-overflow: ellipsis;
     text-transform: capitalize;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: inherit;
+}
+
+.name[data-switchable]:hover,
+.name[aria-expanded='true'] {
+    color: var(--ink);
+    background: var(--well);
+    cursor: pointer;
 }
 
 .title:active {
@@ -215,7 +235,8 @@
     border-radius: 50%;
 }
 
-.stores {
+.stores,
+.switcher {
     position: absolute;
     inset-block-start: 34px;
     inset-inline-end: 8px;
@@ -234,8 +255,92 @@
     cursor: default;
 }
 
-.stores[hidden] {
+.stores[hidden],
+.switcher[hidden] {
     display: none;
+}
+
+.switcher {
+    inset-inline: 8px auto;
+    max-block-size: 360px;
+}
+
+.switch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-block-size: 0;
+    overflow: auto;
+}
+
+.switch-group {
+    margin: 6px 8px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.switch-group:first-child {
+    margin-block-start: 0;
+}
+
+.switch-row svg {
+    flex: none;
+    inline-size: 15px;
+    block-size: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.switch-row .option-name {
+    text-transform: capitalize;
+}
+
+.switch-row[data-current] .option-name {
+    font-weight: 600;
+}
+
+.back {
+    display: grid;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    margin-inline-start: -4px;
+    padding: 0;
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.back[hidden],
+.add[hidden] {
+    display: none;
+}
+
+.back:hover {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.back svg {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.switch-title {
+    text-transform: capitalize;
 }
 
 .stores-head {

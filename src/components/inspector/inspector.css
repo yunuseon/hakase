@@ -8,7 +8,15 @@
     color: var(--ink);
 }
 
+.side {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-block-size: 0;
+}
+
 .tree {
+    flex: 1;
     min-block-size: 0;
     padding: 4px;
     overflow: auto;
@@ -219,6 +227,33 @@
 .item:focus-visible,
 .toggle:focus-visible,
 .copy:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+.prune {
+    flex: none;
+    padding: 6px 10px;
+    font: 500 11px var(--font-ui);
+    color: var(--ink);
+    background: var(--well);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.prune:hover:not(:disabled),
+.prune[data-armed] {
+    background: color-mix(in srgb, var(--accent) 25%, var(--well));
+}
+
+.prune:disabled {
+    color: var(--muted);
+    background: transparent;
+    cursor: default;
+}
+
+.prune:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }

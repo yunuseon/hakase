@@ -1,4 +1,4 @@
-import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -19,6 +19,8 @@ import {
     RESIZE_EDGES,
     type ResizeEdge,
     type StoreOption,
+    type SwitchGroup,
+    type SwitchItem,
     type WindowGesture,
     type WindowView,
 } from './frame.ts';
@@ -30,7 +32,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const TEMPLATE = `
     <div class="title">
         <span class="glyph"></span>
-        <span class="name"></span>
+        <button class="name" type="button" aria-haspopup="true" aria-expanded="false" title="change program"></button>
         <button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
             <span class="dot"></span><span class="store-name"></span>
         </button>
@@ -56,7 +58,90 @@ const TEMPLATE = `
         </header>
         <ul class="options"></ul>
     </div>
+    <div class="switcher" role="dialog" aria-label="change program" hidden>
+        <header class="stores-head">
+            <button class="back" type="button" aria-label="back to programs" title="back to programs" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6 L8 12 L14 18"/></svg>
+            </button>
+            <span class="switch-title">Program</span>
+            <button class="add switch-new" type="button" title="New empty state" aria-label="new empty state" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
+            </button>
+        </header>
+        <div class="switch-list"></div>
+    </div>
 `;
+
+// Further than this between press and click, and the press was a drag of the title, not a click on the name.
+const CLICK_SLOP = 4;
+
+type Switching =
+    | { readonly step: 'closed' }
+    | { readonly step: 'programs' }
+    | { readonly step: 'stores'; readonly program: string };
+
+type SwitchAction =
+    | { readonly kind: 'toggle' }
+    | { readonly kind: 'close' }
+    | { readonly kind: 'pick'; readonly program: string }
+    | { readonly kind: 'back' };
+
+const reduceSwitching = (state: Switching, action: SwitchAction): Switching => {
+    switch (action.kind) {
+        case 'toggle':
+            return state.step === 'closed' ? { step: 'programs' } : { step: 'closed' };
+        case 'close':
+            return { step: 'closed' };
+        case 'pick':
+            return { step: 'stores', program: action.program };
+        case 'back':
+            return { step: 'programs' };
+    }
+};
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const switchRow = (
+    label: string,
+    meta: string,
+    current: boolean,
+    icon: string | null,
+    colour: string | null,
+): HTMLElement => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'pick switch-row';
+    row.toggleAttribute('data-current', current);
+
+    if (icon !== null) {
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', icon);
+        svg.append(path);
+        row.append(svg);
+    }
+
+    if (colour !== null) {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.setProperty('--store', colour);
+        row.append(dot);
+    }
+
+    const name = document.createElement('span');
+    name.className = 'option-name';
+    name.textContent = label;
+
+    const extra = document.createElement('span');
+    extra.className = 'users';
+    extra.textContent = meta;
+
+    row.append(name, extra);
+
+    return row;
+};
 
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
     const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
@@ -126,6 +211,7 @@ export class HksWindow extends HTMLElement {
     private readonly glyph: HTMLElement;
     private readonly shadow: ShadowRoot;
     private readonly open$: Observable<boolean>;
+    private readonly switching$: Observable<SwitchAction>;
 
     constructor() {
         super();
@@ -172,6 +258,65 @@ export class HksWindow extends HTMLElement {
             share(),
         );
 
+        const name = this.name;
+        const switcher = requireChild(shadow, '.switcher');
+        const insideSwitcher = (event: Event): boolean =>
+            event.composedPath().includes(switcher) || event.composedPath().includes(name);
+        const rowOf = (target: EventTarget | null): HTMLElement | null => {
+            const row =
+                target instanceof Element ? target.closest('.switch-row, .switch-new') : null;
+
+            return row instanceof HTMLElement ? row : null;
+        };
+
+        // Shared: the picker's steps and the replace it ends in read one sequence of clicks.
+        this.switching$ = merge(
+            merge(
+                fromElementEvent$(name, 'pointerdown').pipe(
+                    switchMap(down =>
+                        // On the title, not the name: the drag captures the pointer there, and the click follows it.
+                        fromElementEvent$(requireChild(shadow, '.title'), 'click').pipe(
+                            take(1),
+                            filter(
+                                up =>
+                                    Math.hypot(
+                                        up.clientX - down.clientX,
+                                        up.clientY - down.clientY,
+                                    ) < CLICK_SLOP,
+                            ),
+                        ),
+                    ),
+                ),
+                // A click from the keyboard has no press before it.
+                fromElementEvent$(name, 'click').pipe(filter(({ detail }) => detail === 0)),
+            ).pipe(map((): SwitchAction => ({ kind: 'toggle' }))),
+            fromDocumentEvent$('pointerdown').pipe(
+                filter(event => !insideSwitcher(event)),
+                map((): SwitchAction => ({ kind: 'close' })),
+            ),
+            fromDocumentEvent$('keydown').pipe(
+                filter(({ key }) => key === 'Escape'),
+                map((): SwitchAction => ({ kind: 'close' })),
+            ),
+            fromElementEvent$(requireChild(shadow, '.back'), 'click').pipe(
+                map((): SwitchAction => ({ kind: 'back' })),
+            ),
+            fromElementEvent$(switcher, 'click').pipe(
+                mergeMap(({ target }): Observable<SwitchAction> => {
+                    const row = rowOf(target);
+                    const program = row?.dataset['program'];
+
+                    if (row === null || program === undefined) {
+                        return EMPTY;
+                    }
+
+                    return row.dataset['stateful'] === 'true' && row.dataset['store'] === undefined
+                        ? of({ kind: 'pick', program })
+                        : of({ kind: 'close' });
+                }),
+            ),
+        ).pipe(share());
+
         const resize = (edge: ResizeEdge) =>
             pointerDelta$(requireChild(shadow, `.handle--${edge}`)).pipe(
                 map(({ dx, dy }): WindowGesture => ({ kind: 'resize', edge, dx, dy })),
@@ -215,6 +360,33 @@ export class HksWindow extends HTMLElement {
                           : copy !== undefined
                             ? of({ kind: 'add-store', copy: copy === 'true' })
                             : EMPTY;
+                }),
+            ),
+            // The row carries what it stands for: the window holds no data about programs.
+            fromElementEvent$(switcher, 'click').pipe(
+                mergeMap(({ target }): Observable<WindowGesture> => {
+                    const row = rowOf(target);
+                    const program = row?.dataset['program'];
+
+                    if (row === null || program === undefined) {
+                        return EMPTY;
+                    }
+
+                    const store = row.dataset['store'];
+                    const chosen = row.dataset['stateful'] !== 'true' || store !== undefined;
+                    const minimum = {
+                        width: Number(row.dataset['width'] ?? 0),
+                        height: Number(row.dataset['height'] ?? 0),
+                    };
+
+                    return chosen
+                        ? of({
+                              kind: 'replace',
+                              program,
+                              store: store === '' || store === undefined ? null : store,
+                              minimum,
+                          })
+                        : EMPTY;
                 }),
             ),
             fromElementEvent$(popover, 'change').pipe(
@@ -263,13 +435,114 @@ export class HksWindow extends HTMLElement {
     connect$(
         view$: Observable<WindowView>,
         stores$: Observable<readonly StoreOption[] | null> = of(null),
+        programs$: Observable<readonly SwitchGroup[] | null> = of(null),
     ): Observable<void> {
         const shadow = this.shadow;
         const chip = requireChild(shadow, '.store');
         const popover = requireChild(shadow, '.stores');
         const options = requireChild(shadow, '.options');
+        const switcher = requireChild(shadow, '.switcher');
+        const list = requireChild(shadow, '.switch-list');
+        const back = requireChild(shadow, '.back');
+        const fresh = requireChild(shadow, '.switch-new');
+        const heading = requireChild(shadow, '.switch-title');
+        const name = this.name;
+        const sized = (row: HTMLElement, { id, minimum }: SwitchItem): HTMLElement => {
+            row.dataset['program'] = id;
+            row.dataset['width'] = String(minimum.width);
+            row.dataset['height'] = String(minimum.height);
+
+            return row;
+        };
 
         return merge(
+            combineLatest([
+                this.switching$.pipe(
+                    scan(reduceSwitching, { step: 'closed' }),
+                    startWith<Switching>({ step: 'closed' }),
+                ),
+                programs$,
+            ]).pipe(
+                tap(([state, groups]) => {
+                    const item =
+                        state.step === 'stores'
+                            ? groups
+                                  ?.flatMap(({ items }) => items)
+                                  .find(({ id }) => id === state.program)
+                            : undefined;
+                    const open = groups !== null && state.step !== 'closed';
+
+                    name.toggleAttribute('data-switchable', groups !== null);
+                    name.setAttribute('aria-expanded', String(open));
+                    switcher.hidden = !open;
+
+                    if (!open || groups === null) {
+                        return;
+                    }
+
+                    back.hidden = item === undefined;
+                    fresh.hidden = item === undefined;
+
+                    if (item === undefined) {
+                        heading.textContent = 'Program';
+                        list.replaceChildren(
+                            ...groups.flatMap(({ title, items }) => {
+                                const label = document.createElement('p');
+                                label.className = 'switch-group';
+                                label.textContent = title;
+
+                                return [
+                                    label,
+                                    ...items.map(entry => {
+                                        const row = sized(
+                                            switchRow(
+                                                entry.title,
+                                                entry.current ? 'open here' : '',
+                                                entry.current,
+                                                entry.icon,
+                                                null,
+                                            ),
+                                            entry,
+                                        );
+                                        row.dataset['stateful'] = String(entry.stores !== null);
+
+                                        return row;
+                                    }),
+                                ];
+                            }),
+                        );
+
+                        return;
+                    }
+
+                    heading.textContent = item.title;
+                    sized(fresh, item);
+                    fresh.dataset['stateful'] = 'true';
+                    fresh.dataset['store'] = '';
+                    list.replaceChildren(
+                        ...(item.stores ?? []).map(store => {
+                            const row = sized(
+                                switchRow(
+                                    store.name,
+                                    store.users === 0
+                                        ? 'unused'
+                                        : store.users === 1
+                                          ? '1 window'
+                                          : `${store.users} windows`,
+                                    false,
+                                    null,
+                                    store.colour,
+                                ),
+                                item,
+                            );
+                            row.dataset['stateful'] = 'true';
+                            row.dataset['store'] = store.id;
+
+                            return row;
+                        }),
+                    );
+                }),
+            ),
             stores$.pipe(
                 tap(stores => {
                     const current = stores?.find(option => option.current);

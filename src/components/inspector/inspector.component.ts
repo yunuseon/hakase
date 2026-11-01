@@ -1,6 +1,16 @@
-import { concat, EMPTY, merge, of, timer, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, switchMap, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { combineLatest, concat, EMPTY, merge, of, timer, type Observable } from 'rxjs';
+import {
+    distinctUntilChanged,
+    filter,
+    map,
+    mergeMap,
+    scan,
+    share,
+    startWith,
+    switchMap,
+    tap,
+} from 'rxjs/operators';
+import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import type { Row } from './inspector.ts';
 import css from './inspector.css?inline';
@@ -8,9 +18,18 @@ import css from './inspector.css?inline';
 const sheet = styleSheet(css);
 
 const COPIED_MS = 1500;
+const ARM_MS = 3000;
+
+type Arming = {
+    readonly armed: number | null;
+    readonly fire: boolean;
+};
 
 const TEMPLATE = `
-    <nav class="tree" aria-label="state"></nav>
+    <div class="side">
+        <nav class="tree" aria-label="state"></nav>
+        <button class="prune" type="button"></button>
+    </div>
     <section class="viewer">
         <header class="head">
             <span class="heading"></span>
@@ -39,6 +58,7 @@ export type InspectorView = {
     readonly heading$: Observable<string>;
     readonly rows$: Observable<readonly Row[]>;
     readonly copied$: Observable<string>;
+    readonly unused$: Observable<number>;
 };
 
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
@@ -144,8 +164,10 @@ export class HksInspector extends HTMLElement {
     readonly selections$: Observable<string>;
     readonly toggles$: Observable<string>;
     readonly copies$: Observable<void>;
+    readonly prunes$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
+    private readonly arming$: Observable<Arming>;
 
     constructor() {
         super();
@@ -175,16 +197,65 @@ export class HksInspector extends HTMLElement {
         this.copies$ = fromElementEvent$(requireChild(shadow, '.copy'), 'click').pipe(
             map(() => undefined),
         );
+
+        // Shared: the button's label and the prune itself must read one sequence of clicks.
+        this.arming$ = fromElementEvent$(requireChild(shadow, '.prune'), 'click').pipe(
+            scan(
+                ({ armed }: Arming, { timeStamp }): Arming =>
+                    armed !== null && timeStamp - armed < ARM_MS
+                        ? { armed: null, fire: true }
+                        : { armed: timeStamp, fire: false },
+                { armed: null, fire: false },
+            ),
+            share(),
+        );
+        this.prunes$ = this.arming$.pipe(
+            filter(({ fire }) => fire),
+            map(() => undefined),
+        );
     }
 
-    connect$({ tree$, selected$, heading$, rows$, copied$ }: InspectorView): Observable<void> {
+    connect$({
+        tree$,
+        selected$,
+        heading$,
+        rows$,
+        copied$,
+        unused$,
+    }: InspectorView): Observable<void> {
         const shadow = this.shadow;
         const tree = requireChild(shadow, '.tree');
         const rows = requireChild(shadow, '.rows');
         const heading = requireChild(shadow, '.heading');
         const copy = requireChild(shadow, '.copy');
+        const prune = requireElement(shadow, '.prune', HTMLButtonElement);
 
         return merge(
+            combineLatest([
+                unused$.pipe(distinctUntilChanged()),
+                this.arming$.pipe(
+                    switchMap(({ armed }) =>
+                        armed === null
+                            ? of(false)
+                            : concat(of(true), timer(ARM_MS).pipe(map(() => false))),
+                    ),
+                    startWith(false),
+                ),
+            ]).pipe(
+                tap(([count, armed]) => {
+                    const states = count === 1 ? '1 unused state' : `${count} unused states`;
+                    prune.disabled = count === 0;
+                    prune.toggleAttribute('data-armed', armed && count > 0);
+                    prune.textContent =
+                        count === 0
+                            ? 'Nothing to prune'
+                            : armed
+                              ? `Delete ${states}?`
+                              : `Prune ${states}`;
+                    prune.title =
+                        count === 0 ? '' : 'deletes every state no window uses, with its data';
+                }),
+            ),
             tree$.pipe(
                 tap(groups => {
                     tree.replaceChildren(...groups.map(groupOf));

@@ -45,11 +45,15 @@ export type CatalogGroup = {
     readonly items: readonly CatalogItem[];
 };
 
-const storesOf = (program: ProgramId, stores: readonly StoreEntry[]): readonly StoreEntry[] => {
+const storesOf = (
+    program: ProgramId,
+    stores: readonly StoreEntry[],
+    held: ReadonlySet<StoreId>,
+): readonly StoreEntry[] => {
     const own = stores.filter(store => store.program === program);
 
-    // A document's main store exists with no window open, so it is listed even then.
-    return HOLDING[program]?.holds === 'document' && !own.some(({ id }) => id === program)
+    // A main store holding data is listed with no window open; an empty one is nothing to show or prune.
+    return held.has(program) && !own.some(({ id }) => id === program)
         ? [{ id: program, program, name: MAIN, kept: true, copy: null }, ...own]
         : own;
 };
@@ -81,9 +85,10 @@ export const catalogOf = (
     stores: readonly StoreEntry[],
     processes: readonly Process[],
     titleOf: (program: ProgramId) => string,
+    held: ReadonlySet<StoreId>,
 ): readonly CatalogGroup[] => [
     ...PROGRAM_IDS.flatMap((program): CatalogGroup[] => {
-        const items = storesOf(program, stores).map((store): CatalogItem => ({
+        const items = storesOf(program, stores, held).map((store): CatalogItem => ({
             id: targetId({ kind: 'store', program, store: store.id }),
             label: store.name,
             colour: colourOf(store.id),

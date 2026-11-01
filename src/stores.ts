@@ -85,8 +85,11 @@ export type Copy = {
     readonly to: StoreId;
 };
 
-export type StoreAction<C> =
-    ({ readonly kind: 'command' } & Stamped<C>) | ({ readonly kind: 'copy' } & Copy);
+export type StoreEvent =
+    | ({ readonly kind: 'copy' } & Copy)
+    | { readonly kind: 'keep'; readonly stores: ReadonlySet<StoreId> };
+
+export type StoreAction<C> = ({ readonly kind: 'command' } & Stamped<C>) | StoreEvent;
 
 export const reduceStores =
     <S, C>(reduce: (state: S, command: C) => S, empty: S) =>
@@ -96,6 +99,12 @@ export const reduceStores =
                 action.store,
                 reduce(all.get(action.store) ?? empty, action.command),
             );
+        }
+
+        if (action.kind === 'keep') {
+            const kept = new Map([...all].filter(([store]) => action.stores.has(store)));
+
+            return kept.size === all.size ? all : kept;
         }
 
         const source = all.get(action.from);
@@ -109,14 +118,14 @@ export const reduceStores =
 // Not refCount: a store outlives every window bound to it, and a rebind must not reset it.
 export const perStore$ = <S, C>(
     commands$: Observable<Stamped<C>>,
-    copies$: Observable<Copy>,
+    events$: Observable<StoreEvent>,
     reduce: (state: S, command: C) => S,
     empty: S,
     initial: ReadonlyMap<StoreId, S>,
 ): Observable<ReadonlyMap<StoreId, S>> =>
     merge(
         commands$.pipe(map((stamped): StoreAction<C> => ({ kind: 'command', ...stamped }))),
-        copies$.pipe(map((copy): StoreAction<C> => ({ kind: 'copy', ...copy }))),
+        events$,
     ).pipe(
         scan(reduceStores(reduce, empty), initial),
         startWith(initial),

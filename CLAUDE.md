@@ -1010,9 +1010,39 @@ It is cheap because of three choices, all needed:
   catalog dedupes with `sameCatalog`, because the workspace emits on every
   pointer move of a drag.
 
+**Prune** (under the tree) deletes every store no window is bound to, data and
+all, and says how many first; one click arms it, a second within three seconds
+prunes. It is one `prune` input routed twice: the workspace drops the unbound
+registry entries (`prune-stores`, undoable), and every fold receives a `keep`
+store event with the bound stores and window ids, read from the same workspace,
+so it cannot matter which listener runs first. A document's data does not come
+back on undo. The catalog lists a main store only while it holds data
+(`held$`, the folds' keys as one sorted string, so a ticking timer does not
+churn it), so an empty Main is neither shown nor counted.
+
 `displayable` turns the folds' `Map`s into objects first: `JSON.stringify` writes
 a `Map` as `{}`. What a window has selected and expanded is its own settings, so
 every inspector window can watch something different, and it can inspect itself.
+
+## Switching a window's program
+
+A window's title is a button: clicking it opens a picker of every program by
+category, then the chosen program's stores (its Main always offered for a
+document program, registered yet or not) and **+** for a new one. Picking
+replaces the window's process in place (`replace`): same slot in the list, so the
+same depth, same frame grown to the new program's minimum, links carried over,
+and a new process id, because a running process is a subscription and the new
+program needs a fresh one; the old one closes like a quit. It is one undoable
+step. A program that keeps no state is replaced at once, with no second step.
+
+The window still knows nothing about programs. It gets `SwitchGroup`s as plain
+data and emits `replace` with what the clicked row carried: the program id, the
+store and the minimum size are read off the row's data attributes, and
+`liveProcess$` and the reducer narrow them. Two traps in the title: the click
+that opens the picker arrives on the **title**, not the name, because the drag
+captures the pointer there; and a drag that ends over the name would also click
+it, so the picker opens only when press and click are within `CLICK_SLOP`
+pixels.
 
 ## The command palette
 
@@ -1389,7 +1419,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and twenty of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and thirty-one of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

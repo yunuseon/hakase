@@ -68,6 +68,14 @@ export const inspectorProgram: Program = {
                             rows$: combineLatest([value$, settings$]).pipe(
                                 map(([value, { expanded }]) => rowsOf(value, new Set(expanded))),
                             ),
+                            unused$: catalog$.pipe(
+                                map(
+                                    groups =>
+                                        groups
+                                            .flatMap(({ items }) => items)
+                                            .filter(({ users }) => users === 0).length,
+                                ),
+                            ),
                             copied$: inspector.copies$.pipe(
                                 withLatestFrom(value$),
                                 map(([, value]) => JSON.stringify(value, null, 2)),
@@ -84,6 +92,7 @@ export const inspectorProgram: Program = {
                             ),
                         ),
                     ),
+                    inspector.prunes$.pipe(map((): AppInput => ({ kind: 'prune' }))),
                     inspector.toggles$.pipe(
                         withLatestFrom(settings$),
                         map(([path, settings]) =>

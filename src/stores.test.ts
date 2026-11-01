@@ -29,6 +29,18 @@ describe('reduceStores', () => {
     });
 });
 
+describe('keep', () => {
+    it('drops every store outside the set, and changes nothing when all are kept', () => {
+        const all = new Map([
+            ['a', 1],
+            ['b', 2],
+        ]);
+
+        expect([...count(all, { kind: 'keep', stores: new Set(['b']) }).keys()]).toEqual(['b']);
+        expect(count(all, { kind: 'keep', stores: new Set(['a', 'b', 'c']) })).toBe(all);
+    });
+});
+
 describe('pruned', () => {
     const entry = (id: string, kept: boolean): StoreEntry => ({
         id,
