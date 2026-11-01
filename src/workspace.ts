@@ -41,7 +41,7 @@ export type Process = {
     readonly id: ProcessId;
     readonly program: ProgramId;
     readonly frame: Frame;
-    // The window's laid-out size: a fitted window's frame holds its content's size, not its own.
+    // The window's laid-out size, which can exceed its frame when content will not shrink below its minimum.
     readonly measured: Size;
 };
 

@@ -18,7 +18,7 @@ export const RESIZE_EDGES = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as cons
 export type ResizeEdge = (typeof RESIZE_EDGES)[number];
 
 export type WindowView = {
-    // 'fitted' is sized by its content: the sketch's frame holds canvas dimensions.
+    // 'fitted' is sized by its content, which only the floating toolbar is: every program window is 'floating'.
     readonly kind: 'floating' | 'fitted';
     readonly frame: Frame;
     readonly focused: boolean;

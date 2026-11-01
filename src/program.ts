@@ -110,11 +110,10 @@ export type ProcessView = {
 export type Program = {
     readonly id: ProgramId;
     readonly title: string;
-    readonly kind: 'floating' | 'fitted';
     // Path data on a 24x24 viewBox: the program's face in the dock and on the desktop.
     readonly icon: string;
     readonly size: Size;
-    // The smallest frame its content still lays out in; a fitted program's frame is its content's size.
+    // The smallest window its content still lays out in; the workspace clamps every resize to it.
     readonly minimum: Size;
     // A factory, not an element: two processes of one program need two elements.
     readonly launch: () => ProcessView;

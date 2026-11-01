@@ -24,7 +24,7 @@ export const liveProcess$ = (
         host.append(element);
 
         const view$ = self.slot$.pipe(
-            map(({ frame, focused }): WindowView => ({ kind: program.kind, frame, focused })),
+            map(({ frame, focused }): WindowView => ({ kind: 'floating', frame, focused })),
         );
 
         return merge(

@@ -209,9 +209,20 @@
     stroke-linejoin: round;
 }
 
-.tabs {
-    inline-size: fit-content;
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
     margin-block-end: 6px;
+}
+
+.document {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
 }
 
 .bar[hidden],

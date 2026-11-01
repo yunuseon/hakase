@@ -2,18 +2,24 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    block-size: 100%;
     line-height: 0;
 }
 
 .viewport {
     position: relative;
-    display: flex;
+    flex: 1;
+    min-block-size: 0;
     overflow: hidden;
     background: var(--well);
     border-radius: 10px;
 }
 
+/* Out of the flow, so the canvas can never hold its own viewport open and the window always decides the size. */
 canvas {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
     display: block;
 }
 
@@ -27,4 +33,5 @@ canvas {
 /* Below the canvas, never over it: the drawing is the one thing a sketch must not hide. */
 ::slotted(hks-sketch-controls) {
     display: block;
+    flex: none;
 }

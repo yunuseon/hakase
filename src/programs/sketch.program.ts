@@ -77,10 +77,9 @@ const statusOf = (event: ExportEvent): ExportStatus => {
 export const sketchProgram: Program = {
     id: 'sketch',
     title: 'sketch',
-    kind: 'fitted',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
-    size: { width: 640, height: 640 },
-    minimum: { width: 160, height: 120 },
+    size: { width: 640, height: 820 },
+    minimum: { width: 320, height: 420 },
     launch: () => {
         const sketch = new HksSketch();
 
@@ -102,12 +101,12 @@ export const sketchProgram: Program = {
 
         return {
             element: sketch,
-            run$: (state, { slot$, settings$: stored$ }) => {
+            run$: (state, { settings$: stored$ }) => {
                 const { playhead$, source$, zoom$ } = state;
-                // Without the comparator, dragging the window would re-prepare the shader.
-                const size$ = slot$.pipe(
-                    map(({ frame: { width, height } }): Size => ({ width, height })),
+                // Without the comparator, every resize observation would re-prepare the shader even at the same size.
+                const size$ = sketch.sizes$.pipe(
                     distinctUntilChanged(sameSize),
+                    shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
                 const settings$ = stored$.pipe(

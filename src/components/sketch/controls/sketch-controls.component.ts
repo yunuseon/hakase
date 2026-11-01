@@ -85,10 +85,14 @@ const tabs = TABS.map(
 ).join('');
 
 const TEMPLATE = `
-    <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs}</div>
+    <div class="head">
+        <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs}</div>
+        <div class="document" role="group" aria-label="what the sketch shows">
+            ${choice('formula', 'formula')}
+            ${choice('theme', 'theme')}
+        </div>
+    </div>
     <div class="bar" role="group" aria-label="sketch parameters">
-        ${choice('formula', 'formula')}
-        ${choice('theme', 'theme')}
         <div class="segments" role="radiogroup" aria-label="draw mode">${modes}</div>
         ${flag('axes', 'axes')}
         ${option('fit', FITS)}
@@ -140,12 +144,21 @@ export class HksSketchControls extends HTMLElement {
         this.resets$ = fromElementEvent$(this.reset, 'click').pipe(map(() => undefined));
 
         this.changes$ = merge(
-            fromElementEvent$(requireChild(this.shadow, '.tabs'), 'change').pipe(
-                mergeMap(({ target }): Observable<ControlChange> =>
-                    target instanceof HTMLInputElement
-                        ? of({ field: 'tab', value: target.value })
-                        : EMPTY,
-                ),
+            // Above both tabs: the formula and theme decide what the parameters draw and what the animation exports.
+            fromElementEvent$(requireChild(this.shadow, '.head'), 'change').pipe(
+                mergeMap(({ target }): Observable<ControlChange> => {
+                    if (target instanceof HTMLInputElement && target.name === 'tab') {
+                        return of({ field: 'tab', value: target.value });
+                    }
+
+                    const pick =
+                        target instanceof HTMLSelectElement ? target.dataset['pick'] : undefined;
+
+                    return target instanceof HTMLSelectElement &&
+                        (pick === 'formula' || pick === 'theme')
+                        ? of({ field: pick, value: target.value })
+                        : EMPTY;
+                }),
             ),
             fromElementEvent$(bar, 'input').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
@@ -171,9 +184,7 @@ export class HksSketchControls extends HTMLElement {
                     if (target instanceof HTMLSelectElement) {
                         const pick = target.dataset['pick'];
 
-                        return pick === 'formula' ||
-                            pick === 'theme' ||
-                            pick === 'fit' ||
+                        return pick === 'fit' ||
                             pick === 'lens' ||
                             pick === 'lattice' ||
                             pick === 'space'

@@ -402,8 +402,9 @@ know it is in a window. Keep that line: the moment a content component reaches
 for its own title bar or placement, the two are welded together again and neither
 can be reused. A window's inputs are a `WindowView`: a frame plus a `kind`, either
 `floating` (positioned and sized by its frame) or `fitted` (positioned by its
-frame but sized by its content, which the sketch needs because its frame holds
-canvas dimensions).
+frame but sized by its content). Every program window is `floating`, so
+`Program` has no `kind` at all; only the floating toolbar's window is `fitted`,
+because its size is its row of tiles.
 
 **Every window is the same window.** There is no per-window chrome, no mode, and
 no window that another one has to be special-cased around. A feature that only
@@ -680,9 +681,8 @@ keeps `drift`, what the last snap held back, and adds it to the next delta;
 pulling away accumulates it until the snap lets go. A drag always begins with a
 `raise`, which clears `drift`, so one drag never inherits another's.
 
-Snapping and seams use `Process.measured`, not the frame: a fitted window's frame
-holds its content's size, so the sketch's frame is smaller than the window you
-see. Every window reports its laid-out size as a `measure` gesture from
+Snapping and seams use `Process.measured`, not the frame: a window whose content
+will not shrink below its own minimum can lay out larger than its frame. Every window reports its laid-out size as a `measure` gesture from
 `observeResize$`, read with `offsetWidth`, which is in world units because it
 ignores the zoom transform. `fit`, `reveal` and the minimap read `boxOf` too. A resize grows
 `measured` along with the frame rather than waiting for the next `measure`,
@@ -696,12 +696,18 @@ watched on the element, the release lands somewhere else, `takeUntil` never fire
 and the gesture stays open forever. The window then resizes on hover the next time
 you cross that border, with no button held. Do not move those listeners back.
 
-**The sketch's frame _is_ its canvas size.** Its grip emits an ordinary `resize`
-like every other window, and the sketch program reads the canvas dimensions back
-out of its own `frame$`, so the size persists with the rest of the layout and needs no
-stream of its own. The one asymmetry: that frame's width and height are never
-applied to the element — the window is sized by the canvas it contains, and
-`connect$` takes only a `Placement`.
+**The window decides the sketch's size; the canvas fills what is left.** The
+sketch was once the one `fitted` window, its frame holding the canvas size and
+the window wrapping around it, which made the window the content's servant and
+gave every window a branch for it. Now the sketch is an ordinary window. Its
+viewport is the flex item that takes the space the controls leave, and
+`HksSketch.sizes$` reports that space from a `ResizeObserver`, read with
+`clientWidth`/`clientHeight` — world units, since they ignore the canvas zoom.
+That is the sketch's `size$`, so switching tabs, which changes how tall the
+controls are, reshapes the canvas, and the export summary and thumbnails follow
+the new aspect. The canvas is `position: absolute` inside the viewport: in the
+flow it would hold its own viewport open, and the window could grow the drawing
+but never shrink it. The minimum (320 x 420) leaves room for the controls.
 
 **The whole app is one snapshot.** `state-store.ts` writes a single versioned
 `hakase.state`: the workspace (processes, links, camera, toolbar), the look and
@@ -775,7 +781,11 @@ commands and the query, not a remembered list.
 ## Animation and export
 
 A sketch's controls have two tabs, **Parameters** and **Animation**, and the tab
-is a setting like any other (`SketchSettings.tab`), saved with the window. The
+is a setting like any other (`SketchSettings.tab`), saved with the window. Each
+tab holds only what is its own: Parameters how the sketch is drawn, Animation the
+strip and the export. **Formula and theme sit above both**, in the header row
+beside the tab switch, because they decide what the sketch shows and so what the
+animation exports; inside Parameters they read as drawing settings. The
 Animation tab is two components the program slots into the controls'
 `animation` slot: `hks-frame-strip`, a Photoshop-style frame strip, and
 `hks-export-panel`, the export settings with **Export** and **Save frame**. The
@@ -835,9 +845,9 @@ rows (GL's origin is bottom-left), and `createImageBitmap(canvas, x, y, w, h,
 resize)` crops and averages it down in one step. Copying out rather than
 `transferToImageBitmap` also keeps the buffer instead of handing it over each
 frame.
-Its host has `contain: inline-size`, which is load-bearing — a sketch window is
-`fitted`, sized by its content, and without it the thousands-of-pixels track
-would make the window that wide.
+Its host has `contain: inline-size`, which is load-bearing: without it the
+thousands-of-pixels track sets the controls' intrinsic width, and the strip
+pushes past the window instead of scrolling inside it.
 
 **Thumbnails and export never touch the live canvas.** Each renders in a GL
 context of its own (`createOffscreenSurface` on an `OffscreenCanvas`, wrapped in
@@ -1094,7 +1104,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and four of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and six of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

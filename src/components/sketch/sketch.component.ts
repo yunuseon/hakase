@@ -1,13 +1,14 @@
-import { combineLatest, merge, type Observable } from 'rxjs';
+import { combineLatest, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, pairwise, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
-import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
+import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$, pointerDrag$ } from '../../shared/drag.ts';
 import type { Orbit, OrbitAction } from './space.ts';
 import { cappedRatio, pointerAt, samePointer, type Pointer, type SketchParams } from './params.ts';
 import { buildRamp } from './theme.ts';
 import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
 import { drawFrame, prepare, type Sketch } from './gl/sketch-program.ts';
+import type { Size } from '../window/frame.ts';
 import css from './sketch.css?inline';
 
 const sheet = styleSheet(css);
@@ -22,6 +23,7 @@ export class HksSketch extends HTMLElement {
     readonly pointers$: Observable<Omit<Pointer, 'down'>>;
     readonly presses$: Observable<boolean>;
     readonly orbits$: Observable<OrbitAction>;
+    readonly sizes$: Observable<Size>;
 
     private readonly surface: Surface<HTMLCanvasElement>;
 
@@ -49,6 +51,12 @@ export class HksSketch extends HTMLElement {
             pointerDrag$(canvas, pressing).pipe(map(() => true)),
             fromDocumentEvent$('pointerup').pipe(map(() => false)),
             fromDocumentEvent$('pointercancel').pipe(map(() => false)),
+        );
+
+        // client*, not the client rect: the rect includes the canvas zoom, and a size here is in world units.
+        this.sizes$ = merge(of(undefined), observeResize$(viewport)).pipe(
+            map((): Size => ({ width: viewport.clientWidth, height: viewport.clientHeight })),
+            filter(({ width, height }) => width > 0 && height > 0),
         );
 
         this.orbits$ = merge(
