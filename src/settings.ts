@@ -41,6 +41,7 @@ import {
     type Orbit,
 } from './components/sketch/space.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
+import { isDay } from './lib/day.ts';
 import { clamp } from './lib/math.ts';
 
 export type SketchSettings = {
@@ -69,7 +70,13 @@ export type NoteSettings = {
     readonly note: string | null;
 };
 
-export type Settings = SketchSettings | FormulaEditorSettings | ThemeEditorSettings | NoteSettings;
+export type AgendaSettings = {
+    readonly kind: 'agenda';
+    readonly day: string | null;
+};
+
+export type Settings =
+    SketchSettings | FormulaEditorSettings | ThemeEditorSettings | NoteSettings | AgendaSettings;
 
 export const defaultSketch: SketchSettings = {
     kind: 'sketch',
@@ -96,6 +103,9 @@ export const defaultNote: NoteSettings = { kind: 'note', note: null };
 
 export const asNote = (settings: Settings | undefined): NoteSettings =>
     settings?.kind === 'note' ? settings : defaultNote;
+
+export const asAgenda = (settings: Settings | undefined): AgendaSettings =>
+    settings?.kind === 'agenda' ? settings : { kind: 'agenda', day: null };
 
 export const asThemeEditor = (settings: Settings | undefined): ThemeEditorSettings =>
     settings?.kind === 'theme' ? settings : defaultThemeEditor;
@@ -291,6 +301,11 @@ export const parseSettings = (value: unknown): Settings | null => {
             const note = field(value, 'note');
 
             return { kind: 'note', note: typeof note === 'string' ? note : null };
+        }
+        case 'agenda': {
+            const day = field(value, 'day');
+
+            return { kind: 'agenda', day: typeof day === 'string' && isDay(day) ? day : null };
         }
         default:
             return null;

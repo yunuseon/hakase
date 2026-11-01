@@ -13,6 +13,7 @@ import { parseTheme, type Theme } from './components/sketch/theme.ts';
 import { defaultBoard, parseBoard, type Board } from './components/board/board.ts';
 import { emptyNotes, parseNotes, type Notes } from './components/note/note.ts';
 import { initialFocus, parseFocus, type Focus } from './components/focus/focus.ts';
+import { emptyAgenda, parseAgenda, type Agenda } from './components/agenda/agenda.ts';
 import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
@@ -43,6 +44,7 @@ export type Snapshot = {
     readonly board: Board;
     readonly notes: Notes;
     readonly focus: Focus;
+    readonly agenda: Agenda;
     readonly library: Library;
 };
 
@@ -114,6 +116,7 @@ const fresh: Restored = {
     board: defaultBoard,
     notes: emptyNotes,
     focus: initialFocus,
+    agenda: emptyAgenda,
     library: emptyLibrary,
 };
 
@@ -149,6 +152,7 @@ export const restoreState = (): Restored => {
         board: parseBoard(field(stored, 'board')),
         notes: parseNotes(field(stored, 'notes')),
         focus: parseFocus(field(stored, 'focus')),
+        agenda: parseAgenda(field(stored, 'agenda')),
         library: parseLibrary(field(stored, 'library')),
     };
 };
@@ -171,6 +175,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         board: snapshot.board,
         notes: snapshot.notes,
         focus: snapshot.focus,
+        agenda: snapshot.agenda,
         library: snapshot.library,
     };
 };

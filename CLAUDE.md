@@ -654,6 +654,19 @@ hidden tab and would freeze the timer exactly when it is not being watched.
 for those and not for a skip. It is saved where it last stood still, like the
 playhead, and never restored running.
 
+**The agenda is a day planner over one shared `Agenda`** of time blocks, each
+on a `Day` (`lib/day.ts`: local `YYYY-MM-DD`, stepped through a date at noon so a
+daylight-saving change can never skip or repeat a day). Each window's day is its
+own setting, and `null` means _today_: `day$` combines it with `wallClock$`, so a
+window left open overnight turns the page by itself and the now line moves.
+Drag on empty time to make a block (a plain click makes an hour), drag a block
+to move it, its bottom edge to resize; everything snaps to `SNAP` minutes in the
+reducer. Minutes are read from the column's `getBoundingClientRect`, height
+included, so the canvas zoom needs no special case. A move or resize emits on
+every pointer move and the block follows through the fold, so there is no local
+drag state; `laidOut` puts overlapping blocks side by side, derived on every
+render rather than stored.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1235,7 +1248,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and forty-four of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and fifty of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

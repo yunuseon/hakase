@@ -1,4 +1,4 @@
-import { concat, defer, fromEvent, Observable, of } from 'rxjs';
+import { concat, defer, fromEvent, Observable, of, timer } from 'rxjs';
 import { viewportSize, type Viewport } from './dom.ts';
 import { map, shareReplay, startWith, switchMap, take } from 'rxjs/operators';
 
@@ -66,4 +66,9 @@ export const viewport$: Observable<Viewport> = fromEvent(window, 'resize').pipe(
     map(() => viewportSize()),
     startWith(viewportSize()),
     shareReplay({ bufferSize: 1, refCount: false }),
+);
+
+export const wallClock$: Observable<number> = timer(0, 1000).pipe(
+    map(() => Date.now()),
+    shareReplay({ bufferSize: 1, refCount: true }),
 );
