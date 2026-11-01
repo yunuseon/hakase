@@ -2,7 +2,13 @@ import type { Observable } from 'rxjs';
 import { debounceTime, map, tap } from 'rxjs/operators';
 import { parseAppearance, type Appearance } from './appearance.ts';
 import { appearances, defaultLook, isAppearanceName, type AppearanceName } from './appearances.ts';
-import { isFormulaName, type FormulaName } from './components/sketch/formulas/registry.ts';
+import {
+    emptyLibrary,
+    isFormulaId,
+    parseLibrary,
+    type FormulaId,
+    type Library,
+} from './library.ts';
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
 import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -24,13 +30,14 @@ export type Snapshot = {
     readonly workspace: Workspace;
     readonly look: AppearanceName;
     readonly looks: ReadonlyMap<AppearanceName, Appearance>;
-    readonly formulas: ReadonlyMap<FormulaName, string>;
+    readonly formulas: ReadonlyMap<FormulaId, string>;
     readonly themes: ReadonlyMap<ThemeName, Theme>;
     readonly duration: number;
     readonly playhead: number;
     readonly looping: boolean;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
     readonly todos: TodoList;
+    readonly library: Library;
 };
 
 export type Restored = Omit<Snapshot, 'workspace'> & {
@@ -59,10 +66,10 @@ const looksFrom = (value: unknown): ReadonlyMap<AppearanceName, Appearance> =>
 const lookFrom = (value: unknown): AppearanceName =>
     typeof value === 'string' && isAppearanceName(value) ? value : defaultLook;
 
-const formulasFrom = (value: unknown): ReadonlyMap<FormulaName, string> =>
+const formulasFrom = (value: unknown): ReadonlyMap<FormulaId, string> =>
     new Map(
-        entriesOf(value).flatMap(([name, text]): [FormulaName, string][] =>
-            isFormulaName(name) && typeof text === 'string' ? [[name, text]] : [],
+        entriesOf(value).flatMap(([name, text]): [FormulaId, string][] =>
+            isFormulaId(name) && typeof text === 'string' ? [[name, text]] : [],
         ),
     );
 
@@ -98,6 +105,7 @@ const fresh: Restored = {
     looping: true,
     settings: new Map(),
     todos: emptyTodos,
+    library: emptyLibrary,
 };
 
 const legacy = (): Restored => {
@@ -129,6 +137,7 @@ export const restoreState = (): Restored => {
         looping: field(stored, 'looping') !== false,
         settings: settingsFrom(field(stored, 'settings')),
         todos: parseTodos(field(stored, 'todos')),
+        library: parseLibrary(field(stored, 'library')),
     };
 };
 
@@ -147,6 +156,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         looping: snapshot.looping,
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
         todos: snapshot.todos,
+        library: snapshot.library,
     };
 };
 

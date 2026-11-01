@@ -3,7 +3,7 @@ import {
     type ControlChange,
     type ControlsView,
 } from './components/sketch/controls/controls.ts';
-import { isFormulaName, type FormulaName } from './components/sketch/formulas/registry.ts';
+import { isFormulaId, type FormulaId } from './library.ts';
 import {
     DRAW_MODES,
     defaultPanel,
@@ -33,7 +33,7 @@ import { clamp } from './lib/math.ts';
 
 export type SketchSettings = {
     readonly kind: 'sketch';
-    readonly formula: FormulaName;
+    readonly formula: FormulaId;
     readonly theme: ThemeName;
     readonly panel: Panel;
     readonly orbit: Orbit;
@@ -41,7 +41,7 @@ export type SketchSettings = {
 
 export type FormulaEditorSettings = {
     readonly kind: 'formula';
-    readonly formula: FormulaName;
+    readonly formula: FormulaId;
 };
 
 export type ThemeEditorSettings = {
@@ -81,7 +81,7 @@ export const controlsView = ({ formula, theme, panel, orbit }: SketchSettings): 
 
 export const withControl = (sketch: SketchSettings, change: ControlChange): SketchSettings => {
     if (change.field === 'formula') {
-        return isFormulaName(change.value) ? { ...sketch, formula: change.value } : sketch;
+        return isFormulaId(change.value) ? { ...sketch, formula: change.value } : sketch;
     }
 
     if (change.field === 'theme') {
@@ -177,8 +177,8 @@ const orbitFrom = (value: unknown): Orbit => {
     };
 };
 
-const formulaFrom = (value: unknown): FormulaName | null =>
-    typeof value === 'string' && isFormulaName(value) ? value : null;
+const formulaFrom = (value: unknown): FormulaId | null =>
+    typeof value === 'string' && isFormulaId(value) ? value : null;
 
 const themeFrom = (value: unknown): ThemeName | null =>
     typeof value === 'string' && isThemeName(value) ? value : null;

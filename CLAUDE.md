@@ -1059,6 +1059,35 @@ away from the glyphs. Change a text metric on one and you must change the other.
 Highlighting is driven by the raw `input` stream so it repaints per keystroke,
 while compilation is debounced; do not merge those two.
 
+## The formula library
+
+A formula is either a built-in (`FormulaName`, the registry's keys) or one the
+user saved (`CustomId`, `custom-<n>`); everything that names a formula takes a
+`FormulaId`, the union, so a custom id is checked like a built-in one rather
+than widened to `string`. `Library` (in `src/library.ts`, folded in `main.ts`,
+saved in the snapshot) holds each saved formula's label and source;
+`source$(id)` falls back to it the way it falls back to the registry, and edits
+apply to either. Ids come from a monotone counter, like `launched`.
+
+The formula editor's ⋯ menu saves the current text as a new formula, copies a
+share link, or deletes a saved one (built-ins cannot be). Saving emits two
+inputs in order — the `add`, then this editor's selection of it — and the id is
+chosen by the program from the library's counter, so the editor can select a
+formula that did not exist a moment ago. Both pickers, the editor's and every
+sketch's, take their options as a stream now, rebuilt together with the
+selected value: rebuilt after it, the selection would be lost.
+
+A share link is the app's URL with `#formula=` and the label and source as
+base64url JSON. `sharedFormulas$` in `src/share.ts` reads it on load and on
+every `hashchange`, clears it so a reload does not import it again, and the
+library imports it, skipping an exact copy of one it already holds. The hash is
+untrusted input and only ever parsed, never run — a shared formula is compiled
+like any other, and a broken one simply shows its error.
+
+**Guide strings are single-quoted** in `formula.ts`, so an apostrophe ends them:
+write "the value of its slider", not "its slider's value". This has broken the
+build twice.
+
 ## Adding a formula
 
 The `Formula` contract lives in `components/sketch/formulas/formula.ts`, one level

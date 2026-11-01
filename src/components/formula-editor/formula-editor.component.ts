@@ -1,5 +1,5 @@
-import { merge, type Observable } from 'rxjs';
-import { debounceTime, distinctUntilChanged, map, tap } from 'rxjs/operators';
+import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map, share, switchMap, tap } from 'rxjs/operators';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-clike.js';
 import 'prismjs/components/prism-c.js';
@@ -34,6 +34,17 @@ const TEMPLATE = `
             <span>Compiled</span>
         </div>
         <select class="preset" aria-label="formula preset"></select>
+        <details class="more">
+            <summary class="toggle" aria-label="formula actions" title="save, share or delete">⋯</summary>
+            <div class="menu">
+                <form class="save">
+                    <input class="name" type="text" placeholder="Name" aria-label="name for the copy" autocomplete="off" />
+                    <button class="action" type="submit">Save as new</button>
+                </form>
+                <button class="action share" type="button">Copy share link</button>
+                <button class="action delete" type="button">Delete this formula</button>
+            </div>
+        </details>
     </div>
 `;
 
@@ -58,9 +69,27 @@ export type PresetOption = {
     readonly label: string;
 };
 
+export type FormulaEditorView = {
+    readonly options$: Observable<readonly PresetOption[]>;
+    readonly selected$: Observable<string>;
+    readonly preset$: Observable<string>;
+    readonly about$: Observable<string>;
+    readonly error$: Observable<string | null>;
+    readonly deletable$: Observable<boolean>;
+    readonly copied$: Observable<string>;
+};
+
+const optionsKey = (options: readonly PresetOption[]): string =>
+    options.map(({ value, label }) => `${value}\u0000${label}`).join('\u0001');
+
+const COPIED_MS = 1600;
+
 export class HksFormulaEditor extends HTMLElement {
     readonly changes$: Observable<string>;
     readonly selections$: Observable<string>;
+    readonly saves$: Observable<string>;
+    readonly shares$: Observable<void>;
+    readonly deletes$: Observable<void>;
 
     private readonly source: HTMLTextAreaElement;
     private readonly picker: HTMLSelectElement;
@@ -72,6 +101,11 @@ export class HksFormulaEditor extends HTMLElement {
     private readonly about: HTMLElement;
     private readonly terms: HTMLElement;
     private readonly typed$: Observable<string>;
+    private readonly menu: HTMLDetailsElement;
+    private readonly saveForm: HTMLFormElement;
+    private readonly share: HTMLButtonElement;
+    private readonly removal: HTMLButtonElement;
+    private readonly submitted$: Observable<string>;
 
     constructor() {
         super();
@@ -96,20 +130,25 @@ export class HksFormulaEditor extends HTMLElement {
         this.selections$ = fromElementEvent$(this.picker, 'change').pipe(
             map(() => this.picker.value),
         );
-    }
 
-    presets(options: readonly PresetOption[]): this {
-        this.picker.replaceChildren(
-            ...options.map(({ value, label }) => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = label;
+        this.menu = requireElement(shadow, '.more', HTMLDetailsElement);
+        this.saveForm = requireElement(shadow, '.save', HTMLFormElement);
+        this.share = requireElement(shadow, '.share', HTMLButtonElement);
+        this.removal = requireElement(shadow, '.delete', HTMLButtonElement);
+        const name = requireElement(shadow, '.name', HTMLInputElement);
 
-                return option;
+        // One listener, shared: the name is read once, before connect$ clears the field.
+        this.submitted$ = fromElementEvent$(this.saveForm, 'submit').pipe(
+            map(event => {
+                event.preventDefault();
+
+                return name.value;
             }),
+            share(),
         );
-
-        return this;
+        this.saves$ = this.submitted$;
+        this.shares$ = fromElementEvent$(this.share, 'click').pipe(map(() => undefined));
+        this.deletes$ = fromElementEvent$(this.removal, 'click').pipe(map(() => undefined));
     }
 
     guide(entries: readonly GuideEntry[]): this {
@@ -130,12 +169,15 @@ export class HksFormulaEditor extends HTMLElement {
         return this;
     }
 
-    connect$(
-        selected$: Observable<string>,
-        preset$: Observable<string>,
-        about$: Observable<string>,
-        error$: Observable<string | null>,
-    ): Observable<void> {
+    connect$({
+        options$,
+        selected$,
+        preset$,
+        about$,
+        error$,
+        deletable$,
+        copied$,
+    }: FormulaEditorView): Observable<void> {
         // Presets only: echoing typing back would reset the caret every keystroke.
         const applied$ = preset$.pipe(
             distinctUntilChanged(),
@@ -148,10 +190,46 @@ export class HksFormulaEditor extends HTMLElement {
         const text$ = merge(applied$, this.typed$);
 
         return merge(
-            selected$.pipe(
-                distinctUntilChanged(),
-                tap(value => {
+            // Together: options rebuilt after the value was set would drop the selection.
+            combineLatest([options$, selected$]).pipe(
+                tap(([options, value]) => {
+                    const current = [...this.picker.options].map(({ value: v, label }) => ({
+                        value: v,
+                        label,
+                    }));
+
+                    if (optionsKey(current) !== optionsKey(options)) {
+                        this.picker.replaceChildren(
+                            ...options.map(option => new Option(option.label, option.value)),
+                        );
+                    }
+
                     this.picker.value = value;
+                }),
+            ),
+            deletable$.pipe(
+                distinctUntilChanged(),
+                tap(deletable => {
+                    this.removal.disabled = !deletable;
+                }),
+            ),
+            merge(this.submitted$, this.shares$, this.deletes$).pipe(
+                tap(() => {
+                    this.saveForm.reset();
+                }),
+            ),
+            merge(this.submitted$, this.deletes$).pipe(
+                tap(() => {
+                    this.menu.open = false;
+                }),
+            ),
+            copied$.pipe(
+                tap(link => {
+                    void navigator.clipboard?.writeText(link).catch(() => undefined);
+                }),
+                switchMap(() => concat(of(true), timer(COPIED_MS).pipe(map(() => false)))),
+                tap(copied => {
+                    this.share.textContent = copied ? 'Link copied' : 'Copy share link';
                 }),
             ),
             text$.pipe(

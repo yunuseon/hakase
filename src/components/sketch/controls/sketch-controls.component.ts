@@ -1,4 +1,4 @@
-import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
@@ -173,21 +173,10 @@ export class HksSketchControls extends HTMLElement {
         );
     }
 
-    presets(formulas: readonly PresetOption[], themes: readonly PresetOption[]): this {
-        const fill = (key: string, options: readonly PresetOption[]) => {
-            this.pick(key).replaceChildren(
-                ...options.map(({ value, label }) => {
-                    const option = document.createElement('option');
-                    option.value = value;
-                    option.textContent = label;
-
-                    return option;
-                }),
-            );
-        };
-
-        fill('formula', formulas);
-        fill('theme', themes);
+    presets(themes: readonly PresetOption[]): this {
+        this.pick('theme').replaceChildren(
+            ...themes.map(({ value, label }) => new Option(label, value)),
+        );
 
         return this;
     }
@@ -200,8 +189,27 @@ export class HksSketchControls extends HTMLElement {
     connect$(
         view$: Observable<ControlsView>,
         knobs$: Observable<readonly string[]>,
+        formulas$: Observable<readonly PresetOption[]>,
     ): Observable<void> {
-        const picks$ = (['formula', 'theme', 'fit', 'lens', 'lattice', 'space'] as const).map(key =>
+        // Together: options rebuilt after the value was set would drop the selection.
+        const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
+            tap(([options, value]) => {
+                const pick = this.pick('formula');
+                const current = [...pick.options]
+                    .map(option => `${option.value}=${option.label}`)
+                    .join();
+
+                if (current !== options.map(option => `${option.value}=${option.label}`).join()) {
+                    pick.replaceChildren(
+                        ...options.map(({ value: v, label }) => new Option(label, v)),
+                    );
+                }
+
+                pick.value = value;
+            }),
+        );
+
+        const picks$ = (['theme', 'fit', 'lens', 'lattice', 'space'] as const).map(key =>
             view$.pipe(
                 map(view => view[key]),
                 distinctUntilChanged(),
@@ -292,9 +300,16 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        return merge(...picks$, ...numbers$, ...flags$, ...motion$, mode$, shown$, turned$).pipe(
-            map(() => undefined),
-        );
+        return merge(
+            formula$,
+            ...picks$,
+            ...numbers$,
+            ...flags$,
+            ...motion$,
+            mode$,
+            shown$,
+            turned$,
+        ).pipe(map(() => undefined));
     }
 }
 

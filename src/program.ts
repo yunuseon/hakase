@@ -1,7 +1,7 @@
 import type { Observable } from 'rxjs';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
-import type { FormulaName } from './components/sketch/formulas/registry.ts';
+import type { FormulaId, Library, LibraryCommand } from './library.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
@@ -33,17 +33,18 @@ export type AppInput =
     | { readonly kind: 'scrub'; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
     | { readonly kind: 'duration'; readonly seconds: number }
-    | { readonly kind: 'source'; readonly formula: FormulaName; readonly text: string }
+    | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
     | { readonly kind: 'settings'; readonly settings: Settings }
+    | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
-          readonly formula: FormulaName;
+          readonly formula: FormulaId;
           readonly message: string | null;
       };
 
@@ -64,10 +65,11 @@ export type AppState = {
     readonly duration$: Observable<number>;
     readonly zoom$: Observable<number>;
     // Selectors, not streams: a formula is a document several processes may show.
-    readonly source$: (formula: FormulaName) => Observable<Source>;
+    readonly source$: (formula: FormulaId) => Observable<Source>;
     readonly theme$: (theme: ThemeName) => Observable<Written<Theme>>;
-    readonly error$: (formula: FormulaName) => Observable<string | null>;
+    readonly error$: (formula: FormulaId) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
+    readonly library$: Observable<Library>;
     readonly tasks$: Observable<readonly Task[]>;
     readonly todos$: Observable<readonly Todo[]>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;

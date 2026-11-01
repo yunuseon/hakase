@@ -201,3 +201,107 @@
 .token.punctuation {
     color: var(--muted);
 }
+
+.more {
+    position: relative;
+    flex: none;
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 26px;
+    block-size: 26px;
+    font: 600 14px/1 var(--font-ui);
+    color: var(--label);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.toggle::-webkit-details-marker {
+    display: none;
+}
+
+.toggle:hover,
+.more[open] .toggle {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.toggle:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+/* Opens upward from the footer, so it never runs past the bottom of the window. */
+.menu {
+    position: absolute;
+    inset-block-end: calc(100% + 6px);
+    inset-inline-end: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    inline-size: 200px;
+    padding: 8px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.save {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding-block-end: 6px;
+    border-block-end: 1px solid var(--edge);
+}
+
+.name {
+    padding: 5px 8px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+
+.name:focus-visible {
+    outline: none;
+    border-color: var(--rule);
+}
+
+.action {
+    padding: 5px 8px;
+    font: 500 12px var(--font-ui);
+    text-align: start;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+    background: var(--well);
+}
+
+.action:disabled {
+    color: var(--muted);
+    cursor: default;
+}
+
+.action:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: -2px;
+}
+
+.delete:not(:disabled) {
+    color: var(--accent);
+}

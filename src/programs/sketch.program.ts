@@ -13,7 +13,7 @@ import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.t
 import { compileFormula$ } from '../components/sketch/compile.ts';
 import { knobsUsed } from '../components/sketch/gl/sketch-program.ts';
 import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
-import { formulas } from '../components/sketch/formulas/registry.ts';
+import { optionsOf } from '../library.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -47,7 +47,6 @@ export const sketchProgram: Program = {
         fpsCounter.slot = 'status';
 
         const controls = new HksSketchControls().presets(
-            Object.entries(formulas).map(([value, { label }]) => ({ value, label })),
             Object.keys(themes).map(value => ({ value, label: value })),
         );
         controls.slot = 'controls';
@@ -140,7 +139,11 @@ export const sketchProgram: Program = {
                         .pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
                     controls
-                        .connect$(settings$.pipe(map(controlsView)), shader$.pipe(map(knobsUsed)))
+                        .connect$(
+                            settings$.pipe(map(controlsView)),
+                            shader$.pipe(map(knobsUsed)),
+                            state.library$.pipe(map(optionsOf)),
+                        )
                         .pipe(ignoreElements()),
                     merge(
                         controls.changes$.pipe(

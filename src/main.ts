@@ -26,7 +26,8 @@ import { HksSections } from './components/sections/sections.component.ts';
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
-import { formulas, type FormulaName } from './components/sketch/formulas/registry.ts';
+import { reduceLibrary, sourceOf, type FormulaId, type LibraryCommand } from './library.ts';
+import { sharedFormulas$ } from './share.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
@@ -297,6 +298,17 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const library$ = merge(
+        inputs$.pipe(
+            mergeMap(({ input }) => (input.kind === 'library' ? of(input.command) : EMPTY)),
+        ),
+        sharedFormulas$.pipe(map((shared): LibraryCommand => ({ kind: 'import', ...shared }))),
+    ).pipe(
+        scan(reduceLibrary, stored.library),
+        startWith(stored.library),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const commands$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'transport' ? of(input.command) : EMPTY)),
         share(),
@@ -335,7 +347,7 @@ const bootstrap = () => {
                 : EMPTY,
         ),
         scan(
-            (edits, { formula, text, from }): ReadonlyMap<FormulaName, Written<string>> =>
+            (edits, { formula, text, from }): ReadonlyMap<FormulaId, Written<string>> =>
                 new Map(edits).set(formula, { value: text, from }),
             restored(stored.formulas),
         ),
@@ -361,9 +373,9 @@ const bootstrap = () => {
         mergeMap(({ input }) => (input.kind === 'diagnostic' ? of(input) : EMPTY)),
         scan(
             (all, { formula, message }) => new Map(all).set(formula, message),
-            new Map<FormulaName, string | null>(),
+            new Map<FormulaId, string | null>(),
         ),
-        startWith(new Map<FormulaName, string | null>()),
+        startWith(new Map<FormulaId, string | null>()),
         // Same: an editor switching formula drops the only subscriber for a moment.
         shareReplay({ bufferSize: 1, refCount: false }),
     );
@@ -412,15 +424,19 @@ const bootstrap = () => {
             map(({ zoom }) => zoom),
             distinctUntilChanged(),
         ),
-        source$: (formula: FormulaName) =>
-            edits$.pipe(
-                map(edits => edits.get(formula) ?? { value: formulas[formula].source, from: null }),
+        source$: (formula: FormulaId) =>
+            combineLatest([edits$, library$]).pipe(
+                map(
+                    ([edits, library]) =>
+                        edits.get(formula) ?? { value: sourceOf(formula, library), from: null },
+                ),
             ),
         theme$: (theme: ThemeName) =>
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         look$,
         appearance$,
         todos$: todos$.pipe(map(({ items }) => items)),
+        library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
@@ -440,7 +456,7 @@ const bootstrap = () => {
                 }),
             ),
         ),
-        error$: (formula: FormulaName) =>
+        error$: (formula: FormulaId) =>
             diagnostics$.pipe(
                 map(all => all.get(formula) ?? null),
                 distinctUntilChanged(),
@@ -467,6 +483,7 @@ const bootstrap = () => {
                 rested: rested$,
                 settings: settings$,
                 todos: todos$,
+                library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({
                     ...parts,
