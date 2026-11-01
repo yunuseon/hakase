@@ -40,6 +40,17 @@ export const safeUrl = (text: string): string | null => {
     }
 };
 
+// Only over https: an http icon on an https page is blocked as mixed content anyway.
+export const faviconOf = (url: string): string | null => {
+    try {
+        const { protocol, origin } = new URL(url);
+
+        return protocol === 'https:' ? `${origin}/favicon.ico` : null;
+    } catch {
+        return null;
+    }
+};
+
 export const hostOf = (url: string): string => {
     try {
         return new URL(url).hostname.replace(/^www\./, '');

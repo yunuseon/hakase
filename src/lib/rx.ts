@@ -5,16 +5,17 @@ import { map, shareReplay, startWith, switchMap, take } from 'rxjs/operators';
 export const fromElementEvent$ = <K extends keyof HTMLElementEventMap>(
     element: HTMLElement,
     type: K,
+    options?: AddEventListenerOptions,
 ): Observable<HTMLElementEventMap[K]> =>
     new Observable<HTMLElementEventMap[K]>(subscriber => {
         const listener = (event: HTMLElementEventMap[K]) => {
             subscriber.next(event);
         };
 
-        element.addEventListener(type, listener);
+        element.addEventListener(type, listener, options);
 
         return () => {
-            element.removeEventListener(type, listener);
+            element.removeEventListener(type, listener, options);
         };
     });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     emptyLinks,
+    faviconOf,
     parseLinks,
     reduceLinks,
     safeUrl,
@@ -22,6 +23,16 @@ describe('safeUrl', () => {
         expect(safeUrl('data:text/html,<b>x</b>')).toBeNull();
         expect(safeUrl('not a url')).toBeNull();
         expect(safeUrl('word')).toBeNull();
+    });
+});
+
+describe('faviconOf', () => {
+    it('asks the site itself, at its origin, and only over https', () => {
+        expect(faviconOf('https://wiki.example.org/home?x=1')).toBe(
+            'https://wiki.example.org/favicon.ico',
+        );
+        expect(faviconOf('http://example.com/')).toBeNull();
+        expect(faviconOf('nonsense')).toBeNull();
     });
 });
 

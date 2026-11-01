@@ -2,7 +2,7 @@ import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { filter, map, mergeMap, share, startWith, switchMap, takeWhile, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import { addable, hostOf, type Link, type LinkCommand } from './links.ts';
+import { addable, faviconOf, hostOf, type Link, type LinkCommand } from './links.ts';
 import css from './links.css?inline';
 
 const sheet = styleSheet(css);
@@ -57,6 +57,17 @@ const itemOf = (id: string): HTMLElement => {
     const badge = document.createElement('span');
     badge.className = 'badge';
 
+    const letter = document.createElement('span');
+    letter.className = 'letter';
+
+    const icon = document.createElement('img');
+    icon.className = 'icon';
+    icon.alt = '';
+    icon.decoding = 'async';
+    // The site learns its icon was asked for, but not from which page.
+    icon.referrerPolicy = 'no-referrer';
+    badge.append(letter, icon);
+
     const anchor = document.createElement('a');
     anchor.className = 'link';
     anchor.target = '_blank';
@@ -98,10 +109,24 @@ const filled = (item: HTMLElement, { url, title }: Link, active: Element | null)
         }
     }
 
-    const badge = item.querySelector('.badge');
+    const letter = item.querySelector('.letter');
+    const icon = item.querySelector('.icon');
+    const wanted = faviconOf(url);
 
-    if (badge !== null) {
-        badge.textContent = (host[0] ?? '?').toUpperCase();
+    if (letter !== null) {
+        letter.textContent = (host[0] ?? '?').toUpperCase();
+    }
+
+    // Only when it changes: setting src again would refetch and flash the letter back.
+    if (icon instanceof HTMLImageElement && icon.dataset['for'] !== url) {
+        icon.dataset['for'] = url;
+        item.querySelector('.badge')?.removeAttribute('data-icon');
+
+        if (wanted === null) {
+            icon.removeAttribute('src');
+        } else {
+            icon.src = wanted;
+        }
     }
 
     // Not while focused: that would overwrite a name being typed with another window's edit.
@@ -252,6 +277,20 @@ export class HksLinks extends HTMLElement {
         const draft = requireElement(shadow, '.draft', HTMLInputElement);
 
         return merge(
+            // Captured: load and error do not bubble, so the list only hears them on the way down.
+            merge(
+                fromElementEvent$(items, 'load', { capture: true }),
+                fromElementEvent$(items, 'error', { capture: true }),
+            ).pipe(
+                tap(({ type, target }) => {
+                    if (target instanceof HTMLImageElement && target.classList.contains('icon')) {
+                        target.parentElement?.toggleAttribute(
+                            'data-icon',
+                            type === 'load' && target.naturalWidth > 1,
+                        );
+                    }
+                }),
+            ),
             links$.pipe(
                 tap(links => {
                     this.toggleAttribute('data-empty', links.length === 0);

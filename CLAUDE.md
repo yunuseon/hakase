@@ -692,8 +692,13 @@ bare address, and `parseLinks` runs every stored link through it again: the
 snapshot is untrusted, and a `javascript:` URL in an `href` would run inside the
 app when clicked. Links open in a new tab with `noopener`. "Name address" names a
 link as it is added, and a bare address is named by its host. A refused address
-stays in the field, marked, rather than being cleared. Rows reorder like the
-todo list's, and renaming is a per-window view state (`editing$`, a stream of
+stays in the field, marked, rather than being cleared. Each link shows its site's
+own `/favicon.ico` (`faviconOf`, https only, sent without a referrer) over the
+letter badge, and the letter stays until the image loads with real pixels; no
+icon service is asked, so no third party sees the shelf. The icon is derived from
+the address and never stored. Its `load` and `error` **do not bubble**, so the
+list listens for them in the capture phase (`fromElementEvent$` takes listener
+options for this). Rows reorder like the todo list's, and renaming is a per-window view state (`editing$`, a stream of
 the ✎ clicks and the input's `focusout`), not app state.
 
 **Sections are named borders on the canvas**, for grouping programs by place.
@@ -1277,7 +1282,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and sixty-nine of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

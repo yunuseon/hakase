@@ -70,10 +70,35 @@
     place-items: center;
     inline-size: 22px;
     block-size: 22px;
+    overflow: hidden;
     font: 600 11px var(--font-ui);
     color: var(--panel);
     background: var(--accent);
     border-radius: 6px;
+}
+
+.letter,
+.icon {
+    grid-area: 1 / 1;
+}
+
+.icon {
+    display: none;
+    inline-size: 16px;
+    block-size: 16px;
+    object-fit: contain;
+}
+
+.badge[data-icon] {
+    background: var(--well);
+}
+
+.badge[data-icon] .icon {
+    display: block;
+}
+
+.badge[data-icon] .letter {
+    display: none;
 }
 
 .link {
