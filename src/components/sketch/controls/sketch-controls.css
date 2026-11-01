@@ -208,3 +208,51 @@
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+
+.capture {
+    gap: 6px;
+    block-size: 26px;
+    padding: 0 8px;
+    font: 500 12px var(--font-ui);
+    color: var(--label);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.capture:hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.capture:disabled {
+    cursor: default;
+}
+
+.capture:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+.dot {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+:host([data-recording]) .record {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+:host([data-recording]) .dot {
+    animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+    to {
+        visibility: hidden;
+    }
+}

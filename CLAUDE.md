@@ -725,6 +725,26 @@ harmless; a panel over a slider swallows its `pointerdown` and the control goes
 dead with no error anywhere. A sketch's parameters panel is collapsed by default
 for this reason.
 
+## Recording
+
+A sketch's controls have **record loop** and **snapshot**. A snapshot is
+`toBlob` of the canvas. A recording plays exactly one loop of the timeline at
+30 fps through `MediaRecorder` on `captureStream(0)`, calling `requestFrame` per
+frame, and saves a WebM (or MP4 where WebM is missing).
+
+**The capture drives the clock, not the other way round.** `clock$` in
+`sketch.program.ts` merges the playhead with the capture's own ticks and, while
+capturing, ignores the playhead, so the loop is recorded from 0 to the duration
+whatever the timeline was doing; when it ends it takes the playhead's current
+value again. With trails on, the loop is played once unrecorded first, so the
+first recorded frame already carries the trail of the last. `exhaustMap` makes
+a second click while recording do nothing.
+
+The known limitation: frames are emitted by a timer, so a throttled tab (a
+hidden pane runs about one timer a second) records every frame but slowly, and
+the WebM's timestamps are wall-clock. A frame-exact file would need WebCodecs
+and a muxer.
+
 ## Layering
 
 One rule, and the folders no longer carry it: **a view never derives, a model

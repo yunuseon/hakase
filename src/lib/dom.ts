@@ -31,3 +31,15 @@ export const viewportSize = (): Viewport => ({
     width: window.innerWidth > 0 ? window.innerWidth : 960,
     height: window.innerHeight > 0 ? window.innerHeight : 600,
 });
+
+// A download the user asked for: an object URL clicked through a detached link, then released.
+export const saveFile = (blob: Blob, name: string): void => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => {
+        URL.revokeObjectURL(url);
+    }, 1000);
+};

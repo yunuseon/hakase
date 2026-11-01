@@ -1,12 +1,17 @@
-import { combineLatest, EMPTY, merge, of } from 'rxjs';
+import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
+    exhaustMap,
     ignoreElements,
     map,
     mergeMap,
+    scan,
+    share,
     shareReplay,
     startWith,
     switchMap,
+    take,
+    takeLast,
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
@@ -18,7 +23,16 @@ import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme, type Theme } from '../components/sketch/theme.ts';
-import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
+import {
+    HksSketchControls,
+    type SavedFile,
+} from '../components/sketch/controls/sketch-controls.component.ts';
+import {
+    captureFrames$,
+    recordCanvas$,
+    snapshot$,
+    type CaptureFrame,
+} from '../components/sketch/capture.ts';
 import {
     centre,
     panelParams,
@@ -33,6 +47,15 @@ import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
+
+type CaptureEvent =
+    | { readonly kind: 'frame'; readonly frame: CaptureFrame }
+    | { readonly kind: 'done' }
+    | { readonly kind: 'file'; readonly blob: Blob };
+
+type Tick = { readonly kind: 'timeline' | 'capture' | 'released'; readonly t: number };
+
+type Clock = { readonly capturing: boolean; readonly t: number | null };
 
 export const sketchProgram: Program = {
     id: 'sketch',
@@ -115,6 +138,91 @@ export const sketchProgram: Program = {
                     mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
                 );
 
+                const canvas = sketch.gl.canvas;
+
+                const captures$: Observable<CaptureEvent> = controls.records$.pipe(
+                    withLatestFrom(state.duration$, panel$),
+                    // exhaustMap: a click while recording is ignored, not a second capture.
+                    exhaustMap(([, seconds, panel]) => {
+                        if (!(canvas instanceof HTMLCanvasElement)) {
+                            return EMPTY;
+                        }
+
+                        const frames$ = captureFrames$(seconds, panel.trails > 0).pipe(share());
+
+                        // Frames first: each must be drawn before the recorder asks for it.
+                        return merge(
+                            frames$.pipe(map((frame): CaptureEvent => ({ kind: 'frame', frame }))),
+                            frames$.pipe(
+                                takeLast(1),
+                                map((): CaptureEvent => ({ kind: 'done' })),
+                            ),
+                            recordCanvas$(canvas, frames$).pipe(
+                                map((blob): CaptureEvent => ({ kind: 'file', blob })),
+                            ),
+                        );
+                    }),
+                    share(),
+                );
+
+                // While capturing, the capture is this sketch's clock and the timeline is ignored.
+                const clock$ = merge(
+                    playhead$.pipe(map((t): Tick => ({ kind: 'timeline', t }))),
+                    captures$.pipe(
+                        mergeMap((event): Observable<Tick> => {
+                            switch (event.kind) {
+                                case 'frame':
+                                    return of({ kind: 'capture', t: event.frame.t });
+                                case 'done':
+                                    return playhead$.pipe(
+                                        take(1),
+                                        map((t): Tick => ({ kind: 'released', t })),
+                                    );
+                                case 'file':
+                                    return EMPTY;
+                            }
+                        }),
+                    ),
+                ).pipe(
+                    scan(
+                        (clock: Clock, tick): Clock =>
+                            tick.kind === 'timeline'
+                                ? { capturing: clock.capturing, t: clock.capturing ? null : tick.t }
+                                : { capturing: tick.kind === 'capture', t: tick.t },
+                        { capturing: false, t: null },
+                    ),
+                    mergeMap(({ t }) => (t === null ? EMPTY : of(t))),
+                );
+
+                const progress$ = captures$.pipe(
+                    mergeMap(event =>
+                        event.kind === 'frame'
+                            ? of(event.frame.progress)
+                            : event.kind === 'done'
+                              ? of(null)
+                              : EMPTY,
+                    ),
+                    startWith(null),
+                );
+
+                const files$: Observable<SavedFile> = merge(
+                    captures$.pipe(
+                        mergeMap(event => (event.kind === 'file' ? of(event.blob) : EMPTY)),
+                        withLatestFrom(formula$),
+                        map(([blob, formula]) => ({
+                            blob,
+                            name: `hakase-${formula}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`,
+                        })),
+                    ),
+                    controls.snapshots$.pipe(
+                        exhaustMap(() =>
+                            canvas instanceof HTMLCanvasElement ? snapshot$(canvas) : EMPTY,
+                        ),
+                        withLatestFrom(formula$),
+                        map(([blob, formula]) => ({ blob, name: `hakase-${formula}.png` })),
+                    ),
+                );
+
                 const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
                     map(([pixelRatio, zoom]) => steppedRatio(pixelRatio, zoom)),
                     distinctUntilChanged(),
@@ -124,7 +232,7 @@ export const sketchProgram: Program = {
                     sketch
                         .connect$(
                             params$,
-                            playhead$,
+                            clock$,
                             shader$,
                             ratio$,
                             combineLatest([
@@ -143,6 +251,8 @@ export const sketchProgram: Program = {
                             settings$.pipe(map(controlsView)),
                             shader$.pipe(map(knobsUsed)),
                             state.library$.pipe(map(optionsOf)),
+                            progress$,
+                            files$,
                         )
                         .pipe(ignoreElements()),
                     merge(
