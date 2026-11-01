@@ -796,7 +796,7 @@ commands and the query, not a remembered list.
 A sketch's controls have two tabs, **Parameters** and **Animation**, and the tab
 is a setting like any other (`SketchSettings.tab`), saved with the window. Each
 tab holds only what is its own: Parameters how the sketch is drawn, Animation the
-strip and the export. **Formula and theme sit above both**, in the header row
+strip and the export. The **Formula and theme sit above both**, in the header row
 beside the tab switch, because they decide what the sketch shows and so what the
 animation exports; inside Parameters they read as drawing settings. The
 Animation tab is two components the program slots into the controls'
@@ -1128,7 +1128,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and nine of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and eleven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -1337,7 +1337,17 @@ to prevent.
 - **Prefer conventional, idiomatic setups over clever ones.** An unusual
   arrangement will be questioned and should be justified or dropped. If the
   ecosystem has a standard way to do something, use it.
-- Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`.
+- Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`,
+  `npm test`.
+- **Tests are Vitest, beside the module they cover** (`todo.ts` → `todo.test.ts`),
+  and only for pure code: folds, geometry, the muxers. That is the payoff of the
+  layering — anything worth testing is a function of its arguments, so a test
+  is a call and an assertion, with no DOM, no GL and no mocks. A test that wants
+  the DOM is a sign the logic it checks sits in a component instead of a pure
+  sibling. Byte formats are tested by parsing what they write (the WebM test
+  walks the EBML tree; the zip test reads the directory back), not by comparing
+  against a stored file. The first run found a real bug: section stepping
+  followed creation order, not the reading order documented above.
 
 ## Performance
 

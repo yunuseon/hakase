@@ -86,10 +86,12 @@ export const steppedSection = (
     viewport: Extent,
     direction: Direction,
 ): string | null => {
+    // Reading order, not the order they were made in, which is how they are stored.
+    const ordered = [...sections].sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
     const centre = worldAt(camera, centreOf(viewport));
     const distance = ({ rect }: Section): number =>
         Math.hypot(rect.x + rect.width / 2 - centre.x, rect.y + rect.height / 2 - centre.y);
-    const nearest = sections.reduce<Section | null>(
+    const nearest = ordered.reduce<Section | null>(
         (best, section) => (best === null || distance(section) < distance(best) ? section : best),
         null,
     );
@@ -104,10 +106,10 @@ export const steppedSection = (
         centre.x <= rect.x + rect.width &&
         centre.y >= rect.y &&
         centre.y <= rect.y + rect.height;
-    const index = sections.indexOf(nearest);
+    const index = ordered.indexOf(nearest);
     const step = inside ? (direction === 'next' ? 1 : -1) : 0;
 
-    return sections[(index + step + sections.length) % sections.length]?.id ?? null;
+    return ordered[(index + step + ordered.length) % ordered.length]?.id ?? null;
 };
 
 const workspaceAction = (
