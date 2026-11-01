@@ -23,6 +23,8 @@ import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
 import { HksSeams } from './components/seams/seams.component.ts';
 import { HksSections } from './components/sections/sections.component.ts';
+import { HksPalette } from './components/palette/palette.component.ts';
+import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
@@ -116,7 +118,32 @@ const bootstrap = () => {
     const sections = new HksSections();
     canvas.append(sections);
 
-    const launches$ = toolbar.launches$.pipe(
+    const palette = new HksPalette();
+    palette.slot = 'chrome';
+    canvas.append(palette);
+
+    const picked$ = palette.picks$.pipe(
+        mergeMap(id => {
+            const picked = pickedOf(id);
+
+            return picked === null ? EMPTY : of(picked);
+        }),
+        share(),
+    );
+
+    const paletteOpen$ = merge(
+        palette.opens$.pipe(map(() => 'toggle' as const)),
+        merge(palette.closes$, palette.picks$).pipe(map(() => 'close' as const)),
+    ).pipe(
+        scan((open, command) => (command === 'toggle' ? !open : false), false),
+        startWith(false),
+        distinctUntilChanged(),
+    );
+
+    const launches$ = merge(
+        toolbar.launches$,
+        picked$.pipe(mergeMap(picked => (picked.kind === 'launch' ? of(picked.program) : EMPTY))),
+    ).pipe(
         mergeMap(id => {
             const program = isProgramId(id) ? programOf(id) : undefined;
 
@@ -148,6 +175,14 @@ const bootstrap = () => {
             map(([, viewport]): WorkspaceAction => ({ kind: 'add-section', viewport })),
         ),
         sections.gestures$.pipe(map(sectionAction)),
+        picked$.pipe(
+            withLatestFrom(viewport$),
+            mergeMap(([picked, viewport]) => {
+                const action = pickedAction(picked, viewport);
+
+                return action === null ? EMPTY : of(action);
+            }),
+        ),
         // defer: a flight starts from the camera this very fold holds.
         defer(() => flights$),
         // defer: the toolbar's window is opened from the state this very fold produces.
@@ -190,7 +225,25 @@ const bootstrap = () => {
 
     const interrupted$ = merge(canvas.gestures$, zoomSteps$);
 
-    const flights$: Observable<WorkspaceAction> = navigator.jumps$.pipe(
+    const jumps$ = merge(
+        navigator.jumps$,
+        picked$.pipe(mergeMap(picked => (picked.kind === 'section' ? of(picked.id) : EMPTY))),
+        merge(
+            canvas.steps$,
+            picked$.pipe(
+                mergeMap(picked => (picked.kind === 'step' ? of(picked.direction) : EMPTY)),
+            ),
+        ).pipe(
+            withLatestFrom(workspace$, viewport$),
+            mergeMap(([direction, { sections: all, camera }, viewport]) => {
+                const id = steppedSection(all, camera, viewport, direction);
+
+                return id === null ? EMPTY : of(id);
+            }),
+        ),
+    );
+
+    const flights$: Observable<WorkspaceAction> = jumps$.pipe(
         withLatestFrom(workspace$, viewport$),
         mergeMap(([id, { sections: all, camera }, viewport]) => {
             const section = all.find(candidate => candidate.id === id);
@@ -383,8 +436,10 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const look$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'look' ? of(input.name) : EMPTY)),
+    const look$ = merge(
+        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'look' ? of(input.name) : EMPTY))),
+        picked$.pipe(mergeMap(picked => (picked.kind === 'look' ? of(picked.name) : EMPTY))),
+    ).pipe(
         startWith(stored.look),
         distinctUntilChanged(),
         // Not refCount: the look outlives every editor that picked it.
@@ -504,6 +559,10 @@ const bootstrap = () => {
         ),
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
+        palette.connect$(
+            workspace$.pipe(map(({ sections: all }) => commandsOf(programs, all))),
+            paletteOpen$,
+        ),
         sections.connect$(
             workspace$.pipe(
                 map(({ sections: all }) =>

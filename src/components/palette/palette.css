@@ -1,0 +1,95 @@
+/* Closed by default and inert while closed: open, it sits over the windows and takes every click. */
+:host {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    font-family: var(--font-ui);
+}
+
+:host([data-open]) {
+    display: block;
+}
+
+.scrim {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.panel {
+    position: absolute;
+    inset-block-start: 14vh;
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    display: flex;
+    flex-direction: column;
+    inline-size: min(560px, calc(100vw - 32px));
+    max-block-size: 60vh;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 16px;
+    box-shadow:
+        0 2px 6px color-mix(in srgb, var(--shadow) 10%, transparent),
+        0 24px 64px color-mix(in srgb, var(--shadow) 28%, transparent);
+}
+
+.query {
+    flex: none;
+    padding: 16px 18px;
+    font: 500 16px var(--font-ui);
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-block-end: 1px solid var(--edge);
+    outline: none;
+}
+
+.query::placeholder {
+    color: var(--muted);
+}
+
+.results {
+    margin: 0;
+    padding: 6px;
+    overflow: auto;
+    list-style: none;
+}
+
+.results:empty {
+    display: none;
+}
+
+.empty {
+    margin: 0;
+    padding: 18px;
+    color: var(--muted);
+}
+
+.results:not(:empty) + .empty {
+    display: none;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--label);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.row:hover,
+.row[data-active] {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--muted);
+}

@@ -589,6 +589,13 @@ second jump replaces the first, and `takeUntil` any pan, zoom or key ends it, so
 the user can always take the camera back. A flight reads the camera from the
 fold it feeds, so it enters through a `defer` like the toolbar's gestures.
 
+**Sections are also slides.** With nothing editable focused, ←/→ and
+PageUp/PageDown step to the previous or next section in reading order (top to
+bottom, then left to right). `steppedSection` in `src/commands.ts` decides from
+the camera alone: if the view's centre is inside a section it steps from there,
+otherwise it goes to the nearest one first. A step is just another jump, so it
+flies, and a pan cancels it like any other flight.
+
 **The navigator** (`hks-navigator`, bottom right, in the chrome slot) holds the zoom
 controls and a minimap. `minimapOf` in `navigator.ts` maps every window frame and
 the visible world rect into a fixed box with one uniform scale; the component only
@@ -740,6 +747,21 @@ undoing a drag must not also fling the view back to where it was. ⌘Z and ⇧�
 (or ⌘Y) come from the canvas's `edits$`, which ignores keys whose
 `composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
 to its host, so `event.target` alone would steal the editor's own undo.
+
+## The command palette
+
+⌘K (Ctrl+K) opens `hks-palette` from anywhere, in the chrome slot. It is a
+component like any other: `opens$`, `closes$` and `picks$` out, `connect$(commands$,
+open$)` in, and it knows commands only as `{ id, label, hint }`. What exists is
+derived in `src/commands.ts`: `commandsOf(programs, sections)` lists launches,
+section jumps, slide steps, undo/redo, fit, reset, the minimap, looks and the
+toolbar's placements, and `pickedOf` parses a picked id back into a `Picked`
+union, which `main.ts` routes into the same streams the toolbar, navigator and
+appearance editors already feed. The palette therefore adds no behaviour of its
+own — every command is something another control could already do — and a new
+command is one entry in `commandsOf` plus one case where it is routed. Filtering
+is every typed word appearing in the label or hint, as a `combineLatest` of the
+commands and the query, not a remembered list.
 
 ## Recording
 

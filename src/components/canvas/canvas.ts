@@ -99,3 +99,18 @@ export const isEditable = (target: EventTarget | null): boolean =>
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     (target instanceof HTMLElement && target.isContentEditable);
+
+export type KeyStep = 'next' | 'previous';
+
+// Bare arrows and page keys only, and never inside something editable, where they move a caret or a thumb.
+export const keyStep = (key: string, modified: boolean, editing: boolean): KeyStep | null => {
+    if (modified || editing) {
+        return null;
+    }
+
+    if (key === 'ArrowRight' || key === 'ArrowDown' || key === 'PageDown') {
+        return 'next';
+    }
+
+    return key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp' ? 'previous' : null;
+};

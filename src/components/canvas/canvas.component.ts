@@ -8,11 +8,13 @@ import {
     gridOf,
     isEditable,
     keyEdit,
+    keyStep,
     keyZoom,
     sameVariables,
     wheelGesture,
     type CanvasGesture,
     type KeyEdit,
+    type KeyStep,
     type KeyZoom,
 } from './canvas.ts';
 import css from './canvas.css?inline';
@@ -29,6 +31,7 @@ export class HksCanvas extends HTMLElement {
     readonly gestures$: Observable<CanvasGesture>;
     readonly keys$: Observable<KeyZoom>;
     readonly edits$: Observable<KeyEdit>;
+    readonly steps$: Observable<KeyStep>;
 
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
@@ -88,6 +91,25 @@ export class HksCanvas extends HTMLElement {
                 event.preventDefault();
 
                 return of(edit);
+            }),
+        );
+
+        this.steps$ = fromDocumentEvent$('keydown').pipe(
+            mergeMap(event => {
+                // defaultPrevented: a control that used the arrow itself, like a todo grip, keeps it.
+                const step = keyStep(
+                    event.key,
+                    event.ctrlKey || event.metaKey || event.altKey,
+                    event.defaultPrevented || isEditable(event.composedPath()[0] ?? null),
+                );
+
+                if (step === null) {
+                    return EMPTY;
+                }
+
+                event.preventDefault();
+
+                return of(step);
             }),
         );
 
