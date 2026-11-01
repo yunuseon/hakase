@@ -106,7 +106,12 @@ export type WorkspaceAction =
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
-    | (WindowGesture & { readonly id: ProcessId });
+    | (Exclude<WindowGesture, { readonly kind: 'resize' }> & { readonly id: ProcessId })
+    // Carries the smallest size its program can lay out in; the workspace never learns programs.
+    | (Extract<WindowGesture, { readonly kind: 'resize' }> & {
+          readonly id: ProcessId;
+          readonly minimum: Size;
+      });
 
 const CASCADE = 26;
 const FLOATING_AT = 96;
@@ -377,6 +382,7 @@ const resizedToNeighbours = (
     workspace: Workspace,
     id: ProcessId,
     edge: ResizeEdge,
+    minimum: Size,
     dx: number,
     dy: number,
 ): Workspace => {
@@ -422,7 +428,7 @@ const resizedToNeighbours = (
               );
     const snap = { x: Number.isFinite(snapX) ? snapX : 0, y: Number.isFinite(snapY) ? snapY : 0 };
 
-    const frame = resized(process.frame, edge, x + snap.x, y + snap.y);
+    const frame = resized(process.frame, edge, x + snap.x, y + snap.y, minimum);
     // Grown with the frame, not left to the next measure: a stale size would misplace the next snap.
     const measured = {
         width: process.measured.width + frame.width - process.frame.width,
@@ -641,6 +647,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 workspace,
                 action.id,
                 action.edge,
+                action.minimum,
                 action.dx / zoom,
                 action.dy / zoom,
             );

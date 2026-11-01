@@ -49,15 +49,23 @@ export const moved = (frame: Frame, dx: number, dy: number): Frame => ({
 });
 
 // West and north shift `x`/`y` by the size the clamp allowed, not the raw delta.
-export const resized = (frame: Frame, edge: ResizeEdge, dx: number, dy: number): Frame => {
+export const MINIMUM: Size = { width: MIN_WIDTH, height: MIN_HEIGHT };
+
+export const resized = (
+    frame: Frame,
+    edge: ResizeEdge,
+    dx: number,
+    dy: number,
+    minimum: Size = MINIMUM,
+): Frame => {
     const west = edge.includes('w');
     const north = edge.includes('n');
 
     const growX = edge.includes('e') ? dx : west ? -dx : 0;
     const growY = edge.includes('s') ? dy : north ? -dy : 0;
 
-    const width = Math.round(clamp(frame.width + growX, MIN_WIDTH, MAX_SIDE));
-    const height = Math.round(clamp(frame.height + growY, MIN_HEIGHT, MAX_SIDE));
+    const width = Math.round(clamp(frame.width + growX, minimum.width, MAX_SIDE));
+    const height = Math.round(clamp(frame.height + growY, minimum.height, MAX_SIDE));
 
     return {
         ...frame,

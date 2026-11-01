@@ -30,6 +30,7 @@ export const formulaProgram: Program = {
     kind: 'floating',
     icon: 'M9.5 8 L5.5 12 L9.5 16 M14.5 8 L18.5 12 L14.5 16',
     size: { width: 340, height: 480 },
+    minimum: { width: 260, height: 260 },
     launch: () => {
         const editor = new HksFormulaEditor().guide(FORMULA_GUIDE);
 

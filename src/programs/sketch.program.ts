@@ -63,6 +63,7 @@ export const sketchProgram: Program = {
     kind: 'fitted',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
     size: { width: 640, height: 640 },
+    minimum: { width: 160, height: 120 },
     launch: () => {
         const sketch = new HksSketch();
 

@@ -486,8 +486,11 @@ parked at the top. Two patterns carry the rest:
 Narrowed to the minimum width (180), every program still fits across; only the
 formula editor's long lines run on, inside its own scrolling code box. Below
 about 150 units of height there is not room for most programs at all, and their
-content runs past the frame — a per-program minimum size would be the fix, not
-clipping, since the floating toolbar's menu has to escape its window.
+content runs past the frame — so **each program declares a `minimum`**, and
+`liveProcess$` stamps it onto every `resize` gesture it forwards. The reducer
+clamps to the action's minimum, not a global one, because only the program
+knows how small its content can go; the window component still knows nothing
+about which program it holds.
 
 **Focus is part of a window's slot, not a stream of its own.** `Self.slot$` carries
 `{ frame, focused }` together, because a raise changes both; a `frame$` and a

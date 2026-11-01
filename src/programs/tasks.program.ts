@@ -10,6 +10,7 @@ export const tasksProgram: Program = {
     kind: 'floating',
     icon: 'M4 6 H4.01 M8 6 H20 M4 12 H4.01 M8 12 H20 M4 18 H4.01 M8 18 H20',
     size: { width: 260, height: 300 },
+    minimum: { width: 200, height: 160 },
     launch: () => {
         const manager = new HksTaskManager();
 

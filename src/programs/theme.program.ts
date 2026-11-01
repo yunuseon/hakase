@@ -26,6 +26,7 @@ export const themeProgram: Program = {
     kind: 'floating',
     icon: 'M4 6 H20 V18 H4 Z M10 6 V18 M15 6 V18',
     size: { width: 300, height: 260 },
+    minimum: { width: 240, height: 200 },
     launch: () => {
         const editor = new HksThemeEditor().presets(options);
 

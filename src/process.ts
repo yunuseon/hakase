@@ -31,7 +31,10 @@ export const liveProcess$ = (
             element.gestures$.pipe(
                 map((gesture): ProcessSignal => ({
                     to: 'workspace',
-                    action: { ...gesture, id: self.id },
+                    action:
+                        gesture.kind === 'resize'
+                            ? { ...gesture, id: self.id, minimum: program.minimum }
+                            : { ...gesture, id: self.id },
                 })),
             ),
             view
