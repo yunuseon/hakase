@@ -6,10 +6,13 @@ import { pointerDelta$ } from '../../shared/drag.ts';
 import type { Camera } from '../../shared/camera.ts';
 import {
     gridOf,
+    isEditable,
+    keyEdit,
     keyZoom,
     sameVariables,
     wheelGesture,
     type CanvasGesture,
+    type KeyEdit,
     type KeyZoom,
 } from './canvas.ts';
 import css from './canvas.css?inline';
@@ -25,6 +28,7 @@ const TEMPLATE = `
 export class HksCanvas extends HTMLElement {
     readonly gestures$: Observable<CanvasGesture>;
     readonly keys$: Observable<KeyZoom>;
+    readonly edits$: Observable<KeyEdit>;
 
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
@@ -65,6 +69,26 @@ export class HksCanvas extends HTMLElement {
                     return of(gesture);
                 }),
             ),
+        );
+
+        this.edits$ = fromDocumentEvent$('keydown').pipe(
+            mergeMap(event => {
+                // composedPath, not target: a textarea inside a shadow root is retargeted to its host.
+                const edit = keyEdit(
+                    event.key,
+                    event.ctrlKey || event.metaKey,
+                    event.shiftKey,
+                    isEditable(event.composedPath()[0] ?? null),
+                );
+
+                if (edit === null) {
+                    return EMPTY;
+                }
+
+                event.preventDefault();
+
+                return of(edit);
+            }),
         );
 
         this.keys$ = fromDocumentEvent$('keydown').pipe(

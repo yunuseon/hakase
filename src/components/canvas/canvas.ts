@@ -71,3 +71,31 @@ export const sameVariables = (
     a: ReadonlyMap<string, string>,
     b: ReadonlyMap<string, string>,
 ): boolean => a.size === b.size && [...a].every(([name, value]) => b.get(name) === value);
+
+export type KeyEdit = 'undo' | 'redo';
+
+// Never inside something editable: the formula editor and every input keep their own undo.
+export const keyEdit = (
+    key: string,
+    modified: boolean,
+    shift: boolean,
+    editing: boolean,
+): KeyEdit | null => {
+    if (!modified || editing) {
+        return null;
+    }
+
+    const lower = key.toLowerCase();
+
+    if (lower === 'z') {
+        return shift ? 'redo' : 'undo';
+    }
+
+    return lower === 'y' ? 'redo' : null;
+};
+
+export const isEditable = (target: EventTarget | null): boolean =>
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable);

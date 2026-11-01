@@ -64,7 +64,8 @@ import {
     listed,
     seamsOf,
     sectionAction,
-    reduceWorkspace,
+    reduceHistory,
+    startHistory,
     type Process,
     type Workspace,
     type WorkspaceAction,
@@ -163,6 +164,7 @@ const bootstrap = () => {
         launches$,
         zoomSteps$,
         canvas.gestures$,
+        canvas.edits$.pipe(map((kind): WorkspaceAction => ({ kind }))),
         toolbarActions$,
         defer(() => signals$).pipe(
             mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
@@ -179,7 +181,8 @@ const bootstrap = () => {
             map((keep): WorkspaceAction => ({ kind: 'close-others', keep })),
         ),
     ).pipe(
-        scan(reduceWorkspace, seed),
+        scan(reduceHistory, startHistory(seed)),
+        map(({ present }) => present),
         // Emitted into the replay buffer before the processes start and read it back.
         startWith(seed),
         shareReplay({ bufferSize: 1, refCount: true }),

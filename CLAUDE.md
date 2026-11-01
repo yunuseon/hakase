@@ -728,6 +728,19 @@ harmless; a panel over a slider swallows its `pointerdown` and the control goes
 dead with no error anywhere. A sketch's parameters panel is collapsed by default
 for this reason.
 
+**Undo is a fold around the fold.** `reduceHistory` wraps `reduceWorkspace` in a
+`History` of `past`, `present` and `future` (100 deep), and `main.ts` scans that
+instead, mapping out `present`. `stepOf` sorts actions: launch, quit, links and
+section edits are steps of their own; a move or resize **joins** the previous
+step while it is the same gesture on the same id, so one drag is one undo rather
+than one per pointer move; a `raise` breaks the join; everything else (camera,
+toolbar, minimap) is not history at all. Undo restores the windows but
+`keepingView` carries the current camera, toolbar and minimap through, because
+undoing a drag must not also fling the view back to where it was. ⌘Z and ⇧⌘Z
+(or ⌘Y) come from the canvas's `edits$`, which ignores keys whose
+`composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
+to its host, so `event.target` alone would steal the editor's own undo.
+
 ## Recording
 
 A sketch's controls have **record loop** and **snapshot**. A snapshot is

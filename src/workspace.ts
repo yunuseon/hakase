@@ -86,6 +86,8 @@ export type WorkspaceAction =
     | { readonly kind: 'place-toolbar'; readonly placement: Placement }
     | { readonly kind: 'retract-toolbar' }
     | { readonly kind: 'toggle-minimap' }
+    | { readonly kind: 'undo' }
+    | { readonly kind: 'redo' }
     | { readonly kind: 'set-camera'; readonly camera: Camera }
     | { readonly kind: 'add-section'; readonly viewport: Extent }
     | {
@@ -595,6 +597,10 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
             };
         case 'toggle-minimap':
             return { ...workspace, minimap: !workspace.minimap };
+        // History is History's business: on a bare workspace they do nothing.
+        case 'undo':
+        case 'redo':
+            return workspace;
         case 'toolbar-window':
             return { ...workspace, toolbar: toolbarGesture(workspace.toolbar, action.gesture) };
         case 'close-others':
@@ -872,3 +878,107 @@ export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
                   ];
         }),
     );
+
+export type History = {
+    readonly past: readonly Workspace[];
+    readonly present: Workspace;
+    readonly future: readonly Workspace[];
+    // The step the last undoable action belonged to, so one drag is one step, not hundreds.
+    readonly step: string | null;
+};
+
+const HISTORY_LIMIT = 100;
+
+type Step = {
+    readonly key: string;
+    // A drag's many moves join one step; a launch or a delete is always a step of its own.
+    readonly joins: boolean;
+};
+
+// Only what changes the layout of the work: camera, chrome and measurements are not steps.
+const stepOf = (action: WorkspaceAction): Step | null => {
+    switch (action.kind) {
+        case 'move':
+        case 'resize':
+        case 'move-section':
+        case 'resize-section':
+            return { key: `${action.kind}:${action.id}`, joins: true };
+        case 'launch':
+        case 'quit':
+        case 'close-others':
+        case 'toggle-link':
+        case 'add-section':
+        case 'rename-section':
+        case 'remove-section':
+            return { key: action.kind, joins: false };
+        default:
+            return null;
+    }
+};
+
+// Undoing restores where things were, not where you are looking: the camera and chrome stay put.
+const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
+    ...restored,
+    camera: current.camera,
+    toolbar: current.toolbar,
+    minimap: current.minimap,
+    drift: null,
+});
+
+export const startHistory = (present: Workspace): History => ({
+    past: [],
+    present,
+    future: [],
+    step: null,
+});
+
+export const reduceHistory = (history: History, action: WorkspaceAction): History => {
+    const { past, present, future } = history;
+
+    if (action.kind === 'undo') {
+        const previous = past.at(-1);
+
+        return previous === undefined
+            ? history
+            : {
+                  past: past.slice(0, -1),
+                  present: keepingView(previous, present),
+                  future: [present, ...future],
+                  step: null,
+              };
+    }
+
+    if (action.kind === 'redo') {
+        const [next, ...rest] = future;
+
+        return next === undefined
+            ? history
+            : {
+                  past: [...past, present],
+                  present: keepingView(next, present),
+                  future: rest,
+                  step: null,
+              };
+    }
+
+    const reduced = reduceWorkspace(present, action);
+    const step = stepOf(action);
+
+    if (step === null) {
+        // A raise starts every drag, so the next move opens a new step rather than joining the last.
+        return {
+            ...history,
+            present: reduced,
+            step: action.kind === 'raise' ? null : history.step,
+        };
+    }
+
+    return step.joins && step.key === history.step
+        ? { ...history, present: reduced }
+        : {
+              past: [...past, present].slice(-HISTORY_LIMIT),
+              present: reduced,
+              future: [],
+              step: step.key,
+          };
+};
