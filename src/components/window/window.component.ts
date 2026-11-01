@@ -1,9 +1,25 @@
-import { merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, ignoreElements, map, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
+import {
+    distinctUntilChanged,
+    filter,
+    ignoreElements,
+    map,
+    mergeMap,
+    scan,
+    share,
+    startWith,
+    tap,
+} from 'rxjs/operators';
+import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
+import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
-import { RESIZE_EDGES, type ResizeEdge, type WindowGesture, type WindowView } from './frame.ts';
+import {
+    RESIZE_EDGES,
+    type ResizeEdge,
+    type StoreOption,
+    type WindowGesture,
+    type WindowView,
+} from './frame.ts';
 import css from './window.css?inline';
 
 const sheet = styleSheet(css);
@@ -13,6 +29,9 @@ const TEMPLATE = `
     <div class="title">
         <span class="glyph"></span>
         <span class="name"></span>
+        <button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
+            <span class="dot"></span><span class="store-name"></span>
+        </button>
         <button class="close" type="button" aria-label="quit">
             <svg viewBox="0 0 12 12" aria-hidden="true">
                 <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"/>
@@ -20,7 +39,61 @@ const TEMPLATE = `
         </button>
     </div>
     <div class="body"><slot></slot></div>
+    <div class="stores" role="dialog" aria-label="window state" hidden>
+        <p class="stores-head">State</p>
+        <ul class="options"></ul>
+        <label class="rename">Name <input class="rename-input" autocomplete="off" /></label>
+        <div class="stores-actions">
+            <button class="add" type="button" data-copy="false">New empty</button>
+            <button class="add" type="button" data-copy="true">Split off with a copy</button>
+        </div>
+    </div>
 `;
+
+const dataOf = (target: EventTarget | null, key: string): string | undefined => {
+    const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
+
+    return element instanceof HTMLElement ? element.dataset[key] : undefined;
+};
+
+const optionOf = ({ id, name, colour, users, current }: StoreOption): HTMLElement => {
+    const row = document.createElement('li');
+    row.className = 'option';
+    row.toggleAttribute('data-current', current);
+
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'pick';
+    pick.dataset['bind'] = id;
+    pick.setAttribute('aria-pressed', String(current));
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.setProperty('--store', colour);
+
+    const label = document.createElement('span');
+    label.className = 'option-name';
+    label.textContent = name;
+
+    const count = document.createElement('span');
+    count.className = 'users';
+    count.textContent = users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
+
+    pick.append(dot, label, count);
+    row.append(pick);
+
+    if (users === 0) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'remove';
+        remove.dataset['remove'] = id;
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', `delete ${name}`);
+        row.append(remove);
+    }
+
+    return row;
+};
 
 const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
@@ -30,6 +103,8 @@ export class HksWindow extends HTMLElement {
 
     private readonly name: HTMLElement;
     private readonly glyph: HTMLElement;
+    private readonly shadow: ShadowRoot;
+    private readonly open$: Observable<boolean>;
 
     constructor() {
         super();
@@ -44,8 +119,40 @@ export class HksWindow extends HTMLElement {
             shadow.appendChild(handle);
         }
 
+        this.shadow = shadow;
         this.name = requireChild(shadow, '.name');
         this.glyph = requireChild(shadow, '.glyph');
+
+        const chip = requireChild(shadow, '.store');
+        const popover = requireChild(shadow, '.stores');
+        const inside = (event: Event): boolean =>
+            event.composedPath().includes(popover) || event.composedPath().includes(chip);
+
+        // Shared: the popover's visibility and its closing after a pick read one sequence of toggles.
+        this.open$ = merge(
+            fromElementEvent$(chip, 'click').pipe(map(() => 'toggle' as const)),
+            fromDocumentEvent$('pointerdown').pipe(
+                filter(event => !inside(event)),
+                map(() => 'close' as const),
+            ),
+            fromDocumentEvent$('keydown').pipe(
+                filter(({ key }) => key === 'Escape'),
+                map(() => 'close' as const),
+            ),
+            fromElementEvent$(popover, 'click').pipe(
+                filter(
+                    ({ target }) =>
+                        dataOf(target, 'bind') !== undefined ||
+                        dataOf(target, 'copy') !== undefined,
+                ),
+                map(() => 'close' as const),
+            ),
+        ).pipe(
+            scan((open: boolean, action) => (action === 'toggle' ? !open : false), false),
+            startWith(false),
+            distinctUntilChanged(),
+            share(),
+        );
 
         const resize = (edge: ResizeEdge) =>
             pointerDelta$(requireChild(shadow, `.handle--${edge}`)).pipe(
@@ -69,6 +176,38 @@ export class HksWindow extends HTMLElement {
             ),
             fromElementEvent$(requireChild(shadow, '.close'), 'click').pipe(
                 map((): WindowGesture => ({ kind: 'quit' })),
+            ),
+            // The chip sits inside the drag handle too.
+            fromElementEvent$(chip, 'pointerdown').pipe(
+                tap(event => {
+                    event.stopPropagation();
+                }),
+                ignoreElements(),
+            ),
+            fromElementEvent$(popover, 'click').pipe(
+                mergeMap(({ target }): Observable<WindowGesture> => {
+                    const bind = dataOf(target, 'bind');
+                    const remove = dataOf(target, 'remove');
+                    const copy = dataOf(target, 'copy');
+
+                    return bind !== undefined
+                        ? of({ kind: 'bind-store', store: bind })
+                        : remove !== undefined
+                          ? of({ kind: 'remove-store', store: remove })
+                          : copy !== undefined
+                            ? of({ kind: 'add-store', copy: copy === 'true' })
+                            : EMPTY;
+                }),
+            ),
+            fromElementEvent$(requireChild(shadow, '.rename-input'), 'change').pipe(
+                mergeMap(({ target }): Observable<WindowGesture> => {
+                    const store =
+                        target instanceof HTMLInputElement ? target.dataset['store'] : undefined;
+
+                    return target instanceof HTMLInputElement && store !== undefined
+                        ? of({ kind: 'rename-store', store, name: target.value })
+                        : EMPTY;
+                }),
             ),
             // offset*, not getBoundingClientRect: the size in world units, before the zoom.
             observeResize$(this).pipe(
@@ -103,26 +242,78 @@ export class HksWindow extends HTMLElement {
         return this;
     }
 
-    connect$(view$: Observable<WindowView>): Observable<void> {
-        return view$.pipe(
-            distinctUntilChanged(sameView),
-            tap(({ kind, frame, focused }) => {
-                this.toggleAttribute('data-focused', focused);
-                this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
-                this.style.zIndex = frame.z.toFixed(0);
+    connect$(
+        view$: Observable<WindowView>,
+        stores$: Observable<readonly StoreOption[] | null> = of(null),
+    ): Observable<void> {
+        const shadow = this.shadow;
+        const chip = requireChild(shadow, '.store');
+        const popover = requireChild(shadow, '.stores');
+        const options = requireChild(shadow, '.options');
+        const rename = requireElement(shadow, '.rename-input', HTMLInputElement);
 
-                if (kind === 'fitted') {
-                    this.style.removeProperty('width');
-                    this.style.removeProperty('height');
+        return merge(
+            stores$.pipe(
+                tap(stores => {
+                    const current = stores?.find(option => option.current);
+                    chip.hidden = current === undefined;
 
-                    return;
-                }
+                    if (stores === null || current === undefined) {
+                        return;
+                    }
 
-                this.style.width = `${frame.width.toFixed(0)}px`;
-                this.style.height = `${frame.height.toFixed(0)}px`;
-            }),
-            map(() => undefined),
-        );
+                    chip.style.setProperty('--store', current.colour);
+                    chip.title = `${current.name}: shared with ${current.users - 1} other window${current.users === 2 ? '' : 's'}`;
+                    chip.toggleAttribute('data-shared', current.users > 1);
+
+                    const label = chip.querySelector('.store-name');
+
+                    if (label !== null) {
+                        label.textContent = current.name;
+                    }
+
+                    options.replaceChildren(...stores.map(optionOf));
+                    rename.dataset['store'] = current.id;
+
+                    // Not while focused: that would overwrite a name being typed.
+                    if (rename !== shadow.activeElement) {
+                        rename.value = current.name;
+                    }
+                }),
+            ),
+            this.open$.pipe(
+                tap(open => {
+                    popover.hidden = !open;
+                    chip.setAttribute('aria-expanded', String(open));
+                }),
+            ),
+            fromElementEvent$(rename, 'keydown').pipe(
+                tap(event => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        rename.blur();
+                    }
+                }),
+            ),
+            view$.pipe(
+                distinctUntilChanged(sameView),
+                tap(({ kind, frame, focused }) => {
+                    this.toggleAttribute('data-focused', focused);
+                    this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
+                    this.style.zIndex = frame.z.toFixed(0);
+
+                    if (kind === 'fitted') {
+                        this.style.removeProperty('width');
+                        this.style.removeProperty('height');
+
+                        return;
+                    }
+
+                    this.style.width = `${frame.width.toFixed(0)}px`;
+                    this.style.height = `${frame.height.toFixed(0)}px`;
+                }),
+            ),
+        ).pipe(map(() => undefined));
     }
 }
 

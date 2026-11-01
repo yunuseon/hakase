@@ -24,6 +24,15 @@ export type WindowView = {
     readonly focused: boolean;
 };
 
+export type StoreOption = {
+    readonly id: string;
+    readonly name: string;
+    readonly colour: string;
+    // How many windows are bound to it, this one included.
+    readonly users: number;
+    readonly current: boolean;
+};
+
 // Untagged: a window does not know which program it holds, so whoever mounts it names that.
 export type WindowGesture =
     | { readonly kind: 'move'; readonly dx: number; readonly dy: number }

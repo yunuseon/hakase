@@ -1,6 +1,6 @@
 import { defer, merge, type Observable } from 'rxjs';
 import { finalize, ignoreElements, map, withLatestFrom } from 'rxjs/operators';
-import type { WindowView } from './components/window/frame.ts';
+import type { StoreOption, WindowView } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { AppInput, AppState, ProcessId, Program, ProgramId, Self } from './program.ts';
 import type { WorkspaceAction } from './workspace.ts';
@@ -23,6 +23,7 @@ export const liveProcess$ = (
     self: Self,
     state: AppState,
     host: HTMLElement,
+    stores$: Observable<readonly StoreOption[] | null>,
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
@@ -54,7 +55,7 @@ export const liveProcess$ = (
                     input,
                 })),
             ),
-            element.connect$(view$).pipe(ignoreElements()),
+            element.connect$(view$, stores$).pipe(ignoreElements()),
         ).pipe(
             finalize(() => {
                 element.remove();

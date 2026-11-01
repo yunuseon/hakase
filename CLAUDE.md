@@ -921,6 +921,54 @@ undoing a drag must not also fling the view back to where it was. ⌘Z and ⇧�
 `composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
 to its host, so `event.target` alone would steal the editor's own undo.
 
+## Stores: shared or separate state, per window
+
+Every program's state lives in **named stores**, and every process is **bound**
+to one store of its own program (`Process.store`). Two windows bound to one
+store share their state; a window on a store no other window uses has its own.
+"Shared document" and "per-window settings" stopped being two mechanisms: they
+are the same one with a different default binding at launch.
+
+- **`HOLDING` in `stores.ts` is the one table** that says, per program, what its
+  store holds and what a new window binds to. A program with a **document**
+  (todo, board, notes, focus, agenda, habits, clocks, bookmarks) binds the
+  document and shares the main store, whose id is the program id; its window
+  settings (which note, which day) stay per window, or two windows on one notes
+  store could never show different notes. A program with only **settings**
+  (sketch, formula and theme editors) binds those, and each new window gets a
+  store of its own. Timeline, playhead, tasks and appearance hold nothing: no
+  store, no chip.
+- **The registry is workspace state**: `Workspace.stores` names each store, ids
+  `store-<n>` come from a monotone `made`, and binding, splitting, renaming and
+  removing are ordinary undoable workspace actions, emitted by the window as
+  untagged gestures and stamped in `liveProcess$`. Which windows share a store is
+  derived, never stored, and so is its colour (`colourOf`). A store a launch
+  made for one window is pruned once no window uses it, like a link; naming it or
+  splitting one off keeps it.
+- **Programs never learn stores exist.** `liveProcess$` stamps every input with
+  the window's binding as it leaves (`withLatestFrom(self.store$)`, which
+  subscribes to the binding first, so nothing emitted on launch is lost), the
+  document folds are `perStore$` maps, and `scoped` hands each program an
+  `AppState` already narrowed to its store with a `switchMap`. Rebinding swaps
+  the stream, and the components already update in place by id. Global state
+  stays global: playhead, transport, look, formulas, themes, library, tasks.
+- **Splitting off copies once.** New stores carrying `copy` are read off the
+  workspace fold with `pairwise` and fed to every document fold, which copies
+  only into a store that has no content yet, so undo and redo cannot overwrite
+  what was done since. A copied focus timer starts paused.
+- **A main store is always saved**, window open or not: it has no registry entry
+  until one of its windows opens. Saving only registered stores once dropped
+  every document of every program that had no window open.
+- Documents are saved `{ byStore: {...} }`; one saved as a single value becomes
+  its program's main store, and a window saved without a binding gets its main
+  store, or its own id when private, which is what its settings were keyed by.
+
+The window shows its binding as a **chip** left of the close button: the store's
+colour and name, outlined when another window shares it. Clicking opens a
+popover listing the program's stores with how many windows use each, rename,
+**New empty** and **Split off with a copy**, and × on unused stores. The window
+receives them as plain `StoreOption`s and knows nothing else.
+
 ## The command palette
 
 ⌘K (Ctrl+K) opens `hks-palette` from anywhere, in the chrome slot. It is a
@@ -1296,7 +1344,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and four of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

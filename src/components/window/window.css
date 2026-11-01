@@ -169,3 +169,204 @@
     gap: 8px;
     padding: 0 8px 8px;
 }
+
+.store {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    align-items: center;
+    max-inline-size: 45%;
+    block-size: 24px;
+    padding: 0 9px 0 7px;
+    font: 500 11px var(--font-ui);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.store[hidden] {
+    display: none;
+}
+
+.store:hover,
+.store[aria-expanded='true'] {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.store[data-shared] {
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--store) 45%, transparent);
+}
+
+.store-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    background: var(--store);
+    border-radius: 50%;
+}
+
+.stores {
+    position: absolute;
+    inset-block-start: 34px;
+    inset-inline-end: 8px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    inline-size: 240px;
+    padding: 10px;
+    font: 12px var(--font-ui);
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--shadow) 18%, transparent);
+    cursor: default;
+}
+
+.stores[hidden] {
+    display: none;
+}
+
+.stores-head {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.options {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-block-size: 200px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.option {
+    display: flex;
+    align-items: center;
+}
+
+.pick {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    align-items: center;
+    min-inline-size: 0;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--ink);
+    text-align: start;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.pick:hover,
+.option[data-current] .pick {
+    background: var(--well);
+}
+
+.option[data-current] .option-name {
+    font-weight: 600;
+}
+
+.option-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.users {
+    flex: none;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.remove {
+    flex: none;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.remove:hover {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.rename {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--muted);
+}
+
+.rename-input {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 5px 8px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 7px;
+}
+
+.rename-input:focus-visible {
+    outline: none;
+    border-color: var(--rule);
+}
+
+.stores-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.add {
+    flex: 1;
+    padding: 6px 8px;
+    font: 500 11px var(--font-ui);
+    color: var(--ink);
+    background: var(--well);
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.add:hover {
+    background: color-mix(in srgb, var(--rule) 30%, var(--well));
+}
+
+.store:focus-visible,
+.pick:focus-visible,
+.remove:focus-visible,
+.add:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

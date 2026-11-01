@@ -51,6 +51,7 @@ import { emptyHabits } from './components/habits/habits.ts';
 import { emptyNotes } from './components/note/note.ts';
 import { emptyTodos } from './components/todo/todo.ts';
 import {
+    colourOf,
     HOLDING,
     inStore,
     perStore$,
@@ -69,6 +70,7 @@ import { defaultSketch, type Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
+import type { StoreOption } from './components/window/frame.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import {
     isProgramId,
@@ -146,6 +148,23 @@ const sameSlot = ({ frame: a, focused }: Slot, { frame: b, focused: other }: Slo
     a.z === b.z &&
     a.width === b.width &&
     a.height === b.height;
+
+const sameOptions = (a: readonly StoreOption[] | null, b: readonly StoreOption[] | null): boolean =>
+    a === b ||
+    (a !== null &&
+        b !== null &&
+        a.length === b.length &&
+        a.every((option, index) => {
+            const other = b[index];
+
+            return (
+                other !== undefined &&
+                option.id === other.id &&
+                option.name === other.name &&
+                option.users === other.users &&
+                option.current === other.current
+            );
+        }));
 
 const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
@@ -357,6 +376,27 @@ const bootstrap = () => {
             distinctUntilChanged(),
         );
 
+    // null for a program that keeps no state of its own: its window shows no chip.
+    const storeOptions$ = ({ id, program }: Process): Observable<readonly StoreOption[] | null> =>
+        HOLDING[program] === null
+            ? of(null)
+            : workspace$.pipe(
+                  map(({ processes, stores }) => {
+                      const current = processes.find(process => process.id === id)?.store;
+
+                      return stores
+                          .filter(store => store.program === program)
+                          .map((store): StoreOption => ({
+                              id: store.id,
+                              name: store.name,
+                              colour: colourOf(store.id),
+                              users: processes.filter(process => process.store === store.id).length,
+                              current: store.id === current,
+                          }));
+                  }),
+                  distinctUntilChanged(sameOptions),
+              );
+
     const appeared$: Observable<Process> = workspace$.pipe(
         map(({ processes }) => processes),
         startWith<readonly Process[]>([]),
@@ -391,6 +431,7 @@ const bootstrap = () => {
                       },
                       scoped(binding$(process.id)),
                       canvas,
+                      storeOptions$(process),
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
