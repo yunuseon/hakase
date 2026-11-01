@@ -37,6 +37,7 @@ import { createFocus$, type Focus } from './components/focus/focus.ts';
 import { chime$ } from './chime.ts';
 import { reduceAgenda } from './components/agenda/agenda.ts';
 import { reduceHabits } from './components/habits/habits.ts';
+import { reduceClocks } from './components/clocks/clocks.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -65,6 +66,7 @@ import { noteProgram } from './programs/note.program.ts';
 import { focusProgram } from './programs/focus.program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
+import { clocksProgram } from './programs/clocks.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -98,6 +100,7 @@ const programs: readonly Program[] = [
     focusProgram,
     agendaProgram,
     habitsProgram,
+    clocksProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -398,6 +401,13 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const clocks$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'clock' ? of(input.command) : EMPTY)),
+        scan(reduceClocks, stored.clocks),
+        startWith(stored.clocks),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const focus$ = createFocus$(
         inputs$.pipe(mergeMap(({ input }) => (input.kind === 'focus' ? of(input.command) : EMPTY))),
         stored.focus,
@@ -559,6 +569,7 @@ const bootstrap = () => {
         focus$,
         agenda$,
         habits$,
+        clocks$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -612,6 +623,7 @@ const bootstrap = () => {
                 focus: focusRested$,
                 agenda: agenda$,
                 habits: habits$,
+                clocks: clocks$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({

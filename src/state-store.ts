@@ -15,6 +15,7 @@ import { emptyNotes, parseNotes, type Notes } from './components/note/note.ts';
 import { initialFocus, parseFocus, type Focus } from './components/focus/focus.ts';
 import { emptyAgenda, parseAgenda, type Agenda } from './components/agenda/agenda.ts';
 import { emptyHabits, parseHabits, type Habits } from './components/habits/habits.ts';
+import { defaultClocks, parseClocks, type Clocks } from './components/clocks/clocks.ts';
 import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
@@ -47,6 +48,7 @@ export type Snapshot = {
     readonly focus: Focus;
     readonly agenda: Agenda;
     readonly habits: Habits;
+    readonly clocks: Clocks;
     readonly library: Library;
 };
 
@@ -120,6 +122,7 @@ const fresh: Restored = {
     focus: initialFocus,
     agenda: emptyAgenda,
     habits: emptyHabits,
+    clocks: defaultClocks,
     library: emptyLibrary,
 };
 
@@ -157,6 +160,7 @@ export const restoreState = (): Restored => {
         focus: parseFocus(field(stored, 'focus')),
         agenda: parseAgenda(field(stored, 'agenda')),
         habits: parseHabits(field(stored, 'habits')),
+        clocks: parseClocks(field(stored, 'clocks')),
         library: parseLibrary(field(stored, 'library')),
     };
 };
@@ -181,6 +185,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         focus: snapshot.focus,
         agenda: snapshot.agenda,
         habits: snapshot.habits,
+        clocks: snapshot.clocks,
         library: snapshot.library,
     };
 };

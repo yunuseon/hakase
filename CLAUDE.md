@@ -677,6 +677,15 @@ today is unticked, because the day is not over. The rows share **one CSS grid**
 first column apart and the day headers drifted off their cells. Deleting a habit
 takes two clicks on the same ×, like a note, because it takes its history with it.
 
+**The world clock is one shared list of IANA zones**, everything else derived
+per second from `wallClock$` by `clocksView`: the time, the day relative to
+yours, the offset (from `formatToParts`, read back as if UTC, so daylight saving
+and half-hour zones come out right) and whether it is day there. A typed zone is
+matched against `Intl.supportedValuesOf('timeZone')` case-insensitively, **not**
+normalised with `resolvedOptions()`, which answers `Asia/Kolkata` with the legacy
+`Asia/Calcutta`; the two engines in play (the browser and Node for the tests) do
+not even list the same names, which is why there is a fallback at all.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1258,7 +1267,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and fifty-seven of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and sixty of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
