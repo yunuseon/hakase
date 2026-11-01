@@ -10,7 +10,7 @@ import {
     startWith,
     tap,
 } from 'rxjs/operators';
-import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
+import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
 import {
@@ -53,7 +53,6 @@ const TEMPLATE = `
             </button>
         </header>
         <ul class="options"></ul>
-        <label class="rename">Name <input class="rename-input" autocomplete="off" /></label>
     </div>
 `;
 
@@ -68,19 +67,32 @@ const optionOf = ({ id, name, colour, users, current }: StoreOption): HTMLElemen
     row.className = 'option';
     row.toggleAttribute('data-current', current);
 
-    const pick = document.createElement('button');
-    pick.type = 'button';
+    // The current store is not a button: a click on it renames it, since switching to it would do nothing.
+    const pick = document.createElement(current ? 'div' : 'button');
     pick.className = 'pick';
-    pick.dataset['bind'] = id;
-    pick.setAttribute('aria-pressed', String(current));
+
+    if (pick instanceof HTMLButtonElement) {
+        pick.type = 'button';
+        pick.dataset['bind'] = id;
+    }
 
     const dot = document.createElement('span');
     dot.className = 'dot';
     dot.style.setProperty('--store', colour);
 
-    const label = document.createElement('span');
+    const label = document.createElement(current ? 'input' : 'span');
     label.className = 'option-name';
-    label.textContent = name;
+
+    if (label instanceof HTMLInputElement) {
+        label.value = name;
+        label.defaultValue = name;
+        label.dataset['rename'] = id;
+        label.autocomplete = 'off';
+        label.title = 'rename';
+        label.setAttribute('aria-label', 'name of this state');
+    } else {
+        label.textContent = name;
+    }
 
     const count = document.createElement('span');
     count.className = 'users';
@@ -206,10 +218,10 @@ export class HksWindow extends HTMLElement {
                             : EMPTY;
                 }),
             ),
-            fromElementEvent$(requireChild(shadow, '.rename-input'), 'change').pipe(
+            fromElementEvent$(popover, 'change').pipe(
                 mergeMap(({ target }): Observable<WindowGesture> => {
                     const store =
-                        target instanceof HTMLInputElement ? target.dataset['store'] : undefined;
+                        target instanceof HTMLInputElement ? target.dataset['rename'] : undefined;
 
                     return target instanceof HTMLInputElement && store !== undefined
                         ? of({ kind: 'rename-store', store, name: target.value })
@@ -257,7 +269,6 @@ export class HksWindow extends HTMLElement {
         const chip = requireChild(shadow, '.store');
         const popover = requireChild(shadow, '.stores');
         const options = requireChild(shadow, '.options');
-        const rename = requireElement(shadow, '.rename-input', HTMLInputElement);
 
         return merge(
             stores$.pipe(
@@ -279,12 +290,9 @@ export class HksWindow extends HTMLElement {
                         label.textContent = current.name;
                     }
 
-                    options.replaceChildren(...stores.map(optionOf));
-                    rename.dataset['store'] = current.id;
-
-                    // Not while focused: that would overwrite a name being typed.
-                    if (rename !== shadow.activeElement) {
-                        rename.value = current.name;
+                    // Not while a name is being typed: rebuilding the list would take the input away.
+                    if (!(shadow.activeElement instanceof HTMLInputElement)) {
+                        options.replaceChildren(...stores.map(optionOf));
                     }
                 }),
             ),
@@ -294,11 +302,22 @@ export class HksWindow extends HTMLElement {
                     chip.setAttribute('aria-expanded', String(open));
                 }),
             ),
-            fromElementEvent$(rename, 'keydown').pipe(
+            fromElementEvent$(popover, 'keydown').pipe(
                 tap(event => {
-                    if (event.key === 'Enter') {
+                    const { target } = event;
+
+                    if (!(target instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    // Escape puts the old name back first, so the blur that follows changes nothing.
+                    if (event.key === 'Escape') {
+                        target.value = target.defaultValue;
+                    }
+
+                    if (event.key === 'Enter' || event.key === 'Escape') {
                         event.preventDefault();
-                        rename.blur();
+                        target.blur();
                     }
                 }),
             ),

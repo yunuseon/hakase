@@ -296,9 +296,31 @@
 
 .option-name {
     flex: 1;
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+input.option-name {
+    margin: -3px 0;
+    padding: 2px 5px;
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: text;
+}
+
+input.option-name:hover {
+    border-color: var(--edge);
+}
+
+input.option-name:focus-visible {
+    outline: none;
+    background: var(--panel);
+    border-color: var(--rule);
 }
 
 .users {
@@ -324,29 +346,6 @@
 .remove:hover {
     color: var(--ink);
     background: var(--well);
-}
-
-.rename {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--muted);
-}
-
-.rename-input {
-    flex: 1;
-    min-inline-size: 0;
-    padding: 5px 8px;
-    font: inherit;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: 7px;
-}
-
-.rename-input:focus-visible {
-    outline: none;
-    border-color: var(--rule);
 }
 
 .add {

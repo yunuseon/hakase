@@ -965,10 +965,14 @@ are the same one with a different default binding at launch.
 
 The window shows its binding as a **chip** left of the close button: the store's
 colour and name, outlined when another window shares it. Clicking opens a
-popover listing the program's stores with how many windows use each, rename,
-× on unused stores, and two icons in its header: **+** for a new empty store and
+popover listing the program's stores with how many windows use each, × on
+unused stores, and two icons in its header: **+** for a new empty store and
 a **fork** (a branch) for continuing on a copy of this one. The icons carry a
-`title` and an `aria-label`, because a glyph alone does not say which is which. The window
+`title` and an `aria-label`, because a glyph alone does not say which is which.
+**The current store's name is an input in its own row**: switching to it would
+do nothing, so a click there renames instead, Enter commits and Escape puts the
+old name back before the blur, so the blur changes nothing. The list is not
+rebuilt while a name has focus, or the rebuild would take the input away. The window
 receives them as plain `StoreOption`s and knows nothing else.
 
 ## The command palette
@@ -1346,7 +1350,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and nine of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and eleven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
