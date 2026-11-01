@@ -966,7 +966,9 @@ are the same one with a different default binding at launch.
 The window shows its binding as a **chip** left of the close button: the store's
 colour and name, outlined when another window shares it. Clicking opens a
 popover listing the program's stores with how many windows use each, rename,
-**New empty** and **Split off with a copy**, and × on unused stores. The window
+× on unused stores, and two icons in its header: **+** for a new empty store and
+a **fork** (a branch) for continuing on a copy of this one. The icons carry a
+`title` and an `aria-label`, because a glyph alone does not say which is which. The window
 receives them as plain `StoreOption`s and knows nothing else.
 
 ## The command palette

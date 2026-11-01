@@ -40,13 +40,20 @@ const TEMPLATE = `
     </div>
     <div class="body"><slot></slot></div>
     <div class="stores" role="dialog" aria-label="window state" hidden>
-        <p class="stores-head">State</p>
+        <header class="stores-head">
+            <span>State</span>
+            <button class="add" type="button" data-copy="false" title="New empty state" aria-label="new empty state">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
+            </button>
+            <button class="add" type="button" data-copy="true" title="Fork: continue on a copy of this state" aria-label="fork this state into a copy">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="7" cy="5.5" r="2"/><circle cx="7" cy="18.5" r="2"/><circle cx="17" cy="5.5" r="2"/>
+                    <path d="M7 7.5 V16.5 M17 7.5 C17 12 7 11 7 16.5"/>
+                </svg>
+            </button>
+        </header>
         <ul class="options"></ul>
         <label class="rename">Name <input class="rename-input" autocomplete="off" /></label>
-        <div class="stores-actions">
-            <button class="add" type="button" data-copy="false">New empty</button>
-            <button class="add" type="button" data-copy="true">Split off with a copy</button>
-        </div>
     </div>
 `;
 
