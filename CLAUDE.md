@@ -686,6 +686,16 @@ normalised with `resolvedOptions()`, which answers `Asia/Kolkata` with the legac
 `Asia/Calcutta`; the two engines in play (the browser and Node for the tests) do
 not even list the same names, which is why there is a fallback at all.
 
+**Links are one shared list, and only ever web addresses.** `safeUrl` accepts
+`http:` and `https:` with a dotted host and nothing else, adding `https://` to a
+bare address, and `parseLinks` runs every stored link through it again: the
+snapshot is untrusted, and a `javascript:` URL in an `href` would run inside the
+app when clicked. Links open in a new tab with `noopener`. "Name address" names a
+link as it is added, and a bare address is named by its host. A refused address
+stays in the field, marked, rather than being cleared. Rows reorder like the
+todo list's, and renaming is a per-window view state (`editing$`, a stream of
+the ✎ clicks and the input's `focusout`), not app state.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1267,7 +1277,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and sixty of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and sixty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

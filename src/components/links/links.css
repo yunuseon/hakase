@@ -1,0 +1,231 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 13px/1.3 var(--font-ui);
+    color: var(--ink);
+}
+
+.items {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-block-size: 36px;
+    padding: 0 4px 0 6px;
+    border-radius: 9px;
+}
+
+.item:hover {
+    background: var(--well);
+}
+
+.item[data-dragging] {
+    opacity: 0.4;
+}
+
+.item[data-drop-before] {
+    box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.item[data-drop-after] {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.grip {
+    flex: none;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 3px;
+    inline-size: 10px;
+    block-size: 16px;
+    background-image: radial-gradient(circle, var(--muted) 1.2px, transparent 1.6px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+    cursor: grab;
+    touch-action: none;
+}
+
+.item:hover .grip {
+    opacity: 1;
+}
+
+.badge {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    font: 600 11px var(--font-ui);
+    color: var(--panel);
+    background: var(--accent);
+    border-radius: 6px;
+}
+
+.link {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.link:hover .title {
+    text-decoration: underline;
+}
+
+.title,
+.host {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.title {
+    font-weight: 500;
+}
+
+.host {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.host:empty {
+    display: none;
+}
+
+.rename {
+    display: none;
+    flex: 1;
+    min-inline-size: 0;
+    padding: 3px 6px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+}
+
+.rename:focus-visible {
+    outline: none;
+}
+
+.item[data-editing] .link {
+    display: none;
+}
+
+.item[data-editing] .rename {
+    display: block;
+}
+
+.edit,
+.remove {
+    flex: none;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.item:hover .edit,
+.item:hover .remove,
+.edit:focus-visible,
+.remove:focus-visible {
+    opacity: 1;
+}
+
+.edit:hover,
+.remove:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--rule) 30%, transparent);
+}
+
+.empty {
+    display: none;
+    margin: auto;
+    padding: 0 12px;
+    color: var(--muted);
+    text-align: center;
+}
+
+:host([data-empty]) .empty {
+    display: block;
+}
+
+:host([data-empty]) .items {
+    display: none;
+}
+
+.add {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    margin: 0;
+}
+
+.draft {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 6px 10px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 9px;
+}
+
+.draft::placeholder {
+    color: var(--muted);
+}
+
+.draft:focus-visible {
+    outline: none;
+    border-color: var(--rule);
+}
+
+.draft[data-invalid] {
+    border-color: var(--accent);
+}
+
+.submit {
+    padding: 0 12px;
+    font: 500 12px var(--font-ui);
+    color: var(--ink);
+    background: var(--well);
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+.grip:focus-visible,
+.link:focus-visible,
+.edit:focus-visible,
+.remove:focus-visible,
+.submit:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

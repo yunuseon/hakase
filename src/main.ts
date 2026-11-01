@@ -38,6 +38,7 @@ import { chime$ } from './chime.ts';
 import { reduceAgenda } from './components/agenda/agenda.ts';
 import { reduceHabits } from './components/habits/habits.ts';
 import { reduceClocks } from './components/clocks/clocks.ts';
+import { reduceLinks } from './components/links/links.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -67,6 +68,7 @@ import { focusProgram } from './programs/focus.program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
 import { clocksProgram } from './programs/clocks.program.ts';
+import { linksProgram } from './programs/links.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -101,6 +103,7 @@ const programs: readonly Program[] = [
     agendaProgram,
     habitsProgram,
     clocksProgram,
+    linksProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -408,6 +411,13 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const links$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'link' ? of(input.command) : EMPTY)),
+        scan(reduceLinks, stored.links),
+        startWith(stored.links),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const focus$ = createFocus$(
         inputs$.pipe(mergeMap(({ input }) => (input.kind === 'focus' ? of(input.command) : EMPTY))),
         stored.focus,
@@ -570,6 +580,7 @@ const bootstrap = () => {
         agenda$,
         habits$,
         clocks$,
+        links$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -624,6 +635,7 @@ const bootstrap = () => {
                 agenda: agenda$,
                 habits: habits$,
                 clocks: clocks$,
+                links: links$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({
