@@ -30,6 +30,7 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
+import { ensured, mainStore, pruned, SHARING, type StoreEntry, type StoreId } from './stores.ts';
 
 export type Section = {
     readonly id: string;
@@ -41,6 +42,7 @@ export type Process = {
     readonly id: ProcessId;
     readonly program: ProgramId;
     readonly frame: Frame;
+    readonly store: StoreId;
     // The window's laid-out size, which can exceed its frame when content will not shrink below its minimum.
     readonly measured: Size;
 };
@@ -70,6 +72,9 @@ export type Workspace = {
     readonly minimap: boolean;
     readonly sections: readonly Section[];
     readonly links: readonly Link[];
+    readonly stores: readonly StoreEntry[];
+    // Monotone, like `launched`: a deleted store's id is never handed out again.
+    readonly made: number;
     readonly drift: Drift | null;
 };
 
@@ -138,16 +143,19 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
                 {
                     id: 'formula-1',
                     program: 'formula',
+                    store: 'formula-1',
                     frame: { x: left, y: gutter, width: editorWidth, height: editorHeight, z: 0 },
                 },
                 {
                     id: 'sketch-2',
                     program: 'sketch',
+                    store: 'sketch-2',
                     frame: { x: sketchX, y: gutter, width: 640, height: 640, z: 0 },
                 },
                 {
                     id: 'timeline-3',
                     program: 'timeline',
+                    store: 'timeline',
                     frame: {
                         x: left,
                         y: editorHeight + 2 * gutter,
@@ -159,6 +167,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
                 {
                     id: 'playhead-4',
                     program: 'playhead',
+                    store: 'playhead',
                     frame: {
                         x: sketchX + 640 + 3 * gutter,
                         y: gutter,
@@ -175,6 +184,13 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
         minimap: false,
         sections: [],
         links: [],
+        stores: [
+            { id: 'formula-1', program: 'formula', name: 'formula 1', kept: false, copy: null },
+            { id: 'sketch-2', program: 'sketch', name: 'sketch 2', kept: false, copy: null },
+            mainStore('timeline'),
+            mainStore('playhead'),
+        ],
+        made: 0,
         drift: null,
     };
 };
@@ -498,15 +514,27 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
             const launched = workspace.launched + 1;
             const step = ((launched % 8) - 4) * CASCADE;
             const centre = worldAt(workspace.camera, centreOf(action.viewport));
+            const own = SHARING[action.program] === 'private';
+            const store: StoreEntry = own
+                ? {
+                      id: `${action.program}-${launched}`,
+                      program: action.program,
+                      name: `${action.program} ${launched}`,
+                      kept: false,
+                      copy: null,
+                  }
+                : mainStore(action.program);
 
             return {
                 ...workspace,
                 launched,
+                stores: ensured(workspace.stores, store),
                 processes: [
                     ...workspace.processes,
                     {
                         id: `${action.program}-${launched}`,
                         program: action.program,
+                        store: store.id,
                         measured: action.size,
                         frame: {
                             ...action.size,
@@ -518,6 +546,58 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 ],
             };
         }
+        case 'bind-store': {
+            const process = workspace.processes.find(({ id }) => id === action.id);
+            const store = workspace.stores.find(({ id }) => id === action.store);
+
+            // Only to a store of its own program: a board cannot read bookmarks.
+            return process === undefined || store?.program !== process.program
+                ? workspace
+                : rebound(workspace, action.id, store.id);
+        }
+        case 'add-store': {
+            const process = workspace.processes.find(({ id }) => id === action.id);
+
+            if (process === undefined) {
+                return workspace;
+            }
+
+            const made = workspace.made + 1;
+            const id = `store-${made}`;
+            const store: StoreEntry = {
+                id,
+                program: process.program,
+                name: `Store ${made}`,
+                kept: true,
+                copy: action.copy ? process.store : null,
+            };
+
+            return rebound(
+                { ...workspace, made, stores: [...workspace.stores, store] },
+                process.id,
+                id,
+            );
+        }
+        case 'rename-store': {
+            const name = action.name.trim();
+
+            return name === ''
+                ? workspace
+                : {
+                      ...workspace,
+                      stores: workspace.stores.map(store =>
+                          store.id === action.store ? { ...store, name, kept: true } : store,
+                      ),
+                  };
+        }
+        case 'remove-store':
+            // Only a store no window uses: removing one under a window would leave it reading nothing.
+            return workspace.processes.some(({ store }) => store === action.store)
+                ? workspace
+                : {
+                      ...workspace,
+                      stores: workspace.stores.filter(({ id }) => id !== action.store),
+                  };
         case 'pan':
             return { ...workspace, camera: panned(workspace.camera, action.dx, action.dy) };
         case 'zoom':
@@ -661,6 +741,13 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
     }
 };
 
+const rebound = (workspace: Workspace, id: ProcessId, store: StoreId): Workspace => ({
+    ...workspace,
+    processes: workspace.processes.map(process =>
+        process.id === id ? { ...process, store } : process,
+    ),
+});
+
 export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
     switch (gesture.kind) {
         case 'move':
@@ -677,7 +764,11 @@ export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
 export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): Workspace => {
     const next = step(workspace, action);
 
-    return { ...next, links: next.links.filter(link => touching(next.processes, link)) };
+    return {
+        ...next,
+        links: next.links.filter(link => touching(next.processes, link)),
+        stores: pruned(next.stores, new Set(next.processes.map(({ store }) => store))),
+    };
 };
 
 const finite = (value: unknown): number | null =>
@@ -714,15 +805,57 @@ const processFrom = (value: unknown): Process | null => {
     // The links shelf grew into bookmarks; its open windows come back as bookmarks windows.
     const program = value.program === 'links' ? 'bookmarks' : value.program;
 
-    return isProgramId(program)
-        ? {
-              id: value.id,
-              program,
-              frame,
-              measured: { width: measured.width, height: measured.height },
-          }
-        : null;
+    if (!isProgramId(program)) {
+        return null;
+    }
+
+    const store = 'store' in value && typeof value.store === 'string' ? value.store : null;
+
+    return {
+        id: value.id,
+        program,
+        frame,
+        // Saved before stores: a private window keeps its own id, which is what its settings are keyed by.
+        store: store ?? (SHARING[program] === 'private' ? value.id : program),
+        measured: { width: measured.width, height: measured.height },
+    };
 };
+
+const storeFrom = (value: unknown): StoreEntry[] => {
+    if (typeof value !== 'object' || value === null) {
+        return [];
+    }
+
+    if (!('id' in value && 'program' in value && 'name' in value)) {
+        return [];
+    }
+
+    const { id, program, name } = value;
+    const copy = 'copy' in value && typeof value.copy === 'string' ? value.copy : null;
+
+    return typeof id === 'string' &&
+        typeof program === 'string' &&
+        isProgramId(program) &&
+        typeof name === 'string'
+        ? [{ id, program, name, kept: !('kept' in value) || value.kept !== false, copy }]
+        : [];
+};
+
+// Every bound store gets an entry, so a window never points at a store the chip cannot name.
+const enrolled = (
+    stores: readonly StoreEntry[],
+    processes: readonly Process[],
+): readonly StoreEntry[] =>
+    processes.reduce(
+        (all, { id, program, store }) =>
+            ensured(
+                all,
+                store === program
+                    ? mainStore(program)
+                    : { id: store, program, name: id.replace('-', ' '), kept: false, copy: null },
+            ),
+        stores,
+    );
 
 const cameraFrom = (value: unknown): Camera | null => {
     if (typeof value !== 'object' || value === null) {
@@ -823,6 +956,13 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
     const links =
         'links' in value && Array.isArray(value.links) ? value.links.flatMap(linkFrom) : [];
 
+    const stores =
+        'stores' in value && Array.isArray(value.stores) ? value.stores.flatMap(storeFrom) : [];
+    const made = Math.max(
+        ('made' in value ? finite(value.made) : null) ?? 0,
+        ...stores.map(({ id }) => Number(/^store-(\d+)$/.exec(id)?.[1] ?? 0)),
+    );
+
     return {
         processes: kept,
         launched,
@@ -831,6 +971,8 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         minimap,
         sections,
         links: links.filter(link => touching(kept, link)),
+        stores: enrolled(stores, kept),
+        made,
         drift: null,
     };
 };
@@ -904,6 +1046,10 @@ const stepOf = (action: WorkspaceAction): Step | null => {
         case 'quit':
         case 'close-others':
         case 'toggle-link':
+        case 'bind-store':
+        case 'add-store':
+        case 'rename-store':
+        case 'remove-store':
         case 'add-section':
         case 'rename-section':
         case 'remove-section':

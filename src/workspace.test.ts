@@ -121,3 +121,113 @@ describe('parseWorkspace', () => {
         expect(parseWorkspace(saved('links'))?.processes[0]?.program).toBe('bookmarks');
     });
 });
+
+describe('stores', () => {
+    const launch = (program: 'bookmarks' | 'sketch'): WorkspaceAction => ({
+        kind: 'launch',
+        program,
+        size: { width: 300, height: 300 },
+        viewport,
+    });
+    const present = (history: History) => history.present;
+    const storeOf = (history: History, id: string) =>
+        present(history).processes.find(process => process.id === id)?.store;
+
+    it('binds a shared program to its main store and a private one to a store of its own', () => {
+        const history = run(fresh(), [launch('bookmarks'), launch('bookmarks'), launch('sketch')]);
+
+        expect(storeOf(history, 'bookmarks-5')).toBe('bookmarks');
+        expect(storeOf(history, 'bookmarks-6')).toBe('bookmarks');
+        expect(storeOf(history, 'sketch-7')).toBe('sketch-7');
+    });
+
+    it('splits a window off with a copy, and binds it back', () => {
+        const split = run(fresh(), [
+            launch('bookmarks'),
+            launch('bookmarks'),
+            { kind: 'add-store', id: 'bookmarks-6', copy: true },
+        ]);
+        const store = present(split).stores.find(({ id }) => id === 'store-1');
+
+        expect(storeOf(split, 'bookmarks-6')).toBe('store-1');
+        expect(store).toMatchObject({ program: 'bookmarks', kept: true, copy: 'bookmarks' });
+        expect(
+            storeOf(
+                run(split, [{ kind: 'bind-store', id: 'bookmarks-6', store: 'bookmarks' }]),
+                'bookmarks-6',
+            ),
+        ).toBe('bookmarks');
+    });
+
+    it('never binds a window to another program’s store', () => {
+        const history = run(fresh(), [
+            launch('bookmarks'),
+            { kind: 'bind-store', id: 'bookmarks-5', store: 'sketch-2' },
+        ]);
+
+        expect(storeOf(history, 'bookmarks-5')).toBe('bookmarks');
+    });
+
+    it('drops a launch’s own store with its last window, but keeps a named one', () => {
+        const closed = run(fresh(), [launch('sketch'), { kind: 'quit', id: 'sketch-5' }]);
+        const named = run(fresh(), [
+            launch('sketch'),
+            { kind: 'rename-store', id: 'sketch-5', store: 'sketch-5', name: 'Loud' },
+            { kind: 'quit', id: 'sketch-5' },
+        ]);
+
+        expect(present(closed).stores.some(({ id }) => id === 'sketch-5')).toBe(false);
+        expect(present(named).stores.find(({ id }) => id === 'sketch-5')?.name).toBe('Loud');
+    });
+
+    it('removes only a store no window uses', () => {
+        const split = run(fresh(), [
+            launch('bookmarks'),
+            { kind: 'add-store', id: 'bookmarks-5', copy: false },
+        ]);
+        const inUse = run(split, [{ kind: 'remove-store', id: 'bookmarks-5', store: 'store-1' }]);
+        const unused = run(split, [
+            { kind: 'remove-store', id: 'bookmarks-5', store: 'bookmarks' },
+        ]);
+
+        expect(present(inUse).stores.some(({ id }) => id === 'store-1')).toBe(true);
+        expect(present(unused).stores.some(({ id }) => id === 'bookmarks')).toBe(false);
+    });
+
+    it('undoes a split', () => {
+        const split = run(fresh(), [
+            launch('bookmarks'),
+            { kind: 'add-store', id: 'bookmarks-5', copy: true },
+        ]);
+
+        expect(storeOf(run(split, [{ kind: 'undo' }]), 'bookmarks-5')).toBe('bookmarks');
+    });
+});
+
+describe('parseWorkspace stores', () => {
+    it('gives windows saved before stores their program’s main store or their own id', () => {
+        const workspace = defaultWorkspace(viewport);
+        const value: unknown = JSON.parse(
+            JSON.stringify({
+                ...workspace,
+                stores: undefined,
+                made: undefined,
+                processes: workspace.processes.map(({ store: _, ...process }) => process),
+            }),
+        );
+        const parsed = parseWorkspace(value);
+
+        expect(parsed?.processes.map(({ store }) => store)).toEqual([
+            'formula-1',
+            'sketch-2',
+            'timeline',
+            'playhead',
+        ]);
+        expect(parsed?.stores.map(({ id }) => id).sort()).toEqual([
+            'formula-1',
+            'playhead',
+            'sketch-2',
+            'timeline',
+        ]);
+    });
+});

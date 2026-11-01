@@ -35,7 +35,11 @@ export type WindowGesture =
       }
     | { readonly kind: 'raise' }
     | { readonly kind: 'quit' }
-    | { readonly kind: 'measure'; readonly width: number; readonly height: number };
+    | { readonly kind: 'measure'; readonly width: number; readonly height: number }
+    | { readonly kind: 'bind-store'; readonly store: string }
+    | { readonly kind: 'add-store'; readonly copy: boolean }
+    | { readonly kind: 'rename-store'; readonly store: string; readonly name: string }
+    | { readonly kind: 'remove-store'; readonly store: string };
 
 const MIN_WIDTH = 180;
 const MIN_HEIGHT = 64;
