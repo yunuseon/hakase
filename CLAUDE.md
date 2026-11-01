@@ -686,20 +686,34 @@ normalised with `resolvedOptions()`, which answers `Asia/Kolkata` with the legac
 `Asia/Calcutta`; the two engines in play (the browser and Node for the tests) do
 not even list the same names, which is why there is a fallback at all.
 
-**Links are one shared list, and only ever web addresses.** `safeUrl` accepts
-`http:` and `https:` with a dotted host and nothing else, adding `https://` to a
-bare address, and `parseLinks` runs every stored link through it again: the
-snapshot is untrusted, and a `javascript:` URL in an `href` would run inside the
-app when clicked. Links open in a new tab with `noopener`. "Name address" names a
-link as it is added, and a bare address is named by its host. A refused address
-stays in the field, marked, rather than being cleared. Each link shows its site's
-own `/favicon.ico` (`faviconOf`, https only, sent without a referrer) over the
-letter badge, and the letter stays until the image loads with real pixels; no
-icon service is asked, so no third party sees the shelf. The icon is derived from
-the address and never stored. Its `load` and `error` **do not bubble**, so the
-list listens for them in the capture phase (`fromElementEvent$` takes listener
-options for this). Rows reorder like the todo list's, and renaming is a per-window view state (`editing$`, a stream of
-the ✎ clicks and the input's `focusout`), not app state.
+**Bookmarks are named, in groups, and only ever web addresses.** One shared
+`Bookmarks` holds groups of bookmarks, each with a name and a URL, and works like
+the board turned on its side: bookmarks drag within and across groups
+(`dropTarget` picks the nearest group and counts the _other_ bookmarks above the
+pointer), ↑/↓ on a grip emit `step`, an intent the fold turns into a move that
+crosses into the next open group at either end, groups reorder by their own
+grip, collapse (saved with the document), and delete only while empty. Groups
+and bookmarks are updated in place by id, for the board's reasons.
+
+`safeUrl` accepts `http:` and `https:` with a dotted host and nothing else,
+adding `https://` to a bare address, and `parseBookmarks` runs every stored
+bookmark through it again: the snapshot is untrusted, and a `javascript:` URL in
+an `href` would run inside the app when clicked. Bookmarks open in a new tab
+with `noopener`. Each shows its site's own `/favicon.ico` (`faviconOf`, https
+only, no referrer) over a letter badge that stays until the image loads with
+real pixels; no icon service is asked, so no third party sees the shelf. Image
+`load` and `error` **do not bubble**, so the list listens in the capture phase.
+A refused address stays in the field, marked. Editing a bookmark is per-window
+view state (`editing$`: the ✎ clicks and a `focusout` that leaves the editor,
+not one that moves between its two fields).
+
+This was the links shelf, a flat list. `parseBookmarks` turns a stored `links`
+list into one group, and `parseWorkspace` brings a saved `links` window back as
+a bookmarks window. **`parseWorkspace` drops an unknown window on its own**: it
+used to reject the whole workspace for one, and renaming this program while the
+app was open reset a user's layout, sections and camera to the default, which
+the next save then made permanent. Retiring a program id needs that mapping, or
+its windows quietly disappear.
 
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
@@ -1282,7 +1296,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and eighty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

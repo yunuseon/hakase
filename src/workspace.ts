@@ -711,11 +711,13 @@ const processFrom = (value: unknown): Process | null => {
 
     // Optional: saved before windows were measured, the frame's own size is the best guess.
     const measured = ('measured' in value ? sizeFrom(value.measured) : null) ?? frame;
+    // The links shelf grew into bookmarks; its open windows come back as bookmarks windows.
+    const program = value.program === 'links' ? 'bookmarks' : value.program;
 
-    return isProgramId(value.program)
+    return isProgramId(program)
         ? {
               id: value.id,
-              program: value.program,
+              program,
               frame,
               measured: { width: measured.width, height: measured.height },
           }
@@ -816,13 +818,8 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
         return null;
     }
 
-    const processes = stored.map(processFrom);
-
-    if (processes.some(process => process === null)) {
-        return null;
-    }
-
-    const kept = processes.filter(process => process !== null);
+    // One unknown window is dropped alone: rejecting the whole workspace for it once reset a user's layout.
+    const kept = stored.map(processFrom).filter(process => process !== null);
     const links =
         'links' in value && Array.isArray(value.links) ? value.links.flatMap(linkFrom) : [];
 

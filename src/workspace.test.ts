@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     defaultWorkspace,
+    parseWorkspace,
     reduceHistory,
     startHistory,
     type History,
@@ -92,5 +93,31 @@ describe('reduceHistory', () => {
         ]);
 
         expect(frameOf(shrunk, id)).toMatchObject({ width: 300, height: 250 });
+    });
+});
+
+describe('parseWorkspace', () => {
+    const saved = (program: string) => {
+        const workspace = defaultWorkspace(viewport);
+        const [first, ...rest] = workspace.processes;
+
+        const value: unknown = JSON.parse(
+            JSON.stringify({
+                ...workspace,
+                processes: first === undefined ? rest : [{ ...first, program }, ...rest],
+            }),
+        );
+
+        return value;
+    };
+
+    it('drops a window of an unknown program and keeps everything else', () => {
+        const parsed = parseWorkspace(saved('retired'));
+
+        expect(parsed?.processes).toHaveLength(defaultWorkspace(viewport).processes.length - 1);
+    });
+
+    it('brings a links window back as bookmarks', () => {
+        expect(parseWorkspace(saved('links'))?.processes[0]?.program).toBe('bookmarks');
     });
 });

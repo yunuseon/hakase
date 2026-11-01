@@ -38,7 +38,7 @@ import { chime$ } from './chime.ts';
 import { reduceAgenda } from './components/agenda/agenda.ts';
 import { reduceHabits } from './components/habits/habits.ts';
 import { reduceClocks } from './components/clocks/clocks.ts';
-import { reduceLinks } from './components/links/links.ts';
+import { reduceBookmarks } from './components/bookmarks/bookmarks.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -68,7 +68,7 @@ import { focusProgram } from './programs/focus.program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
 import { clocksProgram } from './programs/clocks.program.ts';
-import { linksProgram } from './programs/links.program.ts';
+import { bookmarksProgram } from './programs/bookmarks.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -103,7 +103,7 @@ const programs: readonly Program[] = [
     agendaProgram,
     habitsProgram,
     clocksProgram,
-    linksProgram,
+    bookmarksProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -411,10 +411,10 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const links$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'link' ? of(input.command) : EMPTY)),
-        scan(reduceLinks, stored.links),
-        startWith(stored.links),
+    const bookmarks$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'bookmark' ? of(input.command) : EMPTY)),
+        scan(reduceBookmarks, stored.bookmarks),
+        startWith(stored.bookmarks),
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
@@ -580,7 +580,7 @@ const bootstrap = () => {
         agenda$,
         habits$,
         clocks$,
-        links$,
+        bookmarks$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -635,7 +635,7 @@ const bootstrap = () => {
                 agenda: agenda$,
                 habits: habits$,
                 clocks: clocks$,
-                links: links$,
+                bookmarks: bookmarks$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({
