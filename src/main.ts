@@ -71,6 +71,7 @@ import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
 import type { StoreOption } from './components/window/frame.ts';
+import { catalogOf, parseTarget, sameCatalog, type Global } from './inventory.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import {
     isProgramId,
@@ -96,6 +97,7 @@ import { agendaProgram } from './programs/agenda.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
 import { clocksProgram } from './programs/clocks.program.ts';
 import { bookmarksProgram } from './programs/bookmarks.program.ts';
+import { inspectorProgram } from './programs/inspector.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -134,6 +136,7 @@ const programs: readonly Program[] = [
     habitsProgram,
     clocksProgram,
     bookmarksProgram,
+    inspectorProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -734,6 +737,14 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
+        catalog$: workspace$.pipe(
+            map(({ stores, processes }) =>
+                catalogOf(stores, processes, program => programOf(program)?.title ?? program),
+            ),
+            // The workspace emits on every pointer move of a drag; the tree changes far less often.
+            distinctUntilChanged(sameCatalog),
+        ),
+        inspect$: (id: string) => inspected$(id),
         tasks$: workspace$.pipe(
             map(({ processes }) =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
@@ -768,6 +779,54 @@ const bootstrap = () => {
     const clocksIn = inStore(clocks$, defaultClocks);
     const bookmarksIn = inStore(bookmarks$, defaultBookmarks);
     const timerIn = inStore(timers$, initialFocus);
+
+    const documentIn: Readonly<
+        Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
+    > = {
+        todo: todoIn,
+        board: boardIn,
+        note: notesIn,
+        focus: timerIn,
+        agenda: agendaIn,
+        habits: habitsIn,
+        clocks: clocksIn,
+        bookmarks: bookmarksIn,
+    };
+
+    const globalOf = (name: Global): Observable<unknown> => {
+        switch (name) {
+            case 'workspace':
+                return workspace$;
+            case 'transport':
+                return combineLatest({ transport: transport$, duration: duration$ });
+            case 'appearance':
+                return combineLatest({ look: look$, edits: looks$ });
+            case 'formulas':
+                return edits$;
+            case 'themes':
+                return palettes$;
+            case 'library':
+                return library$;
+        }
+    };
+
+    const inspected$ = (id: string): Observable<unknown> => {
+        const target = parseTarget(id);
+
+        if (target === null) {
+            return of(null);
+        }
+
+        if (target.kind === 'global') {
+            return globalOf(target.name);
+        }
+
+        const select = documentIn[target.program];
+
+        return select !== undefined
+            ? select(target.store)
+            : settings$.pipe(map(all => all.get(target.store) ?? null));
+    };
 
     // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
     const scoped = (store$: Observable<StoreId>): AppState => {

@@ -980,6 +980,34 @@ applied the add by the time a bubbling listener runs, and waiting for "the next
 binding" then waits forever. The window
 receives them as plain `StoreOption`s and knows nothing else.
 
+## The inspector
+
+`inspector` shows any state in the app: a tree of the programs that keep state,
+each with its stores and how many windows use them, plus a **global** group
+(workspace, transport, appearance, formulas, themes, library), and a JSON tree of
+the selected one beside it. It is the one program that sees past its own store:
+`AppState.catalog$` and `AppState.inspect$(id)` exist for it alone and are
+read-only, so nothing can be edited around the reducers. `catalogOf` and
+`parseTarget` in `src/inventory.ts` are pure; target ids are
+`store:<program>:<store>` and `global:<name>`.
+
+It is cheap because of three choices, all needed:
+
+- **Only the selected state is followed**, never all of them, and an unchanged
+  value is skipped by reference, which is exact here because a fold makes a new
+  object only when something changed.
+- **A busy state is read at most four times a second** (`throttleTime`, leading
+  and trailing): playback changes the transport every frame, and the rows were
+  measured touching the DOM 8 times in 2 s of it.
+- **Only expanded branches are walked** (`rowsOf`), and rows are kept in place by
+  path, so values update without a rebuild and an open branch stays open. The
+  catalog dedupes with `sameCatalog`, because the workspace emits on every
+  pointer move of a drag.
+
+`displayable` turns the folds' `Map`s into objects first: `JSON.stringify` writes
+a `Map` as `{}`. What a window has selected and expanded is its own settings, so
+every inspector window can watch something different, and it can inspect itself.
+
 ## The command palette
 
 ⌘K (Ctrl+K) opens `hks-palette` from anywhere, in the chrome slot. It is a
@@ -1355,7 +1383,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and thirteen of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and nineteen of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
