@@ -1,4 +1,13 @@
-import { animationFrames, combineLatest, defer, EMPTY, merge, of, type Observable } from 'rxjs';
+import {
+    animationFrames,
+    combineLatest,
+    defer,
+    EMPTY,
+    from,
+    merge,
+    of,
+    type Observable,
+} from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -33,14 +42,30 @@ import { sharedFormulas$ } from './share.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { reduceBoard } from './components/board/board.ts';
 import { reduceNotes } from './components/note/note.ts';
-import { createFocus$, type Focus } from './components/focus/focus.ts';
+import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
+import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
+import { defaultBoard } from './components/board/board.ts';
+import { defaultClocks } from './components/clocks/clocks.ts';
+import { emptyAgenda } from './components/agenda/agenda.ts';
+import { emptyHabits } from './components/habits/habits.ts';
+import { emptyNotes } from './components/note/note.ts';
+import { emptyTodos } from './components/todo/todo.ts';
+import {
+    HOLDING,
+    inStore,
+    perStore$,
+    reduceStores,
+    type Copy,
+    type StoreAction,
+    type StoreId,
+} from './stores.ts';
 import { chime$ } from './chime.ts';
 import { reduceAgenda } from './components/agenda/agenda.ts';
 import { reduceHabits } from './components/habits/habits.ts';
 import { reduceClocks } from './components/clocks/clocks.ts';
 import { reduceBookmarks } from './components/bookmarks/bookmarks.ts';
 import { reduceTodos } from './components/todo/todo.ts';
-import type { Settings } from './settings.ts';
+import { defaultSketch, type Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
@@ -87,6 +112,9 @@ import {
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
+
+type StoreKey =
+    'todos$' | 'board$' | 'notes$' | 'focus$' | 'agenda$' | 'habits$' | 'clocks$' | 'bookmarks$';
 
 const programs: readonly Program[] = [
     formulaProgram,
@@ -319,6 +347,16 @@ const bootstrap = () => {
             distinctUntilChanged(sameSlot),
         );
 
+    const binding$ = (id: ProcessId): Observable<StoreId> =>
+        workspace$.pipe(
+            mergeMap(({ processes }) => {
+                const process = processes.find(candidate => candidate.id === id);
+
+                return process === undefined ? EMPTY : of(process.store);
+            }),
+            distinctUntilChanged(),
+        );
+
     const appeared$: Observable<Process> = workspace$.pipe(
         map(({ processes }) => processes),
         startWith<readonly Process[]>([]),
@@ -339,12 +377,19 @@ const bootstrap = () => {
                       {
                           id: process.id,
                           slot$: slot$(process.id),
-                          settings$: settings$.pipe(
-                              map(all => all.get(process.id)),
+                          store$: binding$(process.id),
+                          settings$: binding$(process.id).pipe(
+                              switchMap(store =>
+                                  settings$.pipe(
+                                      map(all =>
+                                          all.get(settingsKey(process.program, store, process.id)),
+                                      ),
+                                  ),
+                              ),
                               distinctUntilChanged(),
                           ),
                       },
-                      state,
+                      scoped(binding$(process.id)),
                       canvas,
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
@@ -356,78 +401,152 @@ const bootstrap = () => {
         share(),
     );
 
+    // A split-off store is seeded once, from the store it was split from, as it first appears.
+    const copies$: Observable<Copy> = workspace$.pipe(
+        map(({ stores }) => stores),
+        distinctUntilChanged(),
+        pairwise(),
+        mergeMap(([before, after]) =>
+            from(
+                after.flatMap(({ id, copy }) =>
+                    copy === null || before.some(store => store.id === id)
+                        ? []
+                        : [{ from: copy, to: id }],
+                ),
+            ),
+        ),
+        share(),
+    );
+
+    // A program whose store holds settings keys them by store; any other keys them by window.
+    const settingsKey = (program: ProgramId, store: StoreId, from: ProcessId): string =>
+        HOLDING[program]?.holds === 'settings' ? store : from;
+
     // Not refCount: a window's settings must outlive the moment between two of its readers.
-    const settings$ = inputs$.pipe(
-        mergeMap(({ from, input }) => (input.kind === 'settings' ? of({ from, input }) : EMPTY)),
+    const settings$ = merge(
+        inputs$.pipe(
+            mergeMap(({ program, store, from: id, input }) =>
+                input.kind === 'settings'
+                    ? of<StoreAction<Settings>>({
+                          kind: 'command',
+                          store: settingsKey(program, store, id),
+                          command: input.settings,
+                      })
+                    : EMPTY,
+            ),
+        ),
+        copies$.pipe(map((copy): StoreAction<Settings> => ({ kind: 'copy', ...copy }))),
+    ).pipe(
         scan(
-            (all, { from, input }): ReadonlyMap<ProcessId, Settings> =>
-                new Map(all).set(from, input.settings),
+            (all: ReadonlyMap<string, Settings>, action: StoreAction<Settings>) =>
+                action.kind === 'command'
+                    ? new Map(all).set(action.store, action.command)
+                    : reduceStores((_: Settings, next: Settings) => next, defaultSketch)(
+                          all,
+                          action,
+                      ),
             stored.settings,
         ),
         startWith(stored.settings),
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    // Not refCount: the list outlives every todo window, and all of them show the same one.
-    const todos$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'todo' ? of(input.command) : EMPTY)),
-        scan(reduceTodos, stored.todos),
-        startWith(stored.todos),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const todos$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'todo' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceTodos,
+        emptyTodos,
+        stored.todos,
     );
 
-    const board$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'board' ? of(input.command) : EMPTY)),
-        scan(reduceBoard, stored.board),
-        startWith(stored.board),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const boards$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'board' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceBoard,
+        defaultBoard,
+        stored.board,
     );
 
-    const notes$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'note' ? of(input.command) : EMPTY)),
-        scan(reduceNotes, stored.notes),
-        startWith(stored.notes),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const notes$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'note' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceNotes,
+        emptyNotes,
+        stored.notes,
     );
 
-    const agenda$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'agenda' ? of(input.command) : EMPTY)),
-        scan(reduceAgenda, stored.agenda),
-        startWith(stored.agenda),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const agendas$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'agenda' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceAgenda,
+        emptyAgenda,
+        stored.agenda,
     );
 
-    const habits$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'habit' ? of(input.command) : EMPTY)),
-        scan(reduceHabits, stored.habits),
-        startWith(stored.habits),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const habits$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'habit' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceHabits,
+        emptyHabits,
+        stored.habits,
     );
 
-    const clocks$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'clock' ? of(input.command) : EMPTY)),
-        scan(reduceClocks, stored.clocks),
-        startWith(stored.clocks),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const clocks$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'clock' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceClocks,
+        defaultClocks,
+        stored.clocks,
     );
 
-    const bookmarks$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'bookmark' ? of(input.command) : EMPTY)),
-        scan(reduceBookmarks, stored.bookmarks),
-        startWith(stored.bookmarks),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const bookmarks$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'bookmark' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
+        reduceBookmarks,
+        defaultBookmarks,
+        stored.bookmarks,
     );
 
-    const focus$ = createFocus$(
-        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'focus' ? of(input.command) : EMPTY))),
+    const timers$ = createTimers$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        copies$,
         stored.focus,
     );
 
-    // Like the playhead: storage keeps where the timer last stood still, or the debounce never settles.
-    const focusRested$ = focus$.pipe(
-        scan((kept: Focus, now) => (now.running ? kept : now), stored.focus),
-        distinctUntilChanged(),
-    );
+    // Like the playhead: storage keeps where each timer last stood still, or the debounce never settles.
+    const timersRested$ = timers$.pipe(scan(restedTimers, stored.focus), distinctUntilChanged());
 
     const library$ = merge(
         inputs$.pipe(
@@ -544,7 +663,7 @@ const bootstrap = () => {
     const appearance$ = (name: AppearanceName): Observable<Written<Appearance>> =>
         looks$.pipe(map(all => all.get(name) ?? { value: appearances[name], from: null }));
 
-    const state: AppState = {
+    const state: Omit<AppState, StoreKey> = {
         playhead$: transport$.pipe(
             map(({ at }) => at),
             distinctUntilChanged(),
@@ -573,14 +692,6 @@ const bootstrap = () => {
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         look$,
         appearance$,
-        todos$: todos$.pipe(map(({ items }) => items)),
-        board$,
-        notes$,
-        focus$,
-        agenda$,
-        habits$,
-        clocks$,
-        bookmarks$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -608,6 +719,33 @@ const bootstrap = () => {
             ),
     };
 
+    const todoIn = inStore(todos$, emptyTodos);
+    const boardIn = inStore(boards$, defaultBoard);
+    const notesIn = inStore(notes$, emptyNotes);
+    const agendaIn = inStore(agendas$, emptyAgenda);
+    const habitsIn = inStore(habits$, emptyHabits);
+    const clocksIn = inStore(clocks$, defaultClocks);
+    const bookmarksIn = inStore(bookmarks$, defaultBookmarks);
+    const timerIn = inStore(timers$, initialFocus);
+
+    // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
+    const scoped = (store$: Observable<StoreId>): AppState => {
+        const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
+            store$.pipe(switchMap(select));
+
+        return {
+            ...state,
+            todos$: narrowed(todoIn).pipe(map(({ items }) => items)),
+            board$: narrowed(boardIn),
+            notes$: narrowed(notesIn),
+            focus$: narrowed(timerIn),
+            agenda$: narrowed(agendaIn),
+            habits$: narrowed(habitsIn),
+            clocks$: narrowed(clocksIn),
+            bookmarks$: narrowed(bookmarksIn),
+        };
+    };
+
     const toolbarView$ = toolbarState$.pipe(
         map((state): ToolbarView =>
             state.kind === 'docked'
@@ -617,7 +755,7 @@ const bootstrap = () => {
     );
 
     return merge(
-        chime$(focus$),
+        chime$(timers$),
         persistState$(
             combineLatest({
                 workspace: workspace$,
@@ -629,10 +767,10 @@ const bootstrap = () => {
                 rested: rested$,
                 settings: settings$,
                 todos: todos$,
-                board: board$,
+                board: boards$,
                 notes: notes$,
-                focus: focusRested$,
-                agenda: agenda$,
+                focus: timersRested$,
+                agenda: agendas$,
                 habits: habits$,
                 clocks: clocks$,
                 bookmarks: bookmarks$,

@@ -14,11 +14,13 @@ a different default binding at launch.
   monotone `Workspace.made` counter for store ids (`store-<n>`), like `launched`.
   `copy` is the store it was split off from, or null.
 - `Process.store: StoreId`.
-- A program declares `sharing`: `'shared'` (board, todo, bookmarks, habits,
-  clocks, focus): a new window binds to the program's default store, whose id
-  is the program id; `'private'` (sketch, formula, theme, note, agenda): a new
-  window gets a fresh store; or `null` (timeline, playhead, tasks, appearance):
-  no store state, no chip.
+- `HOLDING` (in `stores.ts`) says, per program, what its store holds and what a
+  new window binds to. A program with a **document** (todo, board, notes, focus,
+  agenda, habits, clocks, bookmarks) binds the document and shares the main
+  store, whose id is the program id; its window settings (which note, which day)
+  stay per window. A program with only **settings** (sketch, formula and theme
+  editors) binds those settings, and each new window gets a fresh store. Timeline,
+  playhead, tasks and appearance hold nothing of their own: no store, no chip.
 - Actions: `bind-store`, `add-store` (new or split off with a copy, binding the
   window that asked), `rename-store`, `remove-store` (only one no window uses).
   All are undoable steps.

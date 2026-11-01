@@ -110,15 +110,49 @@ export const reduceFocus = (focus: Focus, action: FocusAction): Focus => {
     }
 };
 
-export const createFocus$ = (
-    commands$: Observable<FocusCommand>,
-    initial: Focus,
-): Observable<Focus> => {
-    const focus$: Observable<Focus> = merge(
-        commands$.pipe(map((command): FocusAction => ({ kind: 'command', command }))),
+export type Timers = ReadonlyMap<string, Focus>;
+
+type TimersAction =
+    | { readonly kind: 'command'; readonly store: string; readonly command: FocusCommand }
+    | { readonly kind: 'copy'; readonly from: string; readonly to: string }
+    | { readonly kind: 'tick'; readonly ms: number };
+
+export const reduceTimers = (timers: Timers, action: TimersAction): Timers => {
+    switch (action.kind) {
+        case 'command':
+            return new Map(timers).set(
+                action.store,
+                reduceFocus(timers.get(action.store) ?? initialFocus, {
+                    kind: 'command',
+                    command: action.command,
+                }),
+            );
+        case 'copy': {
+            const source = timers.get(action.from);
+
+            // A copy starts paused: two timers ticking from one press would look like one.
+            return source === undefined || timers.has(action.to)
+                ? timers
+                : new Map(timers).set(action.to, { ...source, running: false });
+        }
+        case 'tick':
+            return [...timers.values()].some(({ running }) => running)
+                ? new Map([...timers].map(([store, focus]) => [store, reduceFocus(focus, action)]))
+                : timers;
+    }
+};
+
+export const createTimers$ = (
+    commands$: Observable<{ readonly store: string; readonly command: FocusCommand }>,
+    copies$: Observable<{ readonly from: string; readonly to: string }>,
+    initial: Timers,
+): Observable<Timers> => {
+    const timers$: Observable<Timers> = merge(
+        commands$.pipe(map((stamped): TimersAction => ({ kind: 'command', ...stamped }))),
+        copies$.pipe(map((copy): TimersAction => ({ kind: 'copy', ...copy }))),
         // defer: a phase that runs out pauses, so the ticks are gated by this fold.
-        defer(() => focus$).pipe(
-            map(({ running }) => running),
+        defer(() => timers$).pipe(
+            map(timers => [...timers.values()].some(({ running }) => running)),
             distinctUntilChanged(),
             // An interval, not animation frames: those stop in a hidden tab, and a timer must not.
             switchMap(running =>
@@ -131,16 +165,38 @@ export const createFocus$ = (
                       )
                     : EMPTY,
             ),
-            map((ms): FocusAction => ({ kind: 'tick', ms })),
+            map((ms): TimersAction => ({ kind: 'tick', ms })),
         ),
     ).pipe(
-        scan(reduceFocus, initial),
+        scan(reduceTimers, initial),
         startWith(initial),
         // Not refCount: closing the last timer window must not stop or reset the timer.
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    return focus$;
+    return timers$;
+};
+
+// Phases that ran out by themselves since the last reading, in any timer that already existed.
+export const finished = (before: Timers, after: Timers): number =>
+    [...after].filter(([store, focus]) => {
+        const was = before.get(store);
+
+        return was !== undefined && focus.completed > was.completed;
+    }).length;
+
+// Running timers are kept as they last stood still, so storage settles while one runs.
+export const restedTimers = (kept: Timers, now: Timers): Timers => {
+    const next = new Map(
+        [...now].map(([store, focus]) => [
+            store,
+            focus.running ? (kept.get(store) ?? focus) : focus,
+        ]),
+    );
+
+    return next.size === kept.size && [...next].every(([store, focus]) => kept.get(store) === focus)
+        ? kept
+        : next;
 };
 
 export type FocusView = {

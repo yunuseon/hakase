@@ -30,7 +30,7 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
-import { ensured, mainStore, pruned, SHARING, type StoreEntry, type StoreId } from './stores.ts';
+import { ensured, mainStore, pruned, HOLDING, type StoreEntry, type StoreId } from './stores.ts';
 
 export type Section = {
     readonly id: string;
@@ -514,7 +514,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
             const launched = workspace.launched + 1;
             const step = ((launched % 8) - 4) * CASCADE;
             const centre = worldAt(workspace.camera, centreOf(action.viewport));
-            const own = SHARING[action.program] === 'private';
+            const own = HOLDING[action.program]?.sharing === 'private';
             const store: StoreEntry = own
                 ? {
                       id: `${action.program}-${launched}`,
@@ -816,7 +816,7 @@ const processFrom = (value: unknown): Process | null => {
         program,
         frame,
         // Saved before stores: a private window keeps its own id, which is what its settings are keyed by.
-        store: store ?? (SHARING[program] === 'private' ? value.id : program),
+        store: store ?? (HOLDING[program]?.sharing === 'private' ? value.id : program),
         measured: { width: measured.width, height: measured.height },
     };
 };

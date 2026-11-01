@@ -127,6 +127,8 @@ export type Slot = {
 export type Self = {
     readonly id: ProcessId;
     readonly slot$: Observable<Slot>;
+    // The store this window is bound to; its state arrives already narrowed to it.
+    readonly store$: Observable<string>;
     // undefined until this process first changes a setting; each program supplies its own default.
     readonly settings$: Observable<Settings | undefined>;
 };

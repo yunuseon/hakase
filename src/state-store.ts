@@ -10,22 +10,19 @@ import {
     type Library,
 } from './library.ts';
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
-import { defaultBoard, parseBoard, type Board } from './components/board/board.ts';
-import { emptyNotes, parseNotes, type Notes } from './components/note/note.ts';
-import { initialFocus, parseFocus, type Focus } from './components/focus/focus.ts';
-import { emptyAgenda, parseAgenda, type Agenda } from './components/agenda/agenda.ts';
-import { emptyHabits, parseHabits, type Habits } from './components/habits/habits.ts';
-import { defaultClocks, parseClocks, type Clocks } from './components/clocks/clocks.ts';
-import {
-    defaultBookmarks,
-    parseBookmarks,
-    type Bookmarks,
-} from './components/bookmarks/bookmarks.ts';
-import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
+import { parseBoard, type Board } from './components/board/board.ts';
+import { parseNotes, type Notes } from './components/note/note.ts';
+import { parseFocus, type Focus } from './components/focus/focus.ts';
+import { parseAgenda, type Agenda } from './components/agenda/agenda.ts';
+import { parseHabits, type Habits } from './components/habits/habits.ts';
+import { parseClocks, type Clocks } from './components/clocks/clocks.ts';
+import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks.ts';
+import { parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
 import { clamp } from './lib/math.ts';
-import type { ProcessId } from './program.ts';
+import type { ProcessId, ProgramId } from './program.ts';
+import { keptStores, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { defaultDuration } from './shared/playhead.ts';
 import { parseWorkspace, type Workspace } from './workspace.ts';
@@ -47,14 +44,14 @@ export type Snapshot = {
     readonly playhead: number;
     readonly looping: boolean;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
-    readonly todos: TodoList;
-    readonly board: Board;
-    readonly notes: Notes;
-    readonly focus: Focus;
-    readonly agenda: Agenda;
-    readonly habits: Habits;
-    readonly clocks: Clocks;
-    readonly bookmarks: Bookmarks;
+    readonly todos: ReadonlyMap<StoreId, TodoList>;
+    readonly board: ReadonlyMap<StoreId, Board>;
+    readonly notes: ReadonlyMap<StoreId, Notes>;
+    readonly focus: ReadonlyMap<StoreId, Focus>;
+    readonly agenda: ReadonlyMap<StoreId, Agenda>;
+    readonly habits: ReadonlyMap<StoreId, Habits>;
+    readonly clocks: ReadonlyMap<StoreId, Clocks>;
+    readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly library: Library;
 };
 
@@ -109,6 +106,21 @@ const settingsFrom = (value: unknown): ReadonlyMap<ProcessId, Settings> =>
         }),
     );
 
+// Saved before stores, a document was one value: it becomes its program's main store.
+const byStore = <T>(
+    value: unknown,
+    program: ProgramId,
+    parse: (stored: unknown) => T,
+): ReadonlyMap<StoreId, T> => {
+    const stores = field(value, 'byStore');
+
+    if (stores !== undefined) {
+        return new Map(entriesOf(stores).map(([id, stored]): [StoreId, T] => [id, parse(stored)]));
+    }
+
+    return value === undefined ? new Map() : new Map([[program, parse(value)]]);
+};
+
 const numberFrom = (value: unknown, fallback: number, min: number, max: number): number =>
     typeof value === 'number' && Number.isFinite(value) ? clamp(value, min, max) : fallback;
 
@@ -122,14 +134,14 @@ const fresh: Restored = {
     playhead: 0,
     looping: true,
     settings: new Map(),
-    todos: emptyTodos,
-    board: defaultBoard,
-    notes: emptyNotes,
-    focus: initialFocus,
-    agenda: emptyAgenda,
-    habits: emptyHabits,
-    clocks: defaultClocks,
-    bookmarks: defaultBookmarks,
+    todos: new Map(),
+    board: new Map(),
+    notes: new Map(),
+    focus: new Map(),
+    agenda: new Map(),
+    habits: new Map(),
+    clocks: new Map(),
+    bookmarks: new Map(),
     library: emptyLibrary,
 };
 
@@ -161,20 +173,30 @@ export const restoreState = (): Restored => {
         playhead: numberFrom(field(stored, 'playhead'), 0, 0, 1),
         looping: field(stored, 'looping') !== false,
         settings: settingsFrom(field(stored, 'settings')),
-        todos: parseTodos(field(stored, 'todos')),
-        board: parseBoard(field(stored, 'board')),
-        notes: parseNotes(field(stored, 'notes')),
-        focus: parseFocus(field(stored, 'focus')),
-        agenda: parseAgenda(field(stored, 'agenda')),
-        habits: parseHabits(field(stored, 'habits')),
-        clocks: parseClocks(field(stored, 'clocks')),
-        bookmarks: parseBookmarks(field(stored, 'bookmarks'), field(stored, 'links')),
+        todos: byStore(field(stored, 'todos'), 'todo', parseTodos),
+        board: byStore(field(stored, 'board'), 'board', parseBoard),
+        notes: byStore(field(stored, 'notes'), 'note', parseNotes),
+        focus: byStore(field(stored, 'focus'), 'focus', parseFocus),
+        agenda: byStore(field(stored, 'agenda'), 'agenda', parseAgenda),
+        habits: byStore(field(stored, 'habits'), 'habits', parseHabits),
+        clocks: byStore(field(stored, 'clocks'), 'clocks', parseClocks),
+        bookmarks:
+            field(stored, 'bookmarks') === undefined && field(stored, 'links') !== undefined
+                ? new Map([['bookmarks', parseBookmarks(undefined, field(stored, 'links'))]])
+                : byStore(field(stored, 'bookmarks'), 'bookmarks', value => parseBookmarks(value)),
         library: parseLibrary(field(stored, 'library')),
     };
 };
 
 const serialised = (snapshot: Snapshot): unknown => {
-    const live = new Set(snapshot.workspace.processes.map(({ id }) => id));
+    const { stores } = snapshot.workspace;
+    const live = new Set([
+        ...snapshot.workspace.processes.map(({ id }) => id),
+        ...stores.map(({ id }) => id),
+    ]);
+    const saved = <T>(all: ReadonlyMap<StoreId, T>): unknown => ({
+        byStore: Object.fromEntries(keptStores(all, stores)),
+    });
 
     return {
         version: VERSION,
@@ -187,14 +209,14 @@ const serialised = (snapshot: Snapshot): unknown => {
         playhead: snapshot.playhead,
         looping: snapshot.looping,
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
-        todos: snapshot.todos,
-        board: snapshot.board,
-        notes: snapshot.notes,
-        focus: snapshot.focus,
-        agenda: snapshot.agenda,
-        habits: snapshot.habits,
-        clocks: snapshot.clocks,
-        bookmarks: snapshot.bookmarks,
+        todos: saved(snapshot.todos),
+        board: saved(snapshot.board),
+        notes: saved(snapshot.notes),
+        focus: saved(snapshot.focus),
+        agenda: saved(snapshot.agenda),
+        habits: saved(snapshot.habits),
+        clocks: saved(snapshot.clocks),
+        bookmarks: saved(snapshot.bookmarks),
         library: snapshot.library,
     };
 };

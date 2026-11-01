@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
-import { distinctUntilChanged, map, skip, tap } from 'rxjs/operators';
-import type { Focus } from './components/focus/focus.ts';
+import { filter, map, pairwise, tap } from 'rxjs/operators';
+import { finished, type Timers } from './components/focus/focus.ts';
 
 const NOTES = [660, 880, 990];
 
@@ -26,12 +26,10 @@ const play = (): void => {
     });
 };
 
-export const chime$ = (focus$: Observable<Focus>): Observable<void> =>
-    focus$.pipe(
-        map(({ completed }) => completed),
-        distinctUntilChanged(),
-        // The restored count is not a phase ending now.
-        skip(1),
+export const chime$ = (timers$: Observable<Timers>): Observable<void> =>
+    timers$.pipe(
+        pairwise(),
+        filter(([before, after]) => finished(before, after) > 0),
         tap(play),
         map(() => undefined),
     );
