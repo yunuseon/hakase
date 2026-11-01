@@ -1,9 +1,10 @@
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
-import { requireChild, requireElement, saveFile, styleSheet } from '../../../lib/dom.ts';
+import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
 import { CYCLES, DRAW_MODES, KNOBS, defaultPanel, isKnob, type DrawMode } from '../params.ts';
 import { FITS, LATTICES, LENSES, SPACES } from '../space.ts';
+import { TABS } from '../animation.ts';
 import {
     FLAGS,
     NUMERIC_FIELDS,
@@ -74,7 +75,17 @@ const modes = DRAW_MODES.map(
     `,
 ).join('');
 
+const tabs = TABS.map(
+    tab => `
+        <label class="segment">
+            <input type="radio" name="tab" value="${tab}"${tab === 'parameters' ? ' checked' : ''} />
+            <span>${tab}</span>
+        </label>
+    `,
+).join('');
+
 const TEMPLATE = `
+    <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs}</div>
     <div class="bar" role="group" aria-label="sketch parameters">
         ${choice('formula', 'formula')}
         ${choice('theme', 'theme')}
@@ -89,25 +100,14 @@ const TEMPLATE = `
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>
             <span>reset view</span>
         </button>
-        <button class="item capture record" type="button" title="render one loop of the timeline to a video file">
-            <span class="dot" aria-hidden="true"></span>
-            <span class="label">record loop</span>
-        </button>
-        <button class="item capture still" type="button" title="save the current frame as a PNG">
-            <span class="label">snapshot</span>
-        </button>
         ${slider('dimension', 'lattice', 1, 128, 1, defaultPanel.dimension)}
         ${slider('baseSize', 'dot', 1, 20, 1, defaultPanel.baseSize, 'dots')}
         ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
         ${slider('trails', 'trails', 0, 0.97, 0.01, defaultPanel.trails)}
         ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultPanel.knobs[knob])).join('')}
     </div>
+    <div class="animation" hidden><slot name="animation"></slot></div>
 `;
-
-export type SavedFile = {
-    readonly blob: Blob;
-    readonly name: string;
-};
 
 export type PresetOption = {
     readonly value: string;
@@ -120,12 +120,11 @@ const readout = (field: NumericField, value: number): string =>
 export class HksSketchControls extends HTMLElement {
     readonly changes$: Observable<ControlChange>;
     readonly resets$: Observable<void>;
-    readonly records$: Observable<void>;
-    readonly snapshots$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
     private readonly reset: HTMLButtonElement;
-    private readonly record: HTMLButtonElement;
+    private readonly bar: HTMLElement;
+    private readonly animation: HTMLElement;
 
     constructor() {
         super();
@@ -135,16 +134,19 @@ export class HksSketchControls extends HTMLElement {
         this.shadow.innerHTML = TEMPLATE;
 
         const bar = requireChild(this.shadow, '.bar');
+        this.bar = bar;
+        this.animation = requireChild(this.shadow, '.animation');
         this.reset = requireElement(this.shadow, '.reset', HTMLButtonElement);
         this.resets$ = fromElementEvent$(this.reset, 'click').pipe(map(() => undefined));
-        this.record = requireElement(this.shadow, '.record', HTMLButtonElement);
-        this.records$ = fromElementEvent$(this.record, 'click').pipe(map(() => undefined));
-        this.snapshots$ = fromElementEvent$(
-            requireElement(this.shadow, '.still', HTMLButtonElement),
-            'click',
-        ).pipe(map(() => undefined));
 
         this.changes$ = merge(
+            fromElementEvent$(requireChild(this.shadow, '.tabs'), 'change').pipe(
+                mergeMap(({ target }): Observable<ControlChange> =>
+                    target instanceof HTMLInputElement
+                        ? of({ field: 'tab', value: target.value })
+                        : EMPTY,
+                ),
+            ),
             fromElementEvent$(bar, 'input').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
                     const field =
@@ -211,9 +213,6 @@ export class HksSketchControls extends HTMLElement {
         view$: Observable<ControlsView>,
         knobs$: Observable<readonly string[]>,
         formulas$: Observable<readonly PresetOption[]>,
-        // null when idle, else how far the capture is, from 0 to 1.
-        capture$: Observable<number | null>,
-        files$: Observable<SavedFile>,
     ): Observable<void> {
         // Together: options rebuilt after the value was set would drop the selection.
         const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
@@ -324,26 +323,23 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        const recording$ = capture$.pipe(
-            map(progress => (progress === null ? null : Math.floor(progress * 100))),
+        const tab$ = view$.pipe(
+            map(({ tab }) => tab),
             distinctUntilChanged(),
-            tap(percent => {
-                const label = requireElement(this.record, '.label', HTMLElement);
-                label.textContent = percent === null ? 'record loop' : `recording ${percent}%`;
-                this.record.disabled = percent !== null;
-                this.toggleAttribute('data-recording', percent !== null);
-            }),
-        );
+            tap(tab => {
+                for (const radio of this.shadow.querySelectorAll('input[name="tab"]')) {
+                    if (radio instanceof HTMLInputElement) {
+                        radio.checked = radio.value === tab;
+                    }
+                }
 
-        const saved$ = files$.pipe(
-            tap(({ blob, name }) => {
-                saveFile(blob, name);
+                this.bar.hidden = tab !== 'parameters';
+                this.animation.hidden = tab !== 'animation';
             }),
         );
 
         return merge(
-            recording$,
-            saved$,
+            tab$,
             formula$,
             ...picks$,
             ...numbers$,

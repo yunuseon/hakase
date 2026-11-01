@@ -1,9 +1,11 @@
+import type { Tab } from '../animation.ts';
 import { isCycles, isDrawMode, isKnob, type Knob, type Panel } from '../params.ts';
 import { isFit, isLattice, isLens, isSpace } from '../space.ts';
 
 export type ControlsView = Panel & {
     readonly formula: string;
     readonly theme: string;
+    readonly tab: Tab;
     // Whether the viewer has moved the camera at all, which is all the reset button needs to know.
     readonly turned: boolean;
 };
@@ -34,7 +36,8 @@ export const isNumericField = (value: string): value is NumericField =>
 // Only what the user did, never a reading of the inputs: the fold owns the values, the inputs show them.
 export type ControlChange =
     | {
-          readonly field: 'formula' | 'theme' | 'mode' | 'fit' | 'lens' | 'lattice' | 'space';
+          readonly field:
+              'formula' | 'theme' | 'tab' | 'mode' | 'fit' | 'lens' | 'lattice' | 'space';
           readonly value: string;
       }
     | { readonly field: NumericField; readonly value: number }
@@ -48,6 +51,7 @@ export const withChange = (panel: Panel, change: ControlChange): Panel => {
     switch (change.field) {
         case 'formula':
         case 'theme':
+        case 'tab':
             return panel;
         case 'mode':
             return isDrawMode(change.value) ? { ...panel, mode: change.value } : panel;

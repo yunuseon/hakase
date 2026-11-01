@@ -498,7 +498,8 @@ about which program it holds.
 bug, firing once with the stale half.
 
 `hks-sketch` exposes two slots: `status` for the fps readout, laid over the canvas
-top left, and `controls` for the parameter bar, **below** the canvas. The bar sat
+top left, and `controls` for the parameter bar, **below** the canvas. The
+controls in turn expose an `animation` slot for their second tab. The bar sat
 over the drawing once and was in the way of the one thing a sketch exists to show;
 only a readout that small may cover it. Draw mode
 is a three-way radio group, still real `<input type="radio">`s, so the keyboard and
@@ -767,25 +768,146 @@ command is one entry in `commandsOf` plus one case where it is routed. Filtering
 is every typed word appearing in the label or hint, as a `combineLatest` of the
 commands and the query, not a remembered list.
 
-## Recording
+## Animation and export
 
-A sketch's controls have **record loop** and **snapshot**. A snapshot is
-`toBlob` of the canvas. A recording plays exactly one loop of the timeline at
-30 fps through `MediaRecorder` on `captureStream(0)`, calling `requestFrame` per
-frame, and saves a WebM (or MP4 where WebM is missing).
+A sketch's controls have two tabs, **Parameters** and **Animation**, and the tab
+is a setting like any other (`SketchSettings.tab`), saved with the window. The
+Animation tab is two components the program slots into the controls'
+`animation` slot: `hks-frame-strip`, a Photoshop-style frame strip, and
+`hks-export-panel`, the export settings with **Export** and **Save frame**. The
+controls know neither; `sketch.program.ts` composes them.
 
-**The capture drives the clock, not the other way round.** `clock$` in
-`sketch.program.ts` merges the playhead with the capture's own ticks and, while
-capturing, ignores the playhead, so the loop is recorded from 0 to the duration
-whatever the timeline was doing; when it ends it takes the playhead's current
-value again. With trails on, the loop is played once unrecorded first, so the
-first recorded frame already carries the trail of the last. `exhaustMap` makes
-a second click while recording do nothing.
+**One cell is one exported frame.** The strip's frame count is
+`frameCount(duration, export fps)`, so changing the export's frame rate changes
+the strip. Zoom is a continuous **level**, `SketchSettings.stripLevel`: log2 of
+frames per tile at the base tile width, so 0 is one frame per tile. A tile stands
+for `2^ceil(level)` frames, and between whole levels it **widens** rather than
+splitting, so a pinch is smooth and every tile still holds a whole picture,
+rendered at the tile's own shape rather than stretched. − and + step a whole
+level, **fit** picks the level that shows the whole loop. All of it is pure maths
+in `animation.ts` (`stripGeometry`, `zoomedStrip`, `tilesIn`, `frameAtX`,
+`followed`). Clicking or dragging the strip emits an ordinary `scrub`, so the
+shared playhead and every other sketch follow, and while playing the strip pages
+along with the playhead (only while playing: a paused strip belongs to whoever
+scrolls it).
 
-The known limitation: frames are emitted by a timer, so a throttled tab (a
-hidden pane runs about one timer a second) records every frame but slowly, and
-the WebM's timestamps are wall-clock. A frame-exact file would need WebCodecs
-and a muxer.
+**A pinch zooms the strip, not the workspace.** A trackpad pinch arrives as
+ctrl+wheel, which the canvas also reads as its own zoom. The strip claims it with
+`preventDefault`, and the canvas skips any wheel that is already
+`defaultPrevented` — the same contract as a todo grip's arrow keys. A pinch is
+anchored: `zoomedStrip` returns the new level **and** the scroll that keeps the
+frame under the fingers in place. That scroll is applied `observeOn(asapScheduler)`,
+after the synchronous settings fold has laid out the new level; applied at once,
+the track still has its old width and the browser clamps the scroll.
+
+The strip takes one `layout$` — geometry and the visible tile range together —
+not a geometry stream beside a range derived from it, which would be two paths
+into one `combineLatest` and fire twice on every pinch tick. The playhead's x is
+computed from that same layout inside the strip (`markerX`). Tiles are rebuilt
+only when what a tile stands for changes (frames, frames per tile); a pinch
+between whole levels only moves and widens the ones in view, so their pictures
+stay up until the new ones arrive.
+
+The strip is virtualised: only the tiles in view, plus one either side, exist in
+the DOM or get rendered. **They are rendered as one picture**, a `Filmstrip`:
+every visible tile side by side in a single offscreen render (a viewport and a
+scissor per tile, so each draw's clear stays in its own slot), handed over as one
+`ImageBitmap` and shown on one `.film` canvas behind the tiles, which carry only
+the numbers and the current-frame ring. A canvas per tile looked equivalent and
+was not: fifteen bitmap handoffs a frame cost almost no CPU (1,066 of them took
+5 ms) but each is a separate canvas for the compositor, and an orbit drag with
+the strip open dropped to 30 fps even at lattice 32. One handoff a frame drops
+none, even at lattice 128 in surface mode. Thinning the thumbnail lattice was
+tried as well and changed nothing, so it is not there. Thumbnails re-render at
+most once per animation frame (`auditTime(0, animationFrameScheduler)`), so they
+move with the canvas rather than stepping behind it.
+
+That picture's canvas is **never resized down**. The number of visible tiles and
+their width change on every pinch tick and every time playback pages the strip,
+and reallocating a canvas that size (up to the GPU's limit at 8x supersampling)
+took up to 100 ms — a pinch ran at 32 fps. `growSurface` only grows it, by half
+at least and capped at `MAX_VIEWPORT_DIMS`, the strip is drawn into its bottom
+rows (GL's origin is bottom-left), and `createImageBitmap(canvas, x, y, w, h,
+resize)` crops and averages it down in one step. Copying out rather than
+`transferToImageBitmap` also keeps the buffer instead of handing it over each
+frame.
+Its host has `contain: inline-size`, which is load-bearing — a sketch window is
+`fitted`, sized by its content, and without it the thousands-of-pixels track
+would make the window that wide.
+
+**Thumbnails and export never touch the live canvas.** Each renders in a GL
+context of its own (`createOffscreenSurface` on an `OffscreenCanvas`, wrapped in
+`offscreen$` so unsubscribing releases it with `WEBGL_lose_context`), compiling
+the same formula text the sketch shows. That is what decoupled export from the
+screen: resolution is the export's own (480 to 2160 px on the long side, aspect
+from the sketch, rounded even because VP8 and VP9 reject odd sizes), the canvas
+zoom no longer matters, the sketch keeps playing while you export, and there is
+no capture clock overriding the playhead any more. The thumbnail context exists
+only while the Animation tab is open — `switchMap` on the tab — and the export's
+only while exporting.
+
+`prepareStill` takes a scale of pixels per **sketch CSS pixel**, not a device
+ratio, because dots are sized in CSS pixels: an export at 2160 px scales them up
+with the picture.
+
+**A thumbnail is the frame scaled down, never reframed.** It renders with the
+sketch's own parameters, size included, fitted into its tile and centred
+(`fitted`), with the backdrop around it, so a tile widened between zoom levels or
+a sketch too wide for the clamped tile width shows the same crop the sketch
+does. Two earlier shortcuts made thumbnails disagree with the sketch, and both
+are traps:
+
+- **Do not floor the dot size.** Scaled exactly, a 54-pixel tile turns 5-pixel
+  dots into specks, and a floor of half their on-screen size looked like the fix,
+  but it made every dense lattice a solid blob the sketch never shows.
+- **Do not raster at tile size.** A dot under a couple of pixels loses most of
+  its coverage and the miniature reads pale. Tiles render supersampled —
+  `supersampleFor`, up to 8x, lowered to fit `MAX_VIEWPORT_DIMS` because a wide
+  strip at 8x would not fit one canvas — and `createImageBitmap` with
+  `resizeQuality: 'high'` averages them down; CSS scaling of a canvas is bilinear
+  and skips most of the pixels. 4x still read pale on dense spikes; 8x matched a
+  high-quality downscale of the sketch itself.
+
+The fragment shader's two size rules — the anti-aliasing band and `SMALL_DOT`,
+below which a dot keeps its soft edge — are in the **live sketch's** pixels:
+`uDotScale` is target pixels per on-screen pixel, 1 for the sketch and
+`(picture px / sketch CSS px) / devicePixelRatio` for a thumbnail. Measured in the
+thumbnail's own pixels, the same dot would be "small" there and crisp in the
+sketch, and dense areas came out half as dark. Exports keep 1: they are their
+own picture, not a view of the screen. Thumbnails draw with trails off, since
+each tile stands alone; an export with trails plays the loop once unrecorded
+first, so the first kept frame carries the trail of the last.
+
+**The encoder paces the export; there is no timer.** `export$` `concatMap`s over
+the frame list: it draws a frame, then hands the canvas to the writer and waits
+for it before the next. For WebM the writer is WebCodecs' `VideoEncoder`, given
+each frame's exact timestamp and a key frame every two seconds, and `drained`
+waits on its `dequeue` event while more than two frames are queued, so a long
+export never holds every frame in memory. For PNG frames it is
+`convertToBlob`. A throttled tab therefore only exports slower, never wrong.
+`exhaustMap` ignores a second Export while one runs, and Export is disabled in
+place rather than swapped for Cancel, or a double-click would start and stop
+one. The surface and writer stay open until unsubscribed, which is why `export$`
+ends at the file with `takeWhile(…, true)`.
+
+**The zip never stalls at the end.** Its CRC-32 is a plain table loop (a
+callback per byte through `reduce` took most of a second over a 240-frame
+export), computed by `zipEntry` as each PNG arrives rather than all at once in
+`finish`, and `zip` returns the parts for a `Blob` instead of joining 80 MB into
+one array first. The PNG export used to end in a 0.6–1.2 s freeze; it now has no
+frame over 50 ms. What remains is `convertToBlob`'s read-back of each frame from
+the GPU, which costs a frame now and then while exporting and is the first thing
+a worker would take, if it ever matters.
+
+**No libraries: the containers are ours.** The user asked for export without
+external dependencies, so `export/webm.ts` writes the WebM (EBML header, Info,
+Tracks, Cues, one Cluster per key frame of SimpleBlocks) and `export/zip.ts`
+writes a stored zip with its own CRC-32. Both are pure functions, bytes in and
+bytes out. Two traps: Cues sit **before** the clusters with fixed 8-byte
+positions, so their own size cannot shift the offsets they hold; and a block's
+timecode is a signed 16-bit offset from its cluster, which is why a cluster
+starts at every key frame. MP4 is not offered: its muxer is too large to
+hand-write sensibly. Mediabunny did this briefly and was removed for that reason.
 
 ## Layering
 
@@ -968,7 +1090,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    One hundred and sixty-six of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

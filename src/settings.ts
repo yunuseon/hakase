@@ -1,4 +1,15 @@
 import {
+    defaultExport,
+    isExportSize,
+    isFormat,
+    isFrameRate,
+    isLevel,
+    isQuality,
+    isTab,
+    type ExportSettings,
+    type Tab,
+} from './components/sketch/animation.ts';
+import {
     withChange,
     type ControlChange,
     type ControlsView,
@@ -37,6 +48,9 @@ export type SketchSettings = {
     readonly theme: ThemeName;
     readonly panel: Panel;
     readonly orbit: Orbit;
+    readonly tab: Tab;
+    readonly stripLevel: number;
+    readonly export: ExportSettings;
 };
 
 export type FormulaEditorSettings = {
@@ -57,6 +71,9 @@ export const defaultSketch: SketchSettings = {
     theme: 'paper',
     panel: defaultPanel,
     orbit: DEFAULT_ORBIT,
+    tab: 'parameters',
+    stripLevel: 2,
+    export: defaultExport,
 };
 
 export const defaultFormulaEditor: FormulaEditorSettings = { kind: 'formula', formula: 'ripple' };
@@ -72,10 +89,17 @@ export const asFormulaEditor = (settings: Settings | undefined): FormulaEditorSe
 export const asThemeEditor = (settings: Settings | undefined): ThemeEditorSettings =>
     settings?.kind === 'theme' ? settings : defaultThemeEditor;
 
-export const controlsView = ({ formula, theme, panel, orbit }: SketchSettings): ControlsView => ({
+export const controlsView = ({
+    formula,
+    theme,
+    panel,
+    orbit,
+    tab,
+}: SketchSettings): ControlsView => ({
     ...panel,
     formula,
     theme,
+    tab,
     turned: !sameOrbit(orbit, DEFAULT_ORBIT),
 });
 
@@ -86,6 +110,10 @@ export const withControl = (sketch: SketchSettings, change: ControlChange): Sket
 
     if (change.field === 'theme') {
         return isThemeName(change.value) ? { ...sketch, theme: change.value } : sketch;
+    }
+
+    if (change.field === 'tab') {
+        return isTab(change.value) ? { ...sketch, tab: change.value } : sketch;
     }
 
     return { ...sketch, panel: withChange(sketch.panel, change) };
@@ -177,6 +205,28 @@ const orbitFrom = (value: unknown): Orbit => {
     };
 };
 
+const exportFrom = (value: unknown): ExportSettings => {
+    const stored = typeof value === 'object' && value !== null ? value : {};
+    const fps = field(stored, 'fps');
+    const size = field(stored, 'size');
+    const format = field(stored, 'format');
+    const quality = field(stored, 'quality');
+
+    return {
+        fps: typeof fps === 'number' && isFrameRate(fps) ? fps : defaultExport.fps,
+        size: typeof size === 'number' && isExportSize(size) ? size : defaultExport.size,
+        format: typeof format === 'string' && isFormat(format) ? format : defaultExport.format,
+        quality:
+            typeof quality === 'string' && isQuality(quality) ? quality : defaultExport.quality,
+    };
+};
+
+const tabFrom = (value: unknown): Tab =>
+    typeof value === 'string' && isTab(value) ? value : defaultSketch.tab;
+
+const stripLevelFrom = (value: unknown): number =>
+    typeof value === 'number' && isLevel(value) ? value : defaultSketch.stripLevel;
+
 const formulaFrom = (value: unknown): FormulaId | null =>
     typeof value === 'string' && isFormulaId(value) ? value : null;
 
@@ -196,6 +246,9 @@ export const parseSettings = (value: unknown): Settings | null => {
                 theme: themeFrom(field(value, 'theme')) ?? defaultSketch.theme,
                 panel: panelFrom(field(value, 'panel')),
                 orbit: orbitFrom(field(value, 'orbit')),
+                tab: tabFrom(field(value, 'tab')),
+                stripLevel: stripLevelFrom(field(value, 'stripLevel')),
+                export: exportFrom(field(value, 'export')),
             };
         case 'formula':
             return {

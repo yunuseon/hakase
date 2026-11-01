@@ -52,6 +52,11 @@ export class HksCanvas extends HTMLElement {
             ),
             fromElementEvent$(this, 'wheel').pipe(
                 mergeMap(event => {
+                    // Handled already: a window that zooms its own content, like the frame strip, keeps the pinch.
+                    if (event.defaultPrevented) {
+                        return EMPTY;
+                    }
+
                     const gesture = wheelGesture({
                         deltaX: event.deltaX,
                         deltaY: event.deltaY,

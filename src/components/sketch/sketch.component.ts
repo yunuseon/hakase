@@ -23,7 +23,7 @@ export class HksSketch extends HTMLElement {
     readonly presses$: Observable<boolean>;
     readonly orbits$: Observable<OrbitAction>;
 
-    private readonly surface: Surface;
+    private readonly surface: Surface<HTMLCanvasElement>;
 
     constructor() {
         super();
@@ -32,7 +32,8 @@ export class HksSketch extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
-        this.surface = createSurface(requireChild(shadow, '.viewport'));
+        const viewport = requireChild(shadow, '.viewport');
+        this.surface = createSurface(viewport);
         this.gl = this.surface.gl;
 
         const { canvas } = this.surface;

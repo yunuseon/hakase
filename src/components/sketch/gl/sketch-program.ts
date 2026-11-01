@@ -69,6 +69,7 @@ export type Uniforms = {
     readonly depthScalar: WebGLUniformLocation | null;
     readonly baseSize: WebGLUniformLocation | null;
     readonly pixelRatio: WebGLUniformLocation | null;
+    readonly dotScale: WebGLUniformLocation | null;
     readonly palette: WebGLUniformLocation | null;
     readonly knobs: readonly (WebGLUniformLocation | null)[];
     readonly pointer: WebGLUniformLocation | null;
@@ -125,6 +126,7 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 depthScalar: at('uDepthScalar'),
                 baseSize: at('uBaseSize'),
                 pixelRatio: at('uPixelRatio'),
+                dotScale: at('uDotScale'),
                 palette: at('uPalette'),
                 knobs: KNOBS.map(at),
                 pointer: at('uPointer'),
@@ -159,6 +161,7 @@ export const prepare = (
     params: SketchParams,
     ramp: Uint8Array,
     pixelRatio: number,
+    dotScale = 1,
 ): void => {
     const { program, uniforms } = sketch;
     gl.useProgram(program);
@@ -172,6 +175,7 @@ export const prepare = (
         gl.uniform1f(uniforms.baseSize, params.draw.baseSize);
     }
     gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+    gl.uniform1f(uniforms.dotScale, dotScale);
     gl.uniform1f(uniforms.reference, REFERENCE_DISTANCE);
     gl.uniform1i(uniforms.lens, LENSES.indexOf(params.lens));
     gl.uniform1i(uniforms.lattice, LATTICES.indexOf(params.lattice));

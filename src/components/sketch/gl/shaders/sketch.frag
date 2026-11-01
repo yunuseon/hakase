@@ -14,6 +14,8 @@ uniform sampler2D uPalette;
 uniform int uMode;
 uniform int uPass;
 uniform float uFade;
+// Target pixels per on-screen pixel of the live sketch: 1 there, other for a thumbnail, so edges match it.
+uniform float uDotScale;
 
 in vec4 vColor;
 in float vTint;
@@ -30,7 +32,7 @@ float coverage() {
     }
 
     float dist = length(gl_PointCoord - 0.5) * 2.0;
-    float aa = 2.0 / max(vPointSize, 1.0);
+    float aa = 2.0 * uDotScale / max(vPointSize, uDotScale);
 
     return 1.0 - smoothstep(1.0 - aa, 1.0, dist);
 }
@@ -70,7 +72,7 @@ void main() {
 
     // Half, not zero: a faint edge that wrote depth would cut a fringe. A dot too small to show a fringe
     // keeps its whole soft edge instead, or a few-pixel dot loses half of itself and all but vanishes.
-    if (alpha < (vPointSize < SMALL_DOT ? 0.02 : 0.5)) {
+    if (alpha < (vPointSize < SMALL_DOT * uDotScale ? 0.02 : 0.5)) {
         discard;
     }
 

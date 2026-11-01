@@ -1,17 +1,17 @@
-import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
+import { asapScheduler, combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     exhaustMap,
+    filter,
     ignoreElements,
     map,
     mergeMap,
-    scan,
+    observeOn,
     share,
     shareReplay,
     startWith,
     switchMap,
-    take,
-    takeLast,
+    takeUntil,
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
@@ -23,16 +23,29 @@ import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme, type Theme } from '../components/sketch/theme.ts';
+import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
+import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
+import { thumbnails$ } from '../components/sketch/strip/thumbnails.ts';
 import {
-    HksSketchControls,
+    HksExportPanel,
+    type ExportStatus,
     type SavedFile,
-} from '../components/sketch/controls/sketch-controls.component.ts';
+} from '../components/sketch/export/export-panel.component.ts';
+import { export$, still$, type ExportEvent } from '../components/sketch/export/export.ts';
 import {
-    captureFrames$,
-    recordCanvas$,
-    snapshot$,
-    type CaptureFrame,
-} from '../components/sketch/capture.ts';
+    exportPixels,
+    followed,
+    markerX,
+    frameAtX,
+    frameCount,
+    isZoom,
+    sameLayout,
+    stripGeometry,
+    tilesIn,
+    withExportChange,
+    zoomedStrip,
+    type ZoomGesture,
+} from '../components/sketch/animation.ts';
 import {
     centre,
     panelParams,
@@ -42,20 +55,22 @@ import {
     type Pointer,
     type SketchParams,
 } from '../components/sketch/params.ts';
-import { asSketch, controlsView, withControl } from '../settings.ts';
+import { asSketch, controlsView, withControl, type SketchSettings } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 
-type CaptureEvent =
-    | { readonly kind: 'frame'; readonly frame: CaptureFrame }
-    | { readonly kind: 'done' }
-    | { readonly kind: 'file'; readonly blob: Blob };
-
-type Tick = { readonly kind: 'timeline' | 'capture' | 'released'; readonly t: number };
-
-type Clock = { readonly capturing: boolean; readonly t: number | null };
+const statusOf = (event: ExportEvent): ExportStatus => {
+    switch (event.kind) {
+        case 'progress':
+            return { kind: 'running', done: event.done };
+        case 'file':
+            return { kind: 'idle' };
+        case 'failed':
+            return { kind: 'failed', message: event.message };
+    }
+};
 
 export const sketchProgram: Program = {
     id: 'sketch',
@@ -74,6 +89,13 @@ export const sketchProgram: Program = {
             Object.keys(themes).map(value => ({ value, label: value })),
         );
         controls.slot = 'controls';
+
+        const strip = new HksFrameStrip();
+        strip.slot = 'animation';
+        const exporter = new HksExportPanel();
+        exporter.slot = 'animation';
+        controls.append(strip, exporter);
+
         sketch.append(fpsCounter, controls);
 
         return {
@@ -112,6 +134,12 @@ export const sketchProgram: Program = {
                         ...size,
                         theme,
                     })),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                const orbit$ = settings$.pipe(
+                    map(({ orbit }) => orbit),
+                    distinctUntilChanged(),
                 );
 
                 // This window's choice; the text behind it is shared with whoever matches.
@@ -121,107 +149,24 @@ export const sketchProgram: Program = {
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                // Per process: each canvas has its own GL context to compile into.
-                const compiled$ = compileFormula$(
-                    sketch.gl,
-                    formula$.pipe(
-                        switchMap(name =>
-                            source$(name).pipe(
-                                map(({ value }) => value),
-                                distinctUntilChanged(),
-                            ),
+                const text$ = formula$.pipe(
+                    switchMap(name =>
+                        source$(name).pipe(
+                            map(({ value }) => value),
+                            distinctUntilChanged(),
                         ),
                     ),
-                ).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                // Per process: each canvas has its own GL context to compile into.
+                const compiled$ = compileFormula$(sketch.gl, text$).pipe(
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
 
                 const shader$ = compiled$.pipe(
                     // A failure simply does not emit, so the canvas keeps the last shader.
                     mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
-                );
-
-                const canvas = sketch.gl.canvas;
-
-                const captures$: Observable<CaptureEvent> = controls.records$.pipe(
-                    withLatestFrom(state.duration$, panel$),
-                    // exhaustMap: a click while recording is ignored, not a second capture.
-                    exhaustMap(([, seconds, panel]) => {
-                        if (!(canvas instanceof HTMLCanvasElement)) {
-                            return EMPTY;
-                        }
-
-                        const frames$ = captureFrames$(seconds, panel.trails > 0).pipe(share());
-
-                        // Frames first: each must be drawn before the recorder asks for it.
-                        return merge(
-                            frames$.pipe(map((frame): CaptureEvent => ({ kind: 'frame', frame }))),
-                            frames$.pipe(
-                                takeLast(1),
-                                map((): CaptureEvent => ({ kind: 'done' })),
-                            ),
-                            recordCanvas$(canvas, frames$).pipe(
-                                map((blob): CaptureEvent => ({ kind: 'file', blob })),
-                            ),
-                        );
-                    }),
-                    share(),
-                );
-
-                // While capturing, the capture is this sketch's clock and the timeline is ignored.
-                const clock$ = merge(
-                    playhead$.pipe(map((t): Tick => ({ kind: 'timeline', t }))),
-                    captures$.pipe(
-                        mergeMap((event): Observable<Tick> => {
-                            switch (event.kind) {
-                                case 'frame':
-                                    return of({ kind: 'capture', t: event.frame.t });
-                                case 'done':
-                                    return playhead$.pipe(
-                                        take(1),
-                                        map((t): Tick => ({ kind: 'released', t })),
-                                    );
-                                case 'file':
-                                    return EMPTY;
-                            }
-                        }),
-                    ),
-                ).pipe(
-                    scan(
-                        (clock: Clock, tick): Clock =>
-                            tick.kind === 'timeline'
-                                ? { capturing: clock.capturing, t: clock.capturing ? null : tick.t }
-                                : { capturing: tick.kind === 'capture', t: tick.t },
-                        { capturing: false, t: null },
-                    ),
-                    mergeMap(({ t }) => (t === null ? EMPTY : of(t))),
-                );
-
-                const progress$ = captures$.pipe(
-                    mergeMap(event =>
-                        event.kind === 'frame'
-                            ? of(event.frame.progress)
-                            : event.kind === 'done'
-                              ? of(null)
-                              : EMPTY,
-                    ),
-                    startWith(null),
-                );
-
-                const files$: Observable<SavedFile> = merge(
-                    captures$.pipe(
-                        mergeMap(event => (event.kind === 'file' ? of(event.blob) : EMPTY)),
-                        withLatestFrom(formula$),
-                        map(([blob, formula]) => ({
-                            blob,
-                            name: `hakase-${formula}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`,
-                        })),
-                    ),
-                    controls.snapshots$.pipe(
-                        exhaustMap(() =>
-                            canvas instanceof HTMLCanvasElement ? snapshot$(canvas) : EMPTY,
-                        ),
-                        withLatestFrom(formula$),
-                        map(([blob, formula]) => ({ blob, name: `hakase-${formula}.png` })),
-                    ),
                 );
 
                 const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
@@ -229,21 +174,148 @@ export const sketchProgram: Program = {
                     distinctUntilChanged(),
                 );
 
+                const exportSettings$ = settings$.pipe(
+                    map(settings => settings.export),
+                    distinctUntilChanged(),
+                );
+
+                // One cell of the strip is one exported frame, so the strip follows the export's frame rate.
+                const frames$ = combineLatest([state.duration$, exportSettings$]).pipe(
+                    map(([seconds, { fps }]) => frameCount(seconds, fps)),
+                    distinctUntilChanged(),
+                );
+
+                const geometry$ = combineLatest([
+                    frames$,
+                    settings$.pipe(
+                        map(({ stripLevel }) => stripLevel),
+                        distinctUntilChanged(),
+                    ),
+                    size$,
+                ]).pipe(
+                    map(([frames, level, size]) => stripGeometry(frames, level, size)),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                const visible$ = strip.visible$.pipe(
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                const layout$ = combineLatest([visible$, geometry$]).pipe(
+                    map(([visible, geometry]) => ({ geometry, range: tilesIn(visible, geometry) })),
+                    distinctUntilChanged(sameLayout),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                const tab$ = settings$.pipe(
+                    map(({ tab }) => tab),
+                    distinctUntilChanged(),
+                );
+
+                const stripZooms$ = merge(
+                    strip.zooms$.pipe(
+                        filter(isZoom),
+                        map((zoom): ZoomGesture => ({ kind: 'step', zoom })),
+                    ),
+                    strip.pinches$.pipe(
+                        map(({ factor, x }): ZoomGesture => ({ kind: 'pinch', factor, x })),
+                    ),
+                ).pipe(
+                    withLatestFrom(geometry$, visible$),
+                    map(([gesture, geometry, visible]) => zoomedStrip(gesture, geometry, visible)),
+                    share(),
+                );
+
+                // Only while playing: a paused strip belongs to whoever is scrolling it.
+                const follow$ = playhead$.pipe(
+                    withLatestFrom(geometry$, visible$, state.playing$, tab$),
+                    mergeMap(([t, geometry, visible, playing, tab]) => {
+                        const left =
+                            playing && tab === 'animation'
+                                ? followed(markerX(t, geometry), visible)
+                                : null;
+
+                        return left === null ? EMPTY : of(left);
+                    }),
+                );
+
+                // A context of their own only while the tab is open: a closed tab holds no GPU at all.
+                const thumbnailed$ = tab$.pipe(
+                    switchMap(tab =>
+                        tab === 'animation'
+                            ? thumbnails$(
+                                  text$,
+                                  combineLatest([params$, orbit$, devicePixelRatio$]).pipe(
+                                      map(([params, orbit, ratio]) => ({ params, orbit, ratio })),
+                                  ),
+                                  layout$,
+                              )
+                            : EMPTY,
+                    ),
+                );
+
+                const request$ = combineLatest([text$, params$, orbit$, exportSettings$]).pipe(
+                    map(([source, params, orbit, settings]) => ({
+                        source,
+                        params,
+                        orbit,
+                        settings,
+                    })),
+                );
+
+                // exhaustMap: a second click while exporting is ignored, not a second export.
+                const exported$ = merge(
+                    exporter.starts$.pipe(
+                        withLatestFrom(request$, state.duration$),
+                        exhaustMap(([, request, seconds]) =>
+                            export$({ ...request, seconds }).pipe(takeUntil(exporter.cancels$)),
+                        ),
+                    ),
+                    exporter.stills$.pipe(
+                        withLatestFrom(request$, playhead$),
+                        exhaustMap(([, request, t]) => still$(request, t)),
+                    ),
+                ).pipe(share());
+
+                const status$ = merge(
+                    exported$.pipe(map(statusOf)),
+                    exporter.cancels$.pipe(map((): ExportStatus => ({ kind: 'idle' }))),
+                ).pipe(startWith({ kind: 'idle' as const }));
+
+                const files$: Observable<SavedFile> = exported$.pipe(
+                    mergeMap(event => (event.kind === 'file' ? of(event) : EMPTY)),
+                    withLatestFrom(formula$),
+                    map(([{ blob, extension }, formula]) => ({
+                        blob,
+                        name: `hakase-${formula}.${extension}`,
+                    })),
+                );
+
+                const summary$ = combineLatest([size$, exportSettings$, frames$]).pipe(
+                    map(([size, settings, frames]) => {
+                        const { width, height } = exportPixels(size, settings.size);
+
+                        return `${width} × ${height} · ${frames} frames`;
+                    }),
+                );
+
+                const changed = (settings: SketchSettings): AppInput => ({
+                    kind: 'settings',
+                    settings,
+                });
+
                 return merge(
                     sketch
                         .connect$(
                             params$,
-                            clock$,
+                            playhead$,
                             shader$,
                             ratio$,
                             combineLatest([
                                 sketch.pointers$.pipe(startWith(centre)),
                                 sketch.presses$.pipe(startWith(false), distinctUntilChanged()),
                             ]).pipe(map(([{ x, y }, down]): Pointer => ({ x, y, down }))),
-                            settings$.pipe(
-                                map(({ orbit }) => orbit),
-                                distinctUntilChanged(),
-                            ),
+                            orbit$,
                         )
                         .pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
@@ -252,10 +324,33 @@ export const sketchProgram: Program = {
                             settings$.pipe(map(controlsView)),
                             shader$.pipe(map(knobsUsed)),
                             state.library$.pipe(map(optionsOf)),
-                            progress$,
-                            files$,
                         )
                         .pipe(ignoreElements()),
+                    strip
+                        .connect$(
+                            layout$,
+                            playhead$,
+                            thumbnailed$,
+                            merge(
+                                follow$,
+                                stripZooms$.pipe(
+                                    map(({ left }) => left),
+                                    // After the fold has laid out the new level: before it, the track still has its old width and clamps the scroll.
+                                    observeOn(asapScheduler),
+                                ),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
+                    exporter
+                        .connect$(exportSettings$, summary$, status$, files$)
+                        .pipe(ignoreElements()),
+                    strip.seeks$.pipe(
+                        withLatestFrom(geometry$),
+                        map(([x, geometry]): AppInput => ({
+                            kind: 'scrub',
+                            at: frameAtX(x, geometry) / geometry.frames,
+                        })),
+                    ),
                     merge(
                         controls.changes$.pipe(
                             withLatestFrom(settings$),
@@ -271,7 +366,18 @@ export const sketchProgram: Program = {
                                 orbit: reduceOrbit(current.orbit, action),
                             })),
                         ),
-                    ).pipe(map((settings): AppInput => ({ kind: 'settings', settings }))),
+                        stripZooms$.pipe(
+                            withLatestFrom(settings$),
+                            map(([{ level }, current]) => ({ ...current, stripLevel: level })),
+                        ),
+                        exporter.changes$.pipe(
+                            withLatestFrom(settings$),
+                            map(([change, current]) => ({
+                                ...current,
+                                export: withExportChange(current.export, change),
+                            })),
+                        ),
+                    ).pipe(map(changed)),
                     compiled$.pipe(
                         withLatestFrom(formula$),
                         map(([result, formula]): AppInput => ({
