@@ -1,0 +1,245 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 13px/1.35 var(--font-ui);
+    color: var(--ink);
+}
+
+.scroller {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: stretch;
+    min-block-size: 0;
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
+}
+
+.columns {
+    display: flex;
+    flex: none;
+    gap: 10px;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    gap: 6px;
+    inline-size: 220px;
+    min-block-size: 0;
+    padding: 6px;
+    background: var(--well);
+    border-radius: 11px;
+}
+
+.column[data-dragging] {
+    opacity: 0.4;
+}
+
+.column[data-drop-before] {
+    box-shadow: -6px 0 0 -4px var(--accent);
+}
+
+.column[data-drop-after] {
+    box-shadow: 6px 0 0 -4px var(--accent);
+}
+
+.column[data-drop-into] .cards {
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    min-block-size: 26px;
+}
+
+.title {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 2px 4px;
+    font: 600 12px var(--font-ui);
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+}
+
+.title:focus-visible {
+    outline: none;
+    border-color: var(--rule);
+    background: var(--panel);
+}
+
+.count {
+    flex: none;
+    font: 11px var(--font-mono);
+    color: var(--muted);
+}
+
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-block-size: 24px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden auto;
+    border-radius: 8px;
+    list-style: none;
+}
+
+.card {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 4px 2px 4px 4px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+}
+
+.card[data-dragging] {
+    opacity: 0.4;
+}
+
+.card[data-drop-before] {
+    box-shadow: 0 -3px 0 -1px var(--accent);
+}
+
+.card[data-drop-after] {
+    box-shadow: 0 3px 0 -1px var(--accent);
+}
+
+.text {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 2px;
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    resize: none;
+    field-sizing: content;
+    overflow-wrap: anywhere;
+}
+
+.text:focus-visible {
+    outline: 1px solid var(--rule);
+}
+
+.grip,
+.column-grip {
+    flex: none;
+    align-self: center;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 3px;
+    inline-size: 10px;
+    block-size: 16px;
+    background-image: radial-gradient(circle, var(--muted) 1.2px, transparent 1.6px);
+    background-size: 5px 5px;
+    opacity: 0.5;
+    cursor: grab;
+    touch-action: none;
+}
+
+.card:hover .grip,
+.head:hover .column-grip {
+    opacity: 1;
+}
+
+.remove,
+.remove-column {
+    flex: none;
+    inline-size: 22px;
+    block-size: 22px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.card:hover .remove,
+.head:hover .remove-column:not(:disabled),
+.remove:focus-visible,
+.remove-column:focus-visible {
+    opacity: 1;
+}
+
+.remove:hover,
+.remove-column:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--rule) 30%, transparent);
+}
+
+.remove-column:disabled {
+    cursor: default;
+}
+
+.add {
+    display: flex;
+    flex: none;
+    margin: 0;
+}
+
+.draft {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 5px 8px;
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+.draft::placeholder {
+    color: var(--muted);
+}
+
+.draft:focus-visible {
+    outline: none;
+    background: var(--panel);
+    border-color: var(--rule);
+}
+
+.add-column {
+    flex: none;
+    align-self: flex-start;
+    padding: 6px 12px;
+    font: 500 12px var(--font-ui);
+    color: var(--muted);
+    background: transparent;
+    border: 1px dashed var(--rule);
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+.add-column:hover {
+    color: var(--ink);
+}
+
+.grip:focus-visible,
+.column-grip:focus-visible,
+.add-column:focus-visible,
+.remove:focus-visible,
+.remove-column:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

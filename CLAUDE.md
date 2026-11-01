@@ -611,6 +611,25 @@ focus before `replaceChildren` and focuses its replacement after. The keydown is
 and skips any key already handled — that `defaultPrevented` check is the whole
 contract between them.
 
+**The board is a kanban document every board window shares**, folded like the
+todo list: `hks-board` emits `BoardCommand`s, `reduceBoard` folds them into one
+`Board` of columns of cards, saved in the snapshot, and ids for both come from
+one counter (`made`). Cards and columns move by their grips, a card across
+columns too: `dropTarget` picks the lane nearest the pointer and counts the
+_other_ cards above it, so `to` again counts places without the moved card. The
+arrow keys on a card's grip emit `step-card`, an intent rather than a position,
+because only the fold knows the board; `stepped` turns it into a move, keeping
+the card's height when it changes column. A column can be deleted only while
+empty, so a stray click never takes cards with it.
+
+Unlike the todo list, the board is **updated in place by id, never rebuilt**: a
+card being edited, a name being typed and a click that lands mid-update all
+belong to a node, and replacing the node on every change (another window's
+included) lost them. `ordered` reorders only when the order differs, and a field
+with focus is never overwritten. The add-card drafts read their text in the one
+shared `submit` listener, for the todo list's reason; reading the form later lost
+every first card.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1192,7 +1211,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and twenty-three of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and thirty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

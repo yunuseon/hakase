@@ -10,6 +10,7 @@ import {
     type Library,
 } from './library.ts';
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
+import { defaultBoard, parseBoard, type Board } from './components/board/board.ts';
 import { emptyTodos, parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
@@ -37,6 +38,7 @@ export type Snapshot = {
     readonly looping: boolean;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
     readonly todos: TodoList;
+    readonly board: Board;
     readonly library: Library;
 };
 
@@ -105,6 +107,7 @@ const fresh: Restored = {
     looping: true,
     settings: new Map(),
     todos: emptyTodos,
+    board: defaultBoard,
     library: emptyLibrary,
 };
 
@@ -137,6 +140,7 @@ export const restoreState = (): Restored => {
         looping: field(stored, 'looping') !== false,
         settings: settingsFrom(field(stored, 'settings')),
         todos: parseTodos(field(stored, 'todos')),
+        board: parseBoard(field(stored, 'board')),
         library: parseLibrary(field(stored, 'library')),
     };
 };
@@ -156,6 +160,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         looping: snapshot.looping,
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
         todos: snapshot.todos,
+        board: snapshot.board,
         library: snapshot.library,
     };
 };

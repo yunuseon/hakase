@@ -31,6 +31,7 @@ import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { reduceLibrary, sourceOf, type FormulaId, type LibraryCommand } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
 import type { Theme } from './components/sketch/theme.ts';
+import { reduceBoard } from './components/board/board.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -54,6 +55,7 @@ import { formulaProgram } from './programs/formula.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
 import { todoProgram } from './programs/todo.program.ts';
+import { boardProgram } from './programs/board.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -82,6 +84,7 @@ const programs: readonly Program[] = [
     playheadProgram,
     tasksProgram,
     todoProgram,
+    boardProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -354,6 +357,13 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const board$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'board' ? of(input.command) : EMPTY)),
+        scan(reduceBoard, stored.board),
+        startWith(stored.board),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const library$ = merge(
         inputs$.pipe(
             mergeMap(({ input }) => (input.kind === 'library' ? of(input.command) : EMPTY)),
@@ -499,6 +509,7 @@ const bootstrap = () => {
         look$,
         appearance$,
         todos$: todos$.pipe(map(({ items }) => items)),
+        board$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -546,6 +557,7 @@ const bootstrap = () => {
                 rested: rested$,
                 settings: settings$,
                 todos: todos$,
+                board: board$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({
