@@ -1,3 +1,4 @@
+#define K1 threshold
 #define STEPS 120
 
 // Four neighbours and fourteen colours: with all eight neighbours the field freezes into still patches.

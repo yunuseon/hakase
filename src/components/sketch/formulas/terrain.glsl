@@ -1,3 +1,6 @@
+#define K1 hills
+#define K2 camera_height
+
 float height(float x, float y) {
     return 0.11 * sin(2.0 * PI * x + 3.0 * PI * y)
         + 0.07 * sin(5.0 * PI * x - 4.0 * PI * y) * cos(2.0 * PI * y)

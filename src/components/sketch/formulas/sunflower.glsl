@@ -1,3 +1,5 @@
+#define K1 spacing
+#define K2 winding
 // Its lattice goes around in x, so the sketch must close the seam where the last column meets the first.
 #define WRAPS
 

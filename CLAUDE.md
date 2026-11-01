@@ -834,10 +834,33 @@ commands and the query, not a remembered list.
 
 ## Animation and export
 
-A sketch's controls have two tabs, **Parameters** and **Animation**, and the tab
-is a setting like any other (`SketchSettings.tab`), saved with the window. Each
-tab holds only what is its own: Parameters how the sketch is drawn, Animation the
-strip and the export. The **Formula and theme sit above both**, in the header row
+A sketch's controls have three tabs, **Parameters**, **Scene** and **Animation**,
+and the tab is a setting like any other (`SketchSettings.tab`), saved with the
+window. Each tab holds only what is its own:
+
+- **Parameters** is the formula's own numbers and nothing else: one row per knob
+  the compiled formula reads, under the name its `#define K1 feed_rate` gives it
+  (`knobLabelsOf`, read like `STEPS` and `WRAPS`; the macro is never expanded,
+  since nothing in GLSL is spelt `K1`), with its motion beside it, and an empty
+  state when the formula reads none.
+- **Scene** is configuration, in four groups by what they change: **Sampling**
+  (lattice, density, focus: where the formula is evaluated), **Space** (how its
+  output is read), **Drawing** (mode, dot size, depth, trails, axes) and
+  **Camera** (lens, fit, the view). Rows share one grid of label, control and
+  value, so controls line up down a group, and the groups flow into two columns
+  where the window has room.
+- **Animation** is the strip and the export.
+
+**Every control belongs to exactly one group, and a group resets as a whole.**
+`GROUPS` is the closed list, `resetGroup(panel, group)` the pure reset, and a
+reset arrives as an ordinary `ControlChange` (`{ field: 'reset', group }`), so
+the fold applies it like any other edit. Resetting the camera also resets the
+orbit, in `withControl`, since the view is part of the camera. Each reset is
+disabled while it would change nothing: `groupChanged` compares the reset
+panel with `samePanel`, and `controlsView` hands the five answers to the view.
+A new control is a field in one group's reset, or it never resets.
+
+The **Formula and theme sit above both**, in the header row
 beside the tab switch, because they decide what the sketch shows and so what the
 animation exports; inside Parameters they read as drawing settings. The
 Animation tab is two components the program slots into the controls'
@@ -1169,7 +1192,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and twenty of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and twenty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

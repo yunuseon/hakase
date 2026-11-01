@@ -1,3 +1,7 @@
+#define K1 strength
+#define K2 falloff
+#define K4 hue
+
 vec4 formula(float x, float y, float t) {
     vec2 away = vec2(x, y) - pointer;
     float d = length(away);

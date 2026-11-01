@@ -3,25 +3,6 @@
     color: var(--label);
 }
 
-.bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-    padding-inline: 2px;
-}
-
-.item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    block-size: 30px;
-}
-
-.item[hidden] {
-    display: none;
-}
-
 .key {
     color: var(--muted);
 }
@@ -156,10 +137,6 @@
     border-radius: 4px;
 }
 
-.toggle {
-    cursor: pointer;
-}
-
 .switch {
     margin: 0;
     accent-color: var(--accent);
@@ -169,44 +146,6 @@
 .switch:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 2px;
-}
-
-.reset {
-    gap: 5px;
-    block-size: 26px;
-    padding: 0 8px;
-    font: 500 12px var(--font-ui);
-    color: var(--label);
-    background: transparent;
-    border: 1px solid var(--edge);
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.reset:hover:not(:disabled) {
-    color: var(--ink);
-    background: var(--well);
-}
-
-.reset:disabled {
-    color: var(--muted);
-    opacity: 0.5;
-    cursor: default;
-}
-
-.reset:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
-}
-
-.reset svg {
-    inline-size: 13px;
-    block-size: 13px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
 }
 
 .head {
@@ -225,13 +164,159 @@
     gap: 4px 12px;
 }
 
-.bar[hidden],
-.animation[hidden] {
+.item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    block-size: 30px;
+}
+
+.pane[hidden],
+.row[hidden],
+.knob[hidden],
+.empty[hidden] {
     display: none;
 }
 
-.animation {
+.pane {
     display: flex;
     flex-direction: column;
+    gap: 4px;
+}
+
+/* Two columns where the window has room, one where it does not; a group never splits. */
+.groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px 20px;
+    align-items: start;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+}
+
+.group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    block-size: 24px;
+}
+
+.group-head h3 {
+    margin: 0;
+    font: 600 10.5px var(--font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* Label, control, value: every row the same three columns, so controls line up down a group. */
+.row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-block-size: 30px;
+}
+
+.row > .key {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row > .segments,
+.row > .pick,
+.row > .switch,
+.row > .view {
+    grid-column: 2 / 4;
+    justify-self: start;
+}
+
+.row .dial {
+    inline-size: 100%;
+}
+
+.knobs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.knob {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.knob .row {
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+}
+
+.motion {
+    color: var(--label);
+}
+
+.empty {
+    margin: 4px 0;
+    color: var(--muted);
+}
+
+.reset,
+.view {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    block-size: 24px;
+    padding: 0 6px;
+    font: 500 12px var(--font-ui);
+    color: var(--label);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.view {
+    padding: 0 8px;
+    border-color: var(--edge);
+}
+
+.reset:hover:not(:disabled),
+.view:hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.reset:disabled,
+.view:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.reset:focus-visible,
+.view:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+.reset svg,
+.view svg {
+    inline-size: 13px;
+    block-size: 13px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.animation {
     gap: 8px;
 }

@@ -10,6 +10,7 @@ import {
     type Tab,
 } from './components/sketch/animation.ts';
 import {
+    groupChanged,
     withChange,
     type ControlChange,
     type ControlsView,
@@ -95,13 +96,25 @@ export const controlsView = ({
     panel,
     orbit,
     tab,
-}: SketchSettings): ControlsView => ({
-    ...panel,
-    formula,
-    theme,
-    tab,
-    turned: !sameOrbit(orbit, DEFAULT_ORBIT),
-});
+}: SketchSettings): ControlsView => {
+    const turned = !sameOrbit(orbit, DEFAULT_ORBIT);
+
+    return {
+        ...panel,
+        formula,
+        theme,
+        tab,
+        turned,
+        changed: {
+            parameters: groupChanged(panel, 'parameters'),
+            sampling: groupChanged(panel, 'sampling'),
+            space: groupChanged(panel, 'space'),
+            drawing: groupChanged(panel, 'drawing'),
+            // The view is part of the camera, so a turned camera is something to reset too.
+            camera: groupChanged(panel, 'camera') || turned,
+        },
+    };
+};
 
 export const withControl = (sketch: SketchSettings, change: ControlChange): SketchSettings => {
     if (change.field === 'formula') {
@@ -116,7 +129,11 @@ export const withControl = (sketch: SketchSettings, change: ControlChange): Sket
         return isTab(change.value) ? { ...sketch, tab: change.value } : sketch;
     }
 
-    return { ...sketch, panel: withChange(sketch.panel, change) };
+    const panel = withChange(sketch.panel, change);
+
+    return change.field === 'reset' && change.group === 'camera'
+        ? { ...sketch, panel, orbit: DEFAULT_ORBIT }
+        : { ...sketch, panel };
 };
 
 const finite = (value: unknown, fallback: number, min: number, max: number): number =>

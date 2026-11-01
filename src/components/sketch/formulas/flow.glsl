@@ -1,3 +1,6 @@
+#define K1 travel
+#define K2 hue
+
 vec2 field(vec2 p, float phase) {
     return vec2(sin(5.0 * p.y + phase + sin(3.0 * p.x)), sin(5.0 * p.x - phase + sin(3.0 * p.y)));
 }

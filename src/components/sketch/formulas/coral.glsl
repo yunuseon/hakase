@@ -1,3 +1,5 @@
+#define K1 feed
+#define K2 kill
 // Gray-Scott runs slowly per step, so many steps a second; a replay from the start costs more for it.
 #define STEPS 480
 

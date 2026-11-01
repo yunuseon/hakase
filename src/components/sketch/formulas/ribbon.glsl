@@ -1,3 +1,4 @@
+#define K1 twist
 // Twists the formula's flat strip around the vertical axis, more the higher it goes.
 vec3 space(vec3 p) {
     float twist = p.y * PI * (0.5 + 1.5 * k1);

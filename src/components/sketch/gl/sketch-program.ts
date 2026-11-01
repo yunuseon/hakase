@@ -36,6 +36,25 @@ const DECLARES_WRAP = /^\s*#define\s+WRAPS\b/m;
 const EVOLVES = /\bvec4\s+evolve\s*\(/;
 const SEEDS = /\bvec4\s+initial\s*\(/;
 const DECLARES_STEPS = /^\s*#define\s+STEPS\s+(\d+)\b/m;
+// `#define K1 feed_rate` names a knob: never expanded, since nothing in GLSL is spelt K1.
+const NAMES_KNOB = /^\s*#define\s+K([1-4])\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/gm;
+
+export const knobLabelsOf = (formula: string): Readonly<Record<Knob, string>> => {
+    const named = new Map(
+        [...formula.matchAll(NAMES_KNOB)].map(([, digit, name]) => [
+            `k${digit ?? ''}`,
+            (name ?? '').replace(/_/g, ' '),
+        ]),
+    );
+
+    return {
+        k1: named.get('k1') ?? 'k1',
+        k2: named.get('k2') ?? 'k2',
+        k3: named.get('k3') ?? 'k3',
+        k4: named.get('k4') ?? 'k4',
+    };
+};
+
 export const DEFAULT_STEPS = 60;
 
 // Steps per second of a formula that evolves: its own #define STEPS, kept to what a frame can replay.
@@ -109,6 +128,7 @@ export type Sketch = {
     readonly wraps: boolean;
     readonly evolves: boolean;
     readonly steps: number;
+    readonly knobLabels: Readonly<Record<Knob, string>>;
 };
 
 export type SketchResult =
@@ -139,6 +159,7 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
             wraps: DECLARES_WRAP.test(formula),
             evolves: EVOLVES.test(formula),
             steps: stepsOf(formula),
+            knobLabels: knobLabelsOf(formula),
             uniforms: {
                 dimension: at('uDimension'),
                 mode: at('uMode'),
@@ -168,8 +189,14 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
 };
 
 // The linker drops a uniform nothing reads, so a null location means the formula ignores that knob.
-export const knobsUsed = ({ uniforms }: Sketch): readonly Knob[] =>
-    KNOBS.filter((_, index) => (uniforms.knobs[index] ?? null) !== null);
+export const knobsUsed = ({
+    uniforms,
+    knobLabels,
+}: Sketch): readonly { knob: Knob; label: string }[] =>
+    KNOBS.filter((_, index) => (uniforms.knobs[index] ?? null) !== null).map(knob => ({
+        knob,
+        label: knobLabels[knob],
+    }));
 
 const closesSeam = (
     { wraps: declared }: Sketch,

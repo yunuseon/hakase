@@ -1,3 +1,5 @@
+#define K1 diagonal
+
 vec4 formula(float x, float y, float t) {
     float phase = t * 2.0 * PI;
     float a = sin(3.0 * PI * x + phase);

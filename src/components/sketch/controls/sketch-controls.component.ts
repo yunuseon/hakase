@@ -2,60 +2,102 @@ import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
-import { CYCLES, DRAW_MODES, KNOBS, defaultPanel, isKnob, type DrawMode } from '../params.ts';
+import {
+    CYCLES,
+    DRAW_MODES,
+    KNOBS,
+    defaultPanel,
+    isKnob,
+    type DrawMode,
+    type Knob,
+} from '../params.ts';
 import { FITS, LATTICES, LENSES, SPACES } from '../space.ts';
 import { TABS } from '../animation.ts';
 import {
     FLAGS,
+    GROUPS,
     NUMERIC_FIELDS,
     isFlag,
+    isGroup,
     isNumericField,
     numberOf,
     type ControlChange,
     type ControlsView,
+    type Group,
+    type KnobView,
     type NumericField,
+    sameKnobViews,
 } from './controls.ts';
 import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);
 
+const RESET_ICON =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>';
+
 const slider = (
     key: string,
     label: string,
+    hint: string,
     min: number,
     max: number,
     step: number,
     value: number,
     only: DrawMode | null = null,
 ) => `
-    <label class="item"${only === null ? '' : ` data-only="${only}"`}${isKnob(key) ? ` data-knob="${key}" hidden` : ''}>
+    <label class="row"${only === null ? '' : ` data-only="${only}"`} title="${hint}">
         <span class="key">${label}</span>
         <input class="dial" data-field="${key}" type="range"
                min="${min}" max="${max}" step="${step}" value="${value}" />
         <output class="read" data-read="${key}"></output>
-        ${isKnob(key) ? cycles(key) : ''}
     </label>
 `;
 
-const cycles = (knob: string) => `
-    <select class="pick cycles" data-cycles="${knob}" aria-label="${knob} motion" title="swing per loop">
-        ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× / loop`}</option>`).join('')}
-    </select>
+const knobRow = (knob: Knob) => `
+    <div class="knob" data-knob="${knob}" hidden>
+        <label class="row">
+            <span class="key" data-label="${knob}">${knob}</span>
+            <input class="dial" data-field="${knob}" type="range" min="0" max="1" step="0.01"
+                   value="${defaultPanel.knobs[knob]}" />
+            <output class="read" data-read="${knob}"></output>
+        </label>
+        <select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
+                title="let it swing from 0 to its value and back, a whole number of times per loop">
+            ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× per loop`}</option>`).join('')}
+        </select>
+    </div>
 `;
 
-const flag = (key: string, label: string) => `
-    <label class="item toggle">
-        <input class="switch" data-flag="${key}" type="checkbox" />
+const segments = (name: string, label: string, values: readonly string[], hint: string) => `
+    <div class="row" title="${hint}">
         <span class="key">${label}</span>
-    </label>
+        <div class="segments" role="radiogroup" aria-label="${label}">
+            ${values
+                .map(
+                    value => `
+                        <label class="segment">
+                            <input type="radio" name="${name}" value="${value}" />
+                            <span>${value}</span>
+                        </label>`,
+                )
+                .join('')}
+        </div>
+    </div>
 `;
 
-const option = (key: string, values: readonly string[]) => `
-    <label class="item">
-        <span class="key">${key}</span>
-        <select class="pick" data-pick="${key}" aria-label="${key}">
+const option = (key: string, label: string, values: readonly string[], hint: string) => `
+    <label class="row" title="${hint}">
+        <span class="key">${label}</span>
+        <select class="pick" data-pick="${key}" aria-label="${label}">
             ${values.map(value => `<option value="${value}">${value}</option>`).join('')}
         </select>
+    </label>
+`;
+
+const flag = (key: string, label: string, hint: string) => `
+    <label class="row" title="${hint}">
+        <span class="key">${label}</span>
+        <input class="switch" data-flag="${key}" type="checkbox" />
     </label>
 `;
 
@@ -66,14 +108,21 @@ const choice = (key: string, label: string) => `
     </label>
 `;
 
-const modes = DRAW_MODES.map(
-    mode => `
-        <label class="segment">
-            <input type="radio" name="mode" value="${mode}"${mode === defaultPanel.mode ? ' checked' : ''} />
-            <span>${mode}</span>
-        </label>
-    `,
-).join('');
+const reset = (group: Group, what: string) => `
+    <button class="reset" type="button" data-reset="${group}" title="reset ${what}" aria-label="reset ${what}" disabled>
+        ${RESET_ICON}
+    </button>
+`;
+
+const group = (name: Group, title: string, rows: string) => `
+    <section class="group" aria-label="${title}">
+        <header class="group-head">
+            <h3>${title}</h3>
+            ${reset(name, title.toLowerCase())}
+        </header>
+        ${rows}
+    </section>
+`;
 
 const tabs = TABS.map(
     tab => `
@@ -92,25 +141,59 @@ const TEMPLATE = `
             ${choice('theme', 'theme')}
         </div>
     </div>
-    <div class="bar" role="group" aria-label="sketch parameters">
-        <div class="segments" role="radiogroup" aria-label="draw mode">${modes}</div>
-        ${flag('axes', 'axes')}
-        ${option('fit', FITS)}
-        ${option('lens', LENSES)}
-        ${option('lattice', LATTICES)}
-        ${slider('focus', 'focus', 0.3, 3, 0.05, defaultPanel.focus)}
-        ${option('space', SPACES)}
-        <button class="item reset" type="button" title="reset camera" aria-label="reset camera" disabled>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>
-            <span>reset view</span>
-        </button>
-        ${slider('dimension', 'lattice', 1, 128, 1, defaultPanel.dimension)}
-        ${slider('baseSize', 'dot', 1, 20, 1, defaultPanel.baseSize, 'dots')}
-        ${slider('depthScalar', 'depth', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
-        ${slider('trails', 'trails', 0, 0.97, 0.01, defaultPanel.trails)}
-        ${KNOBS.map(knob => slider(knob, knob, 0, 1, 0.01, defaultPanel.knobs[knob])).join('')}
+    <div class="panes">
+        <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
+            <header class="group-head">
+                <h3>Parameters</h3>
+                <button class="reset labelled" type="button" data-reset="parameters" disabled>
+                    ${RESET_ICON}<span>reset parameters</span>
+                </button>
+            </header>
+            <div class="knobs">${KNOBS.map(knobRow).join('')}</div>
+            <p class="empty">This formula reads no knobs. Use k1 to k4 in its code and they appear here.</p>
+        </section>
+        <div class="pane groups" data-pane="scene" hidden>
+            ${group(
+                'sampling',
+                'Sampling',
+                `${option('lattice', 'lattice', LATTICES, 'where the formula is evaluated')}
+                 ${slider('dimension', 'density', 'how many points: the lattice has twice this many on a side', 1, 128, 1, defaultPanel.dimension)}
+                 ${slider('focus', 'focus', 'bunch the points toward the middle (above 1) or the edges (below 1)', 0.3, 3, 0.05, defaultPanel.focus)}`,
+            )}
+            ${group(
+                'drawing',
+                'Drawing',
+                `${segments('mode', 'mode', DRAW_MODES, 'how each point is drawn')}
+                 ${slider('baseSize', 'dot size', 'the size of a dot at the camera target, in screen pixels', 1, 20, 1, defaultPanel.baseSize, 'dots')}
+                 ${slider('depthScalar', 'depth', 'how much nearer dots grow and farther ones shrink', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
+                 ${slider('trails', 'trails', 'fade each frame into the next instead of clearing it', 0, 0.97, 0.01, defaultPanel.trails)}
+                 ${flag('axes', 'axes', 'draw x, y and z and the -1 to 1 square')}`,
+            )}
+            ${group(
+                'space',
+                'Space',
+                option(
+                    'space',
+                    'space',
+                    SPACES,
+                    'the coordinate system the formula output is read in',
+                ),
+            )}
+            ${group(
+                'camera',
+                'Camera',
+                `${segments('lens', 'lens', LENSES, 'perspective shrinks what is far away; orthographic keeps sizes')}
+                 ${segments('fit', 'fit', FITS, 'how the -1 to 1 square meets a canvas that is not square')}
+                 <div class="row">
+                     <span class="key">view</span>
+                     <button class="view" type="button" title="undo your own turning and zooming of the camera" disabled>
+                         ${RESET_ICON}<span>reset view</span>
+                     </button>
+                 </div>`,
+            )}
+        </div>
+        <div class="pane animation" data-pane="animation" hidden><slot name="animation"></slot></div>
     </div>
-    <div class="animation" hidden><slot name="animation"></slot></div>
 `;
 
 export type PresetOption = {
@@ -121,14 +204,15 @@ export type PresetOption = {
 const readout = (field: NumericField, value: number): string =>
     field === 'dimension' || field === 'baseSize' ? String(value) : value.toFixed(2);
 
+const RADIOS = ['mode', 'lens', 'fit'] as const;
+
 export class HksSketchControls extends HTMLElement {
     readonly changes$: Observable<ControlChange>;
     readonly resets$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
-    private readonly reset: HTMLButtonElement;
-    private readonly bar: HTMLElement;
-    private readonly animation: HTMLElement;
+    private readonly view: HTMLButtonElement;
+    private readonly empty: HTMLElement;
 
     constructor() {
         super();
@@ -137,14 +221,13 @@ export class HksSketchControls extends HTMLElement {
         this.shadow.adoptedStyleSheets = [sheet];
         this.shadow.innerHTML = TEMPLATE;
 
-        const bar = requireChild(this.shadow, '.bar');
-        this.bar = bar;
-        this.animation = requireChild(this.shadow, '.animation');
-        this.reset = requireElement(this.shadow, '.reset', HTMLButtonElement);
-        this.resets$ = fromElementEvent$(this.reset, 'click').pipe(map(() => undefined));
+        const panes = requireChild(this.shadow, '.panes');
+        this.empty = requireChild(this.shadow, '.empty');
+        this.view = requireElement(this.shadow, '.view', HTMLButtonElement);
+        this.resets$ = fromElementEvent$(this.view, 'click').pipe(map(() => undefined));
 
         this.changes$ = merge(
-            // Above both tabs: the formula and theme decide what the parameters draw and what the animation exports.
+            // Above every tab: the formula and theme decide what the parameters draw and what the animation exports.
             fromElementEvent$(requireChild(this.shadow, '.head'), 'change').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
                     if (target instanceof HTMLInputElement && target.name === 'tab') {
@@ -160,7 +243,19 @@ export class HksSketchControls extends HTMLElement {
                         : EMPTY;
                 }),
             ),
-            fromElementEvent$(bar, 'input').pipe(
+            fromElementEvent$(panes, 'click').pipe(
+                mergeMap(({ target }): Observable<ControlChange> => {
+                    const button =
+                        target instanceof Element ? target.closest('[data-reset]') : null;
+                    const name =
+                        button instanceof HTMLElement ? button.dataset['reset'] : undefined;
+
+                    return name !== undefined && isGroup(name)
+                        ? of({ field: 'reset', group: name })
+                        : EMPTY;
+                }),
+            ),
+            fromElementEvent$(panes, 'input').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
                     const field =
                         target instanceof HTMLInputElement ? target.dataset['field'] : undefined;
@@ -172,34 +267,35 @@ export class HksSketchControls extends HTMLElement {
                         : EMPTY;
                 }),
             ),
-            fromElementEvent$(bar, 'change').pipe(
+            fromElementEvent$(panes, 'change').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
-                    const knob =
-                        target instanceof HTMLSelectElement ? target.dataset['cycles'] : undefined;
-
-                    if (target instanceof HTMLSelectElement && knob !== undefined && isKnob(knob)) {
-                        return of({ field: 'cycles', knob, value: Number(target.value) });
-                    }
-
                     if (target instanceof HTMLSelectElement) {
+                        const knob = target.dataset['cycles'];
+
+                        if (knob !== undefined && isKnob(knob)) {
+                            return of({ field: 'cycles', knob, value: Number(target.value) });
+                        }
+
                         const pick = target.dataset['pick'];
 
-                        return pick === 'fit' ||
-                            pick === 'lens' ||
-                            pick === 'lattice' ||
-                            pick === 'space'
+                        return pick === 'lattice' || pick === 'space'
                             ? of({ field: pick, value: target.value })
                             : EMPTY;
                     }
 
-                    if (target instanceof HTMLInputElement && target.name === 'mode') {
-                        return of({ field: 'mode', value: target.value });
+                    if (!(target instanceof HTMLInputElement)) {
+                        return EMPTY;
                     }
 
-                    const flag =
-                        target instanceof HTMLInputElement ? target.dataset['flag'] : undefined;
+                    const radio = RADIOS.find(name => name === target.name);
 
-                    return target instanceof HTMLInputElement && flag !== undefined && isFlag(flag)
+                    if (radio !== undefined) {
+                        return of({ field: radio, value: target.value });
+                    }
+
+                    const flag = target.dataset['flag'];
+
+                    return flag !== undefined && isFlag(flag)
                         ? of({ field: flag, value: target.checked })
                         : EMPTY;
                 }),
@@ -219,10 +315,18 @@ export class HksSketchControls extends HTMLElement {
         return requireElement(this.shadow, `[data-pick="${key}"]`, HTMLSelectElement);
     }
 
+    private checkRadio(name: string, value: string): void {
+        for (const radio of this.shadow.querySelectorAll(`input[name="${name}"]`)) {
+            if (radio instanceof HTMLInputElement) {
+                radio.checked = radio.value === value;
+            }
+        }
+    }
+
     // Writes every value back: the fold owns them, so a programmatic write raises no event to loop on.
     connect$(
         view$: Observable<ControlsView>,
-        knobs$: Observable<readonly string[]>,
+        knobs$: Observable<readonly KnobView[]>,
         formulas$: Observable<readonly PresetOption[]>,
     ): Observable<void> {
         // Together: options rebuilt after the value was set would drop the selection.
@@ -243,12 +347,22 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        const picks$ = (['theme', 'fit', 'lens', 'lattice', 'space'] as const).map(key =>
+        const picks$ = (['theme', 'lattice', 'space'] as const).map(key =>
             view$.pipe(
                 map(view => view[key]),
                 distinctUntilChanged(),
                 tap(value => {
                     this.pick(key).value = value;
+                }),
+            ),
+        );
+
+        const radios$ = RADIOS.map(name =>
+            view$.pipe(
+                map(view => view[name]),
+                distinctUntilChanged(),
+                tap(value => {
+                    this.checkRadio(name, value);
                 }),
             ),
         );
@@ -283,16 +397,10 @@ export class HksSketchControls extends HTMLElement {
             ),
         );
 
-        const mode$ = view$.pipe(
+        const only$ = view$.pipe(
             map(({ mode }) => mode),
             distinctUntilChanged(),
             tap(mode => {
-                for (const radio of this.shadow.querySelectorAll('input[name="mode"]')) {
-                    if (radio instanceof HTMLInputElement) {
-                        radio.checked = radio.value === mode;
-                    }
-                }
-
                 for (const row of this.shadow.querySelectorAll('[data-only]')) {
                     if (row instanceof HTMLElement) {
                         row.hidden = row.dataset['only'] !== mode;
@@ -313,24 +421,39 @@ export class HksSketchControls extends HTMLElement {
         );
 
         const shown$ = knobs$.pipe(
-            map(knobs => knobs.join()),
-            distinctUntilChanged(),
-            tap(joined => {
-                const used = joined.split(',');
-
+            distinctUntilChanged(sameKnobViews),
+            tap(knobs => {
                 for (const row of this.shadow.querySelectorAll('[data-knob]')) {
                     if (row instanceof HTMLElement) {
-                        row.hidden = !used.includes(row.dataset['knob'] ?? '');
+                        const used = knobs.find(({ knob }) => knob === row.dataset['knob']);
+                        row.hidden = used === undefined;
+                        requireChild(row, '.key').textContent = used?.label ?? '';
                     }
                 }
+
+                this.empty.hidden = knobs.length > 0;
             }),
+        );
+
+        const resets$ = GROUPS.map(name =>
+            view$.pipe(
+                map(({ changed }) => changed[name]),
+                distinctUntilChanged(),
+                tap(changed => {
+                    for (const button of this.shadow.querySelectorAll(`[data-reset="${name}"]`)) {
+                        if (button instanceof HTMLButtonElement) {
+                            button.disabled = !changed;
+                        }
+                    }
+                }),
+            ),
         );
 
         const turned$ = view$.pipe(
             map(({ turned }) => turned),
             distinctUntilChanged(),
             tap(turned => {
-                this.reset.disabled = !turned;
+                this.view.disabled = !turned;
             }),
         );
 
@@ -338,14 +461,13 @@ export class HksSketchControls extends HTMLElement {
             map(({ tab }) => tab),
             distinctUntilChanged(),
             tap(tab => {
-                for (const radio of this.shadow.querySelectorAll('input[name="tab"]')) {
-                    if (radio instanceof HTMLInputElement) {
-                        radio.checked = radio.value === tab;
+                this.checkRadio('tab', tab);
+
+                for (const pane of this.shadow.querySelectorAll('[data-pane]')) {
+                    if (pane instanceof HTMLElement) {
+                        pane.hidden = pane.dataset['pane'] !== tab;
                     }
                 }
-
-                this.bar.hidden = tab !== 'parameters';
-                this.animation.hidden = tab !== 'animation';
             }),
         );
 
@@ -353,10 +475,12 @@ export class HksSketchControls extends HTMLElement {
             tab$,
             formula$,
             ...picks$,
+            ...radios$,
             ...numbers$,
             ...flags$,
             ...motion$,
-            mode$,
+            ...resets$,
+            only$,
             shown$,
             turned$,
         ).pipe(map(() => undefined));

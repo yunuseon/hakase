@@ -1,3 +1,6 @@
+#define K1 size
+#define K2 zoom
+
 vec3 formula(float x, float y, float t) {
     vec2 away = vec2(x, y) - pointer;
     float radius = 0.2 + 0.6 * k1;

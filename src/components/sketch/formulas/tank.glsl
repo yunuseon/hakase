@@ -1,3 +1,5 @@
+#define K1 speed
+#define K2 sustain
 
 vec2 dropAt(float beat) {
     return vec2(fract(sin(beat * 12.9898) * 43758.5453), fract(sin(beat * 78.233) * 43758.5453)) * 1.6 - 0.8;

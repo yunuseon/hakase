@@ -1,3 +1,5 @@
+#define K1 density
+#define K2 glow
 // Ten generations a second: one per frame would be too fast to follow.
 #define STEPS 10
 

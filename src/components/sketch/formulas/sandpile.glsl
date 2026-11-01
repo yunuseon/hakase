@@ -1,3 +1,4 @@
+#define K1 height
 // Grains pile up one step at a time, so a visible pile needs hundreds of steps a second.
 #define STEPS 300
 

@@ -1,3 +1,8 @@
+#define K1 reach
+#define K2 pull
+#define K3 rings
+#define K4 hue
+
 vec4 formula(float x, float y, float t) {
     vec2 here = vec2(x, y);
     vec2 toward = pointer - here;

@@ -1,6 +1,6 @@
 import type { Size } from '../window/frame.ts';
 
-export const TABS = ['parameters', 'animation'] as const;
+export const TABS = ['parameters', 'scene', 'animation'] as const;
 export type Tab = (typeof TABS)[number];
 export const isTab = (value: string): value is Tab => TABS.some(tab => tab === value);
 
