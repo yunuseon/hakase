@@ -7,6 +7,8 @@ precision highp int;
 #define MODE_SURFACE 2
 #define PASS_AXES 1
 #define PASS_FADE 2
+#define PASS_STEP 3
+#define PASS_SEED 4
 
 const float SMALL_DOT = 6.0;
 
@@ -21,6 +23,7 @@ in vec4 vColor;
 in float vTint;
 in float vPointSize;
 in vec3 vPosition;
+flat in vec4 vState;
 
 out vec4 fragColor;
 
@@ -55,6 +58,12 @@ float shading() {
 }
 
 void main() {
+    if (uPass == PASS_STEP || uPass == PASS_SEED) {
+        fragColor = vState;
+
+        return;
+    }
+
     if (uPass == PASS_FADE) {
         // The ramp's first entry is the backdrop, so trails fade into the canvas colour.
         fragColor = vec4(texture(uPalette, vec2(0.0, 0.5)).rgb * uFade, uFade);

@@ -1,4 +1,4 @@
-import { concat, defer, from, Observable, of } from 'rxjs';
+import { combineLatest, concat, defer, from, Observable, of } from 'rxjs';
 import { catchError, concatMap, map, switchMap, takeWhile } from 'rxjs/operators';
 import type { Size } from '../../window/frame.ts';
 import {
@@ -10,7 +10,9 @@ import {
 } from '../animation.ts';
 import { centre, type SketchParams } from '../params.ts';
 import type { Orbit } from '../space.ts';
-import { createSketch, drawFrame } from '../gl/sketch-program.ts';
+import { createSketch, drawFrame, type Sketch } from '../gl/sketch-program.ts';
+import { bindState, evolve, simulation$, type Simulation } from '../gl/simulation.ts';
+import { evolutionsFor, evolutionTo, stepAt } from '../evolution.ts';
 import { offscreen$, prepareStill } from '../gl/still.ts';
 import { muxWebM, type VideoChunk } from './webm.ts';
 import { zip, zipEntry, type ZipEntry } from './zip.ts';
@@ -153,6 +155,13 @@ const writer$ = (pixels: Size, settings: ExportSettings): Observable<Writer> =>
         ),
     );
 
+const simulationFor$ = (
+    gl: WebGL2RenderingContext,
+    sketch: Sketch,
+    params: SketchParams,
+): Observable<Simulation | null> =>
+    sketch.evolves ? simulation$(gl, 2 * params.dimension) : of(null);
+
 const messageOf = (error: unknown): string =>
     error instanceof Error ? error.message : 'The export failed.';
 
@@ -181,13 +190,37 @@ export const export$ = ({
                 pixels,
                 pixels.width / Math.max(params.width, 1),
             );
+            const { sketch } = compiled;
+            const evolutions = evolutionsFor(
+                frames.map(({ t }) => stepAt(t, seconds, sketch.steps)),
+            );
 
-            return writer$(pixels, settings).pipe(
-                switchMap(writer =>
+            return combineLatest([
+                simulationFor$(surface.gl, sketch, params),
+                writer$(pixels, settings),
+            ]).pipe(
+                switchMap(([simulation, writer]) =>
                     concat(
                         from(frames).pipe(
                             concatMap((frame, step) =>
                                 defer(() => {
+                                    const evolution = evolutions[step];
+
+                                    if (simulation !== null && evolution !== undefined) {
+                                        evolve(surface.gl, sketch, simulation, evolution, {
+                                            params,
+                                            seconds,
+                                            pointer: centre,
+                                            orbit,
+                                        });
+                                        bindState(
+                                            surface.gl,
+                                            sketch,
+                                            simulation,
+                                            evolution.end.front,
+                                        );
+                                    }
+
                                     drawFrame(
                                         surface.gl,
                                         compiled.sketch,
@@ -228,7 +261,7 @@ export const export$ = ({
 
 // One frame at the export size, standing alone: a still has no previous frame for trails to fade.
 export const still$ = (
-    { source, params, orbit, settings }: Omit<ExportRequest, 'seconds'>,
+    { source, params, orbit, settings, seconds }: ExportRequest,
     t: number,
 ): Observable<ExportEvent> => {
     const pixels = exportPixels(params, settings.size);
@@ -249,9 +282,25 @@ export const still$ = (
                 pixels,
                 pixels.width / Math.max(params.width, 1),
             );
-            drawFrame(surface.gl, compiled.sketch, alone, t, centre, orbit);
+            const { sketch } = compiled;
 
-            return from(surface.canvas.convertToBlob({ type: 'image/png' })).pipe(
+            return simulationFor$(surface.gl, sketch, alone).pipe(
+                switchMap(simulation => {
+                    if (simulation !== null) {
+                        const evolution = evolutionTo(null, stepAt(t, seconds, sketch.steps));
+                        evolve(surface.gl, sketch, simulation, evolution, {
+                            params: alone,
+                            seconds,
+                            pointer: centre,
+                            orbit,
+                        });
+                        bindState(surface.gl, sketch, simulation, evolution.end.front);
+                    }
+
+                    drawFrame(surface.gl, sketch, alone, t, centre, orbit);
+
+                    return from(surface.canvas.convertToBlob({ type: 'image/png' }));
+                }),
                 map((blob): ExportEvent => ({ kind: 'file', blob, extension: 'png' })),
             );
         }),

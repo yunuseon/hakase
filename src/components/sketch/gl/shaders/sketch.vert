@@ -35,20 +35,27 @@ uniform float pointerDown;
 
 // The mouse over the canvas in clip space; formulas read the world-space globals below instead.
 uniform vec2 uPointer;
+// One texel per lattice point: the state evolve() left there on the step before.
+uniform sampler2D uState;
 
 // Globals, not uniforms: main() fills them from the camera before the formula runs.
 vec2 pointer;
 vec3 pointerOrigin;
 vec3 pointerDirection;
 float pointerOnGround;
+// Which lattice point state() and neighbour() read, set before the formula or evolve() runs.
+ivec2 stateIndex;
 
 out vec4 vColor;
 out float vTint;
 out float vPointSize;
 out vec3 vPosition;
+flat out vec4 vState;
 
 #define PASS_AXES 1
 #define PASS_FADE 2
+#define PASS_STEP 3
+#define PASS_SEED 4
 #define LENS_ORTHOGRAPHIC 1
 
 #define SPACE_CARTESIAN 0
@@ -72,6 +79,24 @@ Camera view(float t);
 vec2 sampled(vec2 uv, float index, float count);
 vec3 placed(vec3 p);
 bool ownSpace();
+vec4 evolved(float x, float y, float t);
+vec4 seeded(float x, float y);
+
+vec4 state() {
+    return texelFetch(uState, stateIndex, 0);
+}
+
+// Wraps at the edges, so a pattern that leaves one side comes back on the other.
+vec4 neighbour(int dx, int dy) {
+    int side = 2 * uDimension;
+
+    return texelFetch(uState, ivec2((stateIndex.x + dx + side) % side, (stateIndex.y + dy + side) % side), 0);
+}
+
+// This point's place on the state grid, -1 to 1: x and y are where it is drawn, which lattice and focus move.
+vec2 cell() {
+    return (vec2(stateIndex - uDimension) + 0.5) / float(uDimension);
+}
 
 const float PITCH_LIMIT = 1.56;
 
@@ -367,9 +392,13 @@ void main() {
 
     aim(eye);
     vColor = vec4(0.0);
+    vState = vec4(0.0);
     int side = 2 * uDimension;
-    ivec2 index = latticePoint(gl_VertexID, side);
+    bool stepping = uPass == PASS_STEP || uPass == PASS_SEED;
+    // A step draws one point per lattice point, in index order, not the mode's primitive.
+    ivec2 index = stepping ? ivec2(gl_VertexID / side, gl_VertexID % side) : latticePoint(gl_VertexID, side);
     ivec2 cell = index - uDimension;
+    stateIndex = index;
 
     // Cell centres: plain i / d spans [-1, 1) and shifts the lattice half a step.
     float d = float(uDimension);
@@ -377,6 +406,19 @@ void main() {
     latticeCell = vec2(index);
     latticeStep = 1.0 / d;
     vec2 at = sampled(uv, float(index.x * side + index.y), float(side * side));
+
+    if (stepping) {
+        vState = uPass == PASS_STEP ? evolved(at.x, at.y, uPlayhead) : seeded(at.x, at.y);
+        // The centre of this point's own texel in the state texture, which is the viewport.
+        gl_Position = vec4((vec2(index) + 0.5) / float(side) * 2.0 - 1.0, 0.0, 1.0);
+        gl_PointSize = 1.0;
+        vPointSize = 1.0;
+        vTint = 0.0;
+        vPosition = vec3(0.0);
+
+        return;
+    }
+
     vec4 p = point(at.x, at.y, uPlayhead);
     vec3 v = placed(p.xyz);
 

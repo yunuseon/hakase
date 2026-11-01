@@ -72,6 +72,14 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
         text: 'Optional. Define it to map what formula returns to the point that is drawn, for twists, warps or your own coordinate system. The space picker then has no effect.',
     },
     {
+        term: 'vec4 evolve(float x, float y, float t)',
+        text: 'Optional. Define it and every lattice point keeps four numbers of state from step to step: evolve returns the next state from state(), this point now, and neighbour(dx, dy), the point dx columns and dy rows away, which wraps at the edges. cell() is the place of this point on that grid, -1 to 1: use it, not x and y, for rules about places like the middle or the rim, because the lattice and focus move where x and y are drawn. formula reads state() too, to place or tint the point. That is enough for ripple tanks, reaction-diffusion and cellular automata; Tank and Coral are worked examples.',
+    },
+    {
+        term: 'vec4 initial(float x, float y), #define STEPS',
+        text: 'initial sets the state at the start of the loop, all zeros without it. The state is stepped 60 times a second, or as often as #define STEPS 240 says. Scrubbing back or starting the loop again replays from initial, so a moment always looks the same, in the strip and in an export too.',
+    },
+    {
         term: 'PI, helpers',
         text: 'PI is defined for you, and you can write your own functions above formula. If an edit does not compile, the error shows below and the last working version keeps running.',
     },

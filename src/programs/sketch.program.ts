@@ -250,8 +250,18 @@ export const sketchProgram: Program = {
                         tab === 'animation'
                             ? thumbnails$(
                                   text$,
-                                  combineLatest([params$, orbit$, devicePixelRatio$]).pipe(
-                                      map(([params, orbit, ratio]) => ({ params, orbit, ratio })),
+                                  combineLatest([
+                                      params$,
+                                      orbit$,
+                                      devicePixelRatio$,
+                                      state.duration$,
+                                  ]).pipe(
+                                      map(([params, orbit, ratio, seconds]) => ({
+                                          params,
+                                          orbit,
+                                          ratio,
+                                          seconds,
+                                      })),
                                   ),
                                   layout$,
                               )
@@ -277,8 +287,8 @@ export const sketchProgram: Program = {
                         ),
                     ),
                     exporter.stills$.pipe(
-                        withLatestFrom(request$, playhead$),
-                        exhaustMap(([, request, t]) => still$(request, t)),
+                        withLatestFrom(request$, playhead$, state.duration$),
+                        exhaustMap(([, request, t, seconds]) => still$({ ...request, seconds }, t)),
                     ),
                 ).pipe(share());
 
@@ -313,7 +323,9 @@ export const sketchProgram: Program = {
                     sketch
                         .connect$(
                             params$,
-                            playhead$,
+                            combineLatest([playhead$, state.duration$]).pipe(
+                                map(([t, seconds]) => ({ t, seconds })),
+                            ),
                             shader$,
                             ratio$,
                             combineLatest([

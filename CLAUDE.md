@@ -231,6 +231,47 @@ pale. The examples keep their tints in roughly 0.3 to 1 with
 `0.65 + 0.35 * sin(...)` rather than `fract(...)`, which also avoids a hard colour
 seam where the fraction wraps.
 
+**A formula can keep state.** With `vec4 evolve(x, y, t)` every lattice point
+keeps a `vec4` from one step to the next: `evolve` returns the next value from
+`state()` and `neighbour(dx, dy)` (wrapping), `initial(x, y)` seeds it, and
+`formula` reads `state()` to place and tint the point. `tank` (the wave
+equation) and `coral` (Gray-Scott) are the worked examples.
+
+- **A step is a pass of the same program,** like the axes and the trail fade,
+  not a program of its own: it needs the whole prelude a formula can call
+  (lattice, space, pointer, camera, knobs), and a second program would mean
+  compiling every formula twice. `PASS_STEP` draws one `POINTS` vertex per
+  lattice point onto its own texel of a float state texture (`side x side`,
+  side = 2 x lattice), the vertex shader runs `evolve()` and hands the result to
+  the fragment shader through a `flat` varying, which writes it. Two textures
+  swap each step. They are created on texture unit 1: binding them on the active
+  unit put them where the palette sampler reads, and WebGL refused every draw as
+  a feedback loop.
+- **Time is replayed, never accumulated.** The state at time t is `evolve`
+  applied `stepAt(t, seconds, steps)` times from `initial`, at 60 steps a second
+  or a formula's `#define STEPS`. Playing steps forward; scrubbing back or
+  looping replays from the start (`evolutionTo`), so a moment always looks the
+  same, and the strip and an export can show it. Which texture holds the state
+  after a run is parity, so the plan carries it (`Evolved.front`) and the
+  textures carry no mutable index. A jump to the end of Coral's 8 s loop replays
+  about 3,800 steps in a third of a second; a loop restart is a few steps.
+- **The state textures are a resource keyed by formula and lattice size**
+  (`simulated$`): kept across every other change, so a knob or a camera drag
+  never resets the simulation, and released when either changes. The live
+  sketch, the thumbnails and an export each own their own, in their own context.
+- **Thumbnails replay once per render**, left to right, drawing each tile as the
+  replay passes its moment. Because that can cost a third of a second, a sketch
+  that evolves renders its strip once things settle (250 ms), not on every frame
+  of a drag; every other sketch keeps per-frame thumbnails.
+- **Rules about places use `cell()`, never `x, y`.** `neighbour()` works on the
+  state grid, but `x, y` are where the lattice and focus _draw_ a point. Sandpile
+  first found its middle with `x, y`, and at any focus but 1 no point was near
+  enough to the middle, so no grain ever fell and the canvas stayed blank.
+  `cell()` is the point's place on the grid, -1 to 1, before any bending.
+- The pointer can paint into a live simulation (shift-drag), but a replay uses
+  the pointer as it is now, so what was painted is gone after a scrub back.
+  Exports and thumbnails use the centre, unpressed.
+
 **Shaders live in their own files**, never in template literals: `.vert`/`.frag`
 for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
 body under `components/sketch/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
@@ -1128,7 +1169,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and eleven of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and twenty of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -33,6 +33,14 @@ const SCRIPTS_CAMERA = /\bCamera\s+camera\s*\(/;
 const PLACES_SAMPLES = /\bvec2\s+lattice\s*\(/;
 const MAPS_SPACE = /\bvec3\s+space\s*\(/;
 const DECLARES_WRAP = /^\s*#define\s+WRAPS\b/m;
+const EVOLVES = /\bvec4\s+evolve\s*\(/;
+const SEEDS = /\bvec4\s+initial\s*\(/;
+const DECLARES_STEPS = /^\s*#define\s+STEPS\s+(\d+)\b/m;
+export const DEFAULT_STEPS = 60;
+
+// Steps per second of a formula that evolves: its own #define STEPS, kept to what a frame can replay.
+const stepsOf = (formula: string): number =>
+    Math.min(Math.max(Number(DECLARES_STEPS.exec(formula)?.[1] ?? DEFAULT_STEPS), 1), 1000);
 
 // Appended after the formula, never before it, or every reported line number would shift.
 export const adapterFor = (formula: string): string =>
@@ -50,6 +58,12 @@ export const adapterFor = (formula: string): string =>
             ? 'vec3 placed(vec3 p) { return space(p); }'
             : 'vec3 placed(vec3 p) { return builtinSpace(p); }',
         `bool ownSpace() { return ${MAPS_SPACE.test(formula) ? 'true' : 'false'}; }`,
+        EVOLVES.test(formula)
+            ? 'vec4 evolved(float x, float y, float t) { return evolve(x, y, t); }'
+            : 'vec4 evolved(float x, float y, float t) { return state(); }',
+        SEEDS.test(formula)
+            ? 'vec4 seeded(float x, float y) { return initial(x, y); }'
+            : 'vec4 seeded(float x, float y) { return vec4(0.0); }',
     ].join('\n');
 const LOG_LOCATION = /^(ERROR|WARNING): \d+:(\d+):/gm;
 
@@ -85,6 +99,7 @@ export type Uniforms = {
     readonly focus: WebGLUniformLocation | null;
     readonly wrap: WebGLUniformLocation | null;
     readonly reference: WebGLUniformLocation | null;
+    readonly state: WebGLUniformLocation | null;
 };
 
 export type Sketch = {
@@ -92,6 +107,8 @@ export type Sketch = {
     readonly uniforms: Uniforms;
     // A formula whose own lattice() or space() goes around x says so with #define WRAPS.
     readonly wraps: boolean;
+    readonly evolves: boolean;
+    readonly steps: number;
 };
 
 export type SketchResult =
@@ -120,6 +137,8 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
         sketch: {
             program,
             wraps: DECLARES_WRAP.test(formula),
+            evolves: EVOLVES.test(formula),
+            steps: stepsOf(formula),
             uniforms: {
                 dimension: at('uDimension'),
                 mode: at('uMode'),
@@ -142,6 +161,7 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 focus: at('uFocus'),
                 wrap: at('uWrap'),
                 reference: at('uReference'),
+                state: at('uState'),
             },
         },
     };
@@ -230,6 +250,26 @@ const primitive = (gl: WebGL2RenderingContext, mode: DrawMode): number => {
 const PASS_LATTICE = 0;
 const PASS_AXES = 1;
 const PASS_FADE = 2;
+export const PASS_STEP = 3;
+export const PASS_SEED = 4;
+
+export const setMoment = (
+    gl: WebGL2RenderingContext,
+    { uniforms }: Sketch,
+    { knobs, motion }: Pick<PanelParams, 'knobs' | 'motion'>,
+    playhead: number,
+    { x, y, down }: Pointer,
+    orbit: Orbit,
+): void => {
+    gl.uniform1f(uniforms.playhead, playhead);
+    // Every frame, not in prepare: a moving knob changes with the playhead, not with its settings.
+    KNOBS.forEach((knob, index) => {
+        gl.uniform1f(uniforms.knobs[index] ?? null, knobAt(knobs[knob], motion[knob], playhead));
+    });
+    gl.uniform2f(uniforms.pointer, x, y);
+    gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
+    gl.uniform3f(uniforms.orbit, ...orbitUniform(orbit));
+};
 // Must match axisVertex in sketch.vert: 7 lines of 48 pieces of two vertices, then 12 ticks of two.
 const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
 
@@ -238,7 +278,7 @@ export const drawFrame = (
     sketch: Sketch,
     { draw: { mode }, dimension, axes, trails, knobs, motion, lattice, space }: PanelParams,
     playhead: number,
-    { x, y, down }: Pointer,
+    pointer: Pointer,
     orbit: Orbit,
 ): void => {
     const { uniforms } = sketch;
@@ -254,14 +294,7 @@ export const drawFrame = (
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
 
-    gl.uniform1f(uniforms.playhead, playhead);
-    // Every frame, not in prepare: a moving knob changes with the playhead, not with its settings.
-    KNOBS.forEach((knob, index) => {
-        gl.uniform1f(uniforms.knobs[index] ?? null, knobAt(knobs[knob], motion[knob], playhead));
-    });
-    gl.uniform2f(uniforms.pointer, x, y);
-    gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
-    gl.uniform3f(uniforms.orbit, ...orbitUniform(orbit));
+    setMoment(gl, sketch, { knobs, motion }, playhead, pointer, orbit);
     gl.uniform1i(uniforms.pass, PASS_LATTICE);
     gl.drawArrays(
         primitive(gl, mode),

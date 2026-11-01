@@ -1,5 +1,5 @@
 import { combineLatest, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, filter, map, pairwise, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, pairwise, scan, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$, pointerDrag$ } from '../../shared/drag.ts';
@@ -8,10 +8,24 @@ import { cappedRatio, pointerAt, samePointer, type Pointer, type SketchParams } 
 import { buildRamp } from './theme.ts';
 import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
 import { drawFrame, prepare, type Sketch } from './gl/sketch-program.ts';
+import { bindState, evolve, simulated$, type Simulation } from './gl/simulation.ts';
+import { evolutionTo, stepAt, type Clock, type Evolution } from './evolution.ts';
 import type { Size } from '../window/frame.ts';
 import css from './sketch.css?inline';
 
 const sheet = styleSheet(css);
+
+type Frame = {
+    readonly stage: {
+        readonly sketch: Sketch;
+        readonly params: SketchParams;
+        readonly simulation: Simulation | null;
+    };
+    readonly clock: Clock;
+    readonly pointer: Pointer;
+    readonly orbit: Orbit;
+    readonly evolution: Evolution;
+};
 
 const TEMPLATE = `
     <div class="viewport"><slot name="status"></slot></div>
@@ -74,7 +88,7 @@ export class HksSketch extends HTMLElement {
 
     connect$(
         params$: Observable<SketchParams>,
-        playhead$: Observable<number>,
+        clock$: Observable<Clock>,
         sketch$: Observable<Sketch>,
         ratio$: Observable<number>,
         pointer$: Observable<Pointer>,
@@ -99,13 +113,43 @@ export class HksSketch extends HTMLElement {
         );
 
         const frames$ = combineLatest([
-            prepared$,
-            playhead$,
+            simulated$(this.surface.gl, prepared$),
+            clock$,
             pointer$.pipe(distinctUntilChanged(samePointer)),
             orbit$,
         ]).pipe(
-            tap(([{ sketch, params }, playhead, pointer, orbit]) => {
-                drawFrame(this.surface.gl, sketch, params, playhead, pointer, orbit);
+            scan(
+                (done: Frame | null, [stage, clock, pointer, orbit]): Frame => ({
+                    stage,
+                    clock,
+                    pointer,
+                    orbit,
+                    evolution: evolutionTo(
+                        done !== null && done.stage.simulation === stage.simulation
+                            ? done.evolution.end
+                            : null,
+                        stage.simulation === null
+                            ? 0
+                            : stepAt(clock.t, clock.seconds, stage.sketch.steps),
+                    ),
+                }),
+                null,
+            ),
+            filter((frame): frame is Frame => frame !== null),
+            tap(({ stage: { sketch, params, simulation }, clock, pointer, orbit, evolution }) => {
+                const { gl } = this.surface;
+
+                if (simulation !== null) {
+                    evolve(gl, sketch, simulation, evolution, {
+                        params,
+                        seconds: clock.seconds,
+                        pointer,
+                        orbit,
+                    });
+                    bindState(gl, sketch, simulation, evolution.end.front);
+                }
+
+                drawFrame(gl, sketch, params, clock.t, pointer, orbit);
             }),
         );
 
