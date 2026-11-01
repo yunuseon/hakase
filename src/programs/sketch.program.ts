@@ -1,4 +1,4 @@
-import { asapScheduler, combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
+import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     exhaustMap,
@@ -58,6 +58,8 @@ import {
 import { asSketch, controlsView, withControl, type SketchSettings } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Size } from '../components/window/frame.ts';
+
+const SETTLE_MS = 150;
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 
@@ -169,9 +171,13 @@ export const sketchProgram: Program = {
                     mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
                 );
 
+                // A new ratio reallocates the buffer (50ms at the cap), so a moving zoom waits to settle; the first is at once.
                 const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
                     map(([pixelRatio, zoom]) => steppedRatio(pixelRatio, zoom)),
                     distinctUntilChanged(),
+                    switchMap((ratio, index) =>
+                        index === 0 ? of(ratio) : timer(SETTLE_MS).pipe(map(() => ratio)),
+                    ),
                 );
 
                 const exportSettings$ = settings$.pipe(

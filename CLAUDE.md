@@ -636,7 +636,11 @@ so a wheel zoom does not reallocate the drawing buffer on every tick, and capped
 at 2048px a side by `cappedRatio`. The program passes in the stepped ratio and the
 component applies the cap, because the size already reaches the component
 through `params$` — passing it in again would be a second path into one
-`combineLatest`.
+`combineLatest`. Stepping alone was not enough: a ctrl+wheel zoom still crossed a
+step every few ticks, and at the cap each reallocation took 50 ms. So `ratio$`
+waits until the zoom has settled for `SETTLE_MS` (150 ms) before it emits, and in
+the meantime CSS scales the old buffer; the first value applies at once, or a
+sketch would open late.
 
 Windows drag by their title bar, resize from any edge or corner, and raise on
 click. `HksWindow` adds the eight handles itself, so the frame is described
@@ -1090,7 +1094,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and three of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -1295,6 +1299,31 @@ to prevent.
   arrangement will be questioned and should be justified or dropped. If the
   ecosystem has a standard way to do something, use it.
 - Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`.
+
+## Performance
+
+Measured, not guessed. The method that worked:
+
+- **The pane must be visible.** A hidden pane reports `document.hidden`, rAF runs
+  at about 1 fps and every number is wrong; check before measuring.
+- **Frame gaps** from a rAF loop (p95, worst, frames over 25 ms) and the
+  **Long Animation Frames** API, which attributes any frame over 50 ms to its
+  scripts and forced layout without any setup.
+- **The JS Self-Profiling API** for where time goes under 50 ms. It needs the
+  `Document-Policy: js-profiling` response header; add it to `server.headers` in
+  `vite.config.ts` for the session and take it out again.
+- Gestures as scripted pointer and ctrl+wheel events along closed paths, so a
+  run ends where it began; startup on a production build (`vite preview`),
+  never the dev server's unbundled modules.
+
+Baselines at the time of writing (four windows, 2x display): idle and paused
+costs nothing (no frame loop runs); playback 2 ms/s of script; window drag,
+canvas pan, orbit, scrub and typing all hold 60 fps; startup paints at about
+100 ms with 5 MB of heap; fifteen sketch launch-and-close cycles leave heap, DOM
+and GL contexts where they started. The three hot spots found — strip canvas
+reallocation, sketch buffer reallocation during zoom, the zip's CRC — are fixed
+above. Web workers were considered and are not needed: nothing measured is
+main-thread bound except the PNG read-back.
 
 ## Verifying UI changes
 
