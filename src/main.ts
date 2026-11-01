@@ -32,6 +32,7 @@ import { reduceLibrary, sourceOf, type FormulaId, type LibraryCommand } from './
 import { sharedFormulas$ } from './share.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import { reduceBoard } from './components/board/board.ts';
+import { reduceNotes } from './components/note/note.ts';
 import { reduceTodos } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
@@ -56,6 +57,7 @@ import { playheadProgram } from './programs/playhead.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
 import { todoProgram } from './programs/todo.program.ts';
 import { boardProgram } from './programs/board.program.ts';
+import { noteProgram } from './programs/note.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -85,6 +87,7 @@ const programs: readonly Program[] = [
     tasksProgram,
     todoProgram,
     boardProgram,
+    noteProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -364,6 +367,13 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
+    const notes$ = inputs$.pipe(
+        mergeMap(({ input }) => (input.kind === 'note' ? of(input.command) : EMPTY)),
+        scan(reduceNotes, stored.notes),
+        startWith(stored.notes),
+        shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
     const library$ = merge(
         inputs$.pipe(
             mergeMap(({ input }) => (input.kind === 'library' ? of(input.command) : EMPTY)),
@@ -510,6 +520,7 @@ const bootstrap = () => {
         appearance$,
         todos$: todos$.pipe(map(({ items }) => items)),
         board$,
+        notes$,
         library$,
         tasks$: workspace$.pipe(
             map(({ processes }) =>
@@ -558,6 +569,7 @@ const bootstrap = () => {
                 settings: settings$,
                 todos: todos$,
                 board: board$,
+                notes: notes$,
                 library: library$,
             }).pipe(
                 map(({ rested, ...parts }) => ({

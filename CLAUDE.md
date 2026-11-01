@@ -630,6 +630,17 @@ with focus is never overwritten. The add-card drafts read their text in the one
 shared `submit` listener, for the todo list's reason; reading the form later lost
 every first card.
 
+**Notes are documents a window chooses between**, like formulas: one `Notes`
+collection folded in `main.ts` and saved, and each note window's choice in its
+own `NoteSettings`. A window that has never chosen (`settings$` still undefined
+on its first emission) is a new launch, so it creates a blank note and turns to
+it; a restored window has chosen and does not. `shownNote` falls back to the
+first note when the chosen one was deleted elsewhere. Edits are folded per
+keystroke, not debounced, so the text that comes back always equals what the
+textarea holds and is written only when it differs: that is what keeps the caret
+still, without the formula editor's `from` fold. Delete asks first: one click
+arms it for three seconds, a second deletes, both read from one shared `scan`.
+
 **Sections are named borders on the canvas**, for grouping programs by place.
 They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
 and a world `Rect`. **Which windows a section holds is derived, never stored**:
@@ -1211,7 +1222,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Two hundred and thirty-three of them survive in `src/` today, every one a single line. Treat that
+    Two hundred and thirty-eight of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

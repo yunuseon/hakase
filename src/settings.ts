@@ -64,7 +64,12 @@ export type ThemeEditorSettings = {
     readonly theme: ThemeName;
 };
 
-export type Settings = SketchSettings | FormulaEditorSettings | ThemeEditorSettings;
+export type NoteSettings = {
+    readonly kind: 'note';
+    readonly note: string | null;
+};
+
+export type Settings = SketchSettings | FormulaEditorSettings | ThemeEditorSettings | NoteSettings;
 
 export const defaultSketch: SketchSettings = {
     kind: 'sketch',
@@ -86,6 +91,11 @@ export const asSketch = (settings: Settings | undefined): SketchSettings =>
 
 export const asFormulaEditor = (settings: Settings | undefined): FormulaEditorSettings =>
     settings?.kind === 'formula' ? settings : defaultFormulaEditor;
+
+export const defaultNote: NoteSettings = { kind: 'note', note: null };
+
+export const asNote = (settings: Settings | undefined): NoteSettings =>
+    settings?.kind === 'note' ? settings : defaultNote;
 
 export const asThemeEditor = (settings: Settings | undefined): ThemeEditorSettings =>
     settings?.kind === 'theme' ? settings : defaultThemeEditor;
@@ -277,6 +287,11 @@ export const parseSettings = (value: unknown): Settings | null => {
                 kind: 'theme',
                 theme: themeFrom(field(value, 'theme')) ?? defaultThemeEditor.theme,
             };
+        case 'note': {
+            const note = field(value, 'note');
+
+            return { kind: 'note', note: typeof note === 'string' ? note : null };
+        }
         default:
             return null;
     }

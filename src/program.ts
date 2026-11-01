@@ -7,6 +7,7 @@ import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
 import type { Board, BoardCommand } from './components/board/board.ts';
+import type { NoteCommand, Notes } from './components/note/note.ts';
 import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import type { TransportCommand } from './shared/playhead.ts';
@@ -21,6 +22,7 @@ export const PROGRAM_IDS = [
     'tasks',
     'todo',
     'board',
+    'note',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -45,6 +47,7 @@ export type AppInput =
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
     | { readonly kind: 'board'; readonly command: BoardCommand }
+    | { readonly kind: 'note'; readonly command: NoteCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
           readonly kind: 'diagnostic';
@@ -77,6 +80,7 @@ export type AppState = {
     readonly tasks$: Observable<readonly Task[]>;
     readonly todos$: Observable<readonly Todo[]>;
     readonly board$: Observable<Board>;
+    readonly notes$: Observable<Notes>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 
