@@ -3,7 +3,13 @@ import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import type { Rect } from '../../shared/camera.ts';
-import { isZoomCommand, sameMiniMap, type MiniMap, type ZoomCommand } from './navigator.ts';
+import {
+    isZoomCommand,
+    MINIMAP,
+    sameMiniMap,
+    type MiniMap,
+    type ZoomCommand,
+} from './navigator.ts';
 import css from './navigator.css?inline';
 
 const sheet = styleSheet(css);
@@ -66,6 +72,9 @@ export class HksNavigator extends HTMLElement {
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
+        // From the constant the map is laid out in, so the map and the rows around it cannot drift apart.
+        this.style.setProperty('--map-width', `${MINIMAP.width}px`);
+        this.style.setProperty('--map-height', `${MINIMAP.height}px`);
 
         this.windows = requireChild(shadow, '.windows');
         this.outlines = requireChild(shadow, '.sections');

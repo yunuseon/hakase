@@ -21,8 +21,8 @@
 .map {
     position: relative;
     display: none;
-    inline-size: 216px;
-    block-size: 120px;
+    inline-size: var(--map-width);
+    block-size: var(--map-height);
     overflow: hidden;
     background: var(--well);
     border-radius: 10px;
@@ -50,7 +50,7 @@
     display: none;
     flex-wrap: wrap;
     gap: 4px;
-    inline-size: 216px;
+    inline-size: var(--map-width);
 }
 
 :host([data-open]) .places {
@@ -63,7 +63,8 @@
 
 .jump,
 .add {
-    padding: 4px 9px;
+    block-size: 26px;
+    padding: 0 10px;
     font: 500 12px var(--font-ui);
     color: var(--ink);
     background: var(--well);
@@ -119,6 +120,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
+    inline-size: var(--map-width);
 }
 
 .key,
@@ -126,7 +128,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    block-size: 32px;
+    block-size: 30px;
     padding: 0;
     color: inherit;
     background: transparent;
@@ -136,12 +138,13 @@
 }
 
 .key {
-    inline-size: 32px;
+    flex: none;
+    inline-size: 30px;
 }
 
 .readout {
     flex: 1;
-    min-inline-size: 52px;
+    min-inline-size: 0;
     font: 500 12px var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--ink);
@@ -183,7 +186,7 @@ svg {
 .divider {
     flex: none;
     inline-size: 1px;
-    block-size: 18px;
-    margin-inline: 3px;
+    block-size: 16px;
+    margin-inline: 4px;
     background: var(--edge);
 }
