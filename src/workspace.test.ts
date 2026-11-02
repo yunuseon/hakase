@@ -310,6 +310,7 @@ describe('resizing an attached edge', () => {
         id,
         program: 'todo' as const,
         store: 'todo',
+        follows: [],
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
     });
@@ -382,6 +383,7 @@ describe('snapping while resizing', () => {
         id,
         program: 'todo' as const,
         store: 'todo',
+        follows: [],
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
     });
@@ -538,5 +540,73 @@ describe('history labels and travel', () => {
             'Closed bookmarks',
         );
         expect(run(travelled, [{ kind: 'travel', offset: -50 }]).past).toHaveLength(0);
+    });
+});
+
+describe('following', () => {
+    const launchTimeline: WorkspaceAction = {
+        kind: 'launch',
+        program: 'timeline',
+        size: { width: 300, height: 140 },
+        viewport,
+    };
+    const processOf = (history: History, id: string) =>
+        history.present.processes.find(process => process.id === id);
+    // timeline-5 splits off its own clock, store-1, which sketch-2 then follows.
+    const twoClocks = (): History =>
+        run(fresh(), [
+            launchTimeline,
+            { kind: 'add-store', id: 'timeline-5', copy: true },
+            { kind: 'follow', id: 'sketch-2', program: 'timeline', store: 'store-1' },
+        ]);
+
+    it('lets a sketch follow another clock, and the dial too', () => {
+        const history = run(twoClocks(), [
+            { kind: 'follow', id: 'playhead-4', program: 'timeline', store: 'store-1' },
+        ]);
+
+        expect(processOf(history, 'sketch-2')?.follows).toEqual([
+            { program: 'timeline', store: 'store-1' },
+        ]);
+        expect(processOf(history, 'playhead-4')?.follows).toEqual([
+            { program: 'timeline', store: 'store-1' },
+        ]);
+    });
+
+    it('refuses what a program does not follow, or another program’s store', () => {
+        const history = run(twoClocks(), [
+            { kind: 'follow', id: 'formula-1', program: 'timeline', store: 'store-1' },
+            { kind: 'follow', id: 'sketch-2', program: 'timeline', store: 'formula-1' },
+        ]);
+
+        expect(processOf(history, 'formula-1')?.follows).toEqual([]);
+        expect(processOf(history, 'sketch-2')?.follows).toEqual([
+            { program: 'timeline', store: 'store-1' },
+        ]);
+    });
+
+    it('keeps a followed clock when no timeline shows it, through a prune too', () => {
+        const history = run(twoClocks(), [
+            { kind: 'bind-store', id: 'timeline-5', store: 'timeline' },
+            { kind: 'prune-stores' },
+        ]);
+
+        expect(history.present.stores.some(({ id }) => id === 'store-1')).toBe(true);
+    });
+
+    it('is undoable and labelled', () => {
+        const history = twoClocks();
+
+        expect(history.label).toBe('Set sketch to follow Store 1');
+        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual([]);
+    });
+
+    it('is saved and read back, dropping what the program cannot follow', () => {
+        const saved: unknown = JSON.parse(JSON.stringify(twoClocks().present));
+        const parsed = parseWorkspace(saved);
+
+        expect(parsed?.processes.find(({ id }) => id === 'sketch-2')?.follows).toEqual([
+            { program: 'timeline', store: 'store-1' },
+        ]);
     });
 });

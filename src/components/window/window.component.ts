@@ -18,6 +18,7 @@ import { pointerDelta$ } from '../../shared/drag.ts';
 import {
     RESIZE_EDGES,
     type ResizeEdge,
+    type FollowGroup,
     type StoreOption,
     type SwitchGroup,
     type SwitchItem,
@@ -57,6 +58,7 @@ const TEMPLATE = `
             </button>
         </header>
         <ul class="options"></ul>
+        <div class="follows"></div>
     </div>
     <div class="switcher" role="dialog" aria-label="change program" hidden>
         <header class="stores-head">
@@ -201,6 +203,31 @@ const optionOf = ({ id, name, colour, users, current }: StoreOption): HTMLElemen
     return row;
 };
 
+const followRow = ({ id, name, colour, users, current }: StoreOption): HTMLElement => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'pick follow';
+    row.dataset['followStore'] = id;
+    row.toggleAttribute('data-current', current);
+    row.setAttribute('aria-pressed', String(current));
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.setProperty('--store', colour);
+
+    const label = document.createElement('span');
+    label.className = 'option-name';
+    label.textContent = name;
+
+    const count = document.createElement('span');
+    count.className = 'users';
+    count.textContent = users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
+
+    row.append(dot, label, count);
+
+    return row;
+};
+
 const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
 
@@ -248,7 +275,11 @@ export class HksWindow extends HTMLElement {
             ),
             // Not after + or fork: the new store's name is focused next, so it can be named straight away.
             fromElementEvent$(popover, 'click').pipe(
-                filter(({ target }) => dataOf(target, 'bind') !== undefined),
+                filter(
+                    ({ target }) =>
+                        dataOf(target, 'bind') !== undefined ||
+                        dataOf(target, 'follow-store') !== undefined,
+                ),
                 map(() => 'close' as const),
             ),
         ).pipe(
@@ -349,6 +380,22 @@ export class HksWindow extends HTMLElement {
             ),
             fromElementEvent$(popover, 'click').pipe(
                 mergeMap(({ target }): Observable<WindowGesture> => {
+                    const row =
+                        target instanceof Element ? target.closest('[data-follow-store]') : null;
+
+                    return row instanceof HTMLElement &&
+                        row.dataset['followStore'] !== undefined &&
+                        row.dataset['followProgram'] !== undefined
+                        ? of({
+                              kind: 'follow',
+                              program: row.dataset['followProgram'],
+                              store: row.dataset['followStore'],
+                          })
+                        : EMPTY;
+                }),
+            ),
+            fromElementEvent$(popover, 'click').pipe(
+                mergeMap(({ target }): Observable<WindowGesture> => {
                     const bind = dataOf(target, 'bind');
                     const remove = dataOf(target, 'remove');
                     const copy = dataOf(target, 'copy');
@@ -436,6 +483,7 @@ export class HksWindow extends HTMLElement {
         view$: Observable<WindowView>,
         stores$: Observable<readonly StoreOption[] | null> = of(null),
         programs$: Observable<readonly SwitchGroup[] | null> = of(null),
+        follows$: Observable<readonly FollowGroup[] | null> = of(null),
     ): Observable<void> {
         const shadow = this.shadow;
         const chip = requireChild(shadow, '.store');
@@ -543,13 +591,39 @@ export class HksWindow extends HTMLElement {
                     );
                 }),
             ),
-            stores$.pipe(
-                tap(stores => {
-                    const current = stores?.find(option => option.current);
+            combineLatest([stores$, follows$]).pipe(
+                tap(([stores, follows]) => {
+                    // A window with no store of its own shows the one it runs on: the dial shows its clock.
+                    const current =
+                        stores?.find(option => option.current) ??
+                        follows
+                            ?.flatMap(({ options: list }) => list)
+                            .find(option => option.current);
                     chip.hidden = current === undefined;
+                    popover.toggleAttribute('data-own', stores !== null);
 
-                    if (stores === null || current === undefined) {
+                    if (current === undefined) {
                         return;
+                    }
+
+                    if (!(shadow.activeElement instanceof HTMLInputElement)) {
+                        requireChild(shadow, '.follows').replaceChildren(
+                            ...(follows ?? []).flatMap(({ program, title, options: list }) => {
+                                const heading = document.createElement('p');
+                                heading.className = 'follow-title';
+                                heading.textContent = `Follows ${title}`;
+
+                                return [
+                                    heading,
+                                    ...list.map(option => {
+                                        const row = followRow(option);
+                                        row.dataset['followProgram'] = program;
+
+                                        return row;
+                                    }),
+                                ];
+                            }),
+                        );
                     }
 
                     chip.style.setProperty('--store', current.colour);
@@ -563,7 +637,7 @@ export class HksWindow extends HTMLElement {
                     }
 
                     // Not while a name is being typed: rebuilding the list would take the input away.
-                    if (!(shadow.activeElement instanceof HTMLInputElement)) {
+                    if (stores !== null && !(shadow.activeElement instanceof HTMLInputElement)) {
                         options.replaceChildren(...stores.map(optionOf));
                     }
                 }),

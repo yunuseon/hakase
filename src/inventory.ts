@@ -1,15 +1,15 @@
 import { isProgramId, PROGRAM_IDS, type ProgramId } from './program.ts';
-import { colourOf, HOLDING, MAIN, type StoreEntry, type StoreId } from './stores.ts';
+import {
+    colourOf,
+    followedStores,
+    HOLDING,
+    MAIN,
+    type StoreEntry,
+    type StoreId,
+} from './stores.ts';
 import type { Process } from './workspace.ts';
 
-export const GLOBALS = [
-    'workspace',
-    'transport',
-    'appearance',
-    'formulas',
-    'themes',
-    'library',
-] as const;
+export const GLOBALS = ['workspace', 'appearance', 'formulas', 'themes', 'library'] as const;
 export type Global = (typeof GLOBALS)[number];
 
 const isGlobal = (value: string): value is Global => GLOBALS.some(name => name === value);
@@ -92,7 +92,11 @@ export const catalogOf = (
             id: targetId({ kind: 'store', program, store: store.id }),
             label: store.name,
             colour: colourOf(store.id),
-            users: processes.filter(process => process.store === store.id).length,
+            users: processes.filter(
+                process =>
+                    process.store === store.id ||
+                    followedStores(process.program, process.follows).includes(store.id),
+            ).length,
         }));
 
         return HOLDING[program] === null || items.length === 0

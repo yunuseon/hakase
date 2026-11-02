@@ -52,6 +52,9 @@ import { emptyNotes } from './components/note/note.ts';
 import { emptyTodos } from './components/todo/todo.ts';
 import {
     colourOf,
+    followed,
+    followedStores,
+    FOLLOWS,
     HOLDING,
     inStore,
     perStore$,
@@ -72,7 +75,12 @@ import { defaultSketch, type Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
-import type { StoreOption, SwitchGroup, SwitchItem } from './components/window/frame.ts';
+import type {
+    FollowGroup,
+    StoreOption,
+    SwitchGroup,
+    SwitchItem,
+} from './components/window/frame.ts';
 import { catalogOf, parseTarget, sameCatalog, type Global } from './inventory.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import {
@@ -105,7 +113,7 @@ import { historyProgram } from './programs/history.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
-import { createTransport$, type Transport } from './shared/playhead.ts';
+import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
 import { persistState$, restoreState } from './state-store.ts';
 import {
@@ -118,12 +126,24 @@ import {
     startHistory,
     type History,
     type Process,
+    usedStores,
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
 
 type StoreKey =
-    'todos$' | 'board$' | 'notes$' | 'focus$' | 'agenda$' | 'habits$' | 'clocks$' | 'bookmarks$';
+    | 'playhead$'
+    | 'playing$'
+    | 'looping$'
+    | 'duration$'
+    | 'todos$'
+    | 'board$'
+    | 'notes$'
+    | 'focus$'
+    | 'agenda$'
+    | 'habits$'
+    | 'clocks$'
+    | 'bookmarks$';
 
 const programs: readonly Program[] = [
     formulaProgram,
@@ -401,6 +421,42 @@ const bootstrap = () => {
             distinctUntilChanged(),
         );
 
+    const usersOf = (processes: readonly Process[], id: StoreId): number =>
+        processes.filter(
+            process =>
+                process.store === id ||
+                followedStores(process.program, process.follows).includes(id),
+        ).length;
+
+    // null for a program that follows nothing: the popover then has no section for it.
+    const followOptions$ = ({ id, program }: Process): Observable<readonly FollowGroup[] | null> =>
+        FOLLOWS[program].length === 0
+            ? of(null)
+            : workspace$.pipe(
+                  map(({ processes, stores }) => {
+                      const self = processes.find(process => process.id === id);
+
+                      return FOLLOWS[program].map((target): FollowGroup => ({
+                          program: target,
+                          title: programOf(target)?.title ?? target,
+                          options: withMain(target, stores).map((store): StoreOption => ({
+                              id: store.id,
+                              name: store.name,
+                              colour: colourOf(store.id),
+                              users: usersOf(processes, store.id),
+                              current: store.id === followed(self?.follows ?? [], target),
+                          })),
+                      }));
+                  }),
+                  distinctUntilChanged(
+                      (a, b) =>
+                          a.length === b.length &&
+                          a.every((group, index) =>
+                              sameOptions(group.options, b[index]?.options ?? null),
+                          ),
+                  ),
+              );
+
     // null for a program that keeps no state of its own: its window shows no chip.
     const storeOptions$ = ({ id, program }: Process): Observable<readonly StoreOption[] | null> =>
         HOLDING[program] === null
@@ -415,7 +471,7 @@ const bootstrap = () => {
                               id: store.id,
                               name: store.name,
                               colour: colourOf(store.id),
-                              users: processes.filter(process => process.store === store.id).length,
+                              users: usersOf(processes, store.id),
                               current: store.id === current,
                           }));
                   }),
@@ -460,7 +516,7 @@ const bootstrap = () => {
                                       id: store.id,
                                       name: store.name,
                                       colour: colourOf(store.id),
-                                      users: processes.filter(p => p.store === store.id).length,
+                                      users: usersOf(processes, store.id),
                                       current: false,
                                   })),
                     })),
@@ -468,6 +524,23 @@ const bootstrap = () => {
         ),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
+
+    // The clock a window runs on: a timeline's own store, or the timeline store it follows.
+    const clockOf$ = (id: ProcessId): Observable<StoreId> =>
+        workspace$.pipe(
+            mergeMap(({ processes }) => {
+                const process = processes.find(candidate => candidate.id === id);
+
+                return process === undefined
+                    ? EMPTY
+                    : of(
+                          process.program === 'timeline'
+                              ? process.store
+                              : followed(process.follows, 'timeline'),
+                      );
+            }),
+            distinctUntilChanged(),
+        );
 
     const appeared$: Observable<Process> = workspace$.pipe(
         map(({ processes }) => processes),
@@ -490,6 +563,7 @@ const bootstrap = () => {
                           id: process.id,
                           slot$: slot$(process.id),
                           store$: binding$(process.id),
+                          clock$: clockOf$(process.id),
                           settings$: binding$(process.id).pipe(
                               switchMap(store =>
                                   settings$.pipe(
@@ -501,7 +575,7 @@ const bootstrap = () => {
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(binding$(process.id)),
+                      scoped(binding$(process.id), clockOf$(process.id)),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(
@@ -515,6 +589,7 @@ const bootstrap = () => {
                               })),
                           ),
                       ),
+                      followOptions$(process),
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
@@ -547,7 +622,7 @@ const bootstrap = () => {
             withLatestFrom(workspace$),
             map(([, { processes }]): StoreEvent => ({
                 kind: 'keep',
-                stores: new Set(processes.flatMap(({ id, store }) => [id, store])),
+                stores: new Set([...usedStores(processes), ...processes.map(({ id }) => id)]),
             })),
         ),
     ).pipe(share());
@@ -693,40 +768,45 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const commands$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'transport' ? of(input.command) : EMPTY)),
-        share(),
-    );
-
-    const duration$ = inputs$.pipe(
-        mergeMap(({ input }) => (input.kind === 'duration' ? of(input.seconds) : EMPTY)),
-        startWith(stored.duration),
-        distinctUntilChanged(),
-        // Not refCount: closing the last timeline must not reset the clock to the default.
-        shareReplay({ bufferSize: 1, refCount: false }),
-    );
-
-    const transport$ = createTransport$(
+    // Each to the clock of the window that sent it: its own store for a timeline, the one it follows otherwise.
+    const playbacks$ = createClocks$(
         inputs$.pipe(
-            mergeMap(({ input }) =>
-                input.kind === 'scrub' ? of({ phase: input.phase, at: input.at }) : EMPTY,
-            ),
+            mergeMap(({ clock, input }) => {
+                switch (input.kind) {
+                    case 'transport':
+                        return of({
+                            store: clock,
+                            command: { kind: 'command' as const, command: input.command },
+                        });
+                    case 'scrub':
+                        return of({
+                            store: clock,
+                            command: {
+                                kind: 'scrub' as const,
+                                scrub: { phase: input.phase, at: input.at },
+                            },
+                        });
+                    case 'duration':
+                        return of({
+                            store: clock,
+                            command: { kind: 'duration' as const, seconds: input.seconds },
+                        });
+                    default:
+                        return EMPTY;
+                }
+            }),
         ),
-        commands$,
-        duration$,
-        { at: stored.playhead, playing: false, looping: stored.looping, held: false },
+        storeEvents$,
+        stored.playback,
     );
 
-    // Where playback last rested: storage need not follow the playhead every frame it runs.
-    const rested$ = transport$.pipe(
-        scan((kept: Transport, now) => (now.playing ? { ...now, at: kept.at } : now), {
-            at: stored.playhead,
-            playing: false,
-            looping: stored.looping,
-            held: false,
-        }),
-        distinctUntilChanged((a, b) => a.at === b.at && a.looping === b.looping),
+    // Where each clock last rested: storage need not follow the playhead every frame it runs.
+    const playbacksRested$ = playbacks$.pipe(
+        scan(restedClocks, stored.playback),
+        distinctUntilChanged(),
     );
+
+    const playbackIn = inStore(playbacks$, initialClock);
 
     // Keyed by formula: one edit reaches every process showing that formula.
     const edits$ = inputs$.pipe(
@@ -815,19 +895,6 @@ const bootstrap = () => {
     );
 
     const state: Omit<AppState, StoreKey> = {
-        playhead$: transport$.pipe(
-            map(({ at }) => at),
-            distinctUntilChanged(),
-        ),
-        playing$: transport$.pipe(
-            map(({ playing }) => playing),
-            distinctUntilChanged(),
-        ),
-        looping$: transport$.pipe(
-            map(({ looping }) => looping),
-            distinctUntilChanged(),
-        ),
-        duration$,
         zoom$: camera$.pipe(
             map(({ zoom }) => zoom),
             distinctUntilChanged(),
@@ -908,14 +975,13 @@ const bootstrap = () => {
         habits: habitsIn,
         clocks: clocksIn,
         bookmarks: bookmarksIn,
+        timeline: playbackIn,
     };
 
     const globalOf = (name: Global): Observable<unknown> => {
         switch (name) {
             case 'workspace':
                 return workspace$;
-            case 'transport':
-                return combineLatest({ transport: transport$, duration: duration$ });
             case 'appearance':
                 return combineLatest({ look: look$, edits: looks$ });
             case 'formulas':
@@ -946,12 +1012,32 @@ const bootstrap = () => {
     };
 
     // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
-    const scoped = (store$: Observable<StoreId>): AppState => {
+    const scoped = (store$: Observable<StoreId>, clock$: Observable<StoreId>): AppState => {
         const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
             store$.pipe(switchMap(select));
+        const clock = clock$.pipe(
+            switchMap(playbackIn),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
 
         return {
             ...state,
+            playhead$: clock.pipe(
+                map(({ at }) => at),
+                distinctUntilChanged(),
+            ),
+            playing$: clock.pipe(
+                map(({ playing }) => playing),
+                distinctUntilChanged(),
+            ),
+            looping$: clock.pipe(
+                map(({ looping }) => looping),
+                distinctUntilChanged(),
+            ),
+            duration$: clock.pipe(
+                map(({ duration }) => duration),
+                distinctUntilChanged(),
+            ),
             todos$: narrowed(todoIn).pipe(map(({ items }) => items)),
             board$: narrowed(boardIn),
             notes$: narrowed(notesIn),
@@ -980,25 +1066,18 @@ const bootstrap = () => {
                 looks: looks$.pipe(map(valuesOf)),
                 formulas: edits$.pipe(map(valuesOf)),
                 themes: palettes$.pipe(map(valuesOf)),
-                duration: duration$,
-                rested: rested$,
                 settings: settings$,
                 todos: todos$,
                 board: boards$,
                 notes: notes$,
                 focus: timersRested$,
+                playback: playbacksRested$,
                 agenda: agendas$,
                 habits: habits$,
                 clocks: clocks$,
                 bookmarks: bookmarks$,
                 library: library$,
-            }).pipe(
-                map(({ rested, ...parts }) => ({
-                    ...parts,
-                    playhead: rested.at,
-                    looping: rested.looping,
-                })),
-            ),
+            }),
         ),
         canvas.connect$(
             camera$,

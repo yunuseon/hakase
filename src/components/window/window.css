@@ -488,3 +488,40 @@ input.option-name:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }
+
+.stores:not([data-own]) > .stores-head,
+.stores:not([data-own]) > .options {
+    display: none;
+}
+
+.follows:empty {
+    display: none;
+}
+
+.follows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.follow-title {
+    margin: 4px 0 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.stores[data-own] .follow-title {
+    padding-block-start: 8px;
+    border-block-start: 1px solid var(--edge);
+}
+
+.follow[data-current] {
+    background: var(--well);
+}
+
+.follow[data-current] .option-name {
+    font-weight: 600;
+}

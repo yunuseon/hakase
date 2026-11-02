@@ -20,11 +20,10 @@ import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks
 import { parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
-import { clamp } from './lib/math.ts';
 import type { ProcessId, ProgramId } from './program.ts';
 import { keptStores, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
-import { defaultDuration } from './shared/playhead.ts';
+import { parseClock, type Clock } from './shared/playhead.ts';
 import { parseWorkspace, type Workspace } from './workspace.ts';
 
 const KEY = 'hakase.state';
@@ -40,9 +39,7 @@ export type Snapshot = {
     readonly looks: ReadonlyMap<AppearanceName, Appearance>;
     readonly formulas: ReadonlyMap<FormulaId, string>;
     readonly themes: ReadonlyMap<ThemeName, Theme>;
-    readonly duration: number;
-    readonly playhead: number;
-    readonly looping: boolean;
+    readonly playback: ReadonlyMap<StoreId, Clock>;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
     readonly todos: ReadonlyMap<StoreId, TodoList>;
     readonly board: ReadonlyMap<StoreId, Board>;
@@ -121,18 +118,13 @@ const byStore = <T>(
     return value === undefined ? new Map() : new Map([[program, parse(value)]]);
 };
 
-const numberFrom = (value: unknown, fallback: number, min: number, max: number): number =>
-    typeof value === 'number' && Number.isFinite(value) ? clamp(value, min, max) : fallback;
-
 const fresh: Restored = {
     workspace: null,
     look: defaultLook,
     looks: new Map(),
     formulas: new Map(),
     themes: new Map(),
-    duration: defaultDuration,
-    playhead: 0,
-    looping: true,
+    playback: new Map(),
     settings: new Map(),
     todos: new Map(),
     board: new Map(),
@@ -169,9 +161,20 @@ export const restoreState = (): Restored => {
         looks: looksFrom(field(stored, 'looks')),
         formulas: formulasFrom(field(stored, 'formulas')),
         themes: themesFrom(field(stored, 'themes')),
-        duration: numberFrom(field(stored, 'duration'), defaultDuration, 0.1, 600),
-        playhead: numberFrom(field(stored, 'playhead'), 0, 0, 1),
-        looping: field(stored, 'looping') !== false,
+        // Saved before clocks were stores: the one clock there was becomes the timeline's main one.
+        playback:
+            field(stored, 'playback') === undefined
+                ? new Map([
+                      [
+                          'timeline',
+                          parseClock({
+                              at: field(stored, 'playhead'),
+                              looping: field(stored, 'looping'),
+                              duration: field(stored, 'duration'),
+                          }),
+                      ],
+                  ])
+                : byStore(field(stored, 'playback'), 'timeline', parseClock),
         settings: settingsFrom(field(stored, 'settings')),
         todos: byStore(field(stored, 'todos'), 'todo', parseTodos),
         board: byStore(field(stored, 'board'), 'board', parseBoard),
@@ -205,9 +208,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         looks: Object.fromEntries(snapshot.looks),
         formulas: Object.fromEntries(snapshot.formulas),
         themes: Object.fromEntries(snapshot.themes),
-        duration: snapshot.duration,
-        playhead: snapshot.playhead,
-        looping: snapshot.looping,
+        playback: saved(snapshot.playback),
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
         todos: saved(snapshot.todos),
         board: saved(snapshot.board),

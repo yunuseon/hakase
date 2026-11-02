@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { initialTransport, reduceTransport, type Transport } from './playhead.ts';
+import {
+    initialClock,
+    initialTransport,
+    parseClock,
+    reduceClocks,
+    reduceTransport,
+    restedClocks,
+    type Transport,
+} from './playhead.ts';
 
 const playing: Transport = { ...initialTransport, playing: true, at: 0.5 };
 
@@ -56,5 +64,67 @@ describe('reduceTransport', () => {
 
     it('ignores a duration of 0, which cannot advance', () => {
         expect(reduceTransport(playing, { kind: 'advance', ms: 1000, duration: 0 })).toBe(playing);
+    });
+});
+
+describe('reduceClocks', () => {
+    const two = new Map([
+        ['a', { ...initialClock, playing: true }],
+        ['b', { ...initialClock, duration: 4 }],
+    ]);
+
+    it('advances only the clocks that play, each by its own duration', () => {
+        const next = reduceClocks(two, { kind: 'advance', ms: 1000 });
+
+        expect(next.get('a')?.at).toBeCloseTo(1 / 8);
+        expect(next.get('b')?.at).toBe(0);
+    });
+
+    it('sends a command to one clock and starts a missing one from the default', () => {
+        const next = reduceClocks(two, {
+            kind: 'clock',
+            store: 'c',
+            command: { kind: 'duration', seconds: 3 },
+        });
+
+        expect(next.get('c')).toEqual({ ...initialClock, duration: 3 });
+        expect(
+            reduceClocks(two, {
+                kind: 'clock',
+                store: 'b',
+                command: { kind: 'command', command: 'toggle' },
+            }).get('b')?.playing,
+        ).toBe(true);
+    });
+
+    it('starts a copy paused and drops clocks a prune does not keep', () => {
+        expect(reduceClocks(two, { kind: 'copy', from: 'a', to: 'c' }).get('c')?.playing).toBe(
+            false,
+        );
+        expect([...reduceClocks(two, { kind: 'keep', stores: new Set(['b']) }).keys()]).toEqual([
+            'b',
+        ]);
+    });
+});
+
+describe('restedClocks', () => {
+    it('keeps a playing clock where it stood still, and settles while it plays', () => {
+        const still = new Map([['a', { ...initialClock, at: 0.25 }]]);
+        const playing = new Map([['a', { ...initialClock, at: 0.6, playing: true }]]);
+
+        expect(restedClocks(still, playing)).toBe(still);
+        expect(
+            restedClocks(still, new Map([['a', { ...initialClock, at: 0.6 }]])).get('a')?.at,
+        ).toBe(0.6);
+    });
+});
+
+describe('parseClock', () => {
+    it('never restores a playing clock, and clamps what it reads', () => {
+        expect(parseClock({ at: 4, playing: true, looping: false, duration: -1 })).toEqual({
+            ...initialClock,
+            at: 1,
+            looping: false,
+        });
     });
 });

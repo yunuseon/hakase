@@ -22,7 +22,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     theme: settings,
     appearance: null,
     sketch: settings,
-    timeline: null,
+    timeline: document,
     playhead: null,
     tasks: null,
     todo: document,
@@ -36,6 +36,42 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     inspector: settings,
     history: null,
 };
+
+// Another program's store a window reads beside its own: a sketch and the dial run on a timeline's clock.
+export const FOLLOWS: Readonly<Record<ProgramId, readonly ProgramId[]>> = {
+    formula: [],
+    theme: [],
+    appearance: [],
+    sketch: ['timeline'],
+    timeline: [],
+    playhead: ['timeline'],
+    tasks: [],
+    todo: [],
+    board: [],
+    note: [],
+    focus: [],
+    agenda: [],
+    habits: [],
+    clocks: [],
+    bookmarks: [],
+    inspector: [],
+    history: [],
+};
+
+export type Follow = {
+    readonly program: ProgramId;
+    readonly store: StoreId;
+};
+
+// No entry means the program's main store: what every window followed before there was a choice.
+export const followed = (follows: readonly Follow[], program: ProgramId): StoreId =>
+    follows.find(follow => follow.program === program)?.store ?? program;
+
+// Every store a window runs on, the main one included where it chose nothing: counting only choices missed those.
+export const followedStores = (
+    program: ProgramId,
+    follows: readonly Follow[],
+): readonly StoreId[] => FOLLOWS[program].map(target => followed(follows, target));
 
 export type StoreEntry = {
     readonly id: StoreId;

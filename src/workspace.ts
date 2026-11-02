@@ -30,7 +30,17 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
-import { ensured, mainStore, pruned, HOLDING, type StoreEntry, type StoreId } from './stores.ts';
+import {
+    ensured,
+    followedStores,
+    FOLLOWS,
+    HOLDING,
+    mainStore,
+    pruned,
+    type Follow,
+    type StoreEntry,
+    type StoreId,
+} from './stores.ts';
 
 export type Section = {
     readonly id: string;
@@ -43,6 +53,7 @@ export type Process = {
     readonly program: ProgramId;
     readonly frame: Frame;
     readonly store: StoreId;
+    readonly follows: readonly Follow[];
     // The window's laid-out size, which can exceed its frame when content will not shrink below its minimum.
     readonly measured: Size;
 };
@@ -111,6 +122,12 @@ export type WorkspaceAction =
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
     | { readonly kind: 'prune-stores' }
+    | {
+          readonly kind: 'follow';
+          readonly id: ProcessId;
+          readonly program: string;
+          readonly store: StoreId;
+      }
     // Back (negative) or forward through the history by that many steps.
     | { readonly kind: 'travel'; readonly offset: number }
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
@@ -147,18 +164,21 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
                     id: 'formula-1',
                     program: 'formula',
                     store: 'formula-1',
+                    follows: [],
                     frame: { x: left, y: gutter, width: editorWidth, height: editorHeight, z: 0 },
                 },
                 {
                     id: 'sketch-2',
                     program: 'sketch',
                     store: 'sketch-2',
+                    follows: [],
                     frame: { x: sketchX, y: gutter, width: 640, height: 640, z: 0 },
                 },
                 {
                     id: 'timeline-3',
                     program: 'timeline',
                     store: 'timeline',
+                    follows: [],
                     frame: {
                         x: left,
                         y: editorHeight + 2 * gutter,
@@ -171,6 +191,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
                     id: 'playhead-4',
                     program: 'playhead',
                     store: 'playhead',
+                    follows: [],
                     frame: {
                         x: sketchX + 640 + 3 * gutter,
                         y: gutter,
@@ -613,6 +634,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                         id: `${action.program}-${launched}`,
                         program: action.program,
                         store: store.id,
+                        follows: [],
                         measured: action.size,
                         frame: {
                             ...action.size,
@@ -715,6 +737,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                               id,
                               program,
                               store: store.id,
+                              follows: [],
                               frame,
                               measured: { width: frame.width, height: frame.height },
                           }
@@ -723,8 +746,39 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 links: workspace.links.map(({ a, b }) => ({ a: renamed(a), b: renamed(b) })),
             };
         }
+        case 'follow': {
+            const process = workspace.processes.find(({ id }) => id === action.id);
+            const program = action.program;
+            const target = workspace.stores.find(store => store.id === action.store);
+
+            // Only what the program follows, and only that program's stores, or its main one.
+            if (
+                process === undefined ||
+                !isProgramId(program) ||
+                !FOLLOWS[process.program].includes(program) ||
+                (target?.program !== program && action.store !== program)
+            ) {
+                return workspace;
+            }
+
+            return {
+                ...workspace,
+                stores: ensured(workspace.stores, target ?? mainStore(program)),
+                processes: workspace.processes.map(other =>
+                    other.id === action.id
+                        ? {
+                              ...other,
+                              follows: [
+                                  ...other.follows.filter(follow => follow.program !== program),
+                                  { program, store: action.store },
+                              ],
+                          }
+                        : other,
+                ),
+            };
+        }
         case 'prune-stores': {
-            const bound = new Set(workspace.processes.map(({ store }) => store));
+            const bound = usedStores(workspace.processes);
 
             return { ...workspace, stores: workspace.stores.filter(({ id }) => bound.has(id)) };
         }
@@ -880,6 +934,15 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
     }
 };
 
+// Bound or followed: a clock a sketch runs on is in use even with no timeline window open.
+export const usedStores = (processes: readonly Process[]): ReadonlySet<StoreId> =>
+    new Set(
+        processes.flatMap(({ program, store, follows }) => [
+            store,
+            ...followedStores(program, follows),
+        ]),
+    );
+
 const rebound = (workspace: Workspace, id: ProcessId, store: StoreId): Workspace => ({
     ...workspace,
     processes: workspace.processes.map(process =>
@@ -906,7 +969,7 @@ export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): 
     return {
         ...next,
         links: next.links.filter(link => touching(next.processes, link)),
-        stores: pruned(next.stores, new Set(next.processes.map(({ store }) => store))),
+        stores: pruned(next.stores, usedStores(next.processes)),
     };
 };
 
@@ -950,14 +1013,30 @@ const processFrom = (value: unknown): Process | null => {
 
     const store = 'store' in value && typeof value.store === 'string' ? value.store : null;
 
+    const follows =
+        'follows' in value && Array.isArray(value.follows) ? value.follows.flatMap(followFrom) : [];
+
     return {
         id: value.id,
         program,
+        follows: follows.filter(follow => FOLLOWS[program].includes(follow.program)),
         frame,
         // Saved before stores: a private window keeps its own id, which is what its settings are keyed by.
         store: store ?? (HOLDING[program]?.sharing === 'private' ? value.id : program),
         measured: { width: measured.width, height: measured.height },
     };
+};
+
+const followFrom = (value: unknown): Follow[] => {
+    if (typeof value !== 'object' || value === null || !('program' in value && 'store' in value)) {
+        return [];
+    }
+
+    const { program, store } = value;
+
+    return typeof program === 'string' && isProgramId(program) && typeof store === 'string'
+        ? [{ program, store }]
+        : [];
 };
 
 const storeFrom = (value: unknown): StoreEntry[] => {
@@ -1198,6 +1277,7 @@ const stepOf = (action: WorkspaceAction): Step | null => {
         case 'remove-store':
         case 'replace':
         case 'prune-stores':
+        case 'follow':
         case 'add-section':
         case 'rename-section':
         case 'remove-section':
@@ -1243,6 +1323,8 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
             return `Turned ${programOf(before, action.id)} into ${action.program}`;
         case 'prune-stores':
             return 'Pruned unused states';
+        case 'follow':
+            return `Set ${programOf(before, action.id)} to follow ${storeName(before, action.store)}`;
         case 'move':
             return `Moved ${programOf(before, action.id)}`;
         case 'resize':

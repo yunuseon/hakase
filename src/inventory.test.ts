@@ -30,7 +30,8 @@ describe('catalogOf', () => {
         expect(titles).not.toContain('todo');
         expect(titles).toContain('sketch');
         expect(titles).not.toContain('theme');
-        expect(titles).not.toContain('timeline');
+        expect(titles).not.toContain('tasks');
+        expect(titles).toContain('timeline');
         expect(titles.at(-1)).toBe('global');
     });
 

@@ -359,11 +359,11 @@ window, so two sketches can run the same formula at different densities and
 colours. They were global Tweakpane folders once; the moment a program could run
 twice, a shared panel meant two windows fighting over one set of knobs.
 
-**There is no global panel any more.** `duration` was the last knob in Tweakpane,
-and it is genuinely global — the playhead is one clock for the whole app — but
-global state does not need a global widget. It is an `AppInput` like `scrub`: each
-timeline's transport emits `duration`, `main.ts` folds the latest, and every
-timeline reads it back, so two timelines edit one clock. Before adding a knob,
+**There is no global panel any more.** `duration` was the last knob in Tweakpane.
+It belongs to a clock, and a clock is a store of the timeline (see "Following"):
+each timeline's transport emits `duration` like `scrub`, the clocks fold applies
+it to that window's clock, and every window on that clock reads it back, so two
+timelines on one clock edit one duration. Before adding a knob,
 ask whether two processes would want different answers — if so it belongs in the
 window; if not, it is still an input from a window, folded in `main.ts`.
 
@@ -1066,6 +1066,35 @@ captures the pointer there; and a drag that ends over the name would also click
 it, so the picker opens only when press and click are within `CLICK_SLOP`
 pixels.
 
+## Following: a window runs on another program's store
+
+A window is bound to one store of its own program; it may also **follow** a store
+of another program. `FOLLOWS` in `stores.ts` says which: a sketch and the
+playhead dial follow a timeline, so a clock is a timeline store (a `Clock`: the
+transport plus its duration), and two sketches can run on two clocks.
+`Process.follows` holds the choices, and an absent entry is the program's main
+store, which is what every window ran on before there was a choice
+(`followed`).
+
+- **Inputs go to the clock of the window that sent them.** `liveProcess$`
+  stamps `clock` beside `store` (`Self.clock$`: a timeline's own store, the
+  followed one otherwise), and the clocks fold routes `scrub`, `transport` and
+  `duration` by it. A sketch's frame strip therefore scrubs the clock that sketch
+  runs on, not some global one.
+- **A window reads the clock it runs on**, narrowed in `scoped` like a document,
+  so the sketch, dial and timeline programs did not change.
+- **A followed store is in use** (`usedStores`, `followedStores`): it is not
+  pruned, Prune does not count it, and the popovers count the windows that run on
+  it, the ones that chose nothing included. Counting only explicit choices once
+  showed a clock the dial ran on as used by nobody.
+- **The popover has a section per program followed**, its stores with their
+  colours, and a window that only follows (the dial) shows its clock's chip, so
+  windows sharing a clock share a colour.
+- Clocks are saved `{ byStore }` under `playback`, where each last stood still;
+  a save from before has its `playhead`, `looping` and `duration` moved into the
+  timeline's main clock. The world clock program's documents are `clocks`, hence
+  the other name.
+
 ## The command palette
 
 ⌘K (Ctrl+K) opens `hks-palette` from anywhere, in the chrome slot. It is a
@@ -1441,7 +1470,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and forty-five of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and fifty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -1472,14 +1501,16 @@ folded by `reduceTransport` over three kinds of action:
 - `advance` — `ms` since the previous frame. It wraps while looping and clamps
   to 1 and pauses otherwise.
 
-The frames are gated by that same fold's `playing && !held`, so `createTransport$` reads
-itself through a `defer`, the same ordering trick as the workspace cycle. Pausing
+The frames are gated by that same fold, so `createClocks$` reads itself through a
+`defer`, the same ordering trick as the workspace cycle: one `animationFrames()`
+loop runs while **any** clock is `playing && !held`, and each frame advances every
+such clock by its own duration. Pausing
 at the end therefore also stops the `rAF` loop, and so does a hold: held is not
 paused, so `playing` stays true and playback resumes from wherever the pointer
 let go, wherever that pointer was (any of the controls above, since they all
-feed the one fold). `playhead$`, `playing$` and
-`looping$` in `AppState` are projections of the one stream. It is
-`refCount: false`, so closing the last timeline does not rewind the clock.
+feed the one fold). `playhead$`, `playing$`, `looping$` and `duration$` in a
+window's `AppState` are projections of the clock that window runs on. The fold
+is `refCount: false`, so closing the last timeline does not rewind any clock.
 
 Deltas rather than `elapsed` are load-bearing: `animationFrames()` restarts its
 clock on every subscription, so resuming with `elapsed` would jump the playhead

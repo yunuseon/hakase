@@ -1,6 +1,11 @@
 import { defer, merge, type Observable } from 'rxjs';
 import { finalize, ignoreElements, map, withLatestFrom } from 'rxjs/operators';
-import type { StoreOption, SwitchGroup, WindowView } from './components/window/frame.ts';
+import type {
+    FollowGroup,
+    StoreOption,
+    SwitchGroup,
+    WindowView,
+} from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { AppInput, AppState, ProcessId, Program, ProgramId, Self } from './program.ts';
 import type { WorkspaceAction } from './workspace.ts';
@@ -13,6 +18,7 @@ export type ProcessSignal =
           readonly from: ProcessId;
           // Stamped as the input leaves, so a rebind takes effect from the next one.
           readonly store: string;
+          readonly clock: string;
           readonly program: ProgramId;
           readonly input: AppInput;
       };
@@ -25,6 +31,7 @@ export const liveProcess$ = (
     host: HTMLElement,
     stores$: Observable<readonly StoreOption[] | null>,
     programs$: Observable<readonly SwitchGroup[]>,
+    follows$: Observable<readonly FollowGroup[] | null>,
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
@@ -47,16 +54,17 @@ export const liveProcess$ = (
                 })),
             ),
             view.run$(state, self).pipe(
-                withLatestFrom(self.store$),
-                map(([input, store]): ProcessSignal => ({
+                withLatestFrom(self.store$, self.clock$),
+                map(([input, store, clock]): ProcessSignal => ({
                     to: 'app',
                     from: self.id,
                     store,
+                    clock,
                     program: program.id,
                     input,
                 })),
             ),
-            element.connect$(view$, stores$, programs$).pipe(ignoreElements()),
+            element.connect$(view$, stores$, programs$, follows$).pipe(ignoreElements()),
         ).pipe(
             finalize(() => {
                 element.remove();
