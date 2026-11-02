@@ -480,3 +480,63 @@ describe('snapping while resizing', () => {
         expect(frameOf(history, 'a')?.height).toBe(326);
     });
 });
+
+describe('history labels and travel', () => {
+    const launch: WorkspaceAction = {
+        kind: 'launch',
+        program: 'bookmarks',
+        size: { width: 300, height: 300 },
+        viewport,
+    };
+    const labels = (history: History) => ({
+        past: history.past.map(({ label }) => label),
+        present: history.label,
+        future: history.future.map(({ label }) => label),
+    });
+
+    it('labels each step by what it did, a whole drag as one', () => {
+        const history = run(fresh(), [
+            launch,
+            ...drag('bookmarks-5', 3),
+            { kind: 'quit', id: 'bookmarks-5' },
+        ]);
+
+        expect(labels(history)).toEqual({
+            past: ['Opened the app', 'Opened bookmarks', 'Moved bookmarks'],
+            present: 'Closed bookmarks',
+            future: [],
+        });
+    });
+
+    it('moves labels with their workspaces on undo and redo', () => {
+        const history = run(fresh(), [
+            launch,
+            { kind: 'quit', id: 'bookmarks-5' },
+            { kind: 'undo' },
+        ]);
+
+        expect(labels(history)).toEqual({
+            past: ['Opened the app'],
+            present: 'Opened bookmarks',
+            future: ['Closed bookmarks'],
+        });
+        expect(labels(run(history, [{ kind: 'redo' }])).present).toBe('Closed bookmarks');
+    });
+
+    it('travels several steps at once, as that many undos would', () => {
+        const steps: WorkspaceAction[] = [
+            launch,
+            ...drag('bookmarks-5', 2),
+            { kind: 'quit', id: 'bookmarks-5' },
+        ];
+        const travelled = run(fresh(), [...steps, { kind: 'travel', offset: -2 }]);
+        const undone = run(fresh(), [...steps, { kind: 'undo' }, { kind: 'undo' }]);
+
+        expect(travelled.present).toEqual(undone.present);
+        expect(labels(travelled).present).toBe('Opened bookmarks');
+        expect(labels(run(travelled, [{ kind: 'travel', offset: 5 }])).present).toBe(
+            'Closed bookmarks',
+        );
+        expect(run(travelled, [{ kind: 'travel', offset: -50 }]).past).toHaveLength(0);
+    });
+});

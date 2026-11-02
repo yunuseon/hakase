@@ -1,0 +1,107 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 12px/1.35 var(--font-ui);
+    color: var(--ink);
+}
+
+.steps {
+    flex: 1;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0 0 0 4px;
+    overflow: auto;
+    list-style: none;
+}
+
+.step {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: 28px;
+    padding: 0 8px 0 6px;
+    font: inherit;
+    color: var(--ink);
+    text-align: start;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* The line through the dots: a timeline, oldest at the top. */
+.step::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 10px;
+    inline-size: 2px;
+    content: '';
+    background: var(--edge);
+}
+
+li:first-child .step::before {
+    inset-block-start: 50%;
+}
+
+li:last-child .step::before {
+    inset-block-end: 50%;
+}
+
+.dot {
+    position: relative;
+    flex: none;
+    inline-size: 10px;
+    block-size: 10px;
+    background: var(--panel);
+    border: 2px solid var(--rule);
+    border-radius: 50%;
+}
+
+.step:hover {
+    background: var(--well);
+}
+
+.step[data-when='now'] {
+    font-weight: 600;
+    background: var(--well);
+    cursor: default;
+}
+
+.step[data-when='now'] .dot {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.step[data-when='future'] {
+    color: var(--muted);
+}
+
+.step[data-when='future'] .dot {
+    border-style: dashed;
+}
+
+.label {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: none;
+}
+
+.step:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: -2px;
+}
+
+.foot {
+    flex: none;
+    padding-block-start: 6px;
+    border-block-start: 1px solid var(--edge);
+    font: 11px var(--font-mono);
+    color: var(--muted);
+}

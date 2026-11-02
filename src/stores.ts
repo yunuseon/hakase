@@ -34,6 +34,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     clocks: document,
     bookmarks: document,
     inspector: settings,
+    history: null,
 };
 
 export type StoreEntry = {

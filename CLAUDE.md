@@ -937,7 +937,14 @@ undoing a drag must not also fling the view back to where it was. The navigator
 has **undo and redo buttons**, each disabled while its side of the history is
 empty: `history$` is the shared fold and `workspace$` only maps out its
 `present`, so whether there is a past or a future reaches the buttons without a
-second fold. ⌘Z and ⇧⌘Z
+second fold. **Every step is labelled** (`labelOf`, read against the workspace
+before the step so it can still name what a close removes), and each history
+`Entry` carries the label of the step that made it, so undo and redo move labels
+with their workspaces. The **history** program lists them oldest first, the
+present marked and the redo side greyed, and a click emits `travel` with an
+offset, which `reduceHistory` applies as that many undos or redos in a row, so a
+jump lands exactly where pressing ⌘Z that often would. The history is not saved:
+a reload starts at "Opened the app". ⌘Z and ⇧⌘Z
 (or ⌘Y) come from the canvas's `edits$`, which ignores keys whose
 `composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
 to its host, so `event.target` alone would steal the editor's own undo.
@@ -1434,7 +1441,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and forty of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and forty-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

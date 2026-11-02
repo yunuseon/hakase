@@ -14,6 +14,7 @@ import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
 import type { CatalogGroup } from './inventory.ts';
+import type { HistoryEntry } from './components/history/history.component.ts';
 import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import type { TransportCommand } from './shared/playhead.ts';
@@ -35,6 +36,7 @@ export const PROGRAM_IDS = [
     'clocks',
     'bookmarks',
     'inspector',
+    'history',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -56,6 +58,7 @@ export type AppInput =
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
     | { readonly kind: 'prune' }
+    | { readonly kind: 'travel'; readonly offset: number }
     | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
@@ -107,6 +110,7 @@ export type AppState = {
     // Read-only, for the inspector alone: every store and every global, which no other program can see.
     readonly catalog$: Observable<readonly CatalogGroup[]>;
     readonly inspect$: (target: string) => Observable<unknown>;
+    readonly history$: Observable<readonly HistoryEntry[]>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 

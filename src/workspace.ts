@@ -111,6 +111,8 @@ export type WorkspaceAction =
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
     | { readonly kind: 'prune-stores' }
+    // Back (negative) or forward through the history by that many steps.
+    | { readonly kind: 'travel'; readonly offset: number }
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
@@ -816,6 +818,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
         // History is History's business: on a bare workspace they do nothing.
         case 'undo':
         case 'redo':
+        case 'travel':
             return workspace;
         case 'toolbar-window':
             return { ...workspace, toolbar: toolbarGesture(workspace.toolbar, action.gesture) };
@@ -1154,10 +1157,17 @@ export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
         }),
     );
 
+export type Entry = {
+    readonly workspace: Workspace;
+    // What the step that produced this workspace did, for the history window.
+    readonly label: string;
+};
+
 export type History = {
-    readonly past: readonly Workspace[];
+    readonly past: readonly Entry[];
     readonly present: Workspace;
-    readonly future: readonly Workspace[];
+    readonly label: string;
+    readonly future: readonly Entry[];
     // The step the last undoable action belonged to, so one drag is one step, not hundreds.
     readonly step: string | null;
 };
@@ -1197,6 +1207,61 @@ const stepOf = (action: WorkspaceAction): Step | null => {
     }
 };
 
+const programOf = (workspace: Workspace, id: ProcessId): string =>
+    workspace.processes.find(process => process.id === id)?.program ?? 'window';
+
+const storeName = (workspace: Workspace, id: string): string =>
+    workspace.stores.find(store => store.id === id)?.name ?? id;
+
+const sectionName = (workspace: Workspace, id: string): string =>
+    workspace.sections.find(section => section.id === id)?.name ?? 'section';
+
+// Read against the workspace before the step, which still holds what the step removes.
+export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
+    switch (action.kind) {
+        case 'launch':
+            return `Opened ${action.program}`;
+        case 'quit':
+            return `Closed ${programOf(before, action.id)}`;
+        case 'close-others':
+            return 'Closed all other windows';
+        case 'toggle-link':
+            return before.links.some(link => sameLink(link, action.a, action.b))
+                ? 'Detached windows'
+                : 'Attached windows';
+        case 'bind-store':
+            return `Switched ${programOf(before, action.id)} to ${storeName(before, action.store)}`;
+        case 'add-store':
+            return action.copy
+                ? `Forked ${programOf(before, action.id)} state`
+                : `New ${programOf(before, action.id)} state`;
+        case 'rename-store':
+            return `Renamed state to ${action.name.trim()}`;
+        case 'remove-store':
+            return `Deleted state ${storeName(before, action.store)}`;
+        case 'replace':
+            return `Turned ${programOf(before, action.id)} into ${action.program}`;
+        case 'prune-stores':
+            return 'Pruned unused states';
+        case 'move':
+            return `Moved ${programOf(before, action.id)}`;
+        case 'resize':
+            return `Resized ${programOf(before, action.id)}`;
+        case 'add-section':
+            return 'Added a section';
+        case 'move-section':
+            return `Moved section ${sectionName(before, action.id)}`;
+        case 'resize-section':
+            return `Resized section ${sectionName(before, action.id)}`;
+        case 'rename-section':
+            return `Renamed section to ${action.name.trim()}`;
+        case 'remove-section':
+            return `Deleted section ${sectionName(before, action.id)}`;
+        default:
+            return action.kind;
+    }
+};
+
 // Undoing restores where things were, not where you are looking: the camera and chrome stay put.
 const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
     ...restored,
@@ -1206,40 +1271,71 @@ const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
     drift: null,
 });
 
+export const OPENED = 'Opened the app';
+
 export const startHistory = (present: Workspace): History => ({
     past: [],
     present,
+    label: OPENED,
     future: [],
     step: null,
 });
 
+const undone = (history: History): History => {
+    const previous = history.past.at(-1);
+
+    return previous === undefined
+        ? history
+        : {
+              past: history.past.slice(0, -1),
+              present: keepingView(previous.workspace, history.present),
+              label: previous.label,
+              future: [{ workspace: history.present, label: history.label }, ...history.future],
+              step: null,
+          };
+};
+
+const redone = (history: History): History => {
+    const [next, ...rest] = history.future;
+
+    return next === undefined
+        ? history
+        : {
+              past: [...history.past, { workspace: history.present, label: history.label }],
+              present: keepingView(next.workspace, history.present),
+              label: next.label,
+              future: rest,
+              step: null,
+          };
+};
+
+// As many undos or redos in a row, so a jump lands exactly where pressing ⌘Z that often would.
+const travelled = (history: History, offset: number): History =>
+    offset === 0
+        ? history
+        : travelled(
+              offset < 0 ? undone(history) : redone(history),
+              offset < 0 ? offset + 1 : offset - 1,
+          );
+
 export const reduceHistory = (history: History, action: WorkspaceAction): History => {
-    const { past, present, future } = history;
+    const { past, present } = history;
 
     if (action.kind === 'undo') {
-        const previous = past.at(-1);
-
-        return previous === undefined
-            ? history
-            : {
-                  past: past.slice(0, -1),
-                  present: keepingView(previous, present),
-                  future: [present, ...future],
-                  step: null,
-              };
+        return undone(history);
     }
 
     if (action.kind === 'redo') {
-        const [next, ...rest] = future;
+        return redone(history);
+    }
 
-        return next === undefined
-            ? history
-            : {
-                  past: [...past, present],
-                  present: keepingView(next, present),
-                  future: rest,
-                  step: null,
-              };
+    if (action.kind === 'travel') {
+        const offset = Math.max(
+            -history.past.length,
+            Math.min(history.future.length, Math.round(action.offset)),
+        );
+
+        return travelled(history, offset);
     }
 
     const reduced = reduceWorkspace(present, action);
@@ -1257,8 +1353,9 @@ export const reduceHistory = (history: History, action: WorkspaceAction): Histor
     return step.joins && step.key === history.step
         ? { ...history, present: reduced }
         : {
-              past: [...past, present].slice(-HISTORY_LIMIT),
+              past: [...past, { workspace: present, label: history.label }].slice(-HISTORY_LIMIT),
               present: reduced,
+              label: labelOf(action, present),
               future: [],
               step: step.key,
           };

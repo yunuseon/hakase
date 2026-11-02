@@ -101,6 +101,7 @@ import { habitsProgram } from './programs/habits.program.ts';
 import { clocksProgram } from './programs/clocks.program.ts';
 import { bookmarksProgram } from './programs/bookmarks.program.ts';
 import { inspectorProgram } from './programs/inspector.program.ts';
+import { historyProgram } from './programs/history.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
@@ -141,6 +142,7 @@ const programs: readonly Program[] = [
     clocksProgram,
     bookmarksProgram,
     inspectorProgram,
+    historyProgram,
 ];
 
 const programOf = (id: ProgramId): Program | undefined =>
@@ -293,6 +295,10 @@ const bootstrap = () => {
             map(([{ command, id }, viewport]): WorkspaceAction =>
                 command === 'close' ? { kind: 'quit', id } : { kind: 'reveal', id, viewport },
             ),
+        ),
+        defer(() => inputs$).pipe(
+            mergeMap(({ input }) => (input.kind === 'travel' ? of(input.offset) : EMPTY)),
+            map((offset): WorkspaceAction => ({ kind: 'travel', offset })),
         ),
         defer(() => inputs$).pipe(
             filter(({ input }) => input.kind === 'prune'),
@@ -846,6 +852,16 @@ const bootstrap = () => {
             distinctUntilChanged(sameCatalog),
         ),
         inspect$: (id: string) => inspected$(id),
+        history$: history$.pipe(
+            map(({ past, label, future }) => [
+                ...past.map((entry, index) => ({
+                    label: entry.label,
+                    offset: index - past.length,
+                })),
+                { label, offset: 0 },
+                ...future.map((entry, index) => ({ label: entry.label, offset: index + 1 })),
+            ]),
+        ),
         tasks$: workspace$.pipe(
             map(({ processes }) =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
