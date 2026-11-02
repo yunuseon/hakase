@@ -24,8 +24,9 @@ import type { AppInput, Program } from '../program.ts';
 import { asFormulaEditor, defaultFormulaEditor } from '../settings.ts';
 import { shareUrl } from '../share.ts';
 
-export const formulaProgram: Program = {
+export const formulaProgram = {
     id: 'formula',
+    inputs: {},
     title: 'formula',
     category: 'make',
     icon: 'M9.5 8 L5.5 12 L9.5 16 M14.5 8 L18.5 12 L14.5 16',
@@ -127,4 +128,4 @@ export const formulaProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

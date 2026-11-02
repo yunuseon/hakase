@@ -1066,34 +1066,54 @@ captures the pointer there; and a drag that ends over the name would also click
 it, so the picker opens only when press and click are within `CLICK_SLOP`
 pixels.
 
-## Following: a window runs on another program's store
+## Following: programs declare their inputs
 
-A window is bound to one store of its own program; it may also **follow** a store
-of another program. `FOLLOWS` in `stores.ts` says which: a sketch and the
-playhead dial follow a timeline, so a clock is a timeline store (a `Clock`: the
-transport plus its duration), and two sketches can run on two clocks.
-`Process.follows` holds the choices, and an absent entry is the program's main
-store, which is what every window ran on before there was a choice
-(`followed`).
+A window binds its own state and may read one **input** beside it, from another
+program's store. **Each program declares its inputs** (`Program.inputs`, built
+from the definitions in `src/inputs.ts`): the sketch takes `playbackInput`, the
+timeline `ownPlaybackInput` (its clock is its own store, so it follows nothing),
+and the dial `progressInput`, which accepts a `playback` clock (scrubbable) or a
+`focus` timer (read-only). An input definition is inert data: its title, the
+kinds it accepts, where a new window starts (`initial`, the main clock), and per
+kind how a store of it connects (`connect`). There is no separate table to keep
+in step: adding an input is one field on the program.
 
-- **Inputs go to the clock of the window that sent them.** `liveProcess$`
-  stamps `clock` beside `store` (`Self.clock$`: a timeline's own store, the
-  followed one otherwise), and the clocks fold routes `scrub`, `transport` and
-  `duration` by it. A sketch's frame strip therefore scrubs the clock that sketch
-  runs on, not some global one.
-- **A window reads the clock it runs on**, narrowed in `scoped` like a document,
-  so the sketch, dial and timeline programs did not change.
-- **A followed store is in use** (`usedStores`, `followedStores`): it is not
-  pruned, Prune does not count it, and the popovers count the windows that run on
-  it, the ones that chose nothing included. Counting only explicit choices once
-  showed a clock the dial ran on as used by nobody.
-- **The popover has a section per program followed**, its stores with their
-  colours, and a window that only follows (the dial) shows its clock's chip, so
-  windows sharing a clock share a colour.
-- Clocks are saved `{ byStore }` under `playback`, where each last stood still;
-  a save from before has its `playhead`, `looping` and `duration` moved into the
-  timeline's main clock. The world clock program's documents are `clocks`, hence
-  the other name.
+- **The workspace asks, it does not import.** `reduceWorkspace`,
+  `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
+  an `inputsFor(program)`; `main.ts` builds it from the program table, and tests
+  use `src/inputs.fixture.ts`, because the program modules pull in the DOM. The
+  declarations are plain data, so building the table never evaluates the
+  reactive cycle early.
+- **A follow is a tagged binding**, `{ kind, store }`, at most one per window.
+  Every follower starts with an explicit binding to the main clock, so counting
+  windows on a store never has to guess at an implicit one. The reducer and the
+  parser accept a binding only if the program's input accepts its kind and the
+  store belongs to that kind's program (`accepts`, `sourceProgram`). A saved
+  follow from before kinds, `{ program: 'timeline', store }`, is read as a
+  playback binding to the same store; a forged one falls back to the main clock.
+- **`Process` is not a union per program.** Making a sketch's `follows` hold
+  playback bindings by type alone would need the program table at type level,
+  and every place that builds a process for a program known only at runtime
+  would then need casts, which are banned. The rule is enforced at runtime, in
+  the reducer and the parser, and tested there.
+- `scoped` gives each window `progress$`: the connection its input makes for the
+  selected binding (`progressConnection`), with its access and a stream of
+  positions. It changes on a rebind, not on ticks. The dial subscribes to
+  gestures only while the source is scrubbable (`progressScrubs$`), and the
+  circular slider shows read-only progress (role `progressbar`, a hint) without
+  learning which program supplied it. A focus timer is never made seekable.
+- `liveProcess$` stamps each input with the window's playback target, or null
+  when it has none (`playbackBinding`: a timeline's own store, a scrubbable
+  binding otherwise). `routePlayback$` feeds those to the clocks fold; its pure
+  routing fold tracks holds by process and releases an old clock on rebind or
+  close, leaving it held while another process still scrubs it. The release must
+  name the **old** target: stamping it with the new binding would strand the old
+  hold.
+- The popover has one section per kind the input accepts. The source is named
+  only where there is a choice ("Progress · Focus · read-only"; the sketch's
+  section is just "Playback"). A followed store is in use for pruning, deletion
+  and counts. Forking copies the canonical document once, clocks and focus
+  timers starting paused; a connection is never saved or forked.
 
 ## The command palette
 

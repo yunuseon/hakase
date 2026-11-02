@@ -4,16 +4,18 @@ import {
     parseWorkspace,
     reduceHistory,
     startHistory,
+    usedStores,
     type History,
     type WorkspaceAction,
 } from './workspace.ts';
+import { inputsFor } from './inputs.fixture.ts';
 
 const viewport = { width: 1400, height: 900 };
 
 const run = (history: History, actions: readonly WorkspaceAction[]): History =>
-    actions.reduce(reduceHistory, history);
+    actions.reduce((next, action) => reduceHistory(next, action, inputsFor), history);
 
-const fresh = (): History => startHistory(defaultWorkspace(viewport));
+const fresh = (): History => startHistory(defaultWorkspace(viewport, inputsFor));
 
 const frameOf = (history: History, id: string) =>
     history.present.processes.find(process => process.id === id)?.frame;
@@ -34,7 +36,7 @@ describe('reduceHistory', () => {
 
         expect(frameOf(dragged, id)?.x).not.toBe(before?.x);
 
-        const undone = reduceHistory(dragged, { kind: 'undo' });
+        const undone = reduceHistory(dragged, { kind: 'undo' }, inputsFor);
 
         expect(frameOf(undone, id)).toEqual(before);
     });
@@ -43,7 +45,7 @@ describe('reduceHistory', () => {
         const start = fresh();
         const id = firstId(start);
         const twice = run(start, [...drag(id, 5), ...drag(id, 5)]);
-        const once = reduceHistory(twice, { kind: 'undo' });
+        const once = reduceHistory(twice, { kind: 'undo' }, inputsFor);
 
         expect(once.past).toHaveLength(1);
         expect(frameOf(once, id)?.x).toBe((frameOf(start, id)?.x ?? 0) + 50);
@@ -53,7 +55,7 @@ describe('reduceHistory', () => {
         const start = fresh();
         const id = firstId(start);
         const moved = run(start, [...drag(id, 3), { kind: 'pan', dx: 200, dy: 0 }]);
-        const undone = reduceHistory(moved, { kind: 'undo' });
+        const undone = reduceHistory(moved, { kind: 'undo' }, inputsFor);
 
         expect(undone.present.camera).toEqual(moved.present.camera);
     });
@@ -68,9 +70,11 @@ describe('reduceHistory', () => {
         const start = fresh();
         const id = firstId(start);
         const dragged = run(start, drag(id, 3));
-        const undone = reduceHistory(dragged, { kind: 'undo' });
+        const undone = reduceHistory(dragged, { kind: 'undo' }, inputsFor);
 
-        expect(frameOf(reduceHistory(undone, { kind: 'redo' }), id)).toEqual(frameOf(dragged, id));
+        expect(frameOf(reduceHistory(undone, { kind: 'redo' }, inputsFor), id)).toEqual(
+            frameOf(dragged, id),
+        );
 
         const diverged = run(undone, drag(id, 1));
 
@@ -98,7 +102,7 @@ describe('reduceHistory', () => {
 
 describe('parseWorkspace', () => {
     const saved = (program: string) => {
-        const workspace = defaultWorkspace(viewport);
+        const workspace = defaultWorkspace(viewport, inputsFor);
         const [first, ...rest] = workspace.processes;
 
         const value: unknown = JSON.parse(
@@ -112,13 +116,15 @@ describe('parseWorkspace', () => {
     };
 
     it('drops a window of an unknown program and keeps everything else', () => {
-        const parsed = parseWorkspace(saved('retired'));
+        const parsed = parseWorkspace(saved('retired'), inputsFor);
 
-        expect(parsed?.processes).toHaveLength(defaultWorkspace(viewport).processes.length - 1);
+        expect(parsed?.processes).toHaveLength(
+            defaultWorkspace(viewport, inputsFor).processes.length - 1,
+        );
     });
 
     it('brings a links window back as bookmarks', () => {
-        expect(parseWorkspace(saved('links'))?.processes[0]?.program).toBe('bookmarks');
+        expect(parseWorkspace(saved('links'), inputsFor)?.processes[0]?.program).toBe('bookmarks');
     });
 });
 
@@ -206,7 +212,7 @@ describe('stores', () => {
 
 describe('parseWorkspace stores', () => {
     it('gives windows saved before stores their program’s main store or their own id', () => {
-        const workspace = defaultWorkspace(viewport);
+        const workspace = defaultWorkspace(viewport, inputsFor);
         const value: unknown = JSON.parse(
             JSON.stringify({
                 ...workspace,
@@ -215,7 +221,7 @@ describe('parseWorkspace stores', () => {
                 processes: workspace.processes.map(({ store: _, ...process }) => process),
             }),
         );
-        const parsed = parseWorkspace(value);
+        const parsed = parseWorkspace(value, inputsFor);
 
         expect(parsed?.processes.map(({ store }) => store)).toEqual([
             'formula-1',
@@ -317,7 +323,7 @@ describe('resizing an attached edge', () => {
     // a | b | c in a row, d under a.
     const attached = (): History =>
         startHistory({
-            ...defaultWorkspace(viewport),
+            ...defaultWorkspace(viewport, inputsFor),
             processes: [
                 box('a', 0, 0, 200, 200),
                 box('b', 200, 0, 200, 200),
@@ -390,7 +396,7 @@ describe('snapping while resizing', () => {
     const start = (
         processes: ReturnType<typeof box>[],
         links: { a: string; b: string }[] = [],
-    ): History => startHistory({ ...defaultWorkspace(viewport), processes, links });
+    ): History => startHistory({ ...defaultWorkspace(viewport, inputsFor), processes, links });
     const resize = (
         id: string,
         edge: 'e' | 's' | 'se',
@@ -557,31 +563,31 @@ describe('following', () => {
         run(fresh(), [
             launchTimeline,
             { kind: 'add-store', id: 'timeline-5', copy: true },
-            { kind: 'follow', id: 'sketch-2', program: 'timeline', store: 'store-1' },
+            { kind: 'follow', id: 'sketch-2', source: 'playback', store: 'store-1' },
         ]);
 
     it('lets a sketch follow another clock, and the dial too', () => {
         const history = run(twoClocks(), [
-            { kind: 'follow', id: 'playhead-4', program: 'timeline', store: 'store-1' },
+            { kind: 'follow', id: 'playhead-4', source: 'playback', store: 'store-1' },
         ]);
 
         expect(processOf(history, 'sketch-2')?.follows).toEqual([
-            { program: 'timeline', store: 'store-1' },
+            { kind: 'playback', store: 'store-1' },
         ]);
         expect(processOf(history, 'playhead-4')?.follows).toEqual([
-            { program: 'timeline', store: 'store-1' },
+            { kind: 'playback', store: 'store-1' },
         ]);
     });
 
     it('refuses what a program does not follow, or another program’s store', () => {
         const history = run(twoClocks(), [
-            { kind: 'follow', id: 'formula-1', program: 'timeline', store: 'store-1' },
-            { kind: 'follow', id: 'sketch-2', program: 'timeline', store: 'formula-1' },
+            { kind: 'follow', id: 'formula-1', source: 'playback', store: 'store-1' },
+            { kind: 'follow', id: 'sketch-2', source: 'playback', store: 'formula-1' },
         ]);
 
         expect(processOf(history, 'formula-1')?.follows).toEqual([]);
         expect(processOf(history, 'sketch-2')?.follows).toEqual([
-            { program: 'timeline', store: 'store-1' },
+            { kind: 'playback', store: 'store-1' },
         ]);
     });
 
@@ -598,15 +604,125 @@ describe('following', () => {
         const history = twoClocks();
 
         expect(history.label).toBe('Set sketch to follow Store 1');
-        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual([]);
+        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual([
+            { kind: 'playback', store: 'timeline' },
+        ]);
     });
 
     it('is saved and read back, dropping what the program cannot follow', () => {
         const saved: unknown = JSON.parse(JSON.stringify(twoClocks().present));
-        const parsed = parseWorkspace(saved);
+        const parsed = parseWorkspace(saved, inputsFor);
 
         expect(parsed?.processes.find(({ id }) => id === 'sketch-2')?.follows).toEqual([
-            { program: 'timeline', store: 'store-1' },
+            { kind: 'playback', store: 'store-1' },
+        ]);
+    });
+});
+
+describe('follows saved before kinds', () => {
+    it('read a timeline follow as a playback binding to the same store', () => {
+        const workspace = run(fresh(), [
+            { kind: 'launch', program: 'timeline', size: { width: 300, height: 140 }, viewport },
+            { kind: 'add-store', id: 'timeline-5', copy: true },
+        ]).present;
+        const saved: unknown = JSON.parse(
+            JSON.stringify({
+                ...workspace,
+                processes: workspace.processes.map(process =>
+                    process.id === 'sketch-2'
+                        ? { ...process, follows: [{ program: 'timeline', store: 'store-1' }] }
+                        : process,
+                ),
+            }),
+        );
+
+        expect(
+            parseWorkspace(saved, inputsFor)?.processes.find(({ id }) => id === 'sketch-2')
+                ?.follows,
+        ).toEqual([{ kind: 'playback', store: 'store-1' }]);
+    });
+});
+
+describe('focus progress bindings', () => {
+    it('lets a sketch follow playback only, and programs with no inputs follow nothing', () => {
+        const history = run(fresh(), [
+            { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
+            { kind: 'follow', id: 'sketch-2', source: 'focus', store: 'focus' },
+            { kind: 'follow', id: 'formula-1', source: 'playback', store: 'timeline' },
+        ]);
+        const followsOf = (id: string) =>
+            history.present.processes.find(process => process.id === id)?.follows;
+
+        expect(followsOf('sketch-2')).toEqual([{ kind: 'playback', store: 'timeline' }]);
+        expect(followsOf('formula-1')).toEqual([]);
+    });
+    const focus = (): History =>
+        run(fresh(), [
+            { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
+            { kind: 'add-store', id: 'focus-5', copy: true },
+            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'store-1' },
+        ]);
+
+    it('replaces playback with focus as the dial’s single progress source', () => {
+        const history = focus();
+        expect(history.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
+            { kind: 'focus', store: 'store-1' },
+        ]);
+        const back = run(history, [
+            { kind: 'follow', id: 'playhead-4', source: 'playback', store: 'timeline' },
+        ]);
+        expect(back.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
+            { kind: 'playback', store: 'timeline' },
+        ]);
+        expect(run(back, [{ kind: 'undo' }]).present.processes).toEqual(history.present.processes);
+    });
+
+    it('retains a followed focus store after its editor closes, including prune and delete', () => {
+        const history = run(focus(), [
+            { kind: 'quit', id: 'focus-5' },
+            { kind: 'prune-stores' },
+            { kind: 'remove-store', id: 'playhead-4', store: 'store-1' },
+        ]);
+        expect(usedStores(history.present.processes).has('store-1')).toBe(true);
+        expect(history.present.stores.some(({ id }) => id === 'store-1')).toBe(true);
+    });
+
+    it('does not make a focus dial use the default playback store', () => {
+        const history = run(focus(), [
+            { kind: 'quit', id: 'sketch-2' },
+            { kind: 'quit', id: 'timeline-3' },
+        ]);
+        expect(usedStores(history.present.processes).has('timeline')).toBe(false);
+    });
+
+    it('rejects unsupported sources and a valid kind naming the wrong document', () => {
+        const history = run(focus(), [
+            { kind: 'follow', id: 'sketch-2', source: 'focus', store: 'store-1' },
+            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'timeline' },
+            { kind: 'follow', id: 'playhead-4', source: 'board', store: 'store-1' },
+            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'missing' },
+        ]);
+        expect(history.present.processes).toEqual(focus().present.processes);
+    });
+
+    it('round-trips focus bindings and drops forged references without losing the workspace', () => {
+        const workspace = focus().present;
+        expect(parseWorkspace(JSON.parse(JSON.stringify(workspace)), inputsFor)?.processes).toEqual(
+            workspace.processes,
+        );
+        const broken = {
+            ...workspace,
+            processes: workspace.processes.map(process =>
+                process.id === 'playhead-4'
+                    ? { ...process, follows: [{ kind: 'focus', store: 'timeline' }] }
+                    : process,
+            ),
+        };
+        const parsed = parseWorkspace(broken, inputsFor);
+        expect(parsed?.processes).toHaveLength(workspace.processes.length);
+        // A forged binding falls back to where a new dial starts, not to following nothing.
+        expect(parsed?.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
+            { kind: 'playback', store: 'timeline' },
         ]);
     });
 });

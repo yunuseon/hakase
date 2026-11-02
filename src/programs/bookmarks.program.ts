@@ -3,8 +3,9 @@ import { ignoreElements, map } from 'rxjs/operators';
 import { HksBookmarks } from '../components/bookmarks/bookmarks.component.ts';
 import type { AppInput, Program } from '../program.ts';
 
-export const bookmarksProgram: Program = {
+export const bookmarksProgram = {
     id: 'bookmarks',
+    inputs: {},
     title: 'bookmarks',
     category: 'plan',
     icon: 'M7 3.5 H17 V20.5 L12 16.5 L7 20.5 Z',
@@ -24,4 +25,4 @@ export const bookmarksProgram: Program = {
                 ),
         };
     },
-};
+} satisfies Program;

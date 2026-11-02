@@ -1,3 +1,4 @@
+import { ownPlaybackInput } from '../inputs.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import { HksLinearSlider } from '../components/slider/linear/linear-slider.component.ts';
@@ -5,8 +6,9 @@ import { HksTransport } from '../components/transport/transport.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { elapsedLabel } from '../shared/playhead.ts';
 
-export const timelineProgram: Program = {
+export const timelineProgram = {
     id: 'timeline',
+    inputs: { playback: ownPlaybackInput },
     title: 'timeline',
     category: 'make',
     icon: 'M3 12 H21 M7.5 9.5 V14.5 M12 8 V16 M16.5 9.5 V14.5',
@@ -41,4 +43,4 @@ export const timelineProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

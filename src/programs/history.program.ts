@@ -3,8 +3,9 @@ import { ignoreElements, map } from 'rxjs/operators';
 import { HksHistory } from '../components/history/history.component.ts';
 import type { AppInput, Program } from '../program.ts';
 
-export const historyProgram: Program = {
+export const historyProgram = {
     id: 'history',
+    inputs: {},
     title: 'history',
     category: 'system',
     icon: 'M4 12 A8 8 0 1 0 6.5 6.2 M4 4 V8 H8 M12 8 V12 L15 14',
@@ -22,4 +23,4 @@ export const historyProgram: Program = {
                 ),
         };
     },
-};
+} satisfies Program;

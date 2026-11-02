@@ -4,8 +4,9 @@ import { HksTaskManager } from '../components/task-manager/task-manager.componen
 import type { TaskRow } from '../components/task-manager/task-manager.ts';
 import type { AppInput, Program } from '../program.ts';
 
-export const tasksProgram: Program = {
+export const tasksProgram = {
     id: 'tasks',
+    inputs: {},
     title: 'tasks',
     category: 'system',
     icon: 'M4 6 H4.01 M8 6 H20 M4 12 H4.01 M8 12 H20 M4 18 H4.01 M8 18 H20',
@@ -45,4 +46,4 @@ export const tasksProgram: Program = {
                 ),
         };
     },
-};
+} satisfies Program;

@@ -24,6 +24,7 @@ import type { ProcessId, ProgramId } from './program.ts';
 import { keptStores, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
+import type { InputsFor } from './inputs.ts';
 import { parseWorkspace, type Workspace } from './workspace.ts';
 
 const KEY = 'hakase.state';
@@ -137,26 +138,27 @@ const fresh: Restored = {
     library: emptyLibrary,
 };
 
-const legacy = (): Restored => {
+const legacy = (inputsFor: InputsFor): Restored => {
     const appearance = readStored(LEGACY_APPEARANCE);
 
     return {
         ...fresh,
-        workspace: parseWorkspace(readStored(LEGACY_WORKSPACE)),
+        workspace: parseWorkspace(readStored(LEGACY_WORKSPACE), inputsFor),
         look: lookFrom(field(appearance, 'look')),
         looks: looksFrom(field(appearance, 'edits')),
     };
 };
 
-export const restoreState = (): Restored => {
+// Takes what programs read from other programs, so a saved follow is kept only where it still fits.
+export const restoreState = (inputsFor: InputsFor): Restored => {
     const stored = readStored(KEY);
 
     if (field(stored, 'version') !== VERSION) {
-        return legacy();
+        return legacy(inputsFor);
     }
 
     return {
-        workspace: parseWorkspace(field(stored, 'workspace')),
+        workspace: parseWorkspace(field(stored, 'workspace'), inputsFor),
         look: lookFrom(field(stored, 'look')),
         looks: looksFrom(field(stored, 'looks')),
         formulas: formulasFrom(field(stored, 'formulas')),

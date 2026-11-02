@@ -17,6 +17,9 @@ import type { CatalogGroup } from './inventory.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
 import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
+import type { ProgramInputs } from './inputs.ts';
+import type { PlaybackBinding } from './inputs.ts';
+import type { ProgressConnection } from './progress.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
 export const PROGRAM_IDS = [
@@ -87,6 +90,7 @@ export type Task = {
 };
 
 export type AppState = {
+    readonly progress$: Observable<ProgressConnection>;
     readonly playhead$: Observable<number>;
     readonly playing$: Observable<boolean>;
     readonly looping$: Observable<boolean>;
@@ -140,7 +144,7 @@ export type Self = {
     // The store this window is bound to; its state arrives already narrowed to it.
     readonly store$: Observable<string>;
     // The clock this window runs on, which its playhead and duration are narrowed to.
-    readonly clock$: Observable<string>;
+    readonly clock$: Observable<PlaybackBinding | null>;
     // undefined until this process first changes a setting; each program supplies its own default.
     readonly settings$: Observable<Settings | undefined>;
 };
@@ -163,6 +167,7 @@ export const CATEGORIES = [
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
 export type Program = {
+    readonly inputs: ProgramInputs;
     readonly id: ProgramId;
     readonly title: string;
     readonly category: CategoryId;

@@ -22,8 +22,9 @@ import type { AppInput, Program } from '../program.ts';
 
 const options = Object.keys(appearances).map(value => ({ value, label: value }));
 
-export const appearanceProgram: Program = {
+export const appearanceProgram = {
     id: 'appearance',
+    inputs: {},
     title: 'appearance',
     category: 'system',
     icon: 'M12 4 a8 8 0 1 0 0 16 c1.2 0 1.6-.9 1.2-1.8 c-.5-1 .2-2.2 1.4-2.2 H17 a3 3 0 0 0 3-3 C20 7.4 16.4 4 12 4 Z M7.5 12 h.01 M9.5 8 h.01 M14.5 8 h.01',
@@ -69,4 +70,4 @@ export const appearanceProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

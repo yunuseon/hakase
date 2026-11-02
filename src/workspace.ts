@@ -1,4 +1,15 @@
 import {
+    accepts,
+    initialFollows,
+    followedStores,
+    progressBinding,
+    sourceProgram,
+    type Follow,
+    type FollowFor,
+    type InputsFor,
+    type ProgramInputs,
+} from './inputs.ts';
+import {
     centredOn,
     centreOf,
     fitted,
@@ -30,17 +41,7 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
-import {
-    ensured,
-    followedStores,
-    FOLLOWS,
-    HOLDING,
-    mainStore,
-    pruned,
-    type Follow,
-    type StoreEntry,
-    type StoreId,
-} from './stores.ts';
+import { ensured, HOLDING, mainStore, pruned, type StoreEntry, type StoreId } from './stores.ts';
 
 export type Section = {
     readonly id: string;
@@ -48,14 +49,16 @@ export type Section = {
     readonly rect: Rect;
 };
 
-export type Process = {
+type ProcessBase = {
     readonly id: ProcessId;
-    readonly program: ProgramId;
     readonly frame: Frame;
     readonly store: StoreId;
-    readonly follows: readonly Follow[];
-    // The window's laid-out size, which can exceed its frame when content will not shrink below its minimum.
     readonly measured: Size;
+};
+
+export type Process<I extends ProgramInputs = ProgramInputs> = ProcessBase & {
+    readonly program: ProgramId;
+    readonly follows: readonly FollowFor<I>[];
 };
 
 export type Link = {
@@ -125,7 +128,7 @@ export type WorkspaceAction =
     | {
           readonly kind: 'follow';
           readonly id: ProcessId;
-          readonly program: string;
+          readonly source: string;
           readonly store: StoreId;
       }
     // Back (negative) or forward through the history by that many steps.
@@ -143,7 +146,7 @@ export type WorkspaceAction =
 const CASCADE = 26;
 const FLOATING_AT = 96;
 
-export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
+export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor): Workspace => {
     const gutter = 16;
     const left = 88;
     const editorWidth = Math.min(360, Math.round(width * 0.26));
@@ -154,6 +157,7 @@ export const defaultWorkspace = ({ width, height }: Extent): Workspace => {
 
     const sized = (process: Omit<Process, 'measured'>): Process => ({
         ...process,
+        follows: initialFollows(inputsFor(process.program)),
         measured: { width: process.frame.width, height: process.frame.height },
     });
 
@@ -607,7 +611,7 @@ const movedSection = (workspace: Workspace, id: string, dx: number, dy: number):
     };
 };
 
-const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
+const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFor): Workspace => {
     switch (action.kind) {
         case 'launch': {
             const launched = workspace.launched + 1;
@@ -634,7 +638,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                         id: `${action.program}-${launched}`,
                         program: action.program,
                         store: store.id,
-                        follows: [],
+                        follows: initialFollows(inputsFor(action.program)),
                         measured: action.size,
                         frame: {
                             ...action.size,
@@ -737,7 +741,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                               id,
                               program,
                               store: store.id,
-                              follows: [],
+                              follows: initialFollows(inputsFor(program)),
                               frame,
                               measured: { width: frame.width, height: frame.height },
                           }
@@ -748,16 +752,20 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
         }
         case 'follow': {
             const process = workspace.processes.find(({ id }) => id === action.id);
-            const program = action.program;
+            const binding = progressBinding(action.source, action.store);
             const target = workspace.stores.find(store => store.id === action.store);
 
-            // Only what the program follows, and only that program's stores, or its main one.
             if (
                 process === undefined ||
-                !isProgramId(program) ||
-                !FOLLOWS[process.program].includes(program) ||
-                (target?.program !== program && action.store !== program)
+                binding === null ||
+                !accepts(inputsFor(process.program), binding.kind)
             ) {
+                return workspace;
+            }
+
+            const program = sourceProgram(binding.kind);
+
+            if (target === undefined ? action.store !== program : target.program !== program) {
                 return workspace;
             }
 
@@ -765,15 +773,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 ...workspace,
                 stores: ensured(workspace.stores, target ?? mainStore(program)),
                 processes: workspace.processes.map(other =>
-                    other.id === action.id
-                        ? {
-                              ...other,
-                              follows: [
-                                  ...other.follows.filter(follow => follow.program !== program),
-                                  { program, store: action.store },
-                              ],
-                          }
-                        : other,
+                    other.id === action.id ? { ...other, follows: [binding] } : other,
                 ),
             };
         }
@@ -784,7 +784,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
         }
         case 'remove-store':
             // Only a store no window uses: removing one under a window would leave it reading nothing.
-            return workspace.processes.some(({ store }) => store === action.store)
+            return usedStores(workspace.processes).has(action.store)
                 ? workspace
                 : {
                       ...workspace,
@@ -898,7 +898,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
                 processes: workspace.processes.filter(({ id }) => id !== action.id),
             };
         case 'reveal': {
-            const raised = reduceWorkspace(workspace, { kind: 'raise', id: action.id });
+            const raised = reduceWorkspace(workspace, { kind: 'raise', id: action.id }, inputsFor);
             const shown = raised.processes.at(-1);
 
             return shown === undefined || shown.id !== action.id
@@ -936,12 +936,7 @@ const step = (workspace: Workspace, action: WorkspaceAction): Workspace => {
 
 // Bound or followed: a clock a sketch runs on is in use even with no timeline window open.
 export const usedStores = (processes: readonly Process[]): ReadonlySet<StoreId> =>
-    new Set(
-        processes.flatMap(({ program, store, follows }) => [
-            store,
-            ...followedStores(program, follows),
-        ]),
-    );
+    new Set(processes.flatMap(({ store, follows }) => [store, ...followedStores(follows)]));
 
 const rebound = (workspace: Workspace, id: ProcessId, store: StoreId): Workspace => ({
     ...workspace,
@@ -963,8 +958,12 @@ export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
     }
 };
 
-export const reduceWorkspace = (workspace: Workspace, action: WorkspaceAction): Workspace => {
-    const next = step(workspace, action);
+export const reduceWorkspace = (
+    workspace: Workspace,
+    action: WorkspaceAction,
+    inputsFor: InputsFor,
+): Workspace => {
+    const next = step(workspace, action, inputsFor);
 
     return {
         ...next,
@@ -987,7 +986,7 @@ const sizeFrom = (value: unknown): Size | null => {
     return width === null || height === null ? null : { width, height };
 };
 
-const processFrom = (value: unknown): Process | null => {
+const processFrom = (value: unknown, inputsFor: InputsFor): Process | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
     }
@@ -1019,7 +1018,7 @@ const processFrom = (value: unknown): Process | null => {
     return {
         id: value.id,
         program,
-        follows: follows.filter(follow => FOLLOWS[program].includes(follow.program)),
+        follows: follows.filter(follow => accepts(inputsFor(program), follow.kind)).slice(0, 1),
         frame,
         // Saved before stores: a private window keeps its own id, which is what its settings are keyed by.
         store: store ?? (HOLDING[program]?.sharing === 'private' ? value.id : program),
@@ -1028,15 +1027,22 @@ const processFrom = (value: unknown): Process | null => {
 };
 
 const followFrom = (value: unknown): Follow[] => {
-    if (typeof value !== 'object' || value === null || !('program' in value && 'store' in value)) {
+    if (typeof value !== 'object' || value === null || !('store' in value)) {
         return [];
     }
 
-    const { program, store } = value;
+    const { store } = value;
+    // Saved before bindings had kinds, a follow named the program: following a timeline meant its clock.
+    const kind =
+        'kind' in value
+            ? value.kind
+            : 'program' in value && value.program === 'timeline'
+              ? 'playback'
+              : null;
+    const binding =
+        typeof kind === 'string' && typeof store === 'string' ? progressBinding(kind, store) : null;
 
-    return typeof program === 'string' && isProgramId(program) && typeof store === 'string'
-        ? [{ program, store }]
-        : [];
+    return binding === null ? [] : [binding];
 };
 
 const storeFrom = (value: unknown): StoreEntry[] => {
@@ -1145,7 +1151,7 @@ const sectionFrom = (value: unknown): Section[] => {
         : [];
 };
 
-export const parseWorkspace = (value: unknown): Workspace | null => {
+export const parseWorkspace = (value: unknown, inputsFor: InputsFor): Workspace | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
     }
@@ -1170,7 +1176,9 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
     }
 
     // One unknown window is dropped alone: rejecting the whole workspace for it once reset a user's layout.
-    const kept = stored.map(processFrom).filter(process => process !== null);
+    const kept = stored
+        .map(value => processFrom(value, inputsFor))
+        .filter(process => process !== null);
     const links =
         'links' in value && Array.isArray(value.links) ? value.links.flatMap(linkFrom) : [];
 
@@ -1182,7 +1190,22 @@ export const parseWorkspace = (value: unknown): Workspace | null => {
     );
 
     return {
-        processes: kept,
+        processes: kept.map(process => {
+            const follows = process.follows.filter(binding => {
+                const target = stores.find(store => store.id === binding.store);
+                const program = sourceProgram(binding.kind);
+
+                return target === undefined
+                    ? binding.store === program
+                    : target.program === program;
+            });
+
+            return {
+                ...process,
+                follows:
+                    follows.length === 0 ? initialFollows(inputsFor(process.program)) : follows,
+            };
+        }),
         launched,
         camera,
         toolbar,
@@ -1400,7 +1423,11 @@ const travelled = (history: History, offset: number): History =>
               offset < 0 ? offset + 1 : offset - 1,
           );
 
-export const reduceHistory = (history: History, action: WorkspaceAction): History => {
+export const reduceHistory = (
+    history: History,
+    action: WorkspaceAction,
+    inputsFor: InputsFor,
+): History => {
     const { past, present } = history;
 
     if (action.kind === 'undo') {
@@ -1420,7 +1447,7 @@ export const reduceHistory = (history: History, action: WorkspaceAction): Histor
         return travelled(history, offset);
     }
 
-    const reduced = reduceWorkspace(present, action);
+    const reduced = reduceWorkspace(present, action, inputsFor);
     const step = stepOf(action);
 
     if (step === null) {

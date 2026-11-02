@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { catalogOf, parseTarget, targetId } from './inventory.ts';
-import { defaultWorkspace } from './workspace.ts';
+import { inputsFor } from './inputs.fixture.ts';
+import { defaultWorkspace, reduceWorkspace } from './workspace.ts';
 
-const workspace = defaultWorkspace({ width: 1400, height: 900 });
+const workspace = defaultWorkspace({ width: 1400, height: 900 }, inputsFor);
 
 describe('targets', () => {
     it('round-trip through their ids, store ids with colons included', () => {
@@ -41,5 +42,23 @@ describe('catalogOf', () => {
 
         expect(sketch?.items[0]).toMatchObject({ label: 'sketch 2', users: 1 });
         expect(board?.items[0]).toMatchObject({ label: 'Main', users: 0 });
+    });
+});
+
+describe('focus progress consumers', () => {
+    it('counts a dial on focus without counting it on playback too', () => {
+        const following = reduceWorkspace(
+            workspace,
+            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'focus' },
+            inputsFor,
+        );
+        const catalog = catalogOf(
+            following.stores,
+            following.processes,
+            program => program,
+            new Set(),
+        );
+        expect(catalog.find(({ title }) => title === 'focus')?.items[0]?.users).toBe(1);
+        expect(catalog.find(({ title }) => title === 'timeline')?.items[0]?.users).toBe(2);
     });
 });

@@ -1,3 +1,4 @@
+import { playbackInput } from '../inputs.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -74,8 +75,9 @@ const statusOf = (event: ExportEvent): ExportStatus => {
     }
 };
 
-export const sketchProgram: Program = {
+export const sketchProgram = {
     id: 'sketch',
+    inputs: { playback: playbackInput },
     title: 'sketch',
     category: 'make',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
@@ -409,4 +411,4 @@ export const sketchProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

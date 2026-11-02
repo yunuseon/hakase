@@ -385,10 +385,10 @@ export class HksWindow extends HTMLElement {
 
                     return row instanceof HTMLElement &&
                         row.dataset['followStore'] !== undefined &&
-                        row.dataset['followProgram'] !== undefined
+                        row.dataset['followSource'] !== undefined
                         ? of({
                               kind: 'follow',
-                              program: row.dataset['followProgram'],
+                              source: row.dataset['followSource'],
                               store: row.dataset['followStore'],
                           })
                         : EMPTY;
@@ -608,16 +608,16 @@ export class HksWindow extends HTMLElement {
 
                     if (!(shadow.activeElement instanceof HTMLInputElement)) {
                         requireChild(shadow, '.follows').replaceChildren(
-                            ...(follows ?? []).flatMap(({ program, title, options: list }) => {
+                            ...(follows ?? []).flatMap(({ source, title, options: list }) => {
                                 const heading = document.createElement('p');
                                 heading.className = 'follow-title';
-                                heading.textContent = `Follows ${title}`;
+                                heading.textContent = title;
 
                                 return [
                                     heading,
                                     ...list.map(option => {
                                         const row = followRow(option);
-                                        row.dataset['followProgram'] = program;
+                                        row.dataset['followSource'] = source;
 
                                         return row;
                                     }),

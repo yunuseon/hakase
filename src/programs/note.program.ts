@@ -24,8 +24,9 @@ const created = (notes: Notes): readonly AppInput[] => {
 
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-export const noteProgram: Program = {
+export const noteProgram = {
     id: 'note',
+    inputs: {},
     title: 'note',
     category: 'plan',
     icon: 'M5 4 H19 V14 L14 20 H5 Z M14 20 V14 H19 M8.5 9 H15.5 M8.5 12.5 H12.5',
@@ -103,4 +104,4 @@ export const noteProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

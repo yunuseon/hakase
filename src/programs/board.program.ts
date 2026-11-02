@@ -3,8 +3,9 @@ import { ignoreElements, map } from 'rxjs/operators';
 import { HksBoard } from '../components/board/board.component.ts';
 import type { AppInput, Program } from '../program.ts';
 
-export const boardProgram: Program = {
+export const boardProgram = {
     id: 'board',
+    inputs: {},
     title: 'board',
     category: 'plan',
     icon: 'M4 4 H8.5 V20 H4 Z M10 4 H14.5 V14 H10 Z M16 4 H20.5 V10 H16 Z',
@@ -22,4 +23,4 @@ export const boardProgram: Program = {
                 ),
         };
     },
-};
+} satisfies Program;

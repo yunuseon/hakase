@@ -17,8 +17,9 @@ const READ_MS = 250;
 
 const write = (settings: InspectorSettings): AppInput => ({ kind: 'settings', settings });
 
-export const inspectorProgram: Program = {
+export const inspectorProgram = {
     id: 'inspector',
+    inputs: {},
     title: 'inspector',
     category: 'system',
     icon: 'M8.5 4 C5.5 4 6.5 10 4 12 C6.5 14 5.5 20 8.5 20 M15.5 4 C18.5 4 17.5 10 20 12 C17.5 14 18.5 20 15.5 20',
@@ -103,4 +104,4 @@ export const inspectorProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

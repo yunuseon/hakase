@@ -4,8 +4,9 @@ import { HksFocus } from '../components/focus/focus.component.ts';
 import { focusView } from '../components/focus/focus.ts';
 import type { AppInput, Program } from '../program.ts';
 
-export const focusProgram: Program = {
+export const focusProgram = {
     id: 'focus',
+    inputs: {},
     title: 'focus',
     category: 'plan',
     icon: 'M12 5 A7.5 7.5 0 1 1 12 20 A7.5 7.5 0 1 1 12 5 M12 9 V12.5 L14.5 14.5 M10 2.5 H14',
@@ -23,4 +24,4 @@ export const focusProgram: Program = {
                 ),
         };
     },
-};
+} satisfies Program;

@@ -18,8 +18,9 @@ const show = (day: string | null): AppInput => ({
     settings: { kind: 'agenda', day },
 });
 
-export const agendaProgram: Program = {
+export const agendaProgram = {
     id: 'agenda',
+    inputs: {},
     title: 'agenda',
     category: 'plan',
     icon: 'M4 6 H20 V20 H4 Z M4 10 H20 M8 3.5 V7.5 M16 3.5 V7.5 M7.5 13 H12.5 V17 H7.5 Z',
@@ -85,4 +86,4 @@ export const agendaProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

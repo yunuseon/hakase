@@ -20,8 +20,9 @@ const options = Object.keys(themes).map(value => ({ value, label: value }));
 const sameShape = (a: Theme, b: Theme): boolean =>
     a.blend === b.blend && a.stops.length === b.stops.length;
 
-export const themeProgram: Program = {
+export const themeProgram = {
     id: 'theme',
+    inputs: {},
     title: 'theme',
     category: 'make',
     icon: 'M4 6 H20 V18 H4 Z M10 6 V18 M15 6 V18',
@@ -77,4 +78,4 @@ export const themeProgram: Program = {
             },
         };
     },
-};
+} satisfies Program;

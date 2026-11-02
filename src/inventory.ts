@@ -1,12 +1,6 @@
 import { isProgramId, PROGRAM_IDS, type ProgramId } from './program.ts';
-import {
-    colourOf,
-    followedStores,
-    HOLDING,
-    MAIN,
-    type StoreEntry,
-    type StoreId,
-} from './stores.ts';
+import { followedStores } from './inputs.ts';
+import { colourOf, HOLDING, MAIN, type StoreEntry, type StoreId } from './stores.ts';
 import type { Process } from './workspace.ts';
 
 export const GLOBALS = ['workspace', 'appearance', 'formulas', 'themes', 'library'] as const;
@@ -95,7 +89,7 @@ export const catalogOf = (
             users: processes.filter(
                 process =>
                     process.store === store.id ||
-                    followedStores(process.program, process.follows).includes(store.id),
+                    followedStores(process.follows).includes(store.id),
             ).length,
         }));
 

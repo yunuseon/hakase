@@ -8,6 +8,7 @@ import type {
 } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { AppInput, AppState, ProcessId, Program, ProgramId, Self } from './program.ts';
+import type { PlaybackBinding } from './inputs.ts';
 import type { WorkspaceAction } from './workspace.ts';
 
 export type ProcessSignal =
@@ -18,7 +19,7 @@ export type ProcessSignal =
           readonly from: ProcessId;
           // Stamped as the input leaves, so a rebind takes effect from the next one.
           readonly store: string;
-          readonly clock: string;
+          readonly clock: PlaybackBinding | null;
           readonly program: ProgramId;
           readonly input: AppInput;
       };
