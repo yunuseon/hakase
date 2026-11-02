@@ -933,7 +933,11 @@ step while it is the same gesture on the same id, so one drag is one undo rather
 than one per pointer move; a `raise` breaks the join; everything else (camera,
 toolbar, minimap) is not history at all. Undo restores the windows but
 `keepingView` carries the current camera, toolbar and minimap through, because
-undoing a drag must not also fling the view back to where it was. ⌘Z and ⇧⌘Z
+undoing a drag must not also fling the view back to where it was. The navigator
+has **undo and redo buttons**, each disabled while its side of the history is
+empty: `history$` is the shared fold and `workspace$` only maps out its
+`present`, so whether there is a past or a future reaches the buttons without a
+second fold. ⌘Z and ⇧⌘Z
 (or ⌘Y) come from the canvas's `edits$`, which ignores keys whose
 `composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
 to its host, so `event.target` alone would steal the editor's own undo.

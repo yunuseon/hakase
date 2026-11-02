@@ -148,7 +148,7 @@
     background: var(--well);
 }
 
-.key:hover,
+.key:hover:not(:disabled),
 .key[aria-pressed='true'] {
     color: var(--ink);
     background: var(--well);
@@ -172,4 +172,18 @@ svg {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.key:disabled {
+    color: var(--muted);
+    opacity: 0.45;
+    cursor: default;
+}
+
+.divider {
+    flex: none;
+    inline-size: 1px;
+    block-size: 18px;
+    margin-inline: 3px;
+    background: var(--edge);
 }

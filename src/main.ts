@@ -115,6 +115,7 @@ import {
     sectionAction,
     reduceHistory,
     startHistory,
+    type History,
     type Process,
     type Workspace,
     type WorkspaceAction,
@@ -275,11 +276,13 @@ const bootstrap = () => {
     const seed = stored.workspace ?? defaultWorkspace(viewportSize());
 
     // defer, or the cycle is evaluated at construction: signals$ is built from this.
-    const workspace$: Observable<Workspace> = merge(
+    const begun = startHistory(seed);
+
+    const history$: Observable<History> = merge(
         launches$,
         zoomSteps$,
         canvas.gestures$,
-        canvas.edits$.pipe(map((kind): WorkspaceAction => ({ kind }))),
+        merge(canvas.edits$, navigator.edits$).pipe(map((kind): WorkspaceAction => ({ kind }))),
         toolbarActions$,
         defer(() => signals$).pipe(
             mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
@@ -300,12 +303,13 @@ const bootstrap = () => {
             map((keep): WorkspaceAction => ({ kind: 'close-others', keep })),
         ),
     ).pipe(
-        scan(reduceHistory, startHistory(seed)),
-        map(({ present }) => present),
+        scan(reduceHistory, begun),
         // Emitted into the replay buffer before the processes start and read it back.
-        startWith(seed),
+        startWith(begun),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
+
+    const workspace$: Observable<Workspace> = history$.pipe(map(({ present }) => present));
 
     const interrupted$ = merge(canvas.gestures$, zoomSteps$);
 
@@ -1008,6 +1012,9 @@ const bootstrap = () => {
             ),
             camera$.pipe(map(zoomLabel)),
             workspace$.pipe(map(({ minimap }) => minimap)),
+            history$.pipe(
+                map(({ past, future }) => ({ undo: past.length > 0, redo: future.length > 0 })),
+            ),
         ),
     ).subscribe();
 };

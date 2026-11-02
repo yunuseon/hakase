@@ -1,12 +1,19 @@
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import type { Rect } from '../../shared/camera.ts';
 import { isZoomCommand, sameMiniMap, type MiniMap, type ZoomCommand } from './navigator.ts';
 import css from './navigator.css?inline';
 
 const sheet = styleSheet(css);
+
+export type Edit = 'undo' | 'redo';
+
+export type Undoable = {
+    readonly undo: boolean;
+    readonly redo: boolean;
+};
 
 const glyph = (d: string) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 
@@ -21,6 +28,9 @@ const TEMPLATE = `
         <button class="add" type="button" data-add title="new section around the view">+ section</button>
     </div>
     <div class="row">
+        <button class="key edit" type="button" data-edit="undo" aria-label="undo" title="undo (⌘Z)" disabled>${glyph('M9 14 L4 9 L9 4 M4 9 H15 A5 5 0 0 1 15 19 H11')}</button>
+        <button class="key edit" type="button" data-edit="redo" aria-label="redo" title="redo (⇧⌘Z)" disabled>${glyph('M15 14 L20 9 L15 4 M20 9 H9 A5 5 0 0 0 9 19 H13')}</button>
+        <span class="divider" aria-hidden="true"></span>
         <button class="key" type="button" data-zoom="out" aria-label="zoom out" title="zoom out">${glyph('M7 12 H17')}</button>
         <button class="readout" type="button" data-zoom="reset" aria-label="reset zoom" title="reset zoom">100%</button>
         <button class="key" type="button" data-zoom="in" aria-label="zoom in" title="zoom in">${glyph('M7 12 H17 M12 7 V17')}</button>
@@ -40,6 +50,7 @@ export class HksNavigator extends HTMLElement {
     readonly toggles$: Observable<void>;
     readonly jumps$: Observable<string>;
     readonly adds$: Observable<void>;
+    readonly edits$: Observable<Edit>;
 
     private readonly windows: HTMLElement;
     private readonly outlines: HTMLElement;
@@ -47,6 +58,7 @@ export class HksNavigator extends HTMLElement {
     private readonly view: HTMLElement;
     private readonly readout: HTMLElement;
     private readonly toggle: HTMLElement;
+    private readonly shadow: ShadowRoot;
 
     constructor() {
         super();
@@ -86,14 +98,35 @@ export class HksNavigator extends HTMLElement {
         );
 
         this.toggles$ = fromElementEvent$(this.toggle, 'click').pipe(map(() => undefined));
+        this.edits$ = fromElementEvent$(requireChild(shadow, '.row'), 'click').pipe(
+            mergeMap((event): Observable<Edit> => {
+                const button =
+                    event.target instanceof Element ? event.target.closest('[data-edit]') : null;
+                const value = button instanceof HTMLElement ? button.dataset['edit'] : undefined;
+
+                return value === 'undo' || value === 'redo' ? of(value) : EMPTY;
+            }),
+        );
+        this.shadow = shadow;
     }
 
     connect$(
         map$: Observable<MiniMap>,
         zoom$: Observable<string>,
         open$: Observable<boolean>,
+        history$: Observable<Undoable>,
     ): Observable<void> {
+        const undo = requireElement(this.shadow, '[data-edit="undo"]', HTMLButtonElement);
+        const redo = requireElement(this.shadow, '[data-edit="redo"]', HTMLButtonElement);
+
         return merge(
+            history$.pipe(
+                distinctUntilChanged((a, b) => a.undo === b.undo && a.redo === b.redo),
+                tap(({ undo: canUndo, redo: canRedo }) => {
+                    undo.disabled = !canUndo;
+                    redo.disabled = !canRedo;
+                }),
+            ),
             map$.pipe(
                 distinctUntilChanged(sameMiniMap),
                 tap(({ windows, sections, view }) => {
