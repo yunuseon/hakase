@@ -376,3 +376,107 @@ describe('resizing an attached edge', () => {
         expect(xs(run(attached(), [resize('e', -500, 0)])).b).toEqual([100, 0, 200]);
     });
 });
+
+describe('snapping while resizing', () => {
+    const box = (id: string, x: number, y: number, width: number, height: number) => ({
+        id,
+        program: 'todo' as const,
+        store: 'todo',
+        frame: { x, y, width, height, z: 0 },
+        measured: { width, height },
+    });
+    const start = (
+        processes: ReturnType<typeof box>[],
+        links: { a: string; b: string }[] = [],
+    ): History => startHistory({ ...defaultWorkspace(viewport), processes, links });
+    const resize = (
+        id: string,
+        edge: 'e' | 's' | 'se',
+        dx: number,
+        dy: number,
+    ): WorkspaceAction => ({
+        kind: 'resize',
+        id,
+        edge,
+        dx,
+        dy,
+        minimum: { width: 100, height: 100 },
+    });
+    const frameOf = (history: History, id: string) =>
+        history.present.processes.find(process => process.id === id)?.frame;
+
+    it('lines a bottom edge up with a neighbour that is beside it but not linked', () => {
+        const history = run(start([box('a', 0, 0, 200, 200), box('b', 200, 0, 200, 300)]), [
+            { kind: 'raise', id: 'a' },
+            resize('a', 's', 0, 94),
+        ]);
+
+        expect(frameOf(history, 'a')?.height).toBe(300);
+    });
+
+    it('lines up with a window a few pixels away, as a move would', () => {
+        const history = run(start([box('a', 0, 0, 200, 200), box('b', 206, 0, 200, 400)]), [
+            { kind: 'raise', id: 'a' },
+            resize('a', 's', 0, 195),
+        ]);
+
+        expect(frameOf(history, 'a')?.height).toBe(400);
+    });
+
+    it('still snaps the other edge of a window attached on several sides', () => {
+        // a has b to its right and c below; resizing a's bottom lines up with b's.
+        const history = run(
+            start(
+                [box('a', 0, 0, 200, 200), box('b', 200, 0, 200, 260), box('c', 0, 200, 200, 200)],
+                [
+                    { a: 'a', b: 'b' },
+                    { a: 'a', b: 'c' },
+                ],
+            ),
+            [{ kind: 'raise', id: 'a' }, resize('a', 's', 0, 56)],
+        );
+
+        expect(frameOf(history, 'a')?.height).toBe(260);
+        expect(frameOf(history, 'c')?.y).toBe(260);
+    });
+
+    it('never snaps to a window it is carrying along', () => {
+        const history = run(
+            start(
+                [box('a', 0, 0, 200, 200), box('b', 200, 0, 200, 200), box('c', 400, 0, 100, 200)],
+                [
+                    { a: 'a', b: 'b' },
+                    { a: 'b', b: 'c' },
+                ],
+            ),
+            [{ kind: 'raise', id: 'a' }, resize('a', 'e', 4, 0)],
+        );
+
+        expect(frameOf(history, 'a')?.width).toBe(204);
+        expect(frameOf(history, 'c')?.x).toBe(404);
+    });
+
+    it('snaps a corner on both axes, each to its own neighbour', () => {
+        // As the corner grows, b comes up beside it and c just below it.
+        const history = run(
+            start([
+                box('a', 0, 0, 200, 200),
+                box('b', 302, 0, 100, 250),
+                box('c', 0, 254, 296, 100),
+            ]),
+            [{ kind: 'raise', id: 'a' }, resize('a', 'se', 93, 46)],
+        );
+
+        expect(frameOf(history, 'a')).toMatchObject({ width: 296, height: 250 });
+    });
+
+    it('lets go once pulled further than the reach', () => {
+        const history = run(start([box('a', 0, 0, 200, 200), box('b', 200, 0, 200, 300)]), [
+            { kind: 'raise', id: 'a' },
+            resize('a', 's', 0, 96),
+            resize('a', 's', 0, 30),
+        ]);
+
+        expect(frameOf(history, 'a')?.height).toBe(326);
+    });
+});

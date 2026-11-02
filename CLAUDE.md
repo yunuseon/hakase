@@ -835,7 +835,12 @@ through the resized window, so growing pushes it and shrinking pulls it and the
 link survives the prune that follows. Those windows are left out of the resize's
 snap targets, or the edge would snap back to the window it is pushing and never
 move. Windows attached on the other sides stay put, and the edge still snaps to
-them, so a window stacked under another locks to its width. Closing a window
+them, so a window stacked under another locks to its width. **A resized edge
+snaps to every window beside it, linked or not**, by the rule a move uses: near
+in the other direction (within reach), judged from the box **as dragged**, so a
+corner that grows up to a neighbour counts it. Snapping only to linked windows
+made it depend on what happened to be attached, and judging from the box before
+the drag missed whatever a corner was growing towards. Closing a window
 closes only that one.
 
 All of it is the one `scan`. `Workspace.links` holds `{ a, b }` pairs, and a group
@@ -1425,7 +1430,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and thirty-five of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and thirty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

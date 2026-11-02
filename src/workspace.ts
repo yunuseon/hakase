@@ -460,9 +460,22 @@ const resizedToNeighbours = (
 
         return side !== null && edge.includes(side) ? [{ partner, side }] : [];
     });
-    const neighbours = partners
-        .filter(partner => !carried.some(({ partner: other }) => other.id === partner.id))
+    // Linked onward from a carried window, but not back through this one, everything moves with it.
+    const others = workspace.links.filter(({ a, b }) => a !== id && b !== id);
+    const moving = new Set(carried.flatMap(({ partner }) => [...groupOf(others, partner.id)]));
+    // Every window near the edge, linked or not: snapping only to linked ones made it depend on what was attached.
+    const neighbours = workspace.processes
+        .filter(candidate => candidate.id !== id && !moving.has(candidate.id))
         .map(boxOf);
+    // The box as dragged, not as it was: a corner reaching a neighbour must count it as beside it.
+    const left = box.x + (edge.includes('w') ? x : 0);
+    const right = box.x + box.width + (edge.includes('e') ? x : 0);
+    const top = box.y + (edge.includes('n') ? y : 0);
+    const bottom = box.y + box.height + (edge.includes('s') ? y : 0);
+    const besideRows = neighbours.filter(n => overlap(top, bottom, n.y, n.y + n.height) >= -reach);
+    const besideColumns = neighbours.filter(
+        n => overlap(left, right, n.x, n.x + n.width) >= -reach,
+    );
 
     const edgeX = edge.includes('e')
         ? box.x + box.width + x
@@ -478,14 +491,14 @@ const resizedToNeighbours = (
         edgeX === null
             ? Infinity
             : nearest(
-                  neighbours.flatMap(n => [n.x - edgeX, n.x + n.width - edgeX]),
+                  besideRows.flatMap(n => [n.x - edgeX, n.x + n.width - edgeX]),
                   reach,
               );
     const snapY =
         edgeY === null
             ? Infinity
             : nearest(
-                  neighbours.flatMap(n => [n.y - edgeY, n.y + n.height - edgeY]),
+                  besideColumns.flatMap(n => [n.y - edgeY, n.y + n.height - edgeY]),
                   reach,
               );
     const snap = { x: Number.isFinite(snapX) ? snapX : 0, y: Number.isFinite(snapY) ? snapY : 0 };
@@ -498,8 +511,6 @@ const resizedToNeighbours = (
     };
 
     const after: Rect = { x: frame.x, y: frame.y, width: measured.width, height: measured.height };
-    // Linked onward from a carried window, but not back through this one, everything moves with it.
-    const others = workspace.links.filter(({ a, b }) => a !== id && b !== id);
     const shifts = carried.reduce<ReadonlyMap<ProcessId, Point>>((all, { partner, side }) => {
         const shift = shiftOf(side, box, after);
 
