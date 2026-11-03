@@ -3,7 +3,15 @@ import { filter, map, mergeMap, scan, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
-import { wirePath, type PatchCommand, type PatchLayout, type Point } from './patch.ts';
+import {
+    wirePath,
+    type PatchCommand,
+    type PatchLayout,
+    type PlacedPort,
+    type PlacedStore,
+    type PlacedWindow,
+    type Point,
+} from './patch.ts';
 import css from './patch-bay.css?inline';
 
 const sheet = styleSheet(css);
@@ -14,22 +22,28 @@ const TEMPLATE = `
         <svg class="wires" aria-hidden="true"><path class="rubber" /></svg>
         <div class="nodes"></div>
     </div>
-    <p class="empty">No window follows anything yet. Open a sketch, a dial or a signal.</p>
+    <p class="empty">No window keeps or follows any state yet.</p>
 `;
 
 type End =
     | {
-          readonly kind: 'source';
+          readonly kind: 'store';
           readonly id: string;
-          readonly source: string;
-          readonly store: string;
+          readonly program: string;
+          readonly feeds: string | null;
       }
     | {
           readonly kind: 'port';
-          readonly sink: string;
+          readonly window: string;
           readonly input: string;
           readonly accepts: readonly string[];
           readonly cuttable: boolean;
+      }
+    | {
+          readonly kind: 'own';
+          readonly window: string;
+          readonly program: string;
+          readonly store: string;
       };
 
 type Drag = {
@@ -40,24 +54,30 @@ type Drag = {
     readonly over: End | null;
 };
 
+const ENDS = '[data-store], [data-input], [data-own]';
+
 const endOf = (target: EventTarget | null): End | null => {
-    const element =
-        target instanceof Element ? target.closest('[data-source], [data-input]') : null;
+    const element = target instanceof Element ? target.closest(ENDS) : null;
 
     if (!(element instanceof HTMLElement) || target instanceof HTMLButtonElement) {
         return null;
     }
 
-    const { source, kind, store, sink, input, accepts, cuttable } = element.dataset;
+    const { store, program, feeds, window, input, accepts, cuttable, own, current } =
+        element.dataset;
 
-    if (source !== undefined && kind !== undefined && store !== undefined) {
-        return { kind: 'source', id: source, source: kind, store };
+    if (store !== undefined && program !== undefined) {
+        return { kind: 'store', id: store, program, feeds: feeds ?? null };
     }
 
-    return sink !== undefined && input !== undefined && accepts !== undefined
+    if (own !== undefined && program !== undefined && current !== undefined) {
+        return { kind: 'own', window: own, program, store: current };
+    }
+
+    return window !== undefined && input !== undefined && accepts !== undefined
         ? {
               kind: 'port',
-              sink,
+              window,
               input,
               accepts: accepts.split(' '),
               cuttable: cuttable !== undefined,
@@ -65,34 +85,45 @@ const endOf = (target: EventTarget | null): End | null => {
         : null;
 };
 
-const fits = (a: End, b: End | null): boolean =>
-    b !== null &&
-    ((a.kind === 'source' && b.kind === 'port' && b.accepts.includes(a.source)) ||
-        (a.kind === 'port' && b.kind === 'source' && a.accepts.includes(b.source)));
+const sameEnd = (a: End, b: End): boolean => {
+    switch (a.kind) {
+        case 'store':
+            return b.kind === 'store' && a.id === b.id;
+        case 'port':
+            return b.kind === 'port' && a.window === b.window && a.input === b.input;
+        case 'own':
+            return b.kind === 'own' && a.window === b.window;
+    }
+};
 
-const commandOf = (start: End, over: End | null): PatchCommand | null => {
-    if (over === null) {
-        return start.kind === 'port' && start.cuttable
-            ? { kind: 'disconnect', sink: start.sink, input: start.input }
+const commandOf = (a: End, b: End | null): PatchCommand | null => {
+    if (b === null) {
+        return a.kind === 'port' && a.cuttable
+            ? { kind: 'disconnect', window: a.window, input: a.input }
             : null;
     }
 
-    if (!fits(start, over)) {
+    const [store, other] = a.kind === 'store' ? [a, b] : b.kind === 'store' ? [b, a] : [null, null];
+
+    if (store === null || other === null) {
         return null;
     }
 
-    const source = start.kind === 'source' ? start : over.kind === 'source' ? over : null;
-    const port = start.kind === 'port' ? start : over.kind === 'port' ? over : null;
+    if (other.kind === 'port') {
+        return store.feeds !== null && other.accepts.includes(store.feeds)
+            ? {
+                  kind: 'connect',
+                  window: other.window,
+                  input: other.input,
+                  source: store.feeds,
+                  store: store.id,
+              }
+            : null;
+    }
 
-    return source === null || port === null
-        ? null
-        : {
-              kind: 'connect',
-              sink: port.sink,
-              input: port.input,
-              source: source.source,
-              store: source.store,
-          };
+    return other.kind === 'own' && other.program === store.program && other.store !== store.id
+        ? { kind: 'bind', window: other.window, store: store.id }
+        : null;
 };
 
 const iconOf = (path: string): SVGSVGElement => {
@@ -107,12 +138,95 @@ const iconOf = (path: string): SVGSVGElement => {
     return icon;
 };
 
+const span = (className: string, text = ''): HTMLSpanElement => {
+    const element = document.createElement('span');
+    element.className = className;
+    element.textContent = text;
+
+    return element;
+};
+
 const placed = (element: HTMLElement, x: number, y: number, height: number): HTMLElement => {
     element.style.left = `${x}px`;
     element.style.top = `${y}px`;
     element.style.height = `${height}px`;
 
     return element;
+};
+
+const storeNode = ({ id, program, kind, title, name, colour, x, y, height }: PlacedStore) => {
+    const node = placed(document.createElement('div'), x, y, height);
+    node.className = 'node store';
+    node.dataset['store'] = id;
+    node.dataset['program'] = program;
+
+    if (kind !== null) {
+        node.dataset['feeds'] = kind;
+    }
+
+    node.style.setProperty('--store', colour);
+    node.title = `${title} · ${name}: drag onto a window to bind or follow it`;
+
+    const label = span('label');
+    label.append(span('kind', title), span('name', name));
+    node.append(span('dot'), label, span('jack'));
+
+    return node;
+};
+
+const portRow = (window: string, { input, title, accepts, optional, bound }: PlacedPort) => {
+    const row = document.createElement('div');
+    row.className = 'port';
+    row.dataset['window'] = window;
+    row.dataset['input'] = input;
+    row.dataset['accepts'] = accepts.join(' ');
+    row.toggleAttribute('data-bound', bound !== null);
+    row.toggleAttribute('data-cuttable', optional && bound !== null);
+    row.append(span('jack'), span('title', title));
+
+    if (optional && bound !== null) {
+        const cut = document.createElement('button');
+        cut.type = 'button';
+        cut.className = 'cut';
+        cut.dataset['cut'] = '';
+        cut.textContent = '×';
+        cut.setAttribute('aria-label', `stop ${title} following`);
+        row.append(cut);
+    }
+
+    return row;
+};
+
+const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: PlacedWindow) => {
+    const node = placed(document.createElement('div'), x, y, height);
+    node.className = 'node window';
+    node.dataset['windowNode'] = id;
+
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.title = 'double-click to show this window';
+    head.append(iconOf(icon), span('label', label));
+
+    if (own !== null) {
+        head.dataset['own'] = id;
+        head.dataset['program'] = program;
+        head.dataset['current'] = own.store;
+        head.prepend(span('jack'));
+
+        if (own.shown === 'tag') {
+            const tag = span('tag');
+            tag.dataset['store'] = own.store;
+            tag.dataset['program'] = program;
+            tag.style.setProperty('--store', own.colour);
+            tag.title = `${own.name}: only this window uses it; drag onto another window to share it`;
+            tag.append(span('dot'), span('name', own.name));
+            head.append(tag);
+        }
+    }
+
+    node.append(head, ...ports.map(port => portRow(id, port)));
+
+    return node;
 };
 
 export class HksPatchBay extends HTMLElement {
@@ -137,12 +251,9 @@ export class HksPatchBay extends HTMLElement {
 
             return { x: (clientX - rect.left) * scale, y: (clientY - rect.top) * scale };
         };
-        const jackOf = (end: End): Point | null => {
-            const selector =
-                end.kind === 'source'
-                    ? `[data-source="${end.id}"] .jack`
-                    : `[data-sink="${end.sink}"][data-input="${end.input}"] .jack`;
-            const jack = shadow.querySelector(selector);
+        const jackOf = (target: EventTarget | null): Point | null => {
+            const element = target instanceof Element ? target.closest(ENDS) : null;
+            const jack = element?.querySelector(':scope > .jack') ?? element;
 
             if (!(jack instanceof HTMLElement)) {
                 return null;
@@ -160,19 +271,15 @@ export class HksPatchBay extends HTMLElement {
                     const at = local(event.clientX, event.clientY);
                     const over = endOf(shadow.elementFromPoint(event.clientX, event.clientY));
 
-                    if (phase === 'grab') {
-                        const start = endOf(event.target);
-
-                        return {
-                            phase,
-                            start,
-                            from: (start === null ? null : jackOf(start)) ?? at,
-                            at,
-                            over: null,
-                        };
-                    }
-
-                    return { ...drag, phase, at, over };
+                    return phase === 'grab'
+                        ? {
+                              phase,
+                              start: endOf(event.target),
+                              from: jackOf(event.target) ?? at,
+                              at,
+                              over: null,
+                          }
+                        : { ...drag, phase, at, over };
                 },
                 {
                     phase: 'release',
@@ -200,12 +307,12 @@ export class HksPatchBay extends HTMLElement {
                     const port = cut?.closest('[data-input]');
 
                     return port instanceof HTMLElement &&
-                        port.dataset['sink'] !== undefined &&
+                        port.dataset['window'] !== undefined &&
                         port.dataset['input'] !== undefined
                         ? [
                               {
                                   kind: 'disconnect',
-                                  sink: port.dataset['sink'],
+                                  window: port.dataset['window'],
                                   input: port.dataset['input'],
                               },
                           ]
@@ -215,10 +322,10 @@ export class HksPatchBay extends HTMLElement {
             fromElementEvent$(board, 'dblclick').pipe(
                 mergeMap(({ target }): PatchCommand[] => {
                     const head = target instanceof Element ? target.closest('.head') : null;
-                    const sink = head?.closest('[data-sink-node]');
+                    const node = head?.closest('[data-window-node]');
 
-                    return sink instanceof HTMLElement && sink.dataset['sinkNode'] !== undefined
-                        ? [{ kind: 'reveal', sink: sink.dataset['sinkNode'] }]
+                    return node instanceof HTMLElement && node.dataset['windowNode'] !== undefined
+                        ? [{ kind: 'reveal', window: node.dataset['windowNode'] }]
                         : [];
                 }),
             ),
@@ -233,16 +340,16 @@ export class HksPatchBay extends HTMLElement {
         const rubber = requireElement(shadow, '.rubber', SVGPathElement);
 
         const drawn$ = layout$.pipe(
-            tap(({ width, height, sources, sinks, wires: list }) => {
+            tap(({ width, height, stores, windows, wires: list }) => {
                 board.style.width = `${width}px`;
                 board.style.height = `${height}px`;
                 wires.setAttribute('width', String(width));
                 wires.setAttribute('height', String(height));
-                this.toggleAttribute('data-empty', sinks.length === 0);
+                this.toggleAttribute('data-empty', windows.length === 0);
 
-                const paths = list.map(({ path, colour, removable }) => {
+                const paths = list.map(({ kind, path, colour, removable }) => {
                     const wire = document.createElementNS(SVG, 'path');
-                    wire.classList.add('wire');
+                    wire.classList.add('wire', kind);
                     wire.toggleAttribute('data-fixed', !removable);
                     wire.setAttribute('d', path);
                     wire.style.setProperty('--store', colour);
@@ -250,83 +357,7 @@ export class HksPatchBay extends HTMLElement {
                     return wire;
                 });
                 wires.replaceChildren(...paths, rubber);
-
-                const sourceNodes = sources.map(
-                    ({ id, kind, store, title, name, colour, x, y, height: h }) => {
-                        const node = placed(document.createElement('div'), x, y, h);
-                        node.className = 'node source';
-                        node.dataset['source'] = id;
-                        node.dataset['kind'] = kind;
-                        node.dataset['store'] = store;
-                        node.style.setProperty('--store', colour);
-                        node.title = `drag onto an input to follow ${title.toLowerCase()} · ${name}`;
-
-                        const dot = document.createElement('span');
-                        dot.className = 'dot';
-                        const label = document.createElement('span');
-                        label.className = 'label';
-                        const kindLabel = document.createElement('span');
-                        kindLabel.className = 'kind';
-                        kindLabel.textContent = title;
-                        const nameLabel = document.createElement('span');
-                        nameLabel.className = 'name';
-                        nameLabel.textContent = name;
-                        label.append(kindLabel, nameLabel);
-                        const jack = document.createElement('span');
-                        jack.className = 'jack';
-                        node.append(dot, label, jack);
-
-                        return node;
-                    },
-                );
-
-                const sinkNodes = sinks.map(({ id, label, icon, ports, x, y, height: h }) => {
-                    const node = placed(document.createElement('div'), x, y, h);
-                    node.className = 'node sink';
-                    node.dataset['sinkNode'] = id;
-
-                    const head = document.createElement('div');
-                    head.className = 'head';
-                    head.title = 'double-click to show this window';
-                    const name = document.createElement('span');
-                    name.textContent = label;
-                    head.append(iconOf(icon), name);
-
-                    const rows = ports.map(({ input, title, accepts, optional, bound }) => {
-                        const row = document.createElement('div');
-                        row.className = 'port';
-                        row.dataset['sink'] = id;
-                        row.dataset['input'] = input;
-                        row.dataset['accepts'] = accepts.join(' ');
-                        row.toggleAttribute('data-bound', bound !== null);
-                        row.toggleAttribute('data-cuttable', optional && bound !== null);
-
-                        const jack = document.createElement('span');
-                        jack.className = 'jack';
-                        const text = document.createElement('span');
-                        text.className = 'title';
-                        text.textContent = title;
-                        row.append(jack, text);
-
-                        if (optional && bound !== null) {
-                            const cut = document.createElement('button');
-                            cut.type = 'button';
-                            cut.className = 'cut';
-                            cut.dataset['cut'] = '';
-                            cut.textContent = '×';
-                            cut.setAttribute('aria-label', `stop ${title} following`);
-                            row.append(cut);
-                        }
-
-                        return row;
-                    });
-
-                    node.append(head, ...rows);
-
-                    return node;
-                });
-
-                nodes.replaceChildren(...sourceNodes, ...sinkNodes);
+                nodes.replaceChildren(...stores.map(storeNode), ...windows.map(windowNode));
             }),
         );
 
@@ -336,12 +367,14 @@ export class HksPatchBay extends HTMLElement {
                 rubber.setAttribute('d', live ? wirePath(from, at) : '');
                 board.toggleAttribute('data-dragging', live);
 
-                for (const node of shadow.querySelectorAll('[data-source], [data-input]')) {
-                    const end = endOf(node);
-                    node.toggleAttribute('data-ok', live && start !== null && fits(start, end));
-                    node.toggleAttribute(
+                for (const element of shadow.querySelectorAll(ENDS)) {
+                    const end = endOf(element);
+                    const ok =
+                        live && start !== null && end !== null && commandOf(start, end) !== null;
+                    element.toggleAttribute('data-ok', ok);
+                    element.toggleAttribute(
                         'data-over',
-                        live && end !== null && over !== null && sameEnd(end, over),
+                        ok && end !== null && over !== null && sameEnd(end, over),
                     );
                 }
             }),
@@ -350,10 +383,5 @@ export class HksPatchBay extends HTMLElement {
         return merge(drawn$, dragged$).pipe(map(() => undefined));
     }
 }
-
-const sameEnd = (a: End, b: End): boolean =>
-    a.kind === 'source'
-        ? b.kind === 'source' && a.id === b.id
-        : b.kind === 'port' && a.sink === b.sink && a.input === b.input;
 
 customElements.define('hks-patch-bay', HksPatchBay);

@@ -31,6 +31,11 @@
     stroke: var(--store);
 }
 
+/* Own state reads heavier than a follow: it is what the window writes, not just what it reads. */
+.wire.own {
+    stroke-width: 3.5;
+}
+
 .wire[data-fixed] {
     opacity: 0.6;
 }
@@ -43,13 +48,13 @@
 .node {
     position: absolute;
     box-sizing: border-box;
-    inline-size: 150px;
+    inline-size: 160px;
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: 10px;
 }
 
-.source {
+.store {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -93,13 +98,14 @@
     box-sizing: border-box;
 }
 
-.source .jack {
+.store .jack {
     inset-inline-end: -6px;
     inset-block-start: calc(50% - 5px);
     border-color: var(--store);
 }
 
 .head {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -109,6 +115,45 @@
     font-weight: 500;
     cursor: default;
     user-select: none;
+}
+
+.head .jack {
+    inset-inline-start: -6px;
+    inset-block-start: 10px;
+    background: var(--ink);
+    border-color: var(--ink);
+}
+
+.head[data-own] {
+    cursor: grab;
+}
+
+.head > .label {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    max-inline-size: 70px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--label);
+    border: 1px solid var(--edge);
+    border-radius: 999px;
+    cursor: grab;
+}
+
+.tag .dot {
+    inline-size: 7px;
+    block-size: 7px;
 }
 
 .icon {
@@ -170,20 +215,20 @@
     background: var(--well);
 }
 
-.board[data-dragging] [data-source],
-.board[data-dragging] [data-input] {
+/* Children of the header, not the header: a tag inside it may be a target while the header is not. */
+.board[data-dragging] .store:not([data-ok]),
+.board[data-dragging] .port:not([data-ok]),
+.board[data-dragging] .head:not([data-ok]) > :not(.tag),
+.board[data-dragging] .tag:not([data-ok]) {
     opacity: 0.4;
-}
-
-.board[data-dragging] [data-ok] {
-    opacity: 1;
 }
 
 [data-ok][data-over] {
     background: var(--well);
 }
 
-.source[data-ok][data-over] {
+.store[data-ok][data-over],
+.tag[data-ok][data-over] {
     border-color: var(--accent);
 }
 

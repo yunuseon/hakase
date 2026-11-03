@@ -1,7 +1,7 @@
-export type PatchSource = {
+export type PatchStore = {
     readonly id: string;
-    readonly kind: string;
-    readonly store: string;
+    readonly program: string;
+    readonly kind: string | null;
     readonly title: string;
     readonly name: string;
     readonly colour: string;
@@ -15,48 +15,62 @@ export type PatchPort = {
     readonly bound: string | null;
 };
 
-export type PatchSink = {
+export type OwnState = {
+    readonly store: string;
+    readonly name: string;
+    readonly colour: string;
+    readonly shown: 'tag' | 'node';
+};
+
+export type PatchWindow = {
     readonly id: string;
+    readonly program: string;
     readonly label: string;
     readonly icon: string;
+    readonly own: OwnState | null;
     readonly ports: readonly PatchPort[];
 };
 
 export type PatchView = {
-    readonly sources: readonly PatchSource[];
-    readonly sinks: readonly PatchSink[];
+    readonly stores: readonly PatchStore[];
+    readonly windows: readonly PatchWindow[];
 };
 
 export type PatchCommand =
     | {
           readonly kind: 'connect';
-          readonly sink: string;
+          readonly window: string;
           readonly input: string;
           readonly source: string;
           readonly store: string;
       }
-    | { readonly kind: 'disconnect'; readonly sink: string; readonly input: string }
-    | { readonly kind: 'reveal'; readonly sink: string };
+    | { readonly kind: 'disconnect'; readonly window: string; readonly input: string }
+    | { readonly kind: 'bind'; readonly window: string; readonly store: string }
+    | { readonly kind: 'reveal'; readonly window: string };
 
 export type Point = { readonly x: number; readonly y: number };
 
-export const NODE_WIDTH = 150;
+export const NODE_WIDTH = 160;
 const GAP = 140;
-const SOURCE_HEIGHT = 34;
+const STORE_HEIGHT = 34;
 const HEADER = 30;
 const PORT_HEIGHT = 24;
 const SPACING = 10;
 const PAD = 12;
 
-export type PlacedSource = PatchSource &
-    Point & { readonly height: number; readonly anchor: Point };
+export type PlacedStore = PatchStore & Point & { readonly height: number; readonly anchor: Point };
 export type PlacedPort = PatchPort & { readonly y: number; readonly anchor: Point };
-export type PlacedSink = Omit<PatchSink, 'ports'> &
-    Point & { readonly height: number; readonly ports: readonly PlacedPort[] };
+export type PlacedWindow = Omit<PatchWindow, 'ports'> &
+    Point & {
+        readonly height: number;
+        readonly anchor: Point;
+        readonly ports: readonly PlacedPort[];
+    };
 
 export type Wire = {
-    readonly sink: string;
-    readonly input: string;
+    readonly kind: 'own' | 'follow';
+    readonly window: string;
+    readonly input: string | null;
     readonly colour: string;
     readonly path: string;
     readonly removable: boolean;
@@ -65,8 +79,8 @@ export type Wire = {
 export type PatchLayout = {
     readonly width: number;
     readonly height: number;
-    readonly sources: readonly PlacedSource[];
-    readonly sinks: readonly PlacedSink[];
+    readonly stores: readonly PlacedStore[];
+    readonly windows: readonly PlacedWindow[];
     readonly wires: readonly Wire[];
 };
 
@@ -82,35 +96,36 @@ const stacked = <T>(items: readonly T[], height: (item: T) => number) =>
         { tops: [], next: PAD },
     );
 
-const sinkHeight = (sink: PatchSink) => HEADER + sink.ports.length * PORT_HEIGHT + 6;
+const windowHeight = (window: PatchWindow) => HEADER + window.ports.length * PORT_HEIGHT + 6;
 
-export const layoutOf = ({ sources, sinks }: PatchView): PatchLayout => {
+export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
     const left = PAD;
     const right = PAD + NODE_WIDTH + GAP;
-    const sourceTops = stacked(sources, () => SOURCE_HEIGHT);
-    const sinkTops = stacked(sinks, sinkHeight);
+    const storeTops = stacked(stores, () => STORE_HEIGHT);
+    const windowTops = stacked(windows, windowHeight);
 
-    const placedSources = sources.map((source, index): PlacedSource => {
-        const y = sourceTops.tops[index] ?? PAD;
+    const placedStores = stores.map((store, index): PlacedStore => {
+        const y = storeTops.tops[index] ?? PAD;
 
         return {
-            ...source,
+            ...store,
             x: left,
             y,
-            height: SOURCE_HEIGHT,
-            anchor: { x: left + NODE_WIDTH, y: y + SOURCE_HEIGHT / 2 },
+            height: STORE_HEIGHT,
+            anchor: { x: left + NODE_WIDTH, y: y + STORE_HEIGHT / 2 },
         };
     });
 
-    const placedSinks = sinks.map((sink, index): PlacedSink => {
-        const y = sinkTops.tops[index] ?? PAD;
+    const placedWindows = windows.map((window, index): PlacedWindow => {
+        const y = windowTops.tops[index] ?? PAD;
 
         return {
-            ...sink,
+            ...window,
             x: right,
             y,
-            height: sinkHeight(sink),
-            ports: sink.ports.map((port, at) => {
+            height: windowHeight(window),
+            anchor: { x: right, y: y + HEADER / 2 },
+            ports: window.ports.map((port, at) => {
                 const portY = y + HEADER + at * PORT_HEIGHT;
 
                 return { ...port, y: portY, anchor: { x: right, y: portY + PORT_HEIGHT / 2 } };
@@ -118,31 +133,50 @@ export const layoutOf = ({ sources, sinks }: PatchView): PatchLayout => {
         };
     });
 
-    const wires = placedSinks.flatMap(sink =>
-        sink.ports.flatMap((port): Wire[] => {
-            const source = placedSources.find(({ id }) => id === port.bound);
+    const storeAt = (id: string | null) => placedStores.find(store => store.id === id);
 
-            return source === undefined
+    const wires = placedWindows.flatMap(window => {
+        const own = window.own?.shown === 'node' ? storeAt(window.own.store) : undefined;
+        const owned: Wire[] =
+            own === undefined
                 ? []
                 : [
                       {
-                          sink: sink.id,
-                          input: port.input,
-                          colour: source.colour,
-                          path: wirePath(source.anchor, port.anchor),
-                          removable: port.optional,
+                          kind: 'own',
+                          window: window.id,
+                          input: null,
+                          colour: own.colour,
+                          path: wirePath(own.anchor, window.anchor),
+                          removable: false,
                       },
                   ];
-        }),
-    );
+
+        return [
+            ...owned,
+            ...window.ports.flatMap((port): Wire[] => {
+                const source = storeAt(port.bound);
+
+                return source === undefined
+                    ? []
+                    : [
+                          {
+                              kind: 'follow',
+                              window: window.id,
+                              input: port.input,
+                              colour: source.colour,
+                              path: wirePath(source.anchor, port.anchor),
+                              removable: port.optional,
+                          },
+                      ];
+            }),
+        ];
+    });
 
     return {
         width: right + NODE_WIDTH + PAD,
-        height: Math.max(sourceTops.next, sinkTops.next) + PAD - SPACING,
-        sources: placedSources,
-        sinks: placedSinks,
+        height: Math.max(storeTops.next, windowTops.next) + PAD - SPACING,
+        stores: placedStores,
+        windows: placedWindows,
         wires,
     };
 };
-
-export const accepts = (port: PatchPort, source: PatchSource) => port.accepts.includes(source.kind);

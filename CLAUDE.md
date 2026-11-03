@@ -1038,24 +1038,36 @@ to, or null, already resolved from the store.
 
 ## The patch bay
 
-`patch` draws the dataflow the inputs make: every store a window can follow on
-the left (clocks, focus timers, signals), every window with a followed input on
-the right with a jack per input, and a wire in its store's colour for each
-binding. It holds no state and adds no behaviour: `patchOf` in `src/patch.ts`
-derives the graph from the workspace and `inputsFor`, `layoutOf` in the
-component folder places it, and the bay's commands become the very `follow` and
-`unfollow` actions the state popover sends, so the reducer's checks, undo and
-labels all apply. A main store with no window yet is listed once something
-follows it.
+`patch` draws the app's dataflow as one graph: stores on the left, windows on
+the right, and two kinds of wire between them. A window's **own state** runs
+into its header (a thick wire: what the window reads and writes), and each
+**follow** runs into the jack of the input it binds (what the window only
+reads). Where they meet the chain shows whole: signal 1 edits Signal Main,
+which drives sketch 1's k1. It holds no state and adds no behaviour: `patchOf`
+in `src/patch.ts` derives the graph from the workspace and `inputsFor`,
+`layoutOf` in the component folder places it, and every edit is an action the
+window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
+reducer's checks, undo and labels all apply.
 
-Drag from a source to a port, or a port to a source, to wire them; only ports
-that accept the dragged source's kind stay lit, and a drop anywhere else does
-nothing. Drag a bound optional port's jack into empty space, or click its ×, to
-unplug it; a required input (a clock) has no × and cannot be pulled out.
-Double-clicking a window's header reveals it. One shared `drags$` feeds both the
-rubber-band wire and the command it ends in, for the todo grip's reason. The
-workspace emits on every pointer move, so `patch$` dedupes with `samePatch`,
-which names every field, or every window drag would rebuild the bay.
+**A store only one window uses is a tag, not a node.** Every sketch and editor
+has a private settings store, and a node for each with a single wire would
+bury the connections under one-to-one noise. So a store is a node when it can
+be followed (a clock, a timer, a signal, which are targets even unused), when
+something follows it, or when two windows share it; otherwise it is a coloured
+tag in its window's header. A tag is still a drag end, so dragging another
+window's header jack onto it shares it, and the tag becomes a node.
+
+Drag between a store and a window's header to bind the window to it (same
+program only, and not the store it already has), or between a store and a port
+to follow it; only ends that would make a valid action stay lit, judged by the
+same `commandOf` that turns the drop into a command. Drag a bound optional
+port's jack into empty space, or click its ×, to unplug it; a clock input and a
+window's own state cannot be unplugged, only moved. Double-clicking a header
+reveals the window. One shared `drags$` feeds both the rubber-band wire and the
+command, for the todo grip's reason, and `patch$` dedupes with `samePatch`,
+which names every field, because the workspace emits on every pointer move.
+While dragging, the header's children dim rather than the header, or a tag
+inside an unlit header could never show that it is a target.
 
 ## The inspector
 
@@ -1578,7 +1590,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and sixty-nine of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -23,7 +23,7 @@ export const patchProgram = {
                     bay.commands$.pipe(
                         map((command): AppInput =>
                             command.kind === 'reveal'
-                                ? { kind: 'task', command: 'reveal', id: command.sink }
+                                ? { kind: 'task', command: 'reveal', id: command.window }
                                 : { kind: 'patch', command },
                         ),
                     ),

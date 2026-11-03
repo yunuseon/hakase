@@ -301,17 +301,22 @@ const bootstrap = () => {
         ),
         defer(() => inputs$).pipe(
             mergeMap(({ input }) => (input.kind === 'patch' ? of(input.command) : EMPTY)),
-            map((command): WorkspaceAction =>
-                command.kind === 'connect'
-                    ? {
-                          kind: 'follow',
-                          id: command.sink,
-                          input: command.input,
-                          source: command.source,
-                          store: command.store,
-                      }
-                    : { kind: 'unfollow', id: command.sink, input: command.input },
-            ),
+            map((command): WorkspaceAction => {
+                switch (command.kind) {
+                    case 'connect':
+                        return {
+                            kind: 'follow',
+                            id: command.window,
+                            input: command.input,
+                            source: command.source,
+                            store: command.store,
+                        };
+                    case 'disconnect':
+                        return { kind: 'unfollow', id: command.window, input: command.input };
+                    case 'bind':
+                        return { kind: 'bind-store', id: command.window, store: command.store };
+                }
+            }),
         ),
         defer(() => inputs$).pipe(
             mergeMap(({ input }) => (input.kind === 'travel' ? of(input.offset) : EMPTY)),
