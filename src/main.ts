@@ -98,7 +98,6 @@ import {
     isProgramId,
     type AppState,
     type ProcessId,
-    type Program,
     type ProgramId,
     type Slot,
     type Task,
@@ -141,9 +140,9 @@ type StoreKey =
     | 'bookmarks$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
-const programList: readonly Program[] = Object.values(programs);
+const programList = Object.values(programs);
 
-const programOf = (id: ProgramId): Program => programs[id];
+const programOf = (id: ProgramId) => programs[id];
 
 // The programs declare what they read from others; the workspace asks through this, never the table itself.
 const inputsFor: InputsFor = program => programs[program].inputs;

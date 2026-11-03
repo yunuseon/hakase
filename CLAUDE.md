@@ -1433,6 +1433,18 @@ asserting it. When an external source needs adapting, reach for
 so the emitted type is verified rather than declared. The adapters in `lib/rx.ts`
 — `fromElementEvent$`, `fromDocumentEvent$`, `observeResize$` — all work this way.
 
+**Shape over declaration.** Let a type be read off the value rather than
+declared beside it: as few return types and annotations as possible, and
+`satisfies T` where a value should be checked against a type. An annotation
+replaces what was inferred with something wider, and whatever depended on the
+narrow type loses it silently. Every program is `… satisfies Program`, never
+`const x: Program = …`: `Process` is derived from the program record, and an
+annotated program's inputs widen to `ProgramInputs`, so its `follows` types as
+`{}` and nothing errors where the annotation was added. Declare a type where
+there is no value to infer from — parameters, unions, what untrusted input is
+narrowed into — or where widening is the point, as `inputsFor` is: the
+workspace looks programs up at runtime.
+
 **No phantom type parameters.** A `<T>` that appears only in a function's return
 type — or in the parameters of a function it returns — has nothing to be inferred
 from at the call site. TypeScript falls back to `unknown` on a good day and `any`

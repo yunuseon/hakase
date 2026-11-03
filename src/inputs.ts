@@ -86,20 +86,20 @@ export type BindingsOf<I> = {
 export type Bindings = { readonly [input: string]: Follow };
 
 // Not inputs[name]: a name read from storage could be "constructor", which every object has.
-export const definitionOf = (inputs: ProgramInputs, name: string): InputDefinition | undefined =>
+export const definitionOf = (inputs: ProgramInputs, name: string) =>
     Object.entries(inputs).find(([key]) => key === name)?.[1];
 
-export const followedBy = (follows: Bindings, name: string): Follow | null =>
+export const followedBy = (follows: Bindings, name: string) =>
     Object.entries(follows).find(([key]) => key === name)?.[1] ?? null;
 
-export const initialFollows = (inputs: ProgramInputs): Bindings =>
+export const initialFollows = (inputs: ProgramInputs) =>
     Object.fromEntries(
         Object.entries(inputs).flatMap(([name, definition]) =>
-            definition.from === 'followed' ? [[name, definition.initial]] : [],
+            definition.from === 'followed' ? [[name, definition.initial] as const] : [],
         ),
     );
 
-export const accepts = (inputs: ProgramInputs, name: string, kind: Follow['kind']): boolean => {
+export const accepts = (inputs: ProgramInputs, name: string, kind: Follow['kind']) => {
     const definition = definitionOf(inputs, name);
 
     return (
@@ -107,16 +107,16 @@ export const accepts = (inputs: ProgramInputs, name: string, kind: Follow['kind'
     );
 };
 
-export const fits = (inputs: ProgramInputs, follows: Bindings): boolean =>
+export const fits = (inputs: ProgramInputs, follows: Bindings) =>
     Object.entries(follows).every(([name, binding]) => accepts(inputs, name, binding.kind)) &&
     Object.entries(inputs).every(
         ([name, definition]) => definition.from === 'own' || followedBy(follows, name) !== null,
     );
 
-export const sourceProgram = (kind: Follow['kind']): ProgramId =>
+export const sourceProgram = (kind: Follow['kind']) =>
     kind === 'playback' ? playbackSource.program : focusSource.program;
 
-export const progressBinding = (kind: string, store: StoreId): Follow | null => {
+export const progressBinding = (kind: string, store: StoreId) => {
     switch (kind) {
         case 'playback':
             return { kind, store };
@@ -127,16 +127,12 @@ export const progressBinding = (kind: string, store: StoreId): Follow | null => 
     }
 };
 
-export const followedStores = (follows: Bindings): readonly StoreId[] =>
+export const followedStores = (follows: Bindings) =>
     Object.values(follows).map(({ store }) => store);
 
-export const playbackBinding = (
-    inputs: ProgramInputs,
-    store: StoreId,
-    follows: Bindings,
-): PlaybackBinding | null => {
+export const playbackBinding = (inputs: ProgramInputs, store: StoreId, follows: Bindings) => {
     if (Object.values(inputs).some(definition => definition.from === 'own')) {
-        return { kind: 'playback', store };
+        return { kind: 'playback' as const, store };
     }
 
     const scrubbed = Object.entries(follows).find(([name, binding]) => {
@@ -157,7 +153,7 @@ export const progressConnection = (
     definition: FollowedInput,
     binding: Follow,
     sources: InputSources,
-): ProgressConnection => {
+) => {
     const source = definition.sources.find(source => source.kind === binding.kind);
 
     return (source ?? playbackSource).connect(binding.store, sources);

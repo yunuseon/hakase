@@ -161,7 +161,7 @@ export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor
     const editorHeight = Math.max(320, height - timelineHeight - 3 * gutter);
     const sketchX = left + editorWidth + gutter;
 
-    const sized = (process: Omit<Draft, 'measured' | 'follows'>): Process[] => {
+    const sized = (process: Omit<Draft, 'measured' | 'follows'>) => {
         const draft = {
             ...process,
             follows: initialFollows(inputsFor(process.program)),
