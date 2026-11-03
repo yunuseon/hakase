@@ -61,6 +61,7 @@ const knobRow = (knob: Knob) => `
                    value="${defaultPanel.knobs[knob]}" />
             <output class="read" data-read="${knob}"></output>
         </label>
+        <span class="driven" title="this knob follows a signal; set it to none in the window's state menu to turn it by hand">signal</span>
         <select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
                 title="let it swing from 0 to its value and back, a whole number of times per loop">
             ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× per loop`}</option>`).join('')}
@@ -328,6 +329,7 @@ export class HksSketchControls extends HTMLElement {
         view$: Observable<ControlsView>,
         knobs$: Observable<readonly KnobView[]>,
         formulas$: Observable<readonly PresetOption[]>,
+        driven$: Observable<readonly string[]>,
     ): Observable<void> {
         // Together: options rebuilt after the value was set would drop the selection.
         const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
@@ -435,6 +437,32 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
+        const drivers$ = driven$.pipe(
+            map(knobs => knobs.join()),
+            distinctUntilChanged(),
+            tap(joined => {
+                const knobs = joined.split(',');
+
+                for (const knob of KNOBS) {
+                    const driven = knobs.includes(knob);
+                    requireChild(this.shadow, `[data-knob="${knob}"]`).toggleAttribute(
+                        'data-driven',
+                        driven,
+                    );
+                    requireElement(
+                        this.shadow,
+                        `[data-field="${knob}"]`,
+                        HTMLInputElement,
+                    ).disabled = driven;
+                    requireElement(
+                        this.shadow,
+                        `[data-cycles="${knob}"]`,
+                        HTMLSelectElement,
+                    ).disabled = driven;
+                }
+            }),
+        );
+
         const resets$ = GROUPS.map(name =>
             view$.pipe(
                 map(({ changed }) => changed[name]),
@@ -482,6 +510,7 @@ export class HksSketchControls extends HTMLElement {
             ...resets$,
             only$,
             shown$,
+            drivers$,
             turned$,
         ).pipe(map(() => undefined));
     }

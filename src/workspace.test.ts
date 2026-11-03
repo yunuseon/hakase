@@ -627,7 +627,7 @@ describe('following', () => {
     it('is undoable and labelled', () => {
         const history = twoClocks();
 
-        expect(history.label).toBe('Set sketch to follow Store 1');
+        expect(history.label).toBe('Set sketch playback to follow Store 1');
         expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual({
             playback: { kind: 'playback', store: 'timeline' },
         });
@@ -664,6 +664,58 @@ describe('follows saved before kinds', () => {
             parseWorkspace(saved, inputsFor)?.processes.find(({ id }) => id === 'sketch-2')
                 ?.follows,
         ).toEqual({ playback: { kind: 'playback', store: 'store-1' } });
+    });
+});
+
+describe('knob inputs', () => {
+    const signalled = (): History =>
+        run(fresh(), [
+            { kind: 'launch', program: 'signal', size: { width: 300, height: 300 }, viewport },
+            { kind: 'follow', id: 'sketch-2', input: 'k2', source: 'signal', store: 'signal' },
+        ]);
+    const sketchOf = (history: History) =>
+        history.present.processes.find(({ id }) => id === 'sketch-2')?.follows;
+
+    it('start unbound and follow a signal when asked', () => {
+        expect(sketchOf(fresh())).toEqual({ playback: { kind: 'playback', store: 'timeline' } });
+        expect(sketchOf(signalled())).toEqual({
+            playback: { kind: 'playback', store: 'timeline' },
+            k2: { kind: 'signal', store: 'signal' },
+        });
+    });
+
+    it('let go of a knob, but never of the clock', () => {
+        const history = run(signalled(), [
+            { kind: 'unfollow', id: 'sketch-2', input: 'k2' },
+            { kind: 'unfollow', id: 'sketch-2', input: 'playback' },
+        ]);
+
+        expect(sketchOf(history)).toEqual({ playback: { kind: 'playback', store: 'timeline' } });
+        expect(history.label).toBe('Set sketch k2 to follow nothing');
+    });
+
+    it('refuse a clock on a knob and a signal on the clock', () => {
+        const history = run(signalled(), [
+            { kind: 'follow', id: 'sketch-2', input: 'k1', source: 'playback', store: 'timeline' },
+            {
+                kind: 'follow',
+                id: 'sketch-2',
+                input: 'playback',
+                source: 'signal',
+                store: 'signal',
+            },
+        ]);
+
+        expect(sketchOf(history)).toEqual(sketchOf(signalled()));
+    });
+
+    it('keep a followed signal in use, and read it back after a reload', () => {
+        const history = signalled();
+
+        expect(usedStores(history.present.processes).has('signal')).toBe(true);
+        expect(
+            parseWorkspace(JSON.parse(JSON.stringify(history.present)), inputsFor)?.processes,
+        ).toEqual(history.present.processes);
     });
 });
 

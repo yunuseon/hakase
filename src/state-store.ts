@@ -17,6 +17,7 @@ import { parseAgenda, type Agenda } from './components/agenda/agenda.ts';
 import { parseHabits, type Habits } from './components/habits/habits.ts';
 import { parseClocks, type Clocks } from './components/clocks/clocks.ts';
 import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks.ts';
+import { parseSignal, type Signal } from './shared/signal.ts';
 import { parseTodos, type TodoList } from './components/todo/todo.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
@@ -50,6 +51,7 @@ export type Snapshot = {
     readonly habits: ReadonlyMap<StoreId, Habits>;
     readonly clocks: ReadonlyMap<StoreId, Clocks>;
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
+    readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly library: Library;
 };
 
@@ -135,6 +137,7 @@ const fresh: Restored = {
     habits: new Map(),
     clocks: new Map(),
     bookmarks: new Map(),
+    signals: new Map(),
     library: emptyLibrary,
 };
 
@@ -189,6 +192,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
             field(stored, 'bookmarks') === undefined && field(stored, 'links') !== undefined
                 ? new Map([['bookmarks', parseBookmarks(undefined, field(stored, 'links'))]])
                 : byStore(field(stored, 'bookmarks'), 'bookmarks', value => parseBookmarks(value)),
+        signals: byStore(field(stored, 'signals'), 'signal', parseSignal),
         library: parseLibrary(field(stored, 'library')),
     };
 };
@@ -220,6 +224,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         habits: saved(snapshot.habits),
         clocks: saved(snapshot.clocks),
         bookmarks: saved(snapshot.bookmarks),
+        signals: saved(snapshot.signals),
         library: snapshot.library,
     };
 };

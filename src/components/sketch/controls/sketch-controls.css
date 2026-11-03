@@ -263,6 +263,29 @@
     color: var(--label);
 }
 
+.driven {
+    display: none;
+    padding: 2px 8px;
+    font: 500 11px var(--font-ui);
+    color: var(--accent);
+    background: var(--well);
+    border-radius: 8px;
+}
+
+.knob[data-driven] .driven {
+    display: block;
+}
+
+.knob[data-driven] .motion,
+.knob[data-driven] .read {
+    display: none;
+}
+
+.knob[data-driven] .dial {
+    opacity: 0.4;
+    cursor: default;
+}
+
 .empty {
     margin: 4px 0;
     color: var(--muted);

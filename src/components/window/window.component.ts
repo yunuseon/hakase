@@ -228,6 +228,26 @@ const followRow = ({ id, name, colour, users, current }: StoreOption): HTMLEleme
     return row;
 };
 
+const noneRow = (input: string, current: boolean): HTMLElement => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'pick follow none';
+    row.dataset['unfollow'] = input;
+    row.toggleAttribute('data-current', current);
+    row.setAttribute('aria-pressed', String(current));
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+
+    const label = document.createElement('span');
+    label.className = 'option-name';
+    label.textContent = 'None';
+
+    row.append(dot, label);
+
+    return row;
+};
+
 const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
 
@@ -377,6 +397,13 @@ export class HksWindow extends HTMLElement {
                     event.stopPropagation();
                 }),
                 ignoreElements(),
+            ),
+            fromElementEvent$(popover, 'click').pipe(
+                mergeMap(({ target }): Observable<WindowGesture> => {
+                    const input = dataOf(target, 'unfollow');
+
+                    return input === undefined ? EMPTY : of({ kind: 'unfollow', input });
+                }),
             ),
             fromElementEvent$(popover, 'click').pipe(
                 mergeMap(({ target }): Observable<WindowGesture> => {
@@ -611,13 +638,16 @@ export class HksWindow extends HTMLElement {
                     if (!(shadow.activeElement instanceof HTMLInputElement)) {
                         requireChild(shadow, '.follows').replaceChildren(
                             ...(follows ?? []).flatMap(
-                                ({ input, source, title, options: list }) => {
+                                ({ input, optional, source, title, options: list }) => {
                                     const heading = document.createElement('p');
                                     heading.className = 'follow-title';
                                     heading.textContent = title;
 
                                     return [
                                         heading,
+                                        ...(optional
+                                            ? [noneRow(input, !list.some(({ current }) => current))]
+                                            : []),
                                         ...list.map(option => {
                                             const row = followRow(option);
                                             row.dataset['followInput'] = input;

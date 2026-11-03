@@ -1,4 +1,4 @@
-import { playbackInput } from '../inputs.ts';
+import { knobInputs, playbackInput } from '../inputs.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -23,7 +23,7 @@ import { optionsOf } from '../library.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
-import { sameTheme, type Theme } from '../components/sketch/theme.ts';
+import { sameTheme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
 import { thumbnails$ } from '../components/sketch/strip/thumbnails.ts';
@@ -49,10 +49,10 @@ import {
 } from '../components/sketch/animation.ts';
 import {
     centre,
+    KNOBS,
     panelParams,
     samePanel,
     steppedRatio,
-    type Panel,
     type Pointer,
     type SketchParams,
 } from '../components/sketch/params.ts';
@@ -77,7 +77,7 @@ const statusOf = (event: ExportEvent): ExportStatus => {
 
 export const sketchProgram = {
     id: 'sketch',
-    inputs: { playback: playbackInput },
+    inputs: { playback: playbackInput, ...knobInputs },
     title: 'sketch',
     category: 'make',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
@@ -132,9 +132,16 @@ export const sketchProgram = {
                     distinctUntilChanged(sameTheme),
                 );
 
-                const params$ = combineLatest([panel$, size$, theme$]).pipe(
-                    map(([panel, size, theme]: [Panel, Size, Theme]): SketchParams => ({
-                        ...panelParams(panel),
+                const signals$ = combineLatest({
+                    k1: state.followedSignal$('k1'),
+                    k2: state.followedSignal$('k2'),
+                    k3: state.followedSignal$('k3'),
+                    k4: state.followedSignal$('k4'),
+                }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+                const params$ = combineLatest([panel$, size$, theme$, signals$]).pipe(
+                    map(([panel, size, theme, signals]): SketchParams => ({
+                        ...panelParams(panel, signals),
                         ...size,
                         theme,
                     })),
@@ -344,6 +351,9 @@ export const sketchProgram = {
                             settings$.pipe(map(controlsView)),
                             shader$.pipe(map(knobsUsed)),
                             state.library$.pipe(map(optionsOf)),
+                            signals$.pipe(
+                                map(signals => KNOBS.filter(knob => signals[knob] !== null)),
+                            ),
                         )
                         .pipe(ignoreElements()),
                     strip

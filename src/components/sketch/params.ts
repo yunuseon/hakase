@@ -1,6 +1,7 @@
 import type { Size } from '../window/frame.ts';
 import type { Fit, Lattice, Lens, Space } from './space.ts';
 import type { Theme } from './theme.ts';
+import { signalAt, type Signal } from '../../shared/signal.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
 
@@ -39,6 +40,20 @@ export type Motion = Readonly<Record<Knob, Cycles>>;
 export const knobAt = (value: number, cycles: Cycles, t: number): number =>
     cycles === 0 ? value : value * (0.5 - 0.5 * Math.cos(2 * Math.PI * cycles * t));
 
+export type Signals = Readonly<Record<Knob, Signal | null>>;
+
+export const unbound: Signals = { k1: null, k2: null, k3: null, k4: null };
+
+export const knobValue = (
+    { knobs, motion, signals }: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,
+    knob: Knob,
+    t: number,
+) => {
+    const signal = signals[knob];
+
+    return signal === null ? knobAt(knobs[knob], motion[knob], t) : signalAt(signal, t);
+};
+
 export type PanelParams = {
     readonly dimension: number;
     readonly draw: DrawStyle;
@@ -51,6 +66,7 @@ export type PanelParams = {
     readonly space: Space;
     readonly trails: number;
     readonly motion: Motion;
+    readonly signals: Signals;
 };
 
 // Flat, unlike PanelParams: a dot setting must outlive a switch to lines, so it is kept, not dropped.
@@ -87,21 +103,24 @@ export const samePanel = (a: Panel, b: Panel): boolean =>
     a.trails === b.trails &&
     KNOBS.every(knob => a.motion[knob] === b.motion[knob]);
 
-export const panelParams = ({
-    mode,
-    dimension,
-    baseSize,
-    depthScalar,
-    knobs,
-    axes,
-    fit,
-    lens,
-    lattice,
-    focus,
-    space,
-    trails,
-    motion,
-}: Panel): PanelParams => ({
+export const panelParams = (
+    {
+        mode,
+        dimension,
+        baseSize,
+        depthScalar,
+        knobs,
+        axes,
+        fit,
+        lens,
+        lattice,
+        focus,
+        space,
+        trails,
+        motion,
+    }: Panel,
+    signals: Signals,
+): PanelParams => ({
     dimension,
     draw: mode === 'dots' ? { mode, baseSize, depthScalar } : { mode },
     knobs,
@@ -113,6 +132,7 @@ export const panelParams = ({
     space,
     trails,
     motion,
+    signals,
 });
 
 export type Pointer = {

@@ -11,6 +11,7 @@ import { historyProgram } from './programs/history.program.ts';
 import { inspectorProgram } from './programs/inspector.program.ts';
 import { noteProgram } from './programs/note.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
+import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
@@ -24,6 +25,7 @@ export const programs = {
     sketch: sketchProgram,
     timeline: timelineProgram,
     playhead: playheadProgram,
+    signal: signalProgram,
     tasks: tasksProgram,
     todo: todoProgram,
     board: boardProgram,

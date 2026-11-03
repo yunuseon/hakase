@@ -36,6 +36,7 @@ export type StoreOption = {
 // Another program's stores a window can run on, the current one marked.
 export type FollowGroup = {
     readonly input: string;
+    readonly optional: boolean;
     readonly source: string;
     readonly title: string;
     readonly options: readonly StoreOption[];
@@ -77,6 +78,7 @@ export type WindowGesture =
           readonly source: string;
           readonly store: string;
       }
+    | { readonly kind: 'unfollow'; readonly input: string }
     // The window echoes what it was offered: it does not know what a program is.
     | {
           readonly kind: 'replace';

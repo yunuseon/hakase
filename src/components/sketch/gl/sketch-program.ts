@@ -1,7 +1,7 @@
 import {
     DRAW_MODES,
     KNOBS,
-    knobAt,
+    knobValue,
     type DrawMode,
     type Knob,
     type PanelParams,
@@ -283,7 +283,7 @@ export const PASS_SEED = 4;
 export const setMoment = (
     gl: WebGL2RenderingContext,
     { uniforms }: Sketch,
-    { knobs, motion }: Pick<PanelParams, 'knobs' | 'motion'>,
+    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
@@ -291,7 +291,7 @@ export const setMoment = (
     gl.uniform1f(uniforms.playhead, playhead);
     // Every frame, not in prepare: a moving knob changes with the playhead, not with its settings.
     KNOBS.forEach((knob, index) => {
-        gl.uniform1f(uniforms.knobs[index] ?? null, knobAt(knobs[knob], motion[knob], playhead));
+        gl.uniform1f(uniforms.knobs[index] ?? null, knobValue(params, knob, playhead));
     });
     gl.uniform2f(uniforms.pointer, x, y);
     gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
@@ -303,12 +303,20 @@ const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
 export const drawFrame = (
     gl: WebGL2RenderingContext,
     sketch: Sketch,
-    { draw: { mode }, dimension, axes, trails, knobs, motion, lattice, space }: PanelParams,
+    params: PanelParams,
     playhead: number,
     pointer: Pointer,
     orbit: Orbit,
 ): void => {
     const { uniforms } = sketch;
+    const {
+        draw: { mode },
+        dimension,
+        axes,
+        trails,
+        lattice,
+        space,
+    } = params;
     if (trails > 0) {
         // Fade towards the backdrop instead of clearing; depth must not keep the fade from covering.
         gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -321,7 +329,7 @@ export const drawFrame = (
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
 
-    setMoment(gl, sketch, { knobs, motion }, playhead, pointer, orbit);
+    setMoment(gl, sketch, params, playhead, pointer, orbit);
     gl.uniform1i(uniforms.pass, PASS_LATTICE);
     gl.drawArrays(
         primitive(gl, mode),

@@ -180,6 +180,13 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     in `prepare`, because a moving knob changes with the playhead rather than with
     its settings.
 
+    **A knob can follow a signal** instead (see "Signals"). `knobValue` picks
+    for each knob: a bound signal's value at the playhead, or the slider and its
+    motion. The bound signals travel in `PanelParams.signals`, beside the panel
+    rather than in it, so the live sketch, the thumbnails and an export all draw
+    the same frame; a bound knob's row shows **signal**, with its slider and
+    motion disabled but kept for when it is let go.
+
 - **The pointer, in world space.** TypeScript sends only the mouse's clip-space
   position (`uPointer`, from `pointerAt`) and whether it is pressed; the vertex
   shader turns that into what a formula reads, because only the shader knows the
@@ -1008,6 +1015,27 @@ applied the add by the time a bubbling listener runs, and waiting for "the next
 binding" then waits forever. The window
 receives them as plain `StoreOption`s and knows nothing else.
 
+## Signals
+
+`signal` is a document program: a low-frequency wave, `Signal = { shape, rate,
+phase, low, high }`, with `signalAt(signal, t)` a **pure function of the
+playhead** (`src/shared/signal.ts`, shared because the sketch reads it too).
+That is what keeps a signal honest about time: it loops seamlessly, a scrub
+lands exactly, and an export or a thumbnail evaluates it at its own frame with
+no recording. Rates are whole cycles per loop (`RATES`), for the same reason as
+knob motion; `noise` eases between hashed points whose index wraps at the
+loop's point count, or its last point would jump back to the first. `low` above
+`high` inverts the wave.
+
+A signal window shows its wave and marks the moment of the clock it follows
+(it takes `playbackInput` like a sketch). A sketch's four knobs are inputs
+(`knobInputs`, optional, accepting `signal`), so one signal can drive knobs in
+several sketches, and a fork drives another set apart. A signal never reads the
+clock of the window that shows it: the follower evaluates it at its **own**
+playhead, so a sketch on a second clock plays the same wave on its own time.
+`AppState.followedSignal$(input)` hands a program the signal its input is bound
+to, or null, already resolved from the store.
+
 ## The inspector
 
 `inspector` shows any state in the app: a tree of the programs that keep state,
@@ -1082,9 +1110,14 @@ in step: adding an input is one field on the program.
 says so.** The program table is a record keyed by id (`src/programs.ts`,
 `satisfies { [K in ProgramId]: Program<K> }`), and `Process` is derived from it
 with `import type`: one member per program, whose `follows` is a record keyed by
-input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding }`, the
-dial's `{ progress: Follow }`, a todo's and a timeline's have no keys at all, so
-a focus binding on a sketch does not type-check. `BindingsOf` reads the kinds
+input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding, k1?:
+SignalBinding, … }`, the dial's `{ progress: PlaybackBinding | FocusBinding }`,
+a todo's and a timeline's have no keys at all, so a focus binding on a sketch
+does not type-check. An input whose `initial` is `null` is **optional**: a new
+window starts without it, its key is optional in the type, `fits` does not
+require it, and the popover offers **None** above its stores, which emits
+`unfollow`. A required input (the clock) cannot be let go: the reducer refuses
+it. `BindingsOf` reads the kinds
 with `infer` from the input's `sources`: indexing `D['sources']` inside the
 conditional falls back to the constraint and lets every kind through.
 
@@ -1097,6 +1130,11 @@ conditional falls back to the constraint and lets every kind through.
 - Input names from storage are looked up with `definitionOf`/`followedBy`,
   never `inputs[name]`: every object has a `constructor`.
 
+- **A refused action is no step.** `step` hands back the very workspace it was
+  given when it refuses, `reduceWorkspace` passes that through untouched, and
+  `reduceHistory` records nothing for it, so clicking None on a knob already at
+  None leaves no empty undo. A `raise` is the exception: it must still end the
+  last drag's step even when it changes nothing.
 - **The workspace asks, it does not import.** `reduceWorkspace`,
   `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
   an `inputsFor(program)`; `main.ts` builds it from the program table, and tests
@@ -1519,7 +1557,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and sixty-two of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and sixty-six of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -793,6 +793,29 @@ const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFo
                   }
                 : workspace;
         }
+        case 'unfollow': {
+            const process = workspace.processes.find(({ id }) => id === action.id);
+
+            if (process === undefined) {
+                return workspace;
+            }
+
+            const unfollowed = {
+                ...process,
+                follows: Object.fromEntries(
+                    Object.entries(process.follows).filter(([name]) => name !== action.input),
+                ),
+            };
+
+            return ownsInputs(inputsFor)(unfollowed)
+                ? {
+                      ...workspace,
+                      processes: workspace.processes.map(other =>
+                          other.id === action.id ? unfollowed : other,
+                      ),
+                  }
+                : workspace;
+        }
         case 'prune-stores': {
             const bound = usedStores(workspace.processes);
 
@@ -980,6 +1003,11 @@ export const reduceWorkspace = (
     inputsFor: InputsFor,
 ): Workspace => {
     const next = step(workspace, action, inputsFor);
+
+    // Refused: the same object back, so history can tell that nothing happened.
+    if (next === workspace) {
+        return workspace;
+    }
 
     return {
         ...next,
@@ -1340,6 +1368,7 @@ const stepOf = (action: WorkspaceAction): Step | null => {
         case 'replace':
         case 'prune-stores':
         case 'follow':
+        case 'unfollow':
         case 'add-section':
         case 'rename-section':
         case 'remove-section':
@@ -1386,7 +1415,9 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
         case 'prune-stores':
             return 'Pruned unused states';
         case 'follow':
-            return `Set ${programOf(before, action.id)} to follow ${storeName(before, action.store)}`;
+            return `Set ${programOf(before, action.id)} ${action.input} to follow ${storeName(before, action.store)}`;
+        case 'unfollow':
+            return `Set ${programOf(before, action.id)} ${action.input} to follow nothing`;
         case 'move':
             return `Moved ${programOf(before, action.id)}`;
         case 'resize':
@@ -1496,6 +1527,11 @@ export const reduceHistory = (
             present: reduced,
             step: action.kind === 'raise' ? null : history.step,
         };
+    }
+
+    // Not for a raise above: one that changes nothing must still end the last drag's step.
+    if (reduced === present) {
+        return history;
     }
 
     return step.joins && step.key === history.step

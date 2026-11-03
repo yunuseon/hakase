@@ -44,6 +44,7 @@ import { reduceBoard } from './components/board/board.ts';
 import { reduceNotes } from './components/note/note.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
+import { defaultSignal, reduceSignal } from './shared/signal.ts';
 import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
@@ -53,10 +54,10 @@ import { emptyTodos } from './components/todo/todo.ts';
 import {
     definitionOf,
     followedBy,
+    type Bindings,
     followedStores,
     playbackBinding,
     progressConnection,
-    type Follow,
     type InputsFor,
     type ProgramInputs,
     type PlaybackBinding,
@@ -137,7 +138,9 @@ type StoreKey =
     | 'agenda$'
     | 'habits$'
     | 'clocks$'
-    | 'bookmarks$';
+    | 'bookmarks$'
+    | 'signal$'
+    | 'followedSignal$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -428,14 +431,17 @@ const bootstrap = () => {
                       return followedInputs.flatMap(({ name, definition }) => {
                           const binding = followedBy(follows, name);
 
-                          return definition.sources.map((source): FollowGroup => ({
+                          const choice = definition.sources.length > 1;
+
+                          return definition.sources.map((source, index): FollowGroup => ({
                               input: name,
+                              optional: index === 0 && definition.initial === null,
                               source: source.kind,
-                              // The source is named only where there is a choice of them: "Playback · Playback" says nothing.
+                              // Only where there is a choice of sources: "Playback · Playback" says nothing.
                               title: [
                                   definition.title,
-                                  ...(definition.sources.length > 1 ? [source.title] : []),
-                                  ...(source.access === 'read' ? ['read-only'] : []),
+                                  ...(choice ? [source.title] : []),
+                                  ...(choice && source.access === 'read' ? ['read-only'] : []),
                               ].join(' · '),
                               options: withMain(source.program, stores).map(
                                   (store): StoreOption => ({
@@ -529,14 +535,14 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const sourceOf$ = (id: ProcessId): Observable<Follow | null> =>
+    const followsOf$ = (id: ProcessId): Observable<Bindings> =>
         workspace$.pipe(
-            map(({ processes }) => {
+            mergeMap(({ processes }) => {
                 const process = processes.find(candidate => candidate.id === id);
 
-                return process === undefined ? null : followedBy(process.follows, 'progress');
+                return process === undefined ? EMPTY : of(process.follows);
             }),
-            distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
+            distinctUntilChanged(),
         );
 
     const clockOf$ = (id: ProcessId): Observable<PlaybackBinding | null> =>
@@ -588,7 +594,7 @@ const bootstrap = () => {
                           inputsFor(process.program),
                           binding$(process.id),
                           clockOf$(process.id),
-                          sourceOf$(process.id),
+                          followsOf$(process.id),
                       ),
                       canvas,
                       storeOptions$(process),
@@ -746,6 +752,18 @@ const bootstrap = () => {
         stored.clocks,
     );
 
+    const waves$ = perStore$(
+        inputs$.pipe(
+            mergeMap(({ store, input }) =>
+                input.kind === 'signal' ? of({ store, command: input.command }) : EMPTY,
+            ),
+        ),
+        storeEvents$,
+        reduceSignal,
+        defaultSignal,
+        stored.signals,
+    );
+
     const bookmarks$ = perStore$(
         inputs$.pipe(
             mergeMap(({ store, input }) =>
@@ -889,6 +907,7 @@ const bootstrap = () => {
         habits$,
         clocks$,
         bookmarks$,
+        waves$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -964,6 +983,7 @@ const bootstrap = () => {
     const habitsIn = inStore(habits$, emptyHabits);
     const clocksIn = inStore(clocks$, defaultClocks);
     const bookmarksIn = inStore(bookmarks$, defaultBookmarks);
+    const signalIn = inStore(waves$, defaultSignal);
     const timerIn = inStore(timers$, initialFocus);
 
     const documentIn: Readonly<
@@ -977,6 +997,7 @@ const bootstrap = () => {
         habits: habitsIn,
         clocks: clocksIn,
         bookmarks: bookmarksIn,
+        signal: signalIn,
         timeline: playbackIn,
     };
 
@@ -1020,8 +1041,13 @@ const bootstrap = () => {
         inputs: ProgramInputs,
         store$: Observable<StoreId>,
         clock$: Observable<PlaybackBinding | null>,
-        source$: Observable<Follow | null>,
+        follows$: Observable<Bindings>,
     ): AppState => {
+        const followed$ = (input: string) =>
+            follows$.pipe(
+                map(follows => followedBy(follows, input)),
+                distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
+            );
         const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
             store$.pipe(switchMap(select));
         const clock = clock$.pipe(
@@ -1033,11 +1059,11 @@ const bootstrap = () => {
 
         return {
             ...state,
-            progress$: source$.pipe(
+            progress$: followed$('progress').pipe(
                 mergeMap((source): ProgressConnection[] =>
                     source === null || progress?.from !== 'followed'
                         ? []
-                        : [progressConnection(progress, source, sources)],
+                        : [progressConnection(source, sources)],
                 ),
                 shareReplay({ bufferSize: 1, refCount: true }),
             ),
@@ -1065,6 +1091,13 @@ const bootstrap = () => {
             habits$: narrowed(habitsIn),
             clocks$: narrowed(clocksIn),
             bookmarks$: narrowed(bookmarksIn),
+            signal$: narrowed(signalIn),
+            followedSignal$: input =>
+                followed$(input).pipe(
+                    switchMap(binding =>
+                        binding?.kind === 'signal' ? signalIn(binding.store) : of(null),
+                    ),
+                ),
         };
     };
 
@@ -1095,6 +1128,7 @@ const bootstrap = () => {
                 habits: habits$,
                 clocks: clocks$,
                 bookmarks: bookmarks$,
+                signals: waves$,
                 library: library$,
             }),
         ),

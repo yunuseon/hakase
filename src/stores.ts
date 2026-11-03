@@ -24,6 +24,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     sketch: settings,
     timeline: document,
     playhead: null,
+    signal: document,
     tasks: null,
     todo: document,
     board: document,

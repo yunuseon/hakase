@@ -8,7 +8,8 @@ import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
-export type Follow = PlaybackBinding | FocusBinding;
+export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
+export type Follow = PlaybackBinding | FocusBinding | SignalBinding;
 
 export type InputSources = {
     readonly playback$: (store: StoreId) => Observable<Clock>;
@@ -37,13 +38,20 @@ const focusSource = {
     }),
 } as const;
 
-type Source = typeof playbackSource | typeof focusSource;
+const signalSource = {
+    kind: 'signal',
+    program: 'signal',
+    title: 'Signal',
+    access: 'read',
+} as const;
+
+type Source = typeof playbackSource | typeof focusSource | typeof signalSource;
 
 export type FollowedInput = {
     readonly title: string;
     readonly from: 'followed';
     readonly sources: readonly Source[];
-    readonly initial: Follow;
+    readonly initial: Follow | null;
 };
 
 export type OwnInput = { readonly title: string; readonly from: 'own'; readonly kind: 'playback' };
@@ -66,6 +74,21 @@ export const progressInput = {
     initial: { kind: 'playback', store: 'timeline' },
 } as const satisfies FollowedInput;
 
+const knobInput = (title: string) =>
+    ({
+        title,
+        from: 'followed',
+        sources: [signalSource],
+        initial: null,
+    }) as const satisfies FollowedInput;
+
+export const knobInputs = {
+    k1: knobInput('k1'),
+    k2: knobInput('k2'),
+    k3: knobInput('k3'),
+    k4: knobInput('k4'),
+};
+
 export const ownPlaybackInput = {
     title: 'Playback',
     from: 'own',
@@ -79,9 +102,21 @@ type BindingOf<D> = D extends {
     ? Extract<Follow, { readonly kind: K }>
     : never;
 
-export type BindingsOf<I> = {
-    readonly [N in keyof I as I[N] extends FollowedInput ? N : never]: BindingOf<I[N]>;
-};
+type Flat<T> = { [K in keyof T]: T[K] };
+
+export type BindingsOf<I> = Flat<
+    {
+        readonly [N in keyof I as I[N] extends { readonly initial: Follow } ? N : never]: BindingOf<
+            I[N]
+        >;
+    } & {
+        readonly [
+            N in keyof I as I[N] extends { readonly from: 'followed'; readonly initial: null }
+                ? N
+                : never
+        ]?: BindingOf<I[N]>;
+    }
+>;
 
 export type Bindings = { readonly [input: string]: Follow };
 
@@ -95,7 +130,9 @@ export const followedBy = (follows: Bindings, name: string) =>
 export const initialFollows = (inputs: ProgramInputs) =>
     Object.fromEntries(
         Object.entries(inputs).flatMap(([name, definition]) =>
-            definition.from === 'followed' ? [[name, definition.initial] as const] : [],
+            definition.from === 'followed' && definition.initial !== null
+                ? [[name, definition.initial] as const]
+                : [],
         ),
     );
 
@@ -110,17 +147,30 @@ export const accepts = (inputs: ProgramInputs, name: string, kind: Follow['kind'
 export const fits = (inputs: ProgramInputs, follows: Bindings) =>
     Object.entries(follows).every(([name, binding]) => accepts(inputs, name, binding.kind)) &&
     Object.entries(inputs).every(
-        ([name, definition]) => definition.from === 'own' || followedBy(follows, name) !== null,
+        ([name, definition]) =>
+            definition.from === 'own' ||
+            definition.initial === null ||
+            followedBy(follows, name) !== null,
     );
 
-export const sourceProgram = (kind: Follow['kind']) =>
-    kind === 'playback' ? playbackSource.program : focusSource.program;
+export const sourceProgram = (kind: Follow['kind']) => {
+    switch (kind) {
+        case 'playback':
+            return playbackSource.program;
+        case 'focus':
+            return focusSource.program;
+        case 'signal':
+            return signalSource.program;
+    }
+};
 
 export const progressBinding = (kind: string, store: StoreId) => {
     switch (kind) {
         case 'playback':
             return { kind, store };
         case 'focus':
+            return { kind, store };
+        case 'signal':
             return { kind, store };
         default:
             return null;
@@ -149,12 +199,5 @@ export const playbackBinding = (inputs: ProgramInputs, store: StoreId, follows: 
     return scrubbed?.kind === 'playback' ? scrubbed : null;
 };
 
-export const progressConnection = (
-    definition: FollowedInput,
-    binding: Follow,
-    sources: InputSources,
-) => {
-    const source = definition.sources.find(source => source.kind === binding.kind);
-
-    return (source ?? playbackSource).connect(binding.store, sources);
-};
+export const progressConnection = (binding: Follow, sources: InputSources) =>
+    (binding.kind === 'focus' ? focusSource : playbackSource).connect(binding.store, sources);

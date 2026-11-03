@@ -12,6 +12,7 @@ import type { Focus, FocusCommand } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
+import type { Signal, SignalCommand } from './shared/signal.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
 import type { CatalogGroup } from './inventory.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
@@ -29,6 +30,7 @@ export const PROGRAM_IDS = [
     'sketch',
     'timeline',
     'playhead',
+    'signal',
     'tasks',
     'todo',
     'board',
@@ -71,6 +73,7 @@ export type AppInput =
     | { readonly kind: 'agenda'; readonly command: AgendaCommand }
     | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'clock'; readonly command: ClockCommand }
+    | { readonly kind: 'signal'; readonly command: SignalCommand }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
@@ -110,6 +113,8 @@ export type AppState = {
     readonly agenda$: Observable<Agenda>;
     readonly habits$: Observable<Habits>;
     readonly clocks$: Observable<Clocks>;
+    readonly signal$: Observable<Signal>;
+    readonly followedSignal$: (input: string) => Observable<Signal | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the inspector alone: every store and every global, which no other program can see.
     readonly catalog$: Observable<readonly CatalogGroup[]>;
