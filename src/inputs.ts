@@ -37,55 +37,81 @@ const focusSource = {
     }),
 } as const;
 
+type Source = typeof playbackSource | typeof focusSource;
+
+export type FollowedInput = {
+    readonly title: string;
+    readonly from: 'followed';
+    readonly sources: readonly Source[];
+    readonly initial: Follow;
+};
+
+export type OwnInput = { readonly title: string; readonly from: 'own'; readonly kind: 'playback' };
+
+export type InputDefinition = FollowedInput | OwnInput;
+export type ProgramInputs = { readonly [name: string]: InputDefinition };
+export type InputsFor = (program: ProgramId) => ProgramInputs;
+
 export const playbackInput = {
     title: 'Playback',
     from: 'followed',
     sources: [playbackSource],
     initial: { kind: 'playback', store: 'timeline' },
-} as const;
+} as const satisfies FollowedInput;
 
 export const progressInput = {
     title: 'Progress',
     from: 'followed',
     sources: [playbackSource, focusSource],
     initial: { kind: 'playback', store: 'timeline' },
-} as const;
+} as const satisfies FollowedInput;
 
-export const ownPlaybackInput = { ...playbackInput, from: 'own' } as const;
+export const ownPlaybackInput = {
+    title: 'Playback',
+    from: 'own',
+    kind: 'playback',
+} as const satisfies OwnInput;
 
-export type ProgramInputs =
-    | {
-          readonly playback: typeof playbackInput | typeof ownPlaybackInput;
-          readonly progress?: never;
-      }
-    | { readonly progress: typeof progressInput; readonly playback?: never }
-    | { readonly playback?: never; readonly progress?: never };
+type BindingOf<D> = D extends {
+    readonly from: 'followed';
+    readonly sources: readonly { readonly kind: infer K }[];
+}
+    ? Extract<Follow, { readonly kind: K }>
+    : never;
 
-export type InputsFor = (program: ProgramId) => ProgramInputs;
-export type InputDefinition = typeof playbackInput | typeof progressInput | typeof ownPlaybackInput;
-
-export type FollowFor<I extends ProgramInputs> = I extends { readonly playback: InputDefinition }
-    ? PlaybackBinding
-    : I extends { readonly progress: InputDefinition }
-      ? Follow
-      : never;
-
-export const inputDefinition = (inputs: ProgramInputs): InputDefinition | undefined =>
-    inputs.playback ?? inputs.progress;
-
-export const initialFollows = (inputs: ProgramInputs): readonly Follow[] => {
-    const definition = inputDefinition(inputs);
-
-    return definition === undefined || definition.from === 'own' ? [] : [definition.initial];
+export type BindingsOf<I> = {
+    readonly [N in keyof I as I[N] extends FollowedInput ? N : never]: BindingOf<I[N]>;
 };
 
-export const accepts = (inputs: ProgramInputs, kind: Follow['kind']): boolean => {
-    const definition = inputDefinition(inputs);
+export type Bindings = { readonly [input: string]: Follow };
+
+// Not inputs[name]: a name read from storage could be "constructor", which every object has.
+export const definitionOf = (inputs: ProgramInputs, name: string): InputDefinition | undefined =>
+    Object.entries(inputs).find(([key]) => key === name)?.[1];
+
+export const followedBy = (follows: Bindings, name: string): Follow | null =>
+    Object.entries(follows).find(([key]) => key === name)?.[1] ?? null;
+
+export const initialFollows = (inputs: ProgramInputs): Bindings =>
+    Object.fromEntries(
+        Object.entries(inputs).flatMap(([name, definition]) =>
+            definition.from === 'followed' ? [[name, definition.initial]] : [],
+        ),
+    );
+
+export const accepts = (inputs: ProgramInputs, name: string, kind: Follow['kind']): boolean => {
+    const definition = definitionOf(inputs, name);
 
     return (
         definition?.from === 'followed' && definition.sources.some(source => source.kind === kind)
     );
 };
+
+export const fits = (inputs: ProgramInputs, follows: Bindings): boolean =>
+    Object.entries(follows).every(([name, binding]) => accepts(inputs, name, binding.kind)) &&
+    Object.entries(inputs).every(
+        ([name, definition]) => definition.from === 'own' || followedBy(follows, name) !== null,
+    );
 
 export const sourceProgram = (kind: Follow['kind']): ProgramId =>
     kind === 'playback' ? playbackSource.program : focusSource.program;
@@ -101,27 +127,34 @@ export const progressBinding = (kind: string, store: StoreId): Follow | null => 
     }
 };
 
-export const followed = (follows: readonly Follow[]): Follow | null => follows[0] ?? null;
-export const followedStores = (follows: readonly Follow[]): readonly StoreId[] =>
-    follows.map(({ store }) => store);
+export const followedStores = (follows: Bindings): readonly StoreId[] =>
+    Object.values(follows).map(({ store }) => store);
 
 export const playbackBinding = (
     inputs: ProgramInputs,
     store: StoreId,
-    follows: readonly Follow[],
+    follows: Bindings,
 ): PlaybackBinding | null => {
-    if (inputs.playback?.from === 'own') {
+    if (Object.values(inputs).some(definition => definition.from === 'own')) {
         return { kind: 'playback', store };
     }
 
-    const binding = followed(follows);
-    const source = inputDefinition(inputs)?.sources.find(source => source.kind === binding?.kind);
+    const scrubbed = Object.entries(follows).find(([name, binding]) => {
+        const definition = definitionOf(inputs, name);
 
-    return binding?.kind === 'playback' && source?.access === 'scrub' ? binding : null;
+        return (
+            definition?.from === 'followed' &&
+            definition.sources.some(
+                source => source.kind === binding.kind && source.access === 'scrub',
+            )
+        );
+    })?.[1];
+
+    return scrubbed?.kind === 'playback' ? scrubbed : null;
 };
 
 export const progressConnection = (
-    definition: typeof progressInput,
+    definition: FollowedInput,
     binding: Follow,
     sources: InputSources,
 ): ProgressConnection => {

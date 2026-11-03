@@ -49,7 +49,13 @@ describe('focus progress consumers', () => {
     it('counts a dial on focus without counting it on playback too', () => {
         const following = reduceWorkspace(
             workspace,
-            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'focus' },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'focus',
+                store: 'focus',
+            },
             inputsFor,
         );
         const catalog = catalogOf(

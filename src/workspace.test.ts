@@ -316,7 +316,7 @@ describe('resizing an attached edge', () => {
         id,
         program: 'todo' as const,
         store: 'todo',
-        follows: [],
+        follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
     });
@@ -389,7 +389,7 @@ describe('snapping while resizing', () => {
         id,
         program: 'todo' as const,
         store: 'todo',
-        follows: [],
+        follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
     });
@@ -563,32 +563,56 @@ describe('following', () => {
         run(fresh(), [
             launchTimeline,
             { kind: 'add-store', id: 'timeline-5', copy: true },
-            { kind: 'follow', id: 'sketch-2', source: 'playback', store: 'store-1' },
+            {
+                kind: 'follow',
+                id: 'sketch-2',
+                input: 'playback',
+                source: 'playback',
+                store: 'store-1',
+            },
         ]);
 
     it('lets a sketch follow another clock, and the dial too', () => {
         const history = run(twoClocks(), [
-            { kind: 'follow', id: 'playhead-4', source: 'playback', store: 'store-1' },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'playback',
+                store: 'store-1',
+            },
         ]);
 
-        expect(processOf(history, 'sketch-2')?.follows).toEqual([
-            { kind: 'playback', store: 'store-1' },
-        ]);
-        expect(processOf(history, 'playhead-4')?.follows).toEqual([
-            { kind: 'playback', store: 'store-1' },
-        ]);
+        expect(processOf(history, 'sketch-2')?.follows).toEqual({
+            playback: { kind: 'playback', store: 'store-1' },
+        });
+        expect(processOf(history, 'playhead-4')?.follows).toEqual({
+            progress: { kind: 'playback', store: 'store-1' },
+        });
     });
 
     it('refuses what a program does not follow, or another program’s store', () => {
         const history = run(twoClocks(), [
-            { kind: 'follow', id: 'formula-1', source: 'playback', store: 'store-1' },
-            { kind: 'follow', id: 'sketch-2', source: 'playback', store: 'formula-1' },
+            {
+                kind: 'follow',
+                id: 'formula-1',
+                input: 'playback',
+                source: 'playback',
+                store: 'store-1',
+            },
+            {
+                kind: 'follow',
+                id: 'sketch-2',
+                input: 'playback',
+                source: 'playback',
+                store: 'formula-1',
+            },
         ]);
 
-        expect(processOf(history, 'formula-1')?.follows).toEqual([]);
-        expect(processOf(history, 'sketch-2')?.follows).toEqual([
-            { kind: 'playback', store: 'store-1' },
-        ]);
+        expect(processOf(history, 'formula-1')?.follows).toEqual({});
+        expect(processOf(history, 'sketch-2')?.follows).toEqual({
+            playback: { kind: 'playback', store: 'store-1' },
+        });
     });
 
     it('keeps a followed clock when no timeline shows it, through a prune too', () => {
@@ -604,18 +628,18 @@ describe('following', () => {
         const history = twoClocks();
 
         expect(history.label).toBe('Set sketch to follow Store 1');
-        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual([
-            { kind: 'playback', store: 'timeline' },
-        ]);
+        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual({
+            playback: { kind: 'playback', store: 'timeline' },
+        });
     });
 
     it('is saved and read back, dropping what the program cannot follow', () => {
         const saved: unknown = JSON.parse(JSON.stringify(twoClocks().present));
         const parsed = parseWorkspace(saved, inputsFor);
 
-        expect(parsed?.processes.find(({ id }) => id === 'sketch-2')?.follows).toEqual([
-            { kind: 'playback', store: 'store-1' },
-        ]);
+        expect(parsed?.processes.find(({ id }) => id === 'sketch-2')?.follows).toEqual({
+            playback: { kind: 'playback', store: 'store-1' },
+        });
     });
 });
 
@@ -639,7 +663,7 @@ describe('follows saved before kinds', () => {
         expect(
             parseWorkspace(saved, inputsFor)?.processes.find(({ id }) => id === 'sketch-2')
                 ?.follows,
-        ).toEqual([{ kind: 'playback', store: 'store-1' }]);
+        ).toEqual({ playback: { kind: 'playback', store: 'store-1' } });
     });
 });
 
@@ -647,33 +671,53 @@ describe('focus progress bindings', () => {
     it('lets a sketch follow playback only, and programs with no inputs follow nothing', () => {
         const history = run(fresh(), [
             { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
-            { kind: 'follow', id: 'sketch-2', source: 'focus', store: 'focus' },
-            { kind: 'follow', id: 'formula-1', source: 'playback', store: 'timeline' },
+            { kind: 'follow', id: 'sketch-2', input: 'playback', source: 'focus', store: 'focus' },
+            {
+                kind: 'follow',
+                id: 'formula-1',
+                input: 'playback',
+                source: 'playback',
+                store: 'timeline',
+            },
         ]);
         const followsOf = (id: string) =>
             history.present.processes.find(process => process.id === id)?.follows;
 
-        expect(followsOf('sketch-2')).toEqual([{ kind: 'playback', store: 'timeline' }]);
-        expect(followsOf('formula-1')).toEqual([]);
+        expect(followsOf('sketch-2')).toEqual({
+            playback: { kind: 'playback', store: 'timeline' },
+        });
+        expect(followsOf('formula-1')).toEqual({});
     });
     const focus = (): History =>
         run(fresh(), [
             { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
             { kind: 'add-store', id: 'focus-5', copy: true },
-            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'store-1' },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'focus',
+                store: 'store-1',
+            },
         ]);
 
     it('replaces playback with focus as the dial’s single progress source', () => {
         const history = focus();
-        expect(history.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
-            { kind: 'focus', store: 'store-1' },
-        ]);
+        expect(history.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
+            progress: { kind: 'focus', store: 'store-1' },
+        });
         const back = run(history, [
-            { kind: 'follow', id: 'playhead-4', source: 'playback', store: 'timeline' },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'playback',
+                store: 'timeline',
+            },
         ]);
-        expect(back.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
-            { kind: 'playback', store: 'timeline' },
-        ]);
+        expect(back.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
+            progress: { kind: 'playback', store: 'timeline' },
+        });
         expect(run(back, [{ kind: 'undo' }]).present.processes).toEqual(history.present.processes);
     });
 
@@ -697,10 +741,34 @@ describe('focus progress bindings', () => {
 
     it('rejects unsupported sources and a valid kind naming the wrong document', () => {
         const history = run(focus(), [
-            { kind: 'follow', id: 'sketch-2', source: 'focus', store: 'store-1' },
-            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'timeline' },
-            { kind: 'follow', id: 'playhead-4', source: 'board', store: 'store-1' },
-            { kind: 'follow', id: 'playhead-4', source: 'focus', store: 'missing' },
+            {
+                kind: 'follow',
+                id: 'sketch-2',
+                input: 'playback',
+                source: 'focus',
+                store: 'store-1',
+            },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'focus',
+                store: 'timeline',
+            },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'board',
+                store: 'store-1',
+            },
+            {
+                kind: 'follow',
+                id: 'playhead-4',
+                input: 'progress',
+                source: 'focus',
+                store: 'missing',
+            },
         ]);
         expect(history.present.processes).toEqual(focus().present.processes);
     });
@@ -721,8 +789,8 @@ describe('focus progress bindings', () => {
         const parsed = parseWorkspace(broken, inputsFor);
         expect(parsed?.processes).toHaveLength(workspace.processes.length);
         // A forged binding falls back to where a new dial starts, not to following nothing.
-        expect(parsed?.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual([
-            { kind: 'playback', store: 'timeline' },
-        ]);
+        expect(parsed?.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
+            progress: { kind: 'playback', store: 'timeline' },
+        });
     });
 });

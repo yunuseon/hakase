@@ -51,9 +51,9 @@ import { emptyHabits } from './components/habits/habits.ts';
 import { emptyNotes } from './components/note/note.ts';
 import { emptyTodos } from './components/todo/todo.ts';
 import {
-    followed,
+    definitionOf,
+    followedBy,
     followedStores,
-    inputDefinition,
     playbackBinding,
     progressConnection,
     type Follow,
@@ -93,6 +93,7 @@ import type {
 } from './components/window/frame.ts';
 import { catalogOf, parseTarget, sameCatalog, type Global } from './inventory.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
+import { programs } from './programs.ts';
 import {
     isProgramId,
     type AppState,
@@ -106,23 +107,6 @@ import {
     restored,
     valuesOf,
 } from './program.ts';
-import { appearanceProgram } from './programs/appearance.program.ts';
-import { formulaProgram } from './programs/formula.program.ts';
-import { playheadProgram } from './programs/playhead.program.ts';
-import { tasksProgram } from './programs/tasks.program.ts';
-import { todoProgram } from './programs/todo.program.ts';
-import { boardProgram } from './programs/board.program.ts';
-import { noteProgram } from './programs/note.program.ts';
-import { focusProgram } from './programs/focus.program.ts';
-import { agendaProgram } from './programs/agenda.program.ts';
-import { habitsProgram } from './programs/habits.program.ts';
-import { clocksProgram } from './programs/clocks.program.ts';
-import { bookmarksProgram } from './programs/bookmarks.program.ts';
-import { inspectorProgram } from './programs/inspector.program.ts';
-import { historyProgram } from './programs/history.program.ts';
-import { sketchProgram } from './programs/sketch.program.ts';
-import { themeProgram } from './programs/theme.program.ts';
-import { timelineProgram } from './programs/timeline.program.ts';
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
 import { persistState$, restoreState } from './state-store.ts';
@@ -156,35 +140,17 @@ type StoreKey =
     | 'clocks$'
     | 'bookmarks$';
 
-const programs: readonly Program[] = [
-    formulaProgram,
-    themeProgram,
-    appearanceProgram,
-    sketchProgram,
-    timelineProgram,
-    playheadProgram,
-    tasksProgram,
-    todoProgram,
-    boardProgram,
-    noteProgram,
-    focusProgram,
-    agendaProgram,
-    habitsProgram,
-    clocksProgram,
-    bookmarksProgram,
-    inspectorProgram,
-    historyProgram,
-];
+// In toolbar order: a record keeps its keys in the order they were written.
+const programList: readonly Program[] = Object.values(programs);
 
-const programOf = (id: ProgramId): Program | undefined =>
-    programs.find(program => program.id === id);
+const programOf = (id: ProgramId): Program => programs[id];
 
 // The programs declare what they read from others; the workspace asks through this, never the table itself.
-const inputsFor: InputsFor = program => programOf(program)?.inputs ?? {};
+const inputsFor: InputsFor = program => programs[program].inputs;
 
 const categories: readonly ToolbarCategory[] = CATEGORIES.map(category => ({
     ...category,
-    items: programs
+    items: programList
         .filter(program => program.category === category.id)
         .map(({ id, title, icon }) => ({ id, title, icon })),
 })).filter(({ items }) => items.length > 0);
@@ -445,37 +411,46 @@ const bootstrap = () => {
         ).length;
 
     // null for a program that follows nothing: the popover then has no section for it.
-    // From the program's own input: one section per kind of state it accepts, and none for its own store.
+    // From the program's own inputs: one section per kind of state each accepts, and none for its own store.
     const followOptions$ = ({
         id,
         program,
     }: Process): Observable<readonly FollowGroup[] | null> => {
-        const definition = inputDefinition(inputsFor(program));
+        const followedInputs = Object.entries(inputsFor(program)).flatMap(([name, definition]) =>
+            definition.from === 'followed' ? [{ name, definition }] : [],
+        );
 
-        return definition === undefined || definition.from === 'own'
+        return followedInputs.length === 0
             ? of(null)
             : workspace$.pipe(
                   map(({ processes, stores }) => {
-                      const binding = followed(
-                          processes.find(process => process.id === id)?.follows ?? [],
-                      );
+                      const follows = processes.find(process => process.id === id)?.follows ?? {};
 
-                      return definition.sources.map((source): FollowGroup => ({
-                          source: source.kind,
-                          // The source is named only where there is a choice of them: "Playback · Playback" says nothing.
-                          title: [
-                              definition.title,
-                              ...(definition.sources.length > 1 ? [source.title] : []),
-                              ...(source.access === 'read' ? ['read-only'] : []),
-                          ].join(' · '),
-                          options: withMain(source.program, stores).map((store): StoreOption => ({
-                              id: store.id,
-                              name: store.name,
-                              colour: colourOf(store.id),
-                              users: usersOf(processes, store.id),
-                              current: binding?.kind === source.kind && binding.store === store.id,
-                          })),
-                      }));
+                      return followedInputs.flatMap(({ name, definition }) => {
+                          const binding = followedBy(follows, name);
+
+                          return definition.sources.map((source): FollowGroup => ({
+                              input: name,
+                              source: source.kind,
+                              // The source is named only where there is a choice of them: "Playback · Playback" says nothing.
+                              title: [
+                                  definition.title,
+                                  ...(definition.sources.length > 1 ? [source.title] : []),
+                                  ...(source.access === 'read' ? ['read-only'] : []),
+                              ].join(' · '),
+                              options: withMain(source.program, stores).map(
+                                  (store): StoreOption => ({
+                                      id: store.id,
+                                      name: store.name,
+                                      colour: colourOf(store.id),
+                                      users: usersOf(processes, store.id),
+                                      current:
+                                          binding?.kind === source.kind &&
+                                          binding.store === store.id,
+                                  }),
+                              ),
+                          }));
+                      });
                   }),
                   distinctUntilChanged(
                       (a, b) =>
@@ -531,7 +506,7 @@ const bootstrap = () => {
         map(([, { processes, stores }]) =>
             CATEGORIES.map((category): SwitchGroup => ({
                 title: category.title,
-                items: programs
+                items: programList
                     .filter(program => program.category === category.id)
                     .map((program): SwitchItem => ({
                         id: program.id,
@@ -560,7 +535,7 @@ const bootstrap = () => {
             map(({ processes }) => {
                 const process = processes.find(candidate => candidate.id === id);
 
-                return process === undefined ? null : followed(process.follows);
+                return process === undefined ? null : followedBy(process.follows, 'progress');
             }),
             distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
         );
@@ -1055,13 +1030,15 @@ const bootstrap = () => {
             shareReplay({ bufferSize: 1, refCount: true }),
         );
 
+        const progress = definitionOf(inputs, 'progress');
+
         return {
             ...state,
             progress$: source$.pipe(
                 mergeMap((source): ProgressConnection[] =>
-                    source === null || inputs.progress === undefined
+                    source === null || progress?.from !== 'followed'
                         ? []
-                        : [progressConnection(inputs.progress, source, sources)],
+                        : [progressConnection(progress, source, sources)],
                 ),
                 shareReplay({ bufferSize: 1, refCount: true }),
             ),
@@ -1132,7 +1109,7 @@ const bootstrap = () => {
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
         palette.connect$(
-            workspace$.pipe(map(({ sections: all }) => commandsOf(programs, all))),
+            workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
             paletteOpen$,
         ),
         sections.connect$(

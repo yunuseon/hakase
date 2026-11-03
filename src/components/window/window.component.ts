@@ -385,9 +385,11 @@ export class HksWindow extends HTMLElement {
 
                     return row instanceof HTMLElement &&
                         row.dataset['followStore'] !== undefined &&
+                        row.dataset['followInput'] !== undefined &&
                         row.dataset['followSource'] !== undefined
                         ? of({
                               kind: 'follow',
+                              input: row.dataset['followInput'],
                               source: row.dataset['followSource'],
                               store: row.dataset['followStore'],
                           })
@@ -608,21 +610,24 @@ export class HksWindow extends HTMLElement {
 
                     if (!(shadow.activeElement instanceof HTMLInputElement)) {
                         requireChild(shadow, '.follows').replaceChildren(
-                            ...(follows ?? []).flatMap(({ source, title, options: list }) => {
-                                const heading = document.createElement('p');
-                                heading.className = 'follow-title';
-                                heading.textContent = title;
+                            ...(follows ?? []).flatMap(
+                                ({ input, source, title, options: list }) => {
+                                    const heading = document.createElement('p');
+                                    heading.className = 'follow-title';
+                                    heading.textContent = title;
 
-                                return [
-                                    heading,
-                                    ...list.map(option => {
-                                        const row = followRow(option);
-                                        row.dataset['followSource'] = source;
+                                    return [
+                                        heading,
+                                        ...list.map(option => {
+                                            const row = followRow(option);
+                                            row.dataset['followInput'] = input;
+                                            row.dataset['followSource'] = source;
 
-                                        return row;
-                                    }),
-                                ];
-                            }),
+                                            return row;
+                                        }),
+                                    ];
+                                },
+                            ),
                         );
                     }
 

@@ -469,15 +469,15 @@ next such feature is worth that, it is worth making it work for every window.
 
 **Nothing is declared in `index.html`** beyond the script tag and the favicon link
 (`public/favicon.svg`, a rippled dot lattice with a dark variant), and no window is
-mounted by hand. `main.ts` holds nothing but the list of programs, and a window's
+mounted by hand. The programs are one record in `src/programs.ts`, and a window's
 existence is
 a subscription: `liveProcess$` creates the `hks-window` in a `defer` factory and
 removes it in `finalize`, with its views merged in as `ignoreElements` side
 pipelines so one subscription both drives the DOM and reports back. Launching and
 quitting is therefore just
 `switchMap(running => running ? liveProcess$(...) : EMPTY)` over the processes
-the workspace fold holds. Adding a program is one entry in the
-table; nothing else in `main.ts` names it.
+the workspace fold holds. Adding a program is one entry in that
+record, in toolbar order; nothing in `main.ts` names it.
 
 **The toolbar is chrome, not a program.** Its tiles only launch: a program can
 run any number of times, so "this program is running" says nothing worth lighting
@@ -1078,24 +1078,41 @@ kinds it accepts, where a new window starts (`initial`, the main clock), and per
 kind how a store of it connects (`connect`). There is no separate table to keep
 in step: adding an input is one field on the program.
 
+**A window can only hold the inputs its own program declares, and the type
+says so.** The program table is a record keyed by id (`src/programs.ts`,
+`satisfies { [K in ProgramId]: Program<K> }`), and `Process` is derived from it
+with `import type`: one member per program, whose `follows` is a record keyed by
+input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding }`, the
+dial's `{ progress: Follow }`, a todo's and a timeline's have no keys at all, so
+a focus binding on a sketch does not type-check. `BindingsOf` reads the kinds
+with `infer` from the input's `sources`: indexing `D['sources']` inside the
+conditional falls back to the constraint and lets every kind through.
+
+- **Where the program is only known at runtime it is narrowed, never cast.**
+  Launch, replace, follow, the default layout and the parser build a `Draft`
+  (follows as a plain `Bindings` record) and keep it only if `ownsInputs`
+  passes: `fits` checks that every binding names an input that accepts its kind
+  and every followed input is bound. A draft that does not fit leaves the
+  workspace unchanged, or is dropped on load.
+- Input names from storage are looked up with `definitionOf`/`followedBy`,
+  never `inputs[name]`: every object has a `constructor`.
+
 - **The workspace asks, it does not import.** `reduceWorkspace`,
   `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
   an `inputsFor(program)`; `main.ts` builds it from the program table, and tests
   use `src/inputs.fixture.ts`, because the program modules pull in the DOM. The
   declarations are plain data, so building the table never evaluates the
   reactive cycle early.
-- **A follow is a tagged binding**, `{ kind, store }`, at most one per window.
-  Every follower starts with an explicit binding to the main clock, so counting
+- **A follow is a tagged binding**, `{ kind, store }`, one per followed input,
+  and the `follow` gesture names the input it binds. Every follower starts with
+  an explicit binding to the main clock, so counting
   windows on a store never has to guess at an implicit one. The reducer and the
   parser accept a binding only if the program's input accepts its kind and the
   store belongs to that kind's program (`accepts`, `sourceProgram`). A saved
   follow from before kinds, `{ program: 'timeline', store }`, is read as a
-  playback binding to the same store; a forged one falls back to the main clock.
-- **`Process` is not a union per program.** Making a sketch's `follows` hold
-  playback bindings by type alone would need the program table at type level,
-  and every place that builds a process for a program known only at runtime
-  would then need casts, which are banned. The rule is enforced at runtime, in
-  the reducer and the parser, and tested there.
+  playback binding to the same store, and a saved array of follows goes to the
+  first input that accepts each kind; a forged one falls back to the input's
+  `initial`.
 - `scoped` gives each window `progress$`: the connection its input makes for the
   selected binding (`progressConnection`), with its access and a stream of
   positions. It changes on a rebind, not on ticks. The dial subscribes to
@@ -1109,7 +1126,7 @@ in step: adding an input is one field on the program.
   close, leaving it held while another process still scrubs it. The release must
   name the **old** target: stamping it with the new binding would strand the old
   hold.
-- The popover has one section per kind the input accepts. The source is named
+- The popover has one section per kind each followed input accepts. The source is named
   only where there is a choice ("Progress · Focus · read-only"; the sketch's
   section is just "Playback"). A followed store is in use for pruning, deletion
   and counts. Forking copies the canonical document once, clocks and focus
@@ -1490,7 +1507,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and fifty-nine of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and sixty-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

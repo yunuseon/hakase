@@ -166,9 +166,9 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
-export type Program = {
+export type Program<K extends ProgramId = ProgramId> = {
     readonly inputs: ProgramInputs;
-    readonly id: ProgramId;
+    readonly id: K;
     readonly title: string;
     readonly category: CategoryId;
     // Path data on a 24x24 viewBox: the program's face in the dock and on the desktop.
