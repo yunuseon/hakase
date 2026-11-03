@@ -45,6 +45,7 @@ import { reduceNotes } from './components/note/note.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import { defaultSignal, reduceSignal } from './shared/signal.ts';
+import { patchOf, samePatch } from './patch.ts';
 import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
@@ -296,6 +297,20 @@ const bootstrap = () => {
             withLatestFrom(viewport$),
             map(([{ command, id }, viewport]): WorkspaceAction =>
                 command === 'close' ? { kind: 'quit', id } : { kind: 'reveal', id, viewport },
+            ),
+        ),
+        defer(() => inputs$).pipe(
+            mergeMap(({ input }) => (input.kind === 'patch' ? of(input.command) : EMPTY)),
+            map((command): WorkspaceAction =>
+                command.kind === 'connect'
+                    ? {
+                          kind: 'follow',
+                          id: command.sink,
+                          input: command.input,
+                          source: command.source,
+                          store: command.store,
+                      }
+                    : { kind: 'unfollow', id: command.sink, input: command.input },
             ),
         ),
         defer(() => inputs$).pipe(
@@ -940,6 +955,10 @@ const bootstrap = () => {
             distinctUntilChanged(sameCatalog),
         ),
         inspect$: (id: string) => inspected$(id),
+        patch$: workspace$.pipe(
+            map(workspace => patchOf(workspace, inputsFor, programOf)),
+            distinctUntilChanged(samePatch),
+        ),
         history$: history$.pipe(
             map(({ past, label, future }) => [
                 ...past.map((entry, index) => ({

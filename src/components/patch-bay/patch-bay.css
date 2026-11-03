@@ -1,0 +1,198 @@
+:host {
+    display: block;
+    block-size: 100%;
+    min-block-size: 0;
+    overflow: auto;
+    font: 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.board {
+    position: relative;
+    margin-inline: auto;
+    touch-action: none;
+}
+
+.wires {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.wire,
+.rubber {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.wire {
+    stroke: var(--store);
+}
+
+.wire[data-fixed] {
+    opacity: 0.6;
+}
+
+.rubber {
+    stroke: var(--accent);
+    stroke-dasharray: 4 4;
+}
+
+.node {
+    position: absolute;
+    box-sizing: border-box;
+    inline-size: 150px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+}
+
+.source {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-inline: 10px 14px;
+    cursor: grab;
+}
+
+.dot {
+    flex: none;
+    inline-size: 9px;
+    block-size: 9px;
+    background: var(--store);
+    border-radius: 50%;
+}
+
+.label {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+}
+
+.kind {
+    font-size: 10px;
+    color: var(--muted);
+}
+
+.name {
+    overflow: hidden;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.jack {
+    position: absolute;
+    inline-size: 10px;
+    block-size: 10px;
+    background: var(--panel);
+    border: 2px solid var(--muted);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.source .jack {
+    inset-inline-end: -6px;
+    inset-block-start: calc(50% - 5px);
+    border-color: var(--store);
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    block-size: 30px;
+    padding-inline: 10px;
+    color: var(--ink);
+    font-weight: 500;
+    cursor: default;
+    user-select: none;
+}
+
+.icon {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.port {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    block-size: 24px;
+    padding-inline: 14px 6px;
+    cursor: grab;
+}
+
+.port .jack {
+    inset-inline-start: -6px;
+    inset-block-start: 7px;
+}
+
+.port[data-bound] .jack {
+    background: var(--muted);
+}
+
+.port:not([data-bound]) .title {
+    color: var(--muted);
+}
+
+.title {
+    flex: 1;
+}
+
+.cut {
+    inline-size: 18px;
+    block-size: 18px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    visibility: hidden;
+}
+
+.port:hover .cut,
+.cut:focus-visible {
+    visibility: visible;
+}
+
+.cut:hover {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.board[data-dragging] [data-source],
+.board[data-dragging] [data-input] {
+    opacity: 0.4;
+}
+
+.board[data-dragging] [data-ok] {
+    opacity: 1;
+}
+
+[data-ok][data-over] {
+    background: var(--well);
+}
+
+.source[data-ok][data-over] {
+    border-color: var(--accent);
+}
+
+.empty {
+    display: none;
+    margin: 16px;
+    color: var(--muted);
+}
+
+:host([data-empty]) .empty {
+    display: block;
+}

@@ -1036,6 +1036,27 @@ playhead, so a sketch on a second clock plays the same wave on its own time.
 `AppState.followedSignal$(input)` hands a program the signal its input is bound
 to, or null, already resolved from the store.
 
+## The patch bay
+
+`patch` draws the dataflow the inputs make: every store a window can follow on
+the left (clocks, focus timers, signals), every window with a followed input on
+the right with a jack per input, and a wire in its store's colour for each
+binding. It holds no state and adds no behaviour: `patchOf` in `src/patch.ts`
+derives the graph from the workspace and `inputsFor`, `layoutOf` in the
+component folder places it, and the bay's commands become the very `follow` and
+`unfollow` actions the state popover sends, so the reducer's checks, undo and
+labels all apply. A main store with no window yet is listed once something
+follows it.
+
+Drag from a source to a port, or a port to a source, to wire them; only ports
+that accept the dragged source's kind stay lit, and a drop anywhere else does
+nothing. Drag a bound optional port's jack into empty space, or click its ×, to
+unplug it; a required input (a clock) has no × and cannot be pulled out.
+Double-clicking a window's header reveals it. One shared `drags$` feeds both the
+rubber-band wire and the command it ends in, for the todo grip's reason. The
+workspace emits on every pointer move, so `patch$` dedupes with `samePatch`,
+which names every field, or every window drag would rebuild the bay.
+
 ## The inspector
 
 `inspector` shows any state in the app: a tree of the programs that keep state,
@@ -1557,7 +1578,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and sixty-six of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and sixty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

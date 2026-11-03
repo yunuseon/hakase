@@ -13,6 +13,7 @@ import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand } from './shared/signal.ts';
+import type { PatchCommand, PatchView } from './components/patch-bay/patch.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
 import type { CatalogGroup } from './inventory.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
@@ -42,6 +43,7 @@ export const PROGRAM_IDS = [
     'bookmarks',
     'inspector',
     'history',
+    'patch',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -74,6 +76,7 @@ export type AppInput =
     | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
+    | { readonly kind: 'patch'; readonly command: Exclude<PatchCommand, { kind: 'reveal' }> }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
@@ -120,6 +123,7 @@ export type AppState = {
     readonly catalog$: Observable<readonly CatalogGroup[]>;
     readonly inspect$: (target: string) => Observable<unknown>;
     readonly history$: Observable<readonly HistoryEntry[]>;
+    readonly patch$: Observable<PatchView>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 

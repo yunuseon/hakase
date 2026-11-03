@@ -45,7 +45,9 @@ const signalSource = {
     access: 'read',
 } as const;
 
-type Source = typeof playbackSource | typeof focusSource | typeof signalSource;
+export const SOURCES = [playbackSource, focusSource, signalSource] as const;
+
+type Source = (typeof SOURCES)[number];
 
 export type FollowedInput = {
     readonly title: string;
