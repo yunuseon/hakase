@@ -184,7 +184,7 @@ export class HksStateWiring extends HTMLElement {
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML =
-            '<svg class="wires" aria-hidden="true"></svg><svg class="rubber" aria-hidden="true"><path/></svg><div class="ports"></div><button class="exit" type="button" aria-label="close state mode" hidden>× Done</button>';
+            '<svg class="wires" aria-hidden="true"></svg><svg class="rubber" aria-hidden="true"><path/></svg><div class="ports"></div>';
         this.shadow = shadow;
         const ports = requireChild(shadow, '.ports');
         this.drags$ = pointerGesture$(ports, event => keyOf(event.target) !== null).pipe(
@@ -255,7 +255,6 @@ export class HksStateWiring extends HTMLElement {
                         : of(null),
                 ),
             ),
-            fromElementEvent$(requireChild(shadow, '.exit'), 'click').pipe(map(() => null)),
         ).pipe(
             scan((open: string | null, key): string | null => (key === open ? null : key), null),
             startWith(null),
@@ -313,9 +312,6 @@ export class HksStateWiring extends HTMLElement {
                     busy: drag.phase !== 'release',
                 })),
             ),
-            fromElementEvent$(requireChild(shadow, '.exit'), 'click').pipe(
-                map((): WiringEvent => ({ kind: 'close' })),
-            ),
             fromElementEvent$(ports, 'click').pipe(
                 mergeMap(({ target }): WiringEvent[] => {
                     const window =
@@ -334,17 +330,9 @@ export class HksStateWiring extends HTMLElement {
         const ports = requireChild(shadow, '.ports');
         const wires = requireElement(shadow, '.wires', SVGSVGElement);
         const rubber = requireElement(shadow, '.rubber path', SVGPathElement);
-        const exit = requireChild(shadow, '.exit');
         const drawn$ = view$.pipe(
             tap(view => {
-                const origin = view?.origin ?? null;
                 this.hidden = view === null;
-                exit.hidden = origin === null;
-
-                if (origin !== null) {
-                    exit.style.left = `${origin.x}px`;
-                    exit.style.top = `${origin.y}px`;
-                }
 
                 wires.replaceChildren(
                     ...(view?.wires ?? []).map(wire => {

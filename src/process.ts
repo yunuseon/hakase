@@ -1,5 +1,6 @@
 import { defer, merge, type Observable } from 'rxjs';
 import {
+    filter,
     finalize,
     ignoreElements,
     map,
@@ -52,10 +53,15 @@ export const liveProcess$ = (
         element.append(view.element);
         host.append(element);
 
-        const menu$ = merge(manage$, element.stateCloses$).pipe(
+        const menu$ = merge(manage$, element.menus$).pipe(
             startWith(false),
             distinctUntilChanged(),
             shareReplay({ bufferSize: 1, refCount: true }),
+        );
+        // Only a menu opened from state mode holds it open; one opened from the chip must not switch it on.
+        const held$ = merge(manage$, element.menus$.pipe(filter(open => !open))).pipe(
+            startWith(false),
+            distinctUntilChanged(),
         );
         const view$ = self.slot$.pipe(
             map(({ frame, focused }): WindowView => ({ kind: 'floating', frame, focused })),
@@ -85,7 +91,7 @@ export const liveProcess$ = (
                           };
                 }),
             ),
-            menu$.pipe(map((busy): ProcessSignal => ({ to: 'state-busy', id: self.id, busy }))),
+            held$.pipe(map((busy): ProcessSignal => ({ to: 'state-busy', id: self.id, busy }))),
             element.stateModes$.pipe(map((): ProcessSignal => ({ to: 'state-mode', id: self.id }))),
             view.run$(state, self).pipe(
                 withLatestFrom(self.store$, self.clock$),

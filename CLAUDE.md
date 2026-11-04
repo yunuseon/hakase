@@ -1201,7 +1201,16 @@ deleted out from under it.
 
 ## State mode, on the canvas
 
-Clicking a window's state chip enters global **state mode**. Every window exposes
+**A window's state chip opens its state menu**, and nothing else: switching,
+making, forking and naming a state, and choosing what each input follows, is
+the everyday part of the app and must stay one click away. The chip once
+entered state mode instead, and the menu became unreachable. **State mode is
+entered from that menu's Connections button**, the navigator's State button,
+or by holding W. Only a menu opened from state mode (an output's ⋯) holds the
+mode on while it is open; a menu opened from the chip reports itself apart
+(`menus$`), or opening it would switch the mode on.
+
+In state mode every window exposes
 its output and declared inputs as minimal jacks inside its frame. Hover or
 focus expands a compact state selector inward over that window's content;
 compatible targets expand during a connection drag. The selectors use in-app
@@ -1255,8 +1264,9 @@ button pins it; Shift retains its sketch painting gesture. A pure session fold
 tracks held, pinned and named interaction locks. Window blur clears temporary
 mode, and closing a window releases its menu lock.
 
-The mode is transient and independent of workspace history. Escape, the global State toggle and Done beside the window
-that entered the mode all close it. Closing a selector or editing a component
+The mode is transient and independent of workspace history. Escape and the
+State toggle close it; there is no Done button beside a window, which only
+duplicated them and sat on top of the chip. Closing a selector or editing a component
 never exits pinned mode. `sameWiring` compares the applied view field by field so
 editing a signal's numeric values does not rebuild an open selector.
 
@@ -1862,7 +1872,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and seven of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

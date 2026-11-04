@@ -50,7 +50,6 @@ export const groupKey = (window: string, group: string) => `${window}${GROUP}${g
 export const windowOfGroup = (key: string) => key.slice(0, Math.max(0, key.indexOf(GROUP)));
 
 export type WiringView = {
-    readonly origin: { readonly x: number; readonly y: number } | null;
     readonly sockets: readonly Socket[];
     readonly groups: readonly GroupRow[];
     readonly wires: readonly {
@@ -63,7 +62,6 @@ export type WiringView = {
 export type WiringCommand =
     | { readonly kind: 'wire'; readonly command: StateCommand }
     | { readonly kind: 'manage'; readonly window: string }
-    | { readonly kind: 'close' }
     | { readonly kind: 'busy'; readonly key: string; readonly busy: boolean }
     | { readonly kind: 'expand'; readonly key: string; readonly open: boolean }
     | { readonly kind: 'spring'; readonly key: string }
@@ -117,7 +115,7 @@ export const selectionOf = (socket: Socket, value: string) => {
 };
 
 export const commandFor = (view: WiringView | null, event: WiringEvent): WiringCommand | null => {
-    if (event.kind === 'manage' || event.kind === 'close' || event.kind === 'busy') {
+    if (event.kind === 'manage' || event.kind === 'busy') {
         return event;
     }
 
@@ -232,10 +230,7 @@ const sameGroup = (a: GroupRow, b: GroupRow) =>
 export const sameWiring = (a: WiringView | null, b: WiringView | null) =>
     a === null || b === null
         ? a === b
-        : (a.origin === null || b.origin === null
-              ? a.origin === b.origin
-              : a.origin.x === b.origin.x && a.origin.y === b.origin.y) &&
-          a.sockets.length === b.sockets.length &&
+        : a.sockets.length === b.sockets.length &&
           a.sockets.every((socket, index) => {
               const other = b.sockets[index];
 

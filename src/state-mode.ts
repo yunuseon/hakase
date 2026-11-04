@@ -12,19 +12,18 @@ import { colourOf, HOLDING, withMain } from './stores.ts';
 import type { Signal } from './shared/signal.ts';
 import { boxOf, type Workspace } from './workspace.ts';
 
-export type StateMode = { readonly active: boolean; readonly origin: string | null };
+export type StateMode = { readonly active: boolean };
 
-export type ModeCommand =
-    { readonly kind: 'enter'; readonly origin: string } | { readonly kind: 'toggle' | 'close' };
+export type ModeCommand = { readonly kind: 'enter' | 'toggle' | 'close' };
 
-export const defaultMode: StateMode = { active: false, origin: null };
+export const defaultMode: StateMode = { active: false };
 
 export const reduceMode = (mode: StateMode, command: ModeCommand): StateMode =>
     command.kind === 'enter'
-        ? { active: true, origin: command.origin }
+        ? { active: true }
         : command.kind === 'close' || mode.active
           ? defaultMode
-          : { active: true, origin: null };
+          : { active: true };
 
 export type ModeAction =
     | ModeCommand
@@ -103,7 +102,6 @@ export const reduceSession = (session: ModeSession, action: ModeAction): ModeSes
 
 export const modeOf = ({ pinned, held, locks }: ModeSession) => ({
     active: pinned.active || held || locks.length > 0,
-    origin: pinned.origin,
 });
 
 const SOCKET_HEIGHT = 30;
@@ -309,15 +307,6 @@ export const wiringOf = (
         };
     });
     const sockets = laid.flatMap(entry => entry.sockets);
-    const origin = processes.find(process => process.id === mode.origin);
 
-    return {
-        sockets,
-        groups: laid.flatMap(entry => entry.groups),
-        wires: wiresOf(sockets),
-        origin:
-            origin === undefined
-                ? null
-                : { x: origin.frame.x + origin.frame.width - 70, y: origin.frame.y + 5 },
-    };
+    return { sockets, groups: laid.flatMap(entry => entry.groups), wires: wiresOf(sockets) };
 };

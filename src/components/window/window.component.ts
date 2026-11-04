@@ -48,6 +48,9 @@ const TEMPLATE = `
         <header class="stores-head" title="the state this window keeps: what it reads and writes">
             <span class="direction" aria-hidden="true">→</span>
             <span>Output</span>
+            <button class="add connections" type="button" title="Show every connection on the canvas (state mode, or hold W)" aria-label="show connections">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6 H9 M15 18 H19 M9 6 C15 6 9 18 15 18 M6 4 V8 M18 16 V20"/></svg>
+            </button>
             <button class="add" type="button" data-copy="false" title="New empty state" aria-label="new empty state">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
             </button>
@@ -356,10 +359,10 @@ export class HksWindow extends HTMLElement {
     private readonly name: HTMLElement;
     private readonly glyph: HTMLElement;
     private readonly shadow: ShadowRoot;
-    private readonly open$: Observable<boolean>;
     private readonly expanded$: Observable<string | null>;
     readonly stateModes$: Observable<void>;
-    readonly stateCloses$: Observable<boolean>;
+    // This window's own menu, apart from one opened from state mode, which alone keeps the mode on.
+    readonly menus$: Observable<boolean>;
     private readonly switching$: Observable<SwitchAction>;
 
     constructor() {
@@ -384,7 +387,11 @@ export class HksWindow extends HTMLElement {
         const inside = (event: Event): boolean =>
             event.composedPath().includes(popover) || event.composedPath().includes(chip);
 
-        this.open$ = merge(
+        const connections = requireChild(shadow, '.connections');
+
+        this.menus$ = merge(
+            fromElementEvent$(chip, 'click').pipe(map(() => 'toggle' as const)),
+            fromElementEvent$(connections, 'click').pipe(map(() => 'close' as const)),
             fromDocumentEvent$('pointerdown').pipe(
                 filter(event => !inside(event)),
                 map(() => 'close' as const),
@@ -403,13 +410,13 @@ export class HksWindow extends HTMLElement {
                 map(() => 'close' as const),
             ),
         ).pipe(
-            map(() => false),
+            scan((open: boolean, action) => (action === 'toggle' ? !open : false), false),
             startWith(false),
+            distinctUntilChanged(),
             share(),
         );
 
-        this.stateCloses$ = this.open$;
-        this.stateModes$ = fromElementEvent$(chip, 'click').pipe(map(() => undefined));
+        this.stateModes$ = fromElementEvent$(connections, 'click').pipe(map(() => undefined));
 
         this.expanded$ = merge(
             fromElementEvent$(popover, 'click').pipe(
@@ -427,7 +434,7 @@ export class HksWindow extends HTMLElement {
                 ),
                 map(() => ({ kind: 'close' as const, input: null })),
             ),
-            this.open$.pipe(
+            this.menus$.pipe(
                 filter(open => !open),
                 map(() => ({ kind: 'close' as const, input: null })),
             ),

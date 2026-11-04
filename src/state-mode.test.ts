@@ -25,7 +25,7 @@ const run = (actions: readonly WorkspaceAction[] = []) =>
         (workspace, action) => reduceWorkspace(workspace, action, inputsFor),
         defaultWorkspace(viewport, inputsFor),
     );
-const active = { active: true, origin: 'sketch-2' };
+const active = { active: true };
 const on = { ...defaultSession, pinned: active };
 const launch: WorkspaceAction = {
     kind: 'launch',
@@ -81,29 +81,20 @@ describe('state mode', () => {
             expect(socket.y + 28).toBeLessThanOrEqual(frame.y + frame.height);
         });
     });
-    it('keeps the originating window until explicitly closed or toggled', () => {
-        const entered = reduceMode(defaultMode, { kind: 'enter', origin: 'signal-5' });
-        expect(entered).toEqual({ active: true, origin: 'signal-5' });
-        expect(reduceMode(entered, { kind: 'enter', origin: 'sketch-2' })).toEqual(active);
+    it('stays on until closed or toggled off', () => {
+        const entered = reduceMode(defaultMode, { kind: 'enter' });
+        expect(entered).toEqual(active);
+        expect(reduceMode(entered, { kind: 'enter' })).toEqual(active);
         expect(reduceMode(entered, { kind: 'close' })).toEqual(defaultMode);
         expect(reduceMode(entered, { kind: 'toggle' })).toEqual(defaultMode);
-        expect(reduceMode(defaultMode, { kind: 'toggle' })).toEqual({ active: true, origin: null });
+        expect(reduceMode(defaultMode, { kind: 'toggle' })).toEqual(active);
     });
 
     it('draws no ports when closed and keeps the mode independent of window focus', () => {
         expect(wiringOf(run(), new Map(), inputsFor, defaultSession)).toBeNull();
         const before = wiringOf(run(), new Map(), inputsFor, on);
         const after = wiringOf(run([{ kind: 'raise', id: 'formula-1' }]), new Map(), inputsFor, on);
-        expect(after?.origin).toEqual(before?.origin);
         expect(after?.sockets.length).toBe(before?.sockets.length);
-        const closedOrigin = wiringOf(
-            run([{ kind: 'quit', id: 'sketch-2' }]),
-            new Map(),
-            inputsFor,
-            on,
-        );
-        expect(closedOrigin).not.toBeNull();
-        expect(closedOrigin?.origin).toBeNull();
     });
 
     it('draws one clock wire to each follower and no duplicate shared-state wire', () => {

@@ -687,7 +687,7 @@ const bootstrap = () => {
     const session$ = merge(
         signals$.pipe(
             mergeMap((signal): ModeAction[] =>
-                signal.to === 'state-mode' ? [{ kind: 'enter', origin: signal.id }] : [],
+                signal.to === 'state-mode' ? [{ kind: 'enter' }] : [],
             ),
         ),
         signals$.pipe(
@@ -704,14 +704,12 @@ const bootstrap = () => {
         canvas.escapes$.pipe(map((): ModeAction => ({ kind: 'close' }))),
         defer(() => wiringEvents$).pipe(
             mergeMap((event): ModeAction[] =>
-                event.kind === 'close'
-                    ? [{ kind: 'close' }]
-                    : event.kind === 'busy' ||
-                        event.kind === 'expand' ||
-                        event.kind === 'spring' ||
-                        event.kind === 'settle'
-                      ? [event]
-                      : [],
+                event.kind === 'busy' ||
+                event.kind === 'expand' ||
+                event.kind === 'spring' ||
+                event.kind === 'settle'
+                    ? [event]
+                    : [],
             ),
         ),
     ).pipe(
