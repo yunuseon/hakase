@@ -1,0 +1,179 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.plot {
+    position: relative;
+    flex: 1;
+    min-block-size: 80px;
+    background: var(--well);
+    border-radius: 10px;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+}
+
+.plot > svg {
+    position: absolute;
+    inset: 12px 10px;
+    inline-size: calc(100% - 20px);
+    block-size: calc(100% - 24px);
+    overflow: visible;
+    pointer-events: none;
+}
+
+.lines path {
+    fill: none;
+    stroke: var(--trace);
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.zeros line {
+    stroke: var(--edge);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.now {
+    stroke: var(--ink);
+    stroke-width: 1;
+    opacity: 0.5;
+    vector-effect: non-scaling-stroke;
+}
+
+/* Laid out over the stretched svg in plain CSS, or the svg's aspect would squash them. */
+.bound {
+    position: absolute;
+    inset-inline-start: 12px;
+    inset-block-start: calc(12px + var(--y, 0) * (100% - 24px));
+    font: 500 10px var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.bound[data-low] {
+    transform: translateY(-100%);
+}
+
+.dot {
+    position: absolute;
+    inset-inline-start: calc(10px + var(--x, 0) * (100% - 20px));
+    inset-block-start: calc(12px + var(--y, 0) * (100% - 24px));
+    inline-size: 8px;
+    block-size: 8px;
+    margin: -4px 0 0 -4px;
+    background: var(--trace);
+    border: 2px solid var(--well);
+    border-radius: 50%;
+    box-sizing: content-box;
+    pointer-events: none;
+}
+
+.empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: 16px;
+    color: var(--muted);
+    text-align: center;
+    pointer-events: none;
+}
+
+.empty b {
+    font: 600 11px var(--font-mono);
+    color: var(--label);
+}
+
+.empty[hidden] {
+    display: none;
+}
+
+.foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.legend li {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.legend li::before {
+    align-self: center;
+    inline-size: 8px;
+    block-size: 8px;
+    content: '';
+    background: var(--trace);
+    border-radius: 50%;
+}
+
+.name {
+    color: var(--label);
+}
+
+.value {
+    min-inline-size: 4ch;
+    font: 500 12px var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
+.layouts {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--well);
+    border-radius: 9px;
+}
+
+.layouts button {
+    block-size: 22px;
+    padding: 0 8px;
+    font: 500 11px var(--font-ui);
+    text-transform: capitalize;
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.layouts button:hover {
+    color: var(--ink);
+}
+
+.layouts button[aria-checked='true'] {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.layouts button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

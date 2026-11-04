@@ -32,6 +32,7 @@ export const PROGRAM_IDS = [
     'timeline',
     'playhead',
     'signal',
+    'plot',
     'tasks',
     'todo',
     'board',
@@ -129,12 +130,21 @@ export type AppState = {
     readonly signal$: Observable<Signal>;
     readonly wave$: Observable<Wave>;
     readonly followedWave$: (input: string) => Observable<Wave | null>;
+    // One stream, not followedWave$ beside a name: a rebind changes both, and two would fire twice.
+    readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the state map alone: any store or global, which no other program can see.
     readonly inspect$: (target: string) => Observable<unknown>;
     readonly history$: Observable<readonly HistoryEntry[]>;
     readonly graph$: Observable<StateGraph>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
+};
+
+export type FollowedSignal = {
+    readonly id: string;
+    readonly name: string;
+    readonly colour: string;
+    readonly wave: Wave;
 };
 
 export type Written<T> = {

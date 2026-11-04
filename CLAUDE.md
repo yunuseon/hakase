@@ -1199,6 +1199,26 @@ what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
 
+## The plot
+
+`plot` draws signals as curves over the loop, like an oscilloscope: four optional inputs, `a` to `d`
+(`plotInputs`, grouped as Signals so state mode folds them), each drawn as a
+line over one loop in the colour of the state it follows, the same colour its
+wire and chip wear. A cursor marks the playhead of the clock it follows, with a
+dot on each line and the value in the legend; a chained signal is drawn as it
+plays, modulation included. **Overlay** puts every line on one fitted scale,
+**lanes** gives each its own band and scale (`lanesOf`, `boundsOf`,
+`readingsAt` in `components/plot/plot.ts`). The layout is the window's only
+setting, and a view-only one, so it is not a step. Dragging across the plot
+scrubs its clock like the frame strip does. It keeps no state of its own
+(`HOLDING` is null): inputs in, a picture out.
+
+It reads each input through `followedSignal$`, which hands over the bound
+store's name, colour and wave **together**, read from the one documents fold.
+Reading `followedWave$` beside a separate name stream was the first version and
+is the two-paths trap: a rebind changes both, and the legend would show one
+signal's name over another's line for a frame.
+
 ## State mode, on the canvas
 
 **A window's state chip opens its state menu**, and nothing else: switching,
@@ -1872,7 +1892,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and nine of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and eleven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

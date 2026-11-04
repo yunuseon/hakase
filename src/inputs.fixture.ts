@@ -1,5 +1,6 @@
 import {
     knobInputs,
+    plotInputs,
     signalInputs,
     sceneInputs,
     ownPlaybackInput,
@@ -12,10 +13,12 @@ import {
 export const inputsFor: InputsFor = program =>
     program === 'sketch'
         ? { playback: playbackInput, ...knobInputs, ...sceneInputs }
-        : program === 'signal'
-          ? { playback: playbackInput, ...signalInputs }
-          : program === 'timeline'
-            ? { playback: ownPlaybackInput }
-            : program === 'playhead'
-              ? { progress: progressInput }
-              : {};
+        : program === 'plot'
+          ? { playback: playbackInput, ...plotInputs }
+          : program === 'signal'
+            ? { playback: playbackInput, ...signalInputs }
+            : program === 'timeline'
+              ? { playback: ownPlaybackInput }
+              : program === 'playhead'
+                ? { progress: progressInput }
+                : {};

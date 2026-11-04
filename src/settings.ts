@@ -1,3 +1,4 @@
+import { isLayout, type Layout } from './components/plot/plot.ts';
 import {
     defaultExport,
     isExportSize,
@@ -78,6 +79,16 @@ export type AgendaSettings = {
 
 export type Spot = { readonly x: number; readonly y: number };
 
+export type PlotSettings = {
+    readonly kind: 'plot';
+    readonly layout: Layout;
+};
+
+export const defaultPlot: PlotSettings = { kind: 'plot', layout: 'overlay' };
+
+export const asPlot = (settings: Settings | undefined): PlotSettings =>
+    settings?.kind === 'plot' ? settings : defaultPlot;
+
 export type StateMapSettings = {
     readonly kind: 'state-map';
     readonly positions: Readonly<Record<string, Spot>>;
@@ -96,7 +107,8 @@ export type Settings =
     | ThemeEditorSettings
     | NoteSettings
     | AgendaSettings
-    | StateMapSettings;
+    | StateMapSettings
+    | PlotSettings;
 
 export const asStateMap = (settings: Settings | undefined): StateMapSettings =>
     settings?.kind === 'state-map' ? settings : defaultStateMap;
@@ -358,6 +370,15 @@ export const parseSettings = (value: unknown): Settings | null => {
             const day = field(value, 'day');
 
             return { kind: 'agenda', day: typeof day === 'string' && isDay(day) ? day : null };
+        }
+        case 'plot': {
+            const layout = field(value, 'layout');
+
+            return {
+                kind: 'plot',
+                layout:
+                    typeof layout === 'string' && isLayout(layout) ? layout : defaultPlot.layout,
+            };
         }
         case 'state-map': {
             const positions = field(value, 'positions');

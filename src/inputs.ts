@@ -130,6 +130,13 @@ export const sceneInputs = {
     trails: signalInput('trails', 'Look'),
 };
 
+export const plotInputs = {
+    a: signalInput('a', 'Signals'),
+    b: signalInput('b', 'Signals'),
+    c: signalInput('c', 'Signals'),
+    d: signalInput('d', 'Signals'),
+};
+
 export const ownPlaybackInput = {
     title: 'Playback',
     from: 'own',

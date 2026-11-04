@@ -155,7 +155,8 @@ type StoreKey =
     | 'bookmarks$'
     | 'signal$'
     | 'wave$'
-    | 'followedWave$';
+    | 'followedWave$'
+    | 'followedSignal$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -1174,6 +1175,26 @@ const bootstrap = () => {
                 followed$(input).pipe(
                     switchMap(binding =>
                         binding?.kind === 'signal' ? waveIn(binding.store) : of(null),
+                    ),
+                ),
+            followedSignal$: input =>
+                followed$(input).pipe(
+                    switchMap(binding =>
+                        binding?.kind !== 'signal'
+                            ? of(null)
+                            : documents$.pipe(
+                                  map(({ workspace, signals }) => ({
+                                      id: binding.store,
+                                      name:
+                                          workspace.stores.find(({ id }) => id === binding.store)
+                                              ?.name ?? 'Main',
+                                      colour: colourOf(binding.store),
+                                      wave: waveOf(signals, binding.store),
+                                  })),
+                                  distinctUntilChanged(
+                                      (a, b) => a.name === b.name && sameWave(a.wave, b.wave),
+                                  ),
+                              ),
                     ),
                 ),
         };
