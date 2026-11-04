@@ -158,7 +158,8 @@ type End =
       }
     | {
           readonly kind: 'port';
-          readonly window: string;
+          readonly owner: 'window' | 'store';
+          readonly sink: string;
           readonly input: string;
           readonly accepts: readonly string[];
           readonly cuttable: boolean;
@@ -187,7 +188,7 @@ const endOf = (target: EventTarget | null): End | null => {
         return null;
     }
 
-    const { store, program, feeds, window, input, accepts, cuttable, own, current } =
+    const { store, program, feeds, sink, owner, input, accepts, cuttable, own, current } =
         element.dataset;
 
     if (store !== undefined && program !== undefined) {
@@ -198,10 +199,11 @@ const endOf = (target: EventTarget | null): End | null => {
         return { kind: 'own', window: own, program, store: current };
     }
 
-    return window !== undefined && input !== undefined && accepts !== undefined
+    return sink !== undefined && input !== undefined && accepts !== undefined
         ? {
               kind: 'port',
-              window,
+              owner: owner === 'store' ? 'store' : 'window',
+              sink,
               input,
               accepts: accepts.split(' '),
               cuttable: cuttable !== undefined,
@@ -214,7 +216,7 @@ const sameEnd = (a: End, b: End): boolean => {
         case 'store':
             return b.kind === 'store' && a.id === b.id;
         case 'port':
-            return b.kind === 'port' && a.window === b.window && a.input === b.input;
+            return b.kind === 'port' && a.sink === b.sink && a.input === b.input;
         case 'own':
             return b.kind === 'own' && a.window === b.window;
     }
@@ -222,9 +224,11 @@ const sameEnd = (a: End, b: End): boolean => {
 
 const commandOf = (a: End, b: End | null): StateCommand | null => {
     if (b === null) {
-        return a.kind === 'port' && a.cuttable
-            ? { kind: 'disconnect', window: a.window, input: a.input }
-            : null;
+        return a.kind !== 'port' || !a.cuttable
+            ? null
+            : a.owner === 'store'
+              ? { kind: 'source', store: a.sink, param: a.input, source: null }
+              : { kind: 'disconnect', window: a.sink, input: a.input };
     }
 
     const [store, other] = a.kind === 'store' ? [a, b] : b.kind === 'store' ? [b, a] : [null, null];
@@ -234,15 +238,23 @@ const commandOf = (a: End, b: End | null): StateCommand | null => {
     }
 
     if (other.kind === 'port') {
-        return store.feeds !== null && other.accepts.includes(store.feeds)
-            ? {
-                  kind: 'connect',
-                  window: other.window,
-                  input: other.input,
-                  source: store.feeds,
-                  store: store.id,
-              }
-            : null;
+        if (store.feeds === null || !other.accepts.includes(store.feeds)) {
+            return null;
+        }
+
+        if (other.owner === 'store') {
+            return other.sink === store.id
+                ? null
+                : { kind: 'source', store: other.sink, param: other.input, source: store.id };
+        }
+
+        return {
+            kind: 'connect',
+            window: other.sink,
+            input: other.input,
+            source: store.feeds,
+            store: store.id,
+        };
     }
 
     return other.kind === 'own' && other.program === store.program && other.store !== store.id
@@ -313,6 +325,7 @@ const storeNode = ({
     title,
     name,
     colour,
+    ports,
     x,
     y,
     height,
@@ -334,15 +347,23 @@ const storeNode = ({
 
     const label = span('label');
     label.append(span('kind', title), span('name', name));
-    node.append(span('dot'), label, span('jack'));
+    const head = document.createElement('div');
+    head.className = 'store-head';
+    head.append(span('dot'), label, span('jack'));
+    node.append(head, ...ports.map(port => portRow('store', id, port)));
 
     return node;
 };
 
-const portRow = (window: string, { input, title, accepts, optional, bound }: PlacedPort) => {
+const portRow = (
+    owner: 'window' | 'store',
+    sink: string,
+    { input, title, accepts, optional, bound }: PlacedPort,
+) => {
     const row = document.createElement('div');
     row.className = 'port';
-    row.dataset['window'] = window;
+    row.dataset['owner'] = owner;
+    row.dataset['sink'] = sink;
     row.dataset['input'] = input;
     row.dataset['accepts'] = accepts.join(' ');
     row.toggleAttribute('data-bound', bound !== null);
@@ -387,7 +408,7 @@ const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: Plac
     locate.append(iconOf(LOCATE));
     head.append(locate);
 
-    node.append(head, ...ports.map(port => portRow(id, port)));
+    node.append(head, ...ports.map(port => portRow('window', id, port)));
 
     return node;
 };
@@ -421,7 +442,8 @@ export class HksStateMap extends HTMLElement {
         };
         const jackOf = (target: EventTarget | null): Point | null => {
             const element = target instanceof Element ? target.closest(ENDS) : null;
-            const jack = element?.querySelector(':scope > .jack') ?? element;
+            const jack =
+                element?.querySelector(':scope > .jack, :scope > .store-head > .jack') ?? element;
 
             if (!(jack instanceof HTMLElement)) {
                 return null;
@@ -531,19 +553,10 @@ export class HksStateMap extends HTMLElement {
             fromElementEvent$(board, 'click').pipe(
                 mergeMap(({ target }): StateCommand[] => {
                     const cut = target instanceof Element ? target.closest('[data-cut]') : null;
-                    const port = cut?.closest('[data-input]');
+                    const end = endOf(cut?.closest('[data-input]') ?? null);
+                    const command = end === null ? null : commandOf(end, null);
 
-                    return port instanceof HTMLElement &&
-                        port.dataset['window'] !== undefined &&
-                        port.dataset['input'] !== undefined
-                        ? [
-                              {
-                                  kind: 'disconnect',
-                                  window: port.dataset['window'],
-                                  input: port.dataset['input'],
-                              },
-                          ]
-                        : [];
+                    return command === null ? [] : [command];
                 }),
             ),
             fromElementEvent$(board, 'click').pipe(
@@ -656,10 +669,10 @@ export class HksStateMap extends HTMLElement {
                 wires.setAttribute('width', String(width));
                 wires.setAttribute('height', String(height));
 
-                const paths = list.map(({ kind, window, input, path, colour, removable }) => {
+                const paths = list.map(({ kind, sink, input, path, colour, removable }) => {
                     const wire = document.createElementNS(SVG, 'path');
                     wire.classList.add('wire', kind);
-                    wire.dataset['key'] = wireKey({ window, input });
+                    wire.dataset['key'] = wireKey({ sink, input });
                     wire.toggleAttribute('data-fixed', !removable);
                     wire.setAttribute('d', path);
                     wire.style.setProperty('--store', colour);

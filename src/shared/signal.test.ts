@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSignal, parseSignal, reduceSignal, SHAPES, signalAt, RATES } from './signal.ts';
+import {
+    closesLoop,
+    defaultSignal,
+    parseSignal,
+    RATES,
+    reachedFrom,
+    reduceSignal,
+    SHAPES,
+    signalAt,
+    waveAt,
+    waveOf,
+    type Signal,
+} from './signal.ts';
 
 describe('signalAt', () => {
     it('ends every loop where it began, for every shape and rate', () => {
@@ -52,5 +64,59 @@ describe('parseSignal', () => {
             high: 0.4,
         });
         expect(parseSignal(null)).toEqual(defaultSignal);
+    });
+});
+
+describe('chains', () => {
+    const slow: Signal = { ...defaultSignal, rate: 1, low: 0.2, high: 0.8 };
+    const fast: Signal = {
+        ...defaultSignal,
+        rate: 4,
+        sources: { phase: null, low: null, high: 'slow' },
+    };
+    const all = new Map([
+        ['slow', slow],
+        ['fast', fast],
+    ]);
+
+    it('lets a followed signal stand in for a parameter, at the same moment', () => {
+        const chained = waveOf(all, 'fast');
+
+        expect(chained.mods.high?.signal).toBe(slow);
+        expect(waveAt(chained, 0.125)).toBeCloseTo(
+            signalAt({ ...fast, high: signalAt(slow, 0.125) }, 0.125),
+        );
+    });
+
+    it('still loops, because what drives it loops too', () => {
+        const chained = waveOf(all, 'fast');
+
+        expect(waveAt(chained, 1)).toBeCloseTo(waveAt(chained, 0), 9);
+    });
+
+    it('refuses a loop, and stops at one that came in through storage', () => {
+        expect(closesLoop(all, 'slow', 'fast')).toBe(true);
+        expect(closesLoop(all, 'fast', 'fast')).toBe(true);
+        expect(closesLoop(all, 'fast', 'slow')).toBe(false);
+
+        const looped = new Map([
+            ['a', { ...defaultSignal, sources: { phase: 'b', low: null, high: null } }],
+            ['b', { ...defaultSignal, sources: { phase: 'a', low: null, high: null } }],
+        ]);
+
+        expect(waveOf(looped, 'a').mods.phase?.mods.phase).toBeNull();
+    });
+
+    it('reaches every store a chain follows, so a prune keeps them', () => {
+        expect([...reachedFrom(all, ['fast'])].sort()).toEqual(['fast', 'slow']);
+        expect([...reachedFrom(all, ['slow'])]).toEqual(['slow']);
+    });
+
+    it('reads sources back from storage, dropping what is not a store id', () => {
+        expect(parseSignal({ sources: { high: 'slow', low: 3 } }).sources).toEqual({
+            phase: null,
+            low: null,
+            high: 'slow',
+        });
     });
 });

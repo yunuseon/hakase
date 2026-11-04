@@ -9,6 +9,7 @@ import {
     SHAPES,
     type Signal,
     type SignalCommand,
+    type Wave,
 } from '../../shared/signal.ts';
 import { HEIGHT, markerOf, pathOf, WIDTH } from './signal.ts';
 import css from './signal.css?inline';
@@ -116,9 +117,13 @@ export class HksSignal extends HTMLElement {
         );
     }
 
-    connect$(signal$: Observable<Signal>, t$: Observable<number>): Observable<void> {
+    connect$(
+        signal$: Observable<Signal>,
+        wave$: Observable<Wave>,
+        t$: Observable<number>,
+    ): Observable<void> {
         const shadow = this.shadow;
-        const wave = requireElement(shadow, '.wave', SVGPathElement);
+        const line = requireElement(shadow, '.wave', SVGPathElement);
         const now = requireElement(shadow, '.now', SVGLineElement);
         const dot = requireChild(shadow, '.dot');
 
@@ -133,28 +138,32 @@ export class HksSignal extends HTMLElement {
         );
 
         const units$ = UNITS.map(unit =>
-            signal$.pipe(
-                map(signal => signal[unit]),
-                distinctUntilChanged(),
-                tap(value => {
-                    requireElement(shadow, `[data-unit="${unit}"]`, HTMLInputElement).value =
-                        String(value);
+            combineLatest([
+                signal$.pipe(map(signal => signal[unit])),
+                wave$.pipe(map(({ mods }) => mods[unit] !== null)),
+            ]).pipe(
+                distinctUntilChanged(([a, x], [b, y]) => a === b && x === y),
+                tap(([value, driven]) => {
+                    const input = requireElement(shadow, `[data-unit="${unit}"]`, HTMLInputElement);
+                    input.value = String(value);
+                    input.disabled = driven;
                     requireElement(shadow, `[data-read="${unit}"]`, HTMLOutputElement).textContent =
-                        value.toFixed(2);
+                        driven ? 'signal' : value.toFixed(2);
+                    input.closest('.row')?.toggleAttribute('data-driven', driven);
                 }),
             ),
         );
 
-        const path$ = signal$.pipe(
+        const path$ = wave$.pipe(
             map(pathOf),
             distinctUntilChanged(),
             tap(path => {
-                wave.setAttribute('d', path);
+                line.setAttribute('d', path);
             }),
         );
 
-        const marker$ = combineLatest([signal$, t$]).pipe(
-            map(([signal, t]) => markerOf(signal, t)),
+        const marker$ = combineLatest([wave$, t$]).pipe(
+            map(([wave, t]) => markerOf(wave, t)),
             tap(({ x, y }) => {
                 now.setAttribute('x1', String(x));
                 now.setAttribute('x2', String(x));

@@ -12,7 +12,7 @@ import type { Focus, FocusCommand } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
-import type { Signal, SignalCommand } from './shared/signal.ts';
+import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
 import type { StateCommand, StateGraph } from './components/state-map/state-map.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
@@ -76,8 +76,14 @@ export type AppInput =
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
     | {
+          readonly kind: 'modulate';
+          readonly store: string;
+          readonly param: string;
+          readonly source: string | null;
+      }
+    | {
           readonly kind: 'wiring';
-          readonly command: Exclude<StateCommand, { kind: 'locate' | 'prune' }>;
+          readonly command: Exclude<StateCommand, { kind: 'locate' | 'prune' | 'source' }>;
       }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
@@ -119,7 +125,8 @@ export type AppState = {
     readonly habits$: Observable<Habits>;
     readonly clocks$: Observable<Clocks>;
     readonly signal$: Observable<Signal>;
-    readonly followedSignal$: (input: string) => Observable<Signal | null>;
+    readonly wave$: Observable<Wave>;
+    readonly followedWave$: (input: string) => Observable<Wave | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the state map alone: any store or global, which no other program can see.
     readonly inspect$: (target: string) => Observable<unknown>;

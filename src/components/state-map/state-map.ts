@@ -9,6 +9,7 @@ export type GraphStore = {
     readonly title: string;
     readonly name: string;
     readonly colour: string;
+    readonly ports: readonly GraphPort[];
 };
 
 export type GraphPort = {
@@ -44,7 +45,13 @@ export type StateCommand =
     | { readonly kind: 'disconnect'; readonly window: string; readonly input: string }
     | { readonly kind: 'bind'; readonly window: string; readonly store: string }
     | { readonly kind: 'locate'; readonly window: string }
-    | { readonly kind: 'prune' };
+    | { readonly kind: 'prune' }
+    | {
+          readonly kind: 'source';
+          readonly store: string;
+          readonly param: string;
+          readonly source: string | null;
+      };
 
 export type Point = { readonly x: number; readonly y: number };
 
@@ -57,8 +64,13 @@ const SPACING = 10;
 const PAD = 12;
 const GROUP_GAP = 14;
 
-export type PlacedStore = GraphStore & Point & { readonly height: number; readonly anchor: Point };
 export type PlacedPort = GraphPort & { readonly y: number; readonly anchor: Point };
+export type PlacedStore = Omit<GraphStore, 'ports'> &
+    Point & {
+        readonly height: number;
+        readonly anchor: Point;
+        readonly ports: readonly PlacedPort[];
+    };
 export type PlacedWindow = Omit<GraphWindow, 'ports'> &
     Point & {
         readonly height: number;
@@ -67,8 +79,8 @@ export type PlacedWindow = Omit<GraphWindow, 'ports'> &
     };
 
 export type Wire = {
-    readonly kind: 'own' | 'follow';
-    readonly window: string;
+    readonly kind: 'own' | 'follow' | 'source';
+    readonly sink: string;
     readonly store: string;
     readonly input: string | null;
     readonly colour: string;
@@ -104,30 +116,64 @@ const stacked = <T>(
         { tops: [], next: PAD },
     );
 
-const windowHeight = (window: GraphWindow) => HEADER + window.ports.length * PORT_HEIGHT + 6;
+const portsHeight = (ports: readonly GraphPort[]) =>
+    ports.length === 0 ? 0 : ports.length * PORT_HEIGHT + 6;
 
-export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
-    const left = PAD;
-    const right = PAD + NODE_WIDTH + GAP;
-    const storeTops = stacked(
-        stores,
-        () => STORE_HEIGHT,
-        (store, index) => (store.global && stores[index - 1]?.global === false ? GROUP_GAP : 0),
-    );
-    const windowTops = stacked(windows, windowHeight);
+const windowHeight = (window: GraphWindow) => HEADER + portsHeight(window.ports);
 
-    const placedStores = stores.map((store, index): PlacedStore => {
-        const y = storeTops.tops[index] ?? PAD;
+const storeHeight = (store: GraphStore) => STORE_HEIGHT + portsHeight(store.ports);
 
-        return {
-            ...store,
-            x: left,
-            y,
-            height: STORE_HEIGHT,
-            anchor: { x: left + NODE_WIDTH, y: y + STORE_HEIGHT / 2 },
-        };
+const depthsOf = (stores: readonly GraphStore[]): ReadonlyMap<string, number> => {
+    const depth = (store: GraphStore, seen: ReadonlySet<string>): number =>
+        Math.max(
+            0,
+            ...store.ports.flatMap(({ bound }) => {
+                const source = stores.find(({ id }) => id === bound);
+
+                return source === undefined || seen.has(source.id)
+                    ? []
+                    : [depth(source, new Set([...seen, store.id])) + 1];
+            }),
+        );
+
+    return new Map(stores.map(store => [store.id, depth(store, new Set([store.id]))]));
+};
+
+const placedPorts = (ports: readonly GraphPort[], x: number, top: number) =>
+    ports.map((port, at): PlacedPort => {
+        const y = top + at * PORT_HEIGHT;
+
+        return { ...port, y, anchor: { x, y: y + PORT_HEIGHT / 2 } };
     });
 
+export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
+    const depths = depthsOf(stores);
+    const columns = Math.max(0, ...depths.values()) + 1;
+    const columnX = (column: number) => PAD + column * (NODE_WIDTH + GAP);
+    const right = columnX(columns);
+
+    const placedStores = Array.from({ length: columns }, (_, column) => {
+        const here = stores.filter(({ id }) => (depths.get(id) ?? 0) === column);
+        const tops = stacked(here, storeHeight, (store, index) =>
+            store.global && here[index - 1]?.global === false ? GROUP_GAP : 0,
+        );
+
+        return here.map((store, index): PlacedStore => {
+            const x = columnX(column);
+            const y = tops.tops[index] ?? PAD;
+
+            return {
+                ...store,
+                x,
+                y,
+                height: storeHeight(store),
+                anchor: { x: x + NODE_WIDTH, y: y + STORE_HEIGHT / 2 },
+                ports: placedPorts(store.ports, x, y + STORE_HEIGHT),
+            };
+        });
+    }).flat();
+
+    const windowTops = stacked(windows, windowHeight);
     const placedWindows = windows.map((window, index): PlacedWindow => {
         const y = windowTops.tops[index] ?? PAD;
 
@@ -137,58 +183,67 @@ export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
             y,
             height: windowHeight(window),
             anchor: { x: right, y: y + HEADER / 2 },
-            ports: window.ports.map((port, at) => {
-                const portY = y + HEADER + at * PORT_HEIGHT;
-
-                return { ...port, y: portY, anchor: { x: right, y: portY + PORT_HEIGHT / 2 } };
-            }),
+            ports: placedPorts(window.ports, right, y + HEADER),
         };
     });
 
     const storeAt = (id: string | null) => placedStores.find(store => store.id === id);
 
-    const wires = placedWindows.flatMap(window => {
-        const own = storeAt(window.own);
-        const owned: Wire[] =
-            own === undefined
+    const portWires = (
+        kind: 'follow' | 'source',
+        sink: string,
+        ports: readonly PlacedPort[],
+    ): Wire[] =>
+        ports.flatMap(port => {
+            const source = storeAt(port.bound);
+
+            return source === undefined
                 ? []
                 : [
                       {
-                          kind: 'own',
-                          window: window.id,
-                          store: own.id,
-                          input: null,
-                          colour: own.colour,
-                          path: wirePath(own.anchor, window.anchor),
-                          removable: false,
+                          kind,
+                          sink,
+                          store: source.id,
+                          input: port.input,
+                          colour: source.colour,
+                          path: wirePath(source.anchor, port.anchor),
+                          removable: port.optional,
                       },
                   ];
+        });
 
-        return [
-            ...owned,
-            ...window.ports.flatMap((port): Wire[] => {
-                const source = storeAt(port.bound);
+    const wires = [
+        ...placedStores.flatMap(store => portWires('source', store.id, store.ports)),
+        ...placedWindows.flatMap(window => {
+            const own = storeAt(window.own);
 
-                return source === undefined
+            return [
+                ...(own === undefined
                     ? []
                     : [
                           {
-                              kind: 'follow',
-                              window: window.id,
-                              store: source.id,
-                              input: port.input,
-                              colour: source.colour,
-                              path: wirePath(source.anchor, port.anchor),
-                              removable: port.optional,
+                              kind: 'own' as const,
+                              sink: window.id,
+                              store: own.id,
+                              input: null,
+                              colour: own.colour,
+                              path: wirePath(own.anchor, window.anchor),
+                              removable: false,
                           },
-                      ];
-            }),
-        ];
-    });
+                      ]),
+                ...portWires('follow', window.id, window.ports),
+            ];
+        }),
+    ];
 
     return {
         width: right + NODE_WIDTH + PAD,
-        height: Math.max(storeTops.next, windowTops.next) + PAD - SPACING,
+        height:
+            Math.max(
+                PAD,
+                ...placedStores.map(({ y, height }) => y + height),
+                ...placedWindows.map(({ y, height }) => y + height),
+            ) + PAD,
         stores: placedStores,
         windows: placedWindows,
         wires,
@@ -197,8 +252,7 @@ export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
 
 export type Focus = { readonly kind: 'window' | 'store'; readonly id: string };
 
-export const wireKey = ({ window, input }: Pick<Wire, 'window' | 'input'>) =>
-    `${window}:${input ?? ''}`;
+export const wireKey = ({ sink, input }: Pick<Wire, 'sink' | 'input'>) => `${sink}:${input ?? ''}`;
 
 export type Related = {
     readonly stores: ReadonlySet<string>;
@@ -208,13 +262,23 @@ export type Related = {
 
 export const relatedTo = ({ wires }: GraphLayout, focus: Focus): Related => {
     const touching = wires.filter(wire =>
-        focus.kind === 'window' ? wire.window === focus.id : wire.store === focus.id,
+        focus.kind === 'window'
+            ? wire.sink === focus.id
+            : wire.store === focus.id || (wire.kind === 'source' && wire.sink === focus.id),
     );
     const itself = (kind: Focus['kind']) => (focus.kind === kind ? [focus.id] : []);
 
     return {
-        stores: new Set([...itself('store'), ...touching.map(({ store }) => store)]),
-        windows: new Set([...itself('window'), ...touching.map(({ window }) => window)]),
+        stores: new Set([
+            ...itself('store'),
+            ...touching.flatMap(({ kind, store, sink }) =>
+                kind === 'source' ? [store, sink] : [store],
+            ),
+        ]),
+        windows: new Set([
+            ...itself('window'),
+            ...touching.flatMap(({ kind, sink }) => (kind === 'source' ? [] : [sink])),
+        ]),
         wires: new Set(touching.map(wireKey)),
     };
 };
@@ -235,8 +299,24 @@ export const focusedStores = (layout: GraphLayout, focus: Focus | null) => {
     return layout.stores.filter(({ id }) => stores.has(id));
 };
 
-export const unusedOf = ({ stores, wires }: GraphLayout) =>
-    stores.filter(({ id, global }) => !global && !wires.some(wire => wire.store === id)).length;
+// Used is what a window keeps or follows, and whatever those follow in turn: what a prune would keep.
+export const unusedOf = ({ stores, wires }: GraphLayout) => {
+    const grow = (found: ReadonlySet<string>): ReadonlySet<string> => {
+        const next = new Set([
+            ...found,
+            ...wires
+                .filter(({ kind, sink }) => kind === 'source' && found.has(sink))
+                .map(({ store }) => store),
+        ]);
+
+        return next.size === found.size ? found : grow(next);
+    };
+    const used = grow(
+        new Set(wires.filter(({ kind }) => kind !== 'source').map(({ store }) => store)),
+    );
+
+    return stores.filter(({ id, global }) => !global && !used.has(id)).length;
+};
 
 export type Inspected = {
     readonly target: string;

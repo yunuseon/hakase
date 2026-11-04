@@ -44,7 +44,16 @@ import { reduceBoard } from './components/board/board.ts';
 import { reduceNotes } from './components/note/note.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
-import { defaultSignal, reduceSignal } from './shared/signal.ts';
+import {
+    closesLoop,
+    defaultSignal,
+    isParam,
+    reachedFrom,
+    reduceSignal,
+    sameWave,
+    waveOf,
+    type Signal,
+} from './shared/signal.ts';
 import { graphOf, sameGraph } from './state-graph.ts';
 import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
@@ -143,7 +152,8 @@ type StoreKey =
     | 'clocks$'
     | 'bookmarks$'
     | 'signal$'
-    | 'followedSignal$';
+    | 'wave$'
+    | 'followedWave$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -327,7 +337,8 @@ const bootstrap = () => {
         ),
         defer(() => inputs$).pipe(
             filter(({ input }) => input.kind === 'prune'),
-            map((): WorkspaceAction => ({ kind: 'prune-stores' })),
+            withLatestFrom(defer(() => waves$)),
+            map(([, all]): WorkspaceAction => ({ kind: 'prune-stores', followed: all })),
         ),
         defer(() => inputs$).pipe(
             mergeMap(({ from, input }) => (input.kind === 'close-others' ? of(from) : EMPTY)),
@@ -680,10 +691,16 @@ const bootstrap = () => {
         // Bound stores and window ids both: settings of a document program are kept by window.
         inputs$.pipe(
             filter(({ input }) => input.kind === 'prune'),
-            withLatestFrom(workspace$),
-            map(([, { processes }]): StoreEvent => ({
+            withLatestFrom(
+                workspace$,
+                defer(() => waves$),
+            ),
+            map(([, { processes }, all]): StoreEvent => ({
                 kind: 'keep',
-                stores: new Set([...usedStores(processes), ...processes.map(({ id }) => id)]),
+                stores: new Set([
+                    ...reachedFrom(all, usedStores(processes)),
+                    ...processes.map(({ id }) => id),
+                ]),
             })),
         ),
     ).pipe(share());
@@ -793,10 +810,25 @@ const bootstrap = () => {
         stored.clocks,
     );
 
-    const waves$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'signal' ? of({ store, command: input.command }) : EMPTY,
+    // Declared: the fold reads itself, through a defer, to refuse a source that would loop back.
+    const waves$: Observable<ReadonlyMap<StoreId, Signal>> = perStore$(
+        merge(
+            inputs$.pipe(
+                mergeMap(({ store, input }) =>
+                    input.kind === 'signal' ? of({ store, command: input.command }) : EMPTY,
+                ),
+            ),
+            inputs$.pipe(
+                mergeMap(({ input }) => (input.kind === 'modulate' ? of(input) : EMPTY)),
+                withLatestFrom(defer(() => waves$)),
+                mergeMap(([{ store, param, source }, all]) =>
+                    !isParam(param) || (source !== null && closesLoop(all, store, source))
+                        ? EMPTY
+                        : of({
+                              store,
+                              command: { kind: 'source' as const, param, source },
+                          }),
+                ),
             ),
         ),
         storeEvents$,
@@ -974,8 +1006,10 @@ const bootstrap = () => {
         appearance$,
         library$,
         inspect$: (id: string) => inspected$(id),
-        graph$: combineLatest([workspace$, held$]).pipe(
-            map(([workspace, held]) => graphOf(workspace, inputsFor, programOf, held)),
+        graph$: combineLatest([workspace$, held$, waves$]).pipe(
+            map(([workspace, held, signals]) =>
+                graphOf(workspace, inputsFor, programOf, held, signals),
+            ),
             distinctUntilChanged(sameGraph),
         ),
         history$: history$.pipe(
@@ -1022,6 +1056,11 @@ const bootstrap = () => {
     const clocksIn = inStore(clocks$, defaultClocks);
     const bookmarksIn = inStore(bookmarks$, defaultBookmarks);
     const signalIn = inStore(waves$, defaultSignal);
+    const waveIn = (store: StoreId) =>
+        waves$.pipe(
+            map(all => waveOf(all, store)),
+            distinctUntilChanged(sameWave),
+        );
     const timerIn = inStore(timers$, initialFocus);
 
     const documentIn: Readonly<
@@ -1130,10 +1169,11 @@ const bootstrap = () => {
             clocks$: narrowed(clocksIn),
             bookmarks$: narrowed(bookmarksIn),
             signal$: narrowed(signalIn),
-            followedSignal$: input =>
+            wave$: narrowed(waveIn),
+            followedWave$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
-                        binding?.kind === 'signal' ? signalIn(binding.store) : of(null),
+                        binding?.kind === 'signal' ? waveIn(binding.store) : of(null),
                     ),
                 ),
         };

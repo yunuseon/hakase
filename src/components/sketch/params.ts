@@ -1,7 +1,7 @@
 import type { Size } from '../window/frame.ts';
 import type { Fit, Lattice, Lens, Space } from './space.ts';
 import type { Theme } from './theme.ts';
-import { signalAt, type Signal } from '../../shared/signal.ts';
+import { waveAt, type Wave } from '../../shared/signal.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
 
@@ -40,7 +40,7 @@ export type Motion = Readonly<Record<Knob, Cycles>>;
 export const knobAt = (value: number, cycles: Cycles, t: number): number =>
     cycles === 0 ? value : value * (0.5 - 0.5 * Math.cos(2 * Math.PI * cycles * t));
 
-export type Signals = Readonly<Record<Knob, Signal | null>>;
+export type Signals = Readonly<Record<Knob, Wave | null>>;
 
 export const unbound: Signals = { k1: null, k2: null, k3: null, k4: null };
 
@@ -51,7 +51,7 @@ export const knobValue = (
 ) => {
     const signal = signals[knob];
 
-    return signal === null ? knobAt(knobs[knob], motion[knob], t) : signalAt(signal, t);
+    return signal === null ? knobAt(knobs[knob], motion[knob], t) : waveAt(signal, t);
 };
 
 export type PanelParams = {

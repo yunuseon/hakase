@@ -185,7 +185,7 @@
     color: var(--muted);
 }
 
-.store[data-global] .jack {
+.store[data-global] .store-head .jack {
     display: none;
 }
 
@@ -241,11 +241,17 @@
 }
 
 .store {
+    cursor: pointer;
+}
+
+.store-head {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
+    block-size: 34px;
     padding-inline: 10px 14px;
-    cursor: pointer;
+    box-sizing: border-box;
 }
 
 .dot {
@@ -285,7 +291,7 @@
     box-sizing: border-box;
 }
 
-.store .jack {
+.store-head .jack {
     inset-inline-end: -6px;
     inset-block-start: calc(50% - 5px);
     border-color: var(--store);

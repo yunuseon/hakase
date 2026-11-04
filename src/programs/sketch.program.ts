@@ -133,10 +133,10 @@ export const sketchProgram = {
                 );
 
                 const signals$ = combineLatest({
-                    k1: state.followedSignal$('k1'),
-                    k2: state.followedSignal$('k2'),
-                    k3: state.followedSignal$('k3'),
-                    k4: state.followedSignal$('k4'),
+                    k1: state.followedWave$('k1'),
+                    k2: state.followedWave$('k2'),
+                    k3: state.followedWave$('k3'),
+                    k4: state.followedWave$('k4'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
                 const params$ = combineLatest([panel$, size$, theme$, signals$]).pipe(

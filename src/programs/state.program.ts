@@ -125,6 +125,13 @@ export const stateProgram = {
                                     return { kind: 'locate', id: command.window };
                                 case 'prune':
                                     return { kind: 'prune' };
+                                case 'source':
+                                    return {
+                                        kind: 'modulate',
+                                        store: command.store,
+                                        param: command.param,
+                                        source: command.source,
+                                    };
                                 default:
                                     return { kind: 'wiring', command };
                             }

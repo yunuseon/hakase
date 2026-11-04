@@ -3,12 +3,14 @@ import {
     defaultWorkspace,
     parseWorkspace,
     reduceHistory,
+    reduceWorkspace,
     startHistory,
     usedStores,
     type History,
     type WorkspaceAction,
 } from './workspace.ts';
 import { inputsFor } from './inputs.fixture.ts';
+import { defaultSignal } from './shared/signal.ts';
 
 const viewport = { width: 1400, height: 900 };
 
@@ -304,7 +306,7 @@ describe('prune-stores', () => {
             { kind: 'launch', program: 'bookmarks', size: { width: 300, height: 300 }, viewport },
             { kind: 'add-store', id: 'bookmarks-5', copy: false },
             { kind: 'add-store', id: 'bookmarks-5', copy: false },
-            { kind: 'prune-stores' },
+            { kind: 'prune-stores', followed: new Map() },
         ]);
 
         expect(history.present.stores.map(({ id }) => id).sort()).toEqual(
@@ -620,7 +622,7 @@ describe('following', () => {
     it('keeps a followed clock when no timeline shows it, through a prune too', () => {
         const history = run(twoClocks(), [
             { kind: 'bind-store', id: 'timeline-5', store: 'timeline' },
-            { kind: 'prune-stores' },
+            { kind: 'prune-stores', followed: new Map() },
         ]);
 
         expect(history.present.stores.some(({ id }) => id === 'store-1')).toBe(true);
@@ -666,6 +668,29 @@ describe('follows saved before kinds', () => {
             parseWorkspace(saved, inputsFor)?.processes.find(({ id }) => id === 'sketch-2')
                 ?.follows,
         ).toEqual({ playback: { kind: 'playback', store: 'store-1' } });
+    });
+});
+
+describe('pruning signal chains', () => {
+    it('keeps a signal store that only another followed signal follows', () => {
+        const history = run(fresh(), [
+            { kind: 'launch', program: 'signal', size: { width: 300, height: 300 }, viewport },
+            { kind: 'add-store', id: 'signal-5', copy: false },
+            { kind: 'follow', id: 'sketch-2', input: 'k1', source: 'signal', store: 'store-1' },
+        ]);
+        const followed = new Map([
+            ['store-1', { ...defaultSignal, sources: { phase: null, low: null, high: 'signal' } }],
+        ]);
+        const kept = (map: typeof followed) =>
+            reduceWorkspace(
+                history.present,
+                { kind: 'prune-stores', followed: map },
+                inputsFor,
+            ).stores.map(({ id }) => id);
+
+        expect(kept(followed)).toContain('signal');
+        expect(kept(new Map())).not.toContain('signal');
+        expect(kept(new Map())).toContain('store-1');
     });
 });
 
@@ -778,7 +803,7 @@ describe('focus progress bindings', () => {
     it('retains a followed focus store after its editor closes, including prune and delete', () => {
         const history = run(focus(), [
             { kind: 'quit', id: 'focus-5' },
-            { kind: 'prune-stores' },
+            { kind: 'prune-stores', followed: new Map() },
             { kind: 'remove-store', id: 'playhead-4', store: 'store-1' },
         ]);
         expect(usedStores(history.present.processes).has('store-1')).toBe(true);

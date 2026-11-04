@@ -17,9 +17,9 @@ export const signalProgram = {
 
         return {
             element: signal,
-            run$: ({ signal$, playhead$ }) =>
+            run$: ({ signal$, wave$, playhead$ }) =>
                 merge(
-                    signal.connect$(signal$, playhead$).pipe(ignoreElements()),
+                    signal.connect$(signal$, wave$, playhead$).pipe(ignoreElements()),
                     signal.commands$.pipe(
                         map((command): AppInput => ({ kind: 'signal', command })),
                     ),

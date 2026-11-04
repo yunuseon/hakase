@@ -11,7 +11,7 @@ const run = (actions: readonly WorkspaceAction[]) =>
         defaultWorkspace(viewport, inputsFor),
     );
 const graph = (actions: readonly WorkspaceAction[] = []) =>
-    graphOf(run(actions), inputsFor, titles, new Set());
+    graphOf(run(actions), inputsFor, titles, new Set(), new Map());
 const windowOf = (actions: readonly WorkspaceAction[], id: string) =>
     graph(actions).windows.find(window => window.id === id);
 
@@ -51,7 +51,7 @@ describe('graphOf', () => {
     });
 
     it('lists the app-wide globals last, and a main store that only holds data', () => {
-        const held = graphOf(run([]), inputsFor, titles, new Set(['board']));
+        const held = graphOf(run([]), inputsFor, titles, new Set(['board']), new Map());
 
         expect(held.stores.map(({ target }) => target).slice(-6)).toEqual([
             'store:board:board',

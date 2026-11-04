@@ -19,6 +19,7 @@ const view: StateGraph = {
             title: 'sketch',
             name: 'sketch 2',
             colour: 'green',
+            ports: [],
         },
         {
             id: 'timeline',
@@ -29,6 +30,7 @@ const view: StateGraph = {
             title: 'Playback',
             name: 'Main',
             colour: 'red',
+            ports: [],
         },
         {
             id: 'signal',
@@ -39,6 +41,7 @@ const view: StateGraph = {
             title: 'Signal',
             name: 'Main',
             colour: 'blue',
+            ports: [],
         },
     ],
     windows: [
@@ -76,9 +79,9 @@ describe('layoutOf', () => {
         const { wires } = layoutOf(view);
 
         expect(
-            wires.map(({ kind, window, input, colour, removable }) => [
+            wires.map(({ kind, sink, input, colour, removable }) => [
                 kind,
-                window,
+                sink,
                 input,
                 colour,
                 removable,
@@ -164,6 +167,7 @@ describe('unusedOf', () => {
                     title: 'sketch',
                     name: 'spare',
                     colour: 'grey',
+                    ports: [],
                 },
                 {
                     id: 'global:library',
@@ -174,10 +178,72 @@ describe('unusedOf', () => {
                     title: 'app',
                     name: 'library',
                     colour: 'grey',
+                    ports: [],
                 },
             ],
         });
 
         expect(unusedOf(lonely)).toBe(1);
+    });
+});
+
+describe('chains in the map', () => {
+    const signalStore = (id: string, bound: string | null) => ({
+        id,
+        target: `store:signal:${id}`,
+        global: false,
+        program: 'signal',
+        kind: 'signal',
+        title: 'Signal',
+        name: id,
+        colour: id,
+        ports: [{ input: 'high', title: 'high', accepts: ['signal'], optional: true, bound }],
+    });
+    const chain: StateGraph = {
+        stores: [signalStore('slow', null), signalStore('fast', 'slow')],
+        windows: [
+            {
+                id: 'sketch-2',
+                program: 'sketch',
+                label: 'sketch 1',
+                icon: '',
+                own: null,
+                ports: [
+                    {
+                        input: 'k1',
+                        title: 'k1',
+                        accepts: ['signal'],
+                        optional: true,
+                        bound: 'fast',
+                    },
+                ],
+            },
+        ],
+    };
+
+    it('puts a signal right of what it follows, and windows right of both', () => {
+        const { stores, windows } = layoutOf(chain);
+        const slow = stores.find(({ id }) => id === 'slow');
+        const fast = stores.find(({ id }) => id === 'fast');
+
+        expect((fast?.x ?? 0) > (slow?.x ?? 0)).toBe(true);
+        expect((windows[0]?.x ?? 0) > (fast?.x ?? 0)).toBe(true);
+    });
+
+    it('wires the chain store to store, and focusing the middle lights both ends', () => {
+        const layout = layoutOf(chain);
+        const related = relatedTo(layout, { kind: 'store', id: 'fast' });
+
+        expect(layout.wires.map(({ kind, sink, store }) => [kind, sink, store])).toEqual([
+            ['source', 'fast', 'slow'],
+            ['follow', 'sketch-2', 'fast'],
+        ]);
+        expect([...related.stores].sort()).toEqual(['fast', 'slow']);
+        expect([...related.windows]).toEqual(['sketch-2']);
+    });
+
+    it('counts a store that only feeds a used one as used, and a chain nothing reads as unused', () => {
+        expect(unusedOf(layoutOf(chain))).toBe(0);
+        expect(unusedOf(layoutOf({ ...chain, windows: [] }))).toBe(2);
     });
 });

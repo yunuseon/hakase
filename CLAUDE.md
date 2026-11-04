@@ -1043,8 +1043,32 @@ A signal window shows its wave and marks the moment of the clock it follows
 several sketches, and a fork drives another set apart. A signal never reads the
 clock of the window that shows it: the follower evaluates it at its **own**
 playhead, so a sketch on a second clock plays the same wave on its own time.
-`AppState.followedSignal$(input)` hands a program the signal its input is bound
-to, or null, already resolved from the store.
+`AppState.followedWave$(input)` hands a program the signal its input is bound
+to, or null, with its whole chain already resolved.
+
+**A signal's phase, low and high can follow another signal** (`Signal.sources`),
+so an LFO can swell another's range. The followed value stands in for the
+parameter, evaluated at the same moment, so a chain still loops and still
+replays exactly. Three choices hold it together:
+
+- **The sources belong to the signal document, not its window.** A knob follows
+  a signal _store_, so a window's inputs could never reach it, and closing the
+  window would silently stop the modulation. The sources are edited in the state
+  map (a store's own jacks, `modulate` inputs carrying the target store) and
+  folded like any signal command.
+- **Rate cannot follow.** It is a whole number of cycles so a loop loops, and a
+  moving rate would not be one.
+- **A loop cannot be expressed.** `modulate` reads the signal fold it feeds
+  (through a `defer`, declared because it reads itself) and drops a source that
+  would reach back to its target (`closesLoop`). `waveOf` also stops at a store
+  already seen up the chain, for a loop that arrives through storage.
+
+`waveOf` resolves a store into a `Wave`, a signal with its followed parameters
+as waves, and `waveAt` evaluates it; `sameWave` compares by each signal's
+reference, so an edit elsewhere does not re-prepare a sketch. **A prune keeps
+what kept signals follow**: both the registry step and the folds' `keep` take
+`reachedFrom` the bound stores, or a signal that only feeds another would be
+deleted out from under it.
 
 ## The state map
 
@@ -1060,6 +1084,13 @@ in `src/state-graph.ts` derives the graph from the workspace and `inputsFor`,
 `layoutOf` in the component folder places it, and every edit is an action the
 window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
 reducer's checks, undo and labels all apply.
+
+**A store can have jacks of its own**: a signal's phase, low and high. A store
+sits one column right of the deepest store it follows, and windows right of
+every store column, so a chain reads left to right (`depthsOf`). A wire into a
+store's jack is a `source` wire; focusing a store lights both what follows it
+and what it follows. A store a used one follows counts as used, the same rule
+the prune keeps by.
 
 **Every store is a node, private ones too.** Folding a store only one window
 used into a tag in its header was tried and dropped: it made private state a
@@ -1612,7 +1643,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
