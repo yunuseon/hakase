@@ -1,3 +1,4 @@
+import type { Logged } from '../../shared/logged.ts';
 export type Bookmark = {
     readonly id: string;
     readonly name: string;
@@ -150,7 +151,11 @@ export const stepped = (bookmarks: Bookmarks, id: string, step: Step): BookmarkC
         : { kind: 'move', id, group: next.id, to: step === 'up' ? next.items.length : 0 };
 };
 
-export const reduceBookmarks = (bookmarks: Bookmarks, command: BookmarkCommand): Bookmarks => {
+export const reduceBookmarks = (
+    bookmarks: Bookmarks,
+    command: BookmarkCommand,
+    logged?: Logged,
+): Bookmarks => {
     switch (command.kind) {
         case 'add': {
             const url = safeUrl(command.address);
@@ -161,7 +166,7 @@ export const reduceBookmarks = (bookmarks: Bookmarks, command: BookmarkCommand):
             }
 
             const bookmark = {
-                id: `bookmark-${made}`,
+                id: `bookmark-${logged?.seq ?? made}`,
                 name: command.name.trim() || hostOf(url),
                 url,
             };
@@ -219,7 +224,7 @@ export const reduceBookmarks = (bookmarks: Bookmarks, command: BookmarkCommand):
                 made,
                 groups: [
                     ...bookmarks.groups,
-                    { id: `group-${made}`, name: UNTITLED, open: true, items: [] },
+                    { id: `group-${logged?.seq ?? made}`, name: UNTITLED, open: true, items: [] },
                 ],
             };
         }

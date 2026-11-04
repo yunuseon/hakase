@@ -1,3 +1,4 @@
+import type { Logged } from '../../shared/logged.ts';
 import { isDay, shiftDay, type Day } from '../../lib/day.ts';
 
 export type Habit = {
@@ -21,7 +22,7 @@ export const emptyHabits: Habits = { items: [], made: 0 };
 
 const numberOf = (id: string): number => Number(/-(\d+)$/.exec(id)?.[1] ?? 0);
 
-export const reduceHabits = (habits: Habits, command: HabitCommand): Habits => {
+export const reduceHabits = (habits: Habits, command: HabitCommand, logged?: Logged): Habits => {
     switch (command.kind) {
         case 'add': {
             const name = command.name.trim();
@@ -29,7 +30,13 @@ export const reduceHabits = (habits: Habits, command: HabitCommand): Habits => {
 
             return name === ''
                 ? habits
-                : { made, items: [...habits.items, { id: `habit-${made}`, name, done: [] }] };
+                : {
+                      made,
+                      items: [
+                          ...habits.items,
+                          { id: `habit-${logged?.seq ?? made}`, name, done: [] },
+                      ],
+                  };
         }
         case 'rename': {
             const name = command.name.trim();

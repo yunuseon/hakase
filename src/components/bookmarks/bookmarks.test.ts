@@ -12,7 +12,7 @@ import {
 } from './bookmarks.ts';
 
 const run = (...commands: BookmarkCommand[]): Bookmarks =>
-    commands.reduce(reduceBookmarks, defaultBookmarks);
+    commands.reduce((state, command) => reduceBookmarks(state, command), defaultBookmarks);
 
 const names = (bookmarks: Bookmarks): string[][] =>
     bookmarks.groups.map(({ items }) => items.map(({ name }) => name));

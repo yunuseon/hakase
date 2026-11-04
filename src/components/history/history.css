@@ -105,3 +105,55 @@ li:last-child .step::before {
     font: 11px var(--font-mono);
     color: var(--muted);
 }
+
+li {
+    position: relative;
+}
+
+.take {
+    position: absolute;
+    inset-block: 4px;
+    inset-inline-end: 4px;
+    display: none;
+    place-items: center;
+    inline-size: 22px;
+    padding: 0;
+    color: var(--label);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.take svg {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+li:hover .take,
+.take:focus-visible {
+    display: grid;
+}
+
+.take:hover {
+    color: var(--ink);
+}
+
+.take:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+li[data-taken] .label {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+li:hover .step:has(+ .take) .label {
+    padding-inline-end: 22px;
+}

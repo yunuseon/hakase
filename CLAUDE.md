@@ -315,7 +315,7 @@ singleton:
   elements, and one element cannot be in two windows. A module-level
   `export const sketch = new HksSketch()` is exactly the bug this shape prevents.
 - State keyed by `ProgramId` would collide, so `Workspace` is keyed by `ProcessId`,
-  built from a counter kept _in_ the state so a relaunch never reuses a dead id.
+  named from the log's sequence (see "Undo"), so a relaunch never reuses a dead id.
   Its `processes` array is ordered back to front, so a process's **index is its
   z-order** and `raise` is a reorder — there is no z-index counter anywhere.
 - Global state cannot be fed by naming instances, because which instances exist
@@ -597,8 +597,8 @@ which knows `self.id`, rather than from the row count, which would include it.
 **The todo list is a document every todo window shares**, like a formula's text:
 `hks-todo` emits `TodoCommand`s (`add`, `toggle`, `remove`, `clear-done`), `main.ts`
 folds them with the pure `reduceTodos` into one `TodoList`, and every todo window
-reads `AppState.todos$` back. Item ids come from a counter kept in the list
-(`made`), like `launched` for processes, so a deleted item's id is never reused.
+reads `AppState.todos$` back. Item ids come from the log's sequence, like every
+id a reducer makes (see "Undo"), so a deleted item's id is never reused.
 The list is saved in the snapshot. The draft in the input box is the one piece
 of state the component keeps to itself — it is not app state, and it is cleared
 after a submit. **Read it and clear it from one shared listener** (`submitted$`,
@@ -627,7 +627,7 @@ contract between them.
 **The board is a kanban document every board window shares**, folded like the
 todo list: `hks-board` emits `BoardCommand`s, `reduceBoard` folds them into one
 `Board` of columns of cards, saved in the snapshot, and ids for both come from
-one counter (`made`). Cards and columns move by their grips, a card across
+the log's sequence. Cards and columns move by their grips, a card across
 columns too: `dropTarget` picks the lane nearest the pointer and counts the
 _other_ cards above it, so `to` again counts places without the moved card. The
 arrow keys on a card's grip emit `step-card`, an intent rather than a position,
@@ -942,29 +942,86 @@ harmless; a panel over a slider swallows its `pointerdown` and the control goes
 dead with no error anywhere. A sketch's parameters panel is collapsed by default
 for this reason.
 
-**Undo is a fold around the fold.** `reduceHistory` wraps `reduceWorkspace` in a
-`History` of `past`, `present` and `future` (100 deep), and `main.ts` scans that
-instead, mapping out `present`. `stepOf` sorts actions: launch, quit, links and
-section edits are steps of their own; a move or resize **joins** the previous
-step while it is the same gesture on the same id, so one drag is one undo rather
-than one per pointer move; a `raise` breaks the join; everything else (camera,
-toolbar, minimap) is not history at all. Undo restores the windows but
-`keepingView` carries the current camera, toolbar and minimap through, because
-undoing a drag must not also fling the view back to where it was. The navigator
-has **undo and redo buttons**, each disabled while its side of the history is
-empty: `history$` is the shared fold and `workspace$` only maps out its
-`present`, so whether there is a past or a future reaches the buttons without a
-second fold. **Every step is labelled** (`labelOf`, read against the workspace
-before the step so it can still name what a close removes), and each history
-`Entry` carries the label of the step that made it, so undo and redo move labels
-with their workspaces. The **history** program lists them oldest first, the
-present marked and the redo side greyed, and a click emits `travel` with an
-offset, which `reduceHistory` applies as that many undos or redos in a row, so a
-jump lands exactly where pressing ⌘Z that often would. The history is not saved:
-a reload starts at "Opened the app". ⌘Z and ⇧⌘Z
-(or ⌘Y) come from the canvas's `edits$`, which ignores keys whose
-`composedPath()[0]` is editable — a textarea inside a shadow root is retargeted
-to its host, so `event.target` alone would steal the editor's own undo.
+## Undo: one log for every document
+
+**Every document is one fold, and the state is its log, folded.** The
+workspace, settings, todo lists, boards, notes, agendas, habits, world clocks,
+bookmarks, signals, the formula library, formula text, themes, appearances and
+the look are one `Documents` record (`src/documents.ts`), folded by one `scan`
+over a union of `DocumentAction`s; `todos$`, `waves$` and the rest are
+projections of it, so their readers never changed. Clocks are not documents —
+playback, focus timers and diagnostics keep their own folds — and neither is
+anything only looked at. The reducers are what they were; `reduceDocuments`
+dispatches to them. Because every document changes in one reducer:
+
+- **A fork and its copy are one step**: the workspace's new store and the copy
+  into every document of it happen in the same reduction, so one undo takes both
+  back. (Timers and playback still copy from the workspace's `pairwise`.)
+- **A prune is undoable, data and all**: the registry and the documents are
+  pruned in one step, and undo brings both back.
+- **A signal source that would loop is refused against the state it would
+  change**, in the reducer, rather than by a fold reading itself through a
+  `defer`.
+
+The log (`src/timeline.ts`, generic, knowing nothing of documents) keeps
+**steps**, each with the actions that made it and the state after it as a
+checkpoint, so undo, redo and travel are instant. A `Kit` tells it how: the
+reducer, how an action forms a step (`stepOf`), its label, what a jump in time
+keeps where it is, and how an action is settled. Steps join and break as they
+always did — one drag is one step, a `raise` ends it, and a gesture that arrives
+as many commands (a note being typed, a card being edited, an agenda block
+dragged, a signal dragged, a formula, theme or appearance edited, a window's
+settings) joins per key. Actions that are not steps (camera, raise, measure, a
+view-only setting) are still applied, and logged with the step they follow, so
+a replay reproduces them; a jump keeps the view (`keepingView`) and hands every
+restored edit back with `from: null` (`keptDocuments`), or its writer's editor,
+which skips its own echoes, would never show it.
+
+**Any step can be taken back, not only the last.** The History window's ↶ on a
+step folds the log again without it, from the checkpoint just before it, and
+records that as a step of its own ("Took back …"), so it is undone with ⌘Z like
+anything else. Two rules make a replay without an earlier step land the same,
+and both are about an action carrying what it depends on:
+
+- **Ids travel with actions.** Every logged action has a sequence number, and a
+  reducer names what it makes from it (`sketch-41`, `card-57`), not from a
+  counter in its state, which a replay without an earlier step would number
+  differently, and every later action naming that id would miss. Counters stay
+  for names and the cascade, and are the fallback when a reducer is called
+  outside the log (the tests). The document reducers take the sequence as
+  `{ seq }`, never a bare number: handed to `Array.prototype.reduce`, a number
+  parameter takes the index. The sequence is saved; an older save starts above
+  every counter it holds (`seqFloor`), so no new id meets an old one.
+- **What an action reads is settled when it happens** (`settledAction`): a
+  launch carries the camera and cascade it was opened under, a move or resize
+  the camera its pixels were measured in, a new section its view. The reducer
+  looks at those actions through the camera they carry.
+
+Replaying only the step's own actions matters too: a raise or a pan that
+followed a taken-back step is still replayed. Old steps are compacted into the
+base past 100, never between a step and the step that took it back.
+
+**Editors must measure a restore from what they had, not what they wrote.**
+Each editor skips its own echoes; the old folds remembered the last value they
+had _written_ and deduplicated against it, so an undo of the user's own typing
+back to that very text compared equal and never reached the textarea.
+`seenBy` in `program.ts` tracks what the editor _had_, own edits included, and
+the formula editor's component no longer deduplicates its presets.
+
+**Settings that only move the view are not steps** (`viewOnly`): a sketch's
+orbit, tab and strip zoom, the state map's camera, which note, day, formula or
+theme an editor shows. A window's first change is measured from its program's
+defaults, or opening a tab would count as an edit.
+
+Labels are read against the documents before the step, so a close can still
+name what it removes. The **history** program lists the steps oldest first, the
+present marked, the redo side greyed and taken-back steps struck through; a
+click travels, ↶ takes back. The navigator's undo and redo are disabled while
+their side is empty, read from the same fold. The history is not saved: a
+reload starts at "Opened the app". ⌘Z and ⇧⌘Z (or ⌘Y) come from the canvas's
+`edits$`, which ignores keys whose `composedPath()[0]` is editable — a textarea
+inside a shadow root is retargeted to its host, so `event.target` alone would
+steal the editor's own undo.
 
 ## Stores: shared or separate state, per window
 
@@ -997,10 +1054,11 @@ are the same one with a different default binding at launch.
   `AppState` already narrowed to its store with a `switchMap`. Rebinding swaps
   the stream, and the components already update in place by id. Global state
   stays global: playhead, transport, look, formulas, themes, library, tasks.
-- **Splitting off copies once.** New stores carrying `copy` are read off the
-  workspace fold with `pairwise` and fed to every document fold, which copies
-  only into a store that has no content yet, so undo and redo cannot overwrite
-  what was done since. A copied focus timer starts paused.
+- **Splitting off copies once.** A new store carrying `copy` is filled in the
+  same documents step that made it, and only if it has no content yet, so undo
+  and redo cannot overwrite what was done since. Timers and playback, which are
+  not documents, copy from the workspace's `pairwise`; a copied focus timer
+  starts paused.
 - **A main store is always saved**, window open or not: it has no registry entry
   until one of its windows opens. Saving only registered stores once dropped
   every document of every program that had no window open.
@@ -1129,9 +1187,9 @@ replays exactly. Three choices hold it together:
   feed the signal fold, which rejects cycles before applying a source command.
 - **Rate cannot follow.** It is a whole number of cycles so a loop loops, and a
   moving rate would not be one.
-- **A loop cannot be expressed.** `modulate` reads the signal fold it feeds
-  (through a `defer`, declared because it reads itself) and drops a source that
-  would reach back to its target (`closesLoop`). `waveOf` also stops at a store
+- **A loop cannot be expressed.** The documents reducer refuses a source that
+  would reach back to its target (`closesLoop`), against the very state it
+  would change. `waveOf` also stops at a store
   already seen up the chain, for a loop that arrives through storage.
 
 `waveOf` resolves a store into a `Wave`, a signal with its followed parameters
@@ -1316,8 +1374,8 @@ and says how many first; one click arms it, a second within three seconds
 prunes. It is one `prune` input routed twice: the workspace drops the unbound
 registry entries (`prune-stores`, undoable), and every fold receives a `keep`
 store event with the bound stores and window ids, read from the same workspace,
-so it cannot matter which listener runs first. A document's data does not come
-back on undo.
+so it cannot matter which listener runs first. It is one documents step, so undo
+brings the data back too.
 
 ## Switching a window's program
 
@@ -1804,7 +1862,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-nine of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and seven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

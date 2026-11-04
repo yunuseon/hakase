@@ -111,6 +111,8 @@ export type WorkspaceAction =
           readonly program: ProgramId;
           readonly size: Size;
           readonly viewport: Extent;
+          readonly camera?: Camera;
+          readonly order?: number;
       }
     | { readonly kind: 'pan'; readonly dx: number; readonly dy: number }
     | { readonly kind: 'zoom'; readonly factor: number; readonly at: Point }
@@ -121,18 +123,20 @@ export type WorkspaceAction =
     | { readonly kind: 'undo' }
     | { readonly kind: 'redo' }
     | { readonly kind: 'set-camera'; readonly camera: Camera }
-    | { readonly kind: 'add-section'; readonly viewport: Extent }
+    | { readonly kind: 'add-section'; readonly viewport: Extent; readonly camera?: Camera }
     | {
           readonly kind: 'move-section';
           readonly id: string;
           readonly dx: number;
           readonly dy: number;
+          readonly camera?: Camera;
       }
     | {
           readonly kind: 'resize-section';
           readonly id: string;
           readonly dx: number;
           readonly dy: number;
+          readonly camera?: Camera;
       }
     | { readonly kind: 'rename-section'; readonly id: string; readonly name: string }
     | { readonly kind: 'remove-section'; readonly id: string }
@@ -144,11 +148,15 @@ export type WorkspaceAction =
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
-    | (Exclude<WindowGesture, { readonly kind: 'resize' }> & { readonly id: ProcessId })
+    | (Exclude<WindowGesture, { readonly kind: 'resize' }> & {
+          readonly id: ProcessId;
+          readonly camera?: Camera;
+      })
     // Carries the smallest size its program can lay out in; the workspace never learns programs.
     | (Extract<WindowGesture, { readonly kind: 'resize' }> & {
           readonly id: ProcessId;
           readonly minimum: Size;
+          readonly camera?: Camera;
       });
 
 const CASCADE = 26;
@@ -619,16 +627,24 @@ const movedSection = (workspace: Workspace, id: string, dx: number, dy: number):
     };
 };
 
-const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFor): Workspace => {
+const step = (
+    workspace: Workspace,
+    action: WorkspaceAction,
+    inputsFor: InputsFor,
+    seq: number | undefined,
+): Workspace => {
+    // A logged action names what it makes by its own sequence number, so replaying the log without an earlier step names it the same.
+    const tag = (counter: number) => seq ?? counter;
+
     switch (action.kind) {
         case 'launch': {
             const launched = workspace.launched + 1;
-            const step = ((launched % 8) - 4) * CASCADE;
+            const step = (((action.order ?? launched) % 8) - 4) * CASCADE;
             const centre = worldAt(workspace.camera, centreOf(action.viewport));
             const own = HOLDING[action.program]?.sharing === 'private';
             const store: StoreEntry = own
                 ? {
-                      id: `${action.program}-${launched}`,
+                      id: `${action.program}-${tag(launched)}`,
                       program: action.program,
                       name: `${action.program} ${launched}`,
                       kept: false,
@@ -636,7 +652,7 @@ const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFo
                   }
                 : mainStore(action.program);
             const process = {
-                id: `${action.program}-${launched}`,
+                id: `${action.program}-${tag(launched)}`,
                 program: action.program,
                 store: store.id,
                 follows: initialFollows(inputsFor(action.program)),
@@ -675,7 +691,7 @@ const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFo
             }
 
             const made = workspace.made + 1;
-            const id = `store-${made}`;
+            const id = `store-${tag(made)}`;
             const store: StoreEntry = {
                 id,
                 program: process.program,
@@ -722,14 +738,14 @@ const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFo
                 chosen ??
                 (fresh
                     ? {
-                          id: `store-${made}`,
+                          id: `store-${tag(made)}`,
                           program,
                           name: `Store ${made}`,
                           kept: true,
                           copy: null,
                       }
                     : mainStore(program));
-            const id = `${program}-${launched}`;
+            const id = `${program}-${tag(launched)}`;
             const frame = {
                 ...process.frame,
                 width: Math.max(process.frame.width, action.minimum.width),
@@ -862,7 +878,7 @@ const step = (workspace: Workspace, action: WorkspaceAction, inputsFor: InputsFo
                 sections: [
                     ...workspace.sections,
                     {
-                        id: `section-${launched}`,
+                        id: `section-${tag(launched)}`,
                         name: `Section ${workspace.sections.length + 1}`,
                         rect: {
                             x: Math.round(view.x + inset),
@@ -1003,13 +1019,18 @@ export const reduceWorkspace = (
     workspace: Workspace,
     action: WorkspaceAction,
     inputsFor: InputsFor,
+    seq?: number,
 ): Workspace => {
-    const next = step(workspace, action, inputsFor);
+    const camera = 'camera' in action ? action.camera : undefined;
+    const seen = camera === undefined ? workspace : { ...workspace, camera };
+    const stepped = step(seen, action, inputsFor, seq);
 
     // Refused: the same object back, so history can tell that nothing happened.
-    if (next === workspace) {
+    if (stepped === seen) {
         return workspace;
     }
+
+    const next = seen === workspace ? stepped : { ...stepped, camera: workspace.camera };
 
     return {
         ...next,
@@ -1337,23 +1358,6 @@ export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
         }),
     );
 
-export type Entry = {
-    readonly workspace: Workspace;
-    // What the step that produced this workspace did, for the history window.
-    readonly label: string;
-};
-
-export type History = {
-    readonly past: readonly Entry[];
-    readonly present: Workspace;
-    readonly label: string;
-    readonly future: readonly Entry[];
-    // The step the last undoable action belonged to, so one drag is one step, not hundreds.
-    readonly step: string | null;
-};
-
-const HISTORY_LIMIT = 100;
-
 type Step = {
     readonly key: string;
     // A drag's many moves join one step; a launch or a delete is always a step of its own.
@@ -1361,7 +1365,7 @@ type Step = {
 };
 
 // Only what changes the layout of the work: camera, chrome and measurements are not steps.
-const stepOf = (action: WorkspaceAction): Step | null => {
+export const stepOf = (action: WorkspaceAction): Step | null => {
     switch (action.kind) {
         case 'move':
         case 'resize':
@@ -1449,7 +1453,7 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
 };
 
 // Undoing restores where things were, not where you are looking: the camera and chrome stay put.
-const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
+export const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
     ...restored,
     camera: current.camera,
     toolbar: current.toolbar,
@@ -1457,101 +1461,18 @@ const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
     drift: null,
 });
 
-export const OPENED = 'Opened the app';
-
-export const startHistory = (present: Workspace): History => ({
-    past: [],
-    present,
-    label: OPENED,
-    future: [],
-    step: null,
-});
-
-const undone = (history: History): History => {
-    const previous = history.past.at(-1);
-
-    return previous === undefined
-        ? history
-        : {
-              past: history.past.slice(0, -1),
-              present: keepingView(previous.workspace, history.present),
-              label: previous.label,
-              future: [{ workspace: history.present, label: history.label }, ...history.future],
-              step: null,
-          };
-};
-
-const redone = (history: History): History => {
-    const [next, ...rest] = history.future;
-
-    return next === undefined
-        ? history
-        : {
-              past: [...history.past, { workspace: history.present, label: history.label }],
-              present: keepingView(next.workspace, history.present),
-              label: next.label,
-              future: rest,
-              step: null,
-          };
-};
-
-// As many undos or redos in a row, so a jump lands exactly where pressing ⌘Z that often would.
-const travelled = (history: History, offset: number): History =>
-    offset === 0
-        ? history
-        : travelled(
-              offset < 0 ? undone(history) : redone(history),
-              offset < 0 ? offset + 1 : offset - 1,
-          );
-
-export const reduceHistory = (
-    history: History,
-    action: WorkspaceAction,
-    inputsFor: InputsFor,
-): History => {
-    const { past, present } = history;
-
-    if (action.kind === 'undo') {
-        return undone(history);
+// What an action reads from the moment it was made travels with it, so replaying the log without an earlier step does it the same.
+export const settledAction = (workspace: Workspace, action: WorkspaceAction): WorkspaceAction => {
+    switch (action.kind) {
+        case 'launch':
+            return { ...action, camera: workspace.camera, order: workspace.launched + 1 };
+        case 'add-section':
+        case 'move-section':
+        case 'resize-section':
+        case 'move':
+        case 'resize':
+            return { ...action, camera: workspace.camera };
+        default:
+            return action;
     }
-
-    if (action.kind === 'redo') {
-        return redone(history);
-    }
-
-    if (action.kind === 'travel') {
-        const offset = Math.max(
-            -history.past.length,
-            Math.min(history.future.length, Math.round(action.offset)),
-        );
-
-        return travelled(history, offset);
-    }
-
-    const reduced = reduceWorkspace(present, action, inputsFor);
-    const step = stepOf(action);
-
-    if (step === null) {
-        // A raise starts every drag, so the next move opens a new step rather than joining the last.
-        return {
-            ...history,
-            present: reduced,
-            step: action.kind === 'raise' ? null : history.step,
-        };
-    }
-
-    // Not for a raise above: one that changes nothing must still end the last drag's step.
-    if (reduced === present) {
-        return history;
-    }
-
-    return step.joins && step.key === history.step
-        ? { ...history, present: reduced }
-        : {
-              past: [...past, { workspace: present, label: history.label }].slice(-HISTORY_LIMIT),
-              present: reduced,
-              label: labelOf(action, present),
-              future: [],
-              step: step.key,
-          };
 };

@@ -20,6 +20,7 @@ export const historyProgram = {
                 merge(
                     history.connect$(history$).pipe(ignoreElements()),
                     history.travels$.pipe(map((offset): AppInput => ({ kind: 'travel', offset }))),
+                    history.takeBacks$.pipe(map((id): AppInput => ({ kind: 'take-back', id }))),
                 ),
         };
     },

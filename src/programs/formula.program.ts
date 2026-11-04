@@ -20,7 +20,7 @@ import {
     summaryOf,
     type FormulaId,
 } from '../library.ts';
-import type { AppInput, Program } from '../program.ts';
+import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
 import { asFormulaEditor, defaultFormulaEditor } from '../settings.ts';
 import { shareUrl } from '../share.ts';
 
@@ -55,11 +55,10 @@ export const formulaProgram = {
                     switchMap(name =>
                         source$(name).pipe(
                             scan(
-                                (shown, source, index) =>
-                                    index === 0 || source.from !== self.id ? source.value : shown,
-                                '',
+                                seenBy(self.id, (a: string, b: string) => a === b),
+                                unseen,
                             ),
-                            distinctUntilChanged(),
+                            mergeMap(({ write }) => (write === null ? [] : [write])),
                         ),
                     ),
                 );

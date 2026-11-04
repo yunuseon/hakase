@@ -10,7 +10,8 @@ import {
     type BoardCommand,
 } from './board.ts';
 
-const run = (...commands: BoardCommand[]): Board => commands.reduce(reduceBoard, defaultBoard);
+const run = (...commands: BoardCommand[]): Board =>
+    commands.reduce((state, command) => reduceBoard(state, command), defaultBoard);
 
 const texts = (board: Board): string[][] =>
     board.columns.map(({ cards }) => cards.map(({ text }) => text));
@@ -39,7 +40,7 @@ describe('reduceBoard', () => {
             { kind: 'add-column' },
             { kind: 'add-card', column: 'column-1', text: 'e' },
         ];
-        const board = commands.reduce(reduceBoard, filled);
+        const board = commands.reduce((state, command) => reduceBoard(state, command), filled);
         const ids = board.columns.flatMap(({ id, cards }) => [id, ...cards.map(card => card.id)]);
 
         expect(new Set(ids).size).toBe(ids.length);

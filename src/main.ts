@@ -53,19 +53,14 @@ import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.t
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
-import { reduceLibrary, sourceOf, type FormulaId, type LibraryCommand } from './library.ts';
+import { sourceOf, type FormulaId } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
-import type { Theme } from './components/sketch/theme.ts';
-import { reduceBoard } from './components/board/board.ts';
-import { reduceNotes } from './components/note/note.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import {
-    closesLoop,
     defaultSignal,
     isParam,
     reachedFrom,
-    reduceSignal,
     sameWave,
     waveOf,
     type Signal,
@@ -89,26 +84,10 @@ import {
     type ProgramInputs,
     type PlaybackBinding,
 } from './inputs.ts';
-import {
-    colourOf,
-    HOLDING,
-    inStore,
-    perStore$,
-    reduceStores,
-    withMain,
-    type StoreEvent,
-    type StoreAction,
-    type StoreId,
-} from './stores.ts';
+import { colourOf, HOLDING, inStore, withMain, type StoreEvent, type StoreId } from './stores.ts';
 import { routePlayback$ } from './playback-routing.ts';
 import type { ProgressConnection } from './progress.ts';
 import { chime$ } from './chime.ts';
-import { reduceAgenda } from './components/agenda/agenda.ts';
-import { reduceHabits } from './components/habits/habits.ts';
-import { reduceClocks } from './components/clocks/clocks.ts';
-import { reduceBookmarks } from './components/bookmarks/bookmarks.ts';
-import { reduceTodos } from './components/todo/todo.ts';
-import { defaultSketch, type Settings } from './settings.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
 import { viewport$ } from './lib/rx.ts';
@@ -134,6 +113,16 @@ import {
     valuesOf,
 } from './program.ts';
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
+import {
+    documentsKit,
+    reduceHistory,
+    seqFloor,
+    type DocumentAction,
+    type Documents,
+    type History,
+    type TimeCommand,
+} from './documents.ts';
+import { entriesOf, startTimeline } from './timeline.ts';
 import { toolbarHost$ } from './toolbar-host.ts';
 import { persistState$, restoreState } from './state-store.ts';
 import {
@@ -142,9 +131,6 @@ import {
     listed,
     seamsOf,
     sectionAction,
-    reduceHistory,
-    startHistory,
-    type History,
     type Process,
     usedStores,
     type Workspace,
@@ -210,6 +196,8 @@ const sameOptions = (a: readonly StoreOption[] | null, b: readonly StoreOption[]
                 option.current === other.current
             );
         }));
+
+const reduced = reduceHistory(documentsKit(inputsFor));
 
 const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
@@ -309,12 +297,27 @@ const bootstrap = () => {
     );
 
     const stored = restoreState(inputsFor);
-    const seed = stored.workspace ?? defaultWorkspace(viewportSize(), inputsFor);
+    const started: Documents = {
+        workspace: stored.workspace ?? defaultWorkspace(viewportSize(), inputsFor),
+        settings: stored.settings,
+        todos: stored.todos,
+        boards: stored.board,
+        notes: stored.notes,
+        agendas: stored.agenda,
+        habits: stored.habits,
+        clocks: stored.clocks,
+        bookmarks: stored.bookmarks,
+        signals: stored.signals,
+        library: stored.library,
+        formulas: restored(stored.formulas),
+        themes: restored(stored.themes),
+        looks: restored(stored.looks),
+        look: stored.look,
+    };
+    const begun: History = startTimeline(started, Math.max(stored.seq, seqFloor(started)));
 
     // defer, or the cycle is evaluated at construction: signals$ is built from this.
-    const begun = startHistory(seed);
-
-    const history$: Observable<History> = merge(
+    const workspaceActions$ = merge(
         launches$,
         zoomSteps$,
         canvas.gestures$,
@@ -367,26 +370,36 @@ const bootstrap = () => {
             map((offset): WorkspaceAction => ({ kind: 'travel', offset })),
         ),
         defer(() => inputs$).pipe(
-            filter(({ input }) => input.kind === 'prune'),
-            withLatestFrom(defer(() => waves$)),
-            map(([, all]): WorkspaceAction => ({ kind: 'prune-stores', followed: all })),
-        ),
-        defer(() => inputs$).pipe(
             mergeMap(({ from, input }) => (input.kind === 'close-others' ? of(from) : EMPTY)),
             map((keep): WorkspaceAction => ({ kind: 'close-others', keep })),
         ),
+    );
+
+    const history$: Observable<History> = merge(
+        workspaceActions$.pipe(map((action): DocumentAction => ({ kind: 'workspace', action }))),
+        defer(() => documentActions$),
+        defer(() => inputs$).pipe(
+            mergeMap(({ input }): TimeCommand[] =>
+                input.kind === 'take-back' ? [{ kind: 'take-back', id: input.id }] : [],
+            ),
+        ),
     ).pipe(
         scan(
-            (history: History, action: WorkspaceAction) =>
-                reduceHistory(history, action, inputsFor),
+            (history: History, action: DocumentAction | TimeCommand) => reduced(history, action),
             begun,
         ),
         // Emitted into the replay buffer before the processes start and read it back.
         startWith(begun),
-        shareReplay({ bufferSize: 1, refCount: true }),
+        // Not refCount: every document outlives the moment between two of its readers.
+        shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const workspace$: Observable<Workspace> = history$.pipe(map(({ present }) => present));
+    const documents$ = history$.pipe(map(({ present }) => present));
+
+    const workspace$: Observable<Workspace> = documents$.pipe(
+        map(({ workspace }) => workspace),
+        distinctUntilChanged(),
+    );
 
     const interrupted$ = merge(canvas.gestures$, zoomSteps$);
 
@@ -772,167 +785,119 @@ const bootstrap = () => {
     const settingsKey = (program: ProgramId, store: StoreId, from: ProcessId): string =>
         HOLDING[program]?.holds === 'settings' ? store : from;
 
-    // Not refCount: a window's settings must outlive the moment between two of its readers.
-    const settings$ = merge(
+    const sourced = (store: StoreId, param: string, source: string | null): DocumentAction[] =>
+        isParam(param)
+            ? [{ kind: 'signals', store, command: { kind: 'source', param, source } }]
+            : [];
+
+    const documentActions$: Observable<DocumentAction> = merge(
         inputs$.pipe(
-            mergeMap(({ program, store, from: id, input }) =>
-                input.kind === 'settings'
-                    ? of<StoreAction<Settings>>({
-                          kind: 'command',
-                          store: settingsKey(program, store, id),
-                          command: input.settings,
-                      })
-                    : EMPTY,
+            mergeMap(({ program, store, from: id, input }): DocumentAction[] => {
+                switch (input.kind) {
+                    case 'settings':
+                        return [
+                            {
+                                kind: 'settings',
+                                key: settingsKey(program, store, id),
+                                settings: input.settings,
+                            },
+                        ];
+                    case 'todo':
+                        return [{ kind: 'todos', store, command: input.command }];
+                    case 'board':
+                        return [{ kind: 'boards', store, command: input.command }];
+                    case 'note':
+                        return [{ kind: 'notes', store, command: input.command }];
+                    case 'agenda':
+                        return [{ kind: 'agendas', store, command: input.command }];
+                    case 'habit':
+                        return [{ kind: 'habits', store, command: input.command }];
+                    case 'clock':
+                        return [{ kind: 'clocks', store, command: input.command }];
+                    case 'bookmark':
+                        return [{ kind: 'bookmarks', store, command: input.command }];
+                    case 'signal':
+                        return [{ kind: 'signals', store, command: input.command }];
+                    case 'modulate':
+                        return sourced(input.store, input.param, input.source);
+                    case 'library':
+                        return [{ kind: 'library', command: input.command }];
+                    case 'source':
+                        return [
+                            { kind: 'formula', formula: input.formula, text: input.text, from: id },
+                        ];
+                    case 'theme':
+                        return [
+                            { kind: 'theme', theme: input.theme, value: input.value, from: id },
+                        ];
+                    case 'appearance':
+                        return [
+                            { kind: 'appearance', name: input.name, value: input.value, from: id },
+                        ];
+                    case 'look':
+                        return [{ kind: 'look', name: input.name }];
+                    case 'prune':
+                        return [{ kind: 'prune' }];
+                    default:
+                        return [];
+                }
+            }),
+        ),
+        wiringCommands$.pipe(
+            mergeMap(command =>
+                command.kind === 'source'
+                    ? sourced(command.store, command.param, command.source)
+                    : [],
             ),
         ),
-        storeEvents$,
-    ).pipe(
-        scan(
-            (all: ReadonlyMap<string, Settings>, action: StoreAction<Settings>) =>
-                action.kind === 'command'
-                    ? new Map(all).set(action.store, action.command)
-                    : reduceStores((_: Settings, next: Settings) => next, defaultSketch)(
-                          all,
-                          action,
-                      ),
-            stored.settings,
+        sharedFormulas$.pipe(
+            map((shared): DocumentAction => ({
+                kind: 'library',
+                command: { kind: 'import', ...shared },
+            })),
         ),
-        startWith(stored.settings),
-        shareReplay({ bufferSize: 1, refCount: false }),
+        picked$.pipe(
+            mergeMap((picked): DocumentAction[] =>
+                picked.kind === 'look' ? [{ kind: 'look', name: picked.name }] : [],
+            ),
+        ),
     );
 
-    const todos$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'todo' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceTodos,
-        emptyTodos,
-        stored.todos,
+    const settings$ = documents$.pipe(
+        map(({ settings }) => settings),
+        distinctUntilChanged(),
     );
-
-    const boards$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'board' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceBoard,
-        defaultBoard,
-        stored.board,
+    const todos$ = documents$.pipe(
+        map(({ todos }) => todos),
+        distinctUntilChanged(),
     );
-
-    const notes$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'note' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceNotes,
-        emptyNotes,
-        stored.notes,
+    const boards$ = documents$.pipe(
+        map(({ boards }) => boards),
+        distinctUntilChanged(),
     );
-
-    const agendas$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'agenda' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceAgenda,
-        emptyAgenda,
-        stored.agenda,
+    const notes$ = documents$.pipe(
+        map(({ notes }) => notes),
+        distinctUntilChanged(),
     );
-
-    const habits$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'habit' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceHabits,
-        emptyHabits,
-        stored.habits,
+    const agendas$ = documents$.pipe(
+        map(({ agendas }) => agendas),
+        distinctUntilChanged(),
     );
-
-    const clocks$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'clock' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceClocks,
-        defaultClocks,
-        stored.clocks,
+    const habits$ = documents$.pipe(
+        map(({ habits }) => habits),
+        distinctUntilChanged(),
     );
-
-    // Declared: the fold reads itself, through a defer, to refuse a source that would loop back.
-    const waves$: Observable<ReadonlyMap<StoreId, Signal>> = perStore$(
-        merge(
-            inputs$.pipe(
-                mergeMap(({ store, input }) =>
-                    input.kind === 'signal' ? of({ store, command: input.command }) : EMPTY,
-                ),
-            ),
-            merge(
-                inputs$.pipe(
-                    mergeMap(({ input }) => (input.kind === 'modulate' ? of(input) : EMPTY)),
-                ),
-                wiringCommands$.pipe(
-                    mergeMap(command =>
-                        command.kind === 'source'
-                            ? of({
-                                  kind: 'modulate',
-                                  store: command.store,
-                                  param: command.param,
-                                  source: command.source,
-                              })
-                            : EMPTY,
-                    ),
-                ),
-            ).pipe(
-                mergeMap(({ store, param, source }) =>
-                    !isParam(param)
-                        ? EMPTY
-                        : of({
-                              store,
-                              command: { kind: 'source' as const, param, source },
-                          }),
-                ),
-            ),
-        ).pipe(
-            withLatestFrom(defer(() => waves$)),
-            filter(
-                ([{ store, command }, all]) =>
-                    command.kind !== 'source' ||
-                    command.source === null ||
-                    !closesLoop(all, store, command.source),
-            ),
-            map(([stamped]) => stamped),
-        ),
-        storeEvents$,
-        reduceSignal,
-        defaultSignal,
-        stored.signals,
+    const clocks$ = documents$.pipe(
+        map(({ clocks }) => clocks),
+        distinctUntilChanged(),
     );
-
-    const bookmarks$ = perStore$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'bookmark' ? of({ store, command: input.command }) : EMPTY,
-            ),
-        ),
-        storeEvents$,
-        reduceBookmarks,
-        defaultBookmarks,
-        stored.bookmarks,
+    const waves$ = documents$.pipe(
+        map(({ signals }) => signals),
+        distinctUntilChanged(),
+    );
+    const bookmarks$ = documents$.pipe(
+        map(({ bookmarks }) => bookmarks),
+        distinctUntilChanged(),
     );
 
     const timers$ = createTimers$(
@@ -948,15 +913,9 @@ const bootstrap = () => {
     // Like the playhead: storage keeps where each timer last stood still, or the debounce never settles.
     const timersRested$ = timers$.pipe(scan(restedTimers, stored.focus), distinctUntilChanged());
 
-    const library$ = merge(
-        inputs$.pipe(
-            mergeMap(({ input }) => (input.kind === 'library' ? of(input.command) : EMPTY)),
-        ),
-        sharedFormulas$.pipe(map((shared): LibraryCommand => ({ kind: 'import', ...shared }))),
-    ).pipe(
-        scan(reduceLibrary, stored.library),
-        startWith(stored.library),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const library$ = documents$.pipe(
+        map(({ library }) => library),
+        distinctUntilChanged(),
     );
 
     const playbacks$ = createClocks$(
@@ -988,33 +947,14 @@ const bootstrap = () => {
     const playbackIn = inStore(playbacks$, initialClock);
 
     // Keyed by formula: one edit reaches every process showing that formula.
-    const edits$ = inputs$.pipe(
-        mergeMap(({ from, input }) =>
-            input.kind === 'source'
-                ? of({ from, formula: input.formula, text: input.text })
-                : EMPTY,
-        ),
-        scan(
-            (edits, { formula, text, from }): ReadonlyMap<FormulaId, Written<string>> =>
-                new Map(edits).set(formula, { value: text, from }),
-            restored(stored.formulas),
-        ),
-        startWith(restored(stored.formulas)),
-        // Not refCount: the last reader switching formula must not erase the edits.
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const edits$ = documents$.pipe(
+        map(({ formulas }) => formulas),
+        distinctUntilChanged(),
     );
 
-    const palettes$ = inputs$.pipe(
-        mergeMap(({ from, input }) =>
-            input.kind === 'theme' ? of({ from, theme: input.theme, value: input.value }) : EMPTY,
-        ),
-        scan(
-            (all, { theme, value, from }): ReadonlyMap<ThemeName, Written<Theme>> =>
-                new Map(all).set(theme, { value, from }),
-            restored(stored.themes),
-        ),
-        startWith(restored(stored.themes)),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const palettes$ = documents$.pipe(
+        map(({ themes: all }) => all),
+        distinctUntilChanged(),
     );
 
     const diagnostics$ = inputs$.pipe(
@@ -1028,29 +968,14 @@ const bootstrap = () => {
         shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const look$ = merge(
-        inputs$.pipe(mergeMap(({ input }) => (input.kind === 'look' ? of(input.name) : EMPTY))),
-        picked$.pipe(mergeMap(picked => (picked.kind === 'look' ? of(picked.name) : EMPTY))),
-    ).pipe(
-        startWith(stored.look),
+    const look$ = documents$.pipe(
+        map(({ look }) => look),
         distinctUntilChanged(),
-        // Not refCount: the look outlives every editor that picked it.
-        shareReplay({ bufferSize: 1, refCount: false }),
     );
 
-    const looks$ = inputs$.pipe(
-        mergeMap(({ from, input }) =>
-            input.kind === 'appearance'
-                ? of({ from, name: input.name, value: input.value })
-                : EMPTY,
-        ),
-        scan(
-            (all, { name, value, from }): ReadonlyMap<AppearanceName, Written<Appearance>> =>
-                new Map(all).set(name, { value, from }),
-            restored(stored.looks),
-        ),
-        startWith(restored(stored.looks)),
-        shareReplay({ bufferSize: 1, refCount: false }),
+    const looks$ = documents$.pipe(
+        map(({ looks }) => looks),
+        distinctUntilChanged(),
     );
 
     const appearance$ = (name: AppearanceName): Observable<Written<Appearance>> =>
@@ -1098,16 +1023,7 @@ const bootstrap = () => {
             ),
             distinctUntilChanged(sameGraph),
         ),
-        history$: history$.pipe(
-            map(({ past, label, future }) => [
-                ...past.map((entry, index) => ({
-                    label: entry.label,
-                    offset: index - past.length,
-                })),
-                { label, offset: 0 },
-                ...future.map((entry, index) => ({ label: entry.label, offset: index + 1 })),
-            ]),
-        ),
+        history$: history$.pipe(map(entriesOf)),
         tasks$: workspace$.pipe(
             map(({ processes }) =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
@@ -1294,6 +1210,10 @@ const bootstrap = () => {
                 bookmarks: bookmarks$,
                 signals: waves$,
                 library: library$,
+                seq: history$.pipe(
+                    map(({ seq }) => seq),
+                    distinctUntilChanged(),
+                ),
             }),
         ),
         canvas.connect$(
@@ -1327,7 +1247,7 @@ const bootstrap = () => {
             camera$.pipe(map(zoomLabel)),
             workspace$.pipe(map(({ minimap }) => minimap)),
             history$.pipe(
-                map(({ past, future }) => ({ undo: past.length > 0, redo: future.length > 0 })),
+                map(({ cursor, steps }) => ({ undo: cursor > 0, redo: cursor < steps.length })),
             ),
             mode$.pipe(map(mode => mode.active)),
         ),

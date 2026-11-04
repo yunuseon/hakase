@@ -12,7 +12,7 @@ import {
 import type { Theme } from '../components/sketch/theme.ts';
 import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { HksThemeEditor } from '../components/theme-editor/theme-editor.component.ts';
-import type { AppInput, Program } from '../program.ts';
+import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
 import { asThemeEditor } from '../settings.ts';
 
 const options = Object.keys(themes).map(value => ({ value, label: value }));
@@ -45,15 +45,14 @@ export const themeProgram = {
                     switchMap(name =>
                         theme$(name).pipe(
                             scan(
-                                (shown: Theme, written, index) =>
-                                    index === 0 ||
-                                    written.from !== self.id ||
-                                    !sameShape(shown, written.value)
-                                        ? written.value
-                                        : shown,
-                                { stops: [], blend: 'smooth' },
+                                seenBy(
+                                    self.id,
+                                    (a: Theme, b: Theme) => a === b,
+                                    (had: Theme, next: Theme) => !sameShape(had, next),
+                                ),
+                                unseen,
                             ),
-                            distinctUntilChanged(),
+                            mergeMap(({ write }) => (write === null ? [] : [write])),
                         ),
                     ),
                     shareReplay({ bufferSize: 1, refCount: true }),

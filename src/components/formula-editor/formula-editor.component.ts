@@ -179,8 +179,8 @@ export class HksFormulaEditor extends HTMLElement {
         copied$,
     }: FormulaEditorView): Observable<void> {
         // Presets only: echoing typing back would reset the caret every keystroke.
+        // Not deduplicated: an undo can bring back the very text applied last, after the user typed over it.
         const applied$ = preset$.pipe(
-            distinctUntilChanged(),
             map(text => text.trim()),
             tap(text => {
                 this.source.value = text;

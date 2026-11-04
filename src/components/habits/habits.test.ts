@@ -9,7 +9,8 @@ import {
     type Habits,
 } from './habits.ts';
 
-const run = (...commands: HabitCommand[]): Habits => commands.reduce(reduceHabits, emptyHabits);
+const run = (...commands: HabitCommand[]): Habits =>
+    commands.reduce((state, command) => reduceHabits(state, command), emptyHabits);
 
 describe('reduceHabits', () => {
     it('adds named habits and toggles days on and off, kept in order', () => {

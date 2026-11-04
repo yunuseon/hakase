@@ -1,3 +1,4 @@
+import type { Logged } from '../../shared/logged.ts';
 export const STEPS = ['up', 'down', 'left', 'right'] as const;
 export type Step = (typeof STEPS)[number];
 
@@ -59,7 +60,7 @@ const withCards = (board: Board, change: (column: Column) => readonly Card[]): B
     columns: board.columns.map(column => ({ ...column, cards: change(column) })),
 });
 
-export const reduceBoard = (board: Board, command: BoardCommand): Board => {
+export const reduceBoard = (board: Board, command: BoardCommand, logged?: Logged): Board => {
     switch (command.kind) {
         case 'add-card': {
             const text = command.text.trim();
@@ -73,7 +74,10 @@ export const reduceBoard = (board: Board, command: BoardCommand): Board => {
                           column.id === command.column
                               ? {
                                     ...column,
-                                    cards: [...column.cards, { id: `card-${made}`, text }],
+                                    cards: [
+                                        ...column.cards,
+                                        { id: `card-${logged?.seq ?? made}`, text },
+                                    ],
                                 }
                               : column,
                       ),
@@ -113,7 +117,10 @@ export const reduceBoard = (board: Board, command: BoardCommand): Board => {
 
             return {
                 made,
-                columns: [...board.columns, { id: `column-${made}`, title: UNTITLED, cards: [] }],
+                columns: [
+                    ...board.columns,
+                    { id: `column-${logged?.seq ?? made}`, title: UNTITLED, cards: [] },
+                ],
             };
         }
         case 'rename-column': {

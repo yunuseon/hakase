@@ -66,6 +66,7 @@ export type AppInput =
     | { readonly kind: 'close-others' }
     | { readonly kind: 'prune' }
     | { readonly kind: 'travel'; readonly offset: number }
+    | { readonly kind: 'take-back'; readonly id: number }
     | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
@@ -143,6 +144,26 @@ export type Written<T> = {
 };
 
 export type Source = Written<string>;
+
+export type Seen<T> = { readonly had: T | null; readonly write: T | null };
+
+export const unseen: Seen<never> = { had: null, write: null };
+
+// Measured from what the editor had, its own edits included: from what it last wrote, an undo to that value would never arrive.
+export const seenBy =
+    <T>(self: ProcessId, same: (a: T, b: T) => boolean, ownWrites?: (had: T, next: T) => boolean) =>
+    (seen: Seen<T>, written: Written<T>, index: number): Seen<T> => {
+        const had = seen.had;
+        const changed = had === null || !same(had, written.value);
+        const write =
+            index === 0 ||
+            (written.from !== self && changed) ||
+            (had !== null && written.from === self && ownWrites?.(had, written.value) === true)
+                ? written.value
+                : null;
+
+        return { had: written.value, write };
+    };
 
 export const restored = <K, V>(values: ReadonlyMap<K, V>): ReadonlyMap<K, Written<V>> =>
     new Map([...values].map(([key, value]): [K, Written<V>] => [key, { value, from: null }]));

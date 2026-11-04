@@ -93,29 +93,28 @@ export type StoreEvent =
 
 export type StoreAction<C> = ({ readonly kind: 'command' } & Stamped<C>) | StoreEvent;
 
+export const storeEvent = <S>(
+    all: ReadonlyMap<StoreId, S>,
+    event: StoreEvent,
+): ReadonlyMap<StoreId, S> => {
+    if (event.kind === 'keep') {
+        const kept = new Map([...all].filter(([store]) => event.stores.has(store)));
+
+        return kept.size === all.size ? all : kept;
+    }
+
+    const source = all.get(event.from);
+
+    // Only into an empty store: undoing and redoing a split must not overwrite what was done since.
+    return source === undefined || all.has(event.to) ? all : new Map(all).set(event.to, source);
+};
+
 export const reduceStores =
     <S, C>(reduce: (state: S, command: C) => S, empty: S) =>
-    (all: ReadonlyMap<StoreId, S>, action: StoreAction<C>): ReadonlyMap<StoreId, S> => {
-        if (action.kind === 'command') {
-            return new Map(all).set(
-                action.store,
-                reduce(all.get(action.store) ?? empty, action.command),
-            );
-        }
-
-        if (action.kind === 'keep') {
-            const kept = new Map([...all].filter(([store]) => action.stores.has(store)));
-
-            return kept.size === all.size ? all : kept;
-        }
-
-        const source = all.get(action.from);
-
-        // Only into an empty store: undoing and redoing a split must not overwrite what was done since.
-        return source === undefined || all.has(action.to)
-            ? all
-            : new Map(all).set(action.to, source);
-    };
+    (all: ReadonlyMap<StoreId, S>, action: StoreAction<C>): ReadonlyMap<StoreId, S> =>
+        action.kind === 'command'
+            ? new Map(all).set(action.store, reduce(all.get(action.store) ?? empty, action.command))
+            : storeEvent(all, action);
 
 // Not refCount: a store outlives every window bound to it, and a rebind must not reset it.
 export const perStore$ = <S, C>(

@@ -53,6 +53,7 @@ export type Snapshot = {
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly library: Library;
+    readonly seq: number;
 };
 
 export type Restored = Omit<Snapshot, 'workspace'> & {
@@ -97,6 +98,9 @@ const themesFrom = (value: unknown): ReadonlyMap<ThemeName, Theme> =>
         }),
     );
 
+const seqFrom = (value: unknown) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : 0;
+
 const settingsFrom = (value: unknown): ReadonlyMap<ProcessId, Settings> =>
     new Map(
         entriesOf(value).flatMap(([id, stored]): [ProcessId, Settings][] => {
@@ -139,6 +143,7 @@ const fresh: Restored = {
     bookmarks: new Map(),
     signals: new Map(),
     library: emptyLibrary,
+    seq: 0,
 };
 
 const legacy = (inputsFor: InputsFor): Restored => {
@@ -194,6 +199,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
                 : byStore(field(stored, 'bookmarks'), 'bookmarks', value => parseBookmarks(value)),
         signals: byStore(field(stored, 'signals'), 'signal', parseSignal),
         library: parseLibrary(field(stored, 'library')),
+        seq: seqFrom(field(stored, 'seq')),
     };
 };
 
@@ -226,6 +232,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         bookmarks: saved(snapshot.bookmarks),
         signals: saved(snapshot.signals),
         library: snapshot.library,
+        seq: snapshot.seq,
     };
 };
 

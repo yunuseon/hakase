@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
     defaultWorkspace,
+    labelOf,
     parseWorkspace,
-    reduceHistory,
     reduceWorkspace,
-    startHistory,
     usedStores,
-    type History,
+    type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
 import { inputsFor } from './inputs.fixture.ts';
@@ -14,93 +13,16 @@ import { defaultSignal } from './shared/signal.ts';
 
 const viewport = { width: 1400, height: 900 };
 
-const run = (history: History, actions: readonly WorkspaceAction[]): History =>
-    actions.reduce((next, action) => reduceHistory(next, action, inputsFor), history);
+type History = { readonly present: Workspace };
 
-const fresh = (): History => startHistory(defaultWorkspace(viewport, inputsFor));
-
-const frameOf = (history: History, id: string) =>
-    history.present.processes.find(process => process.id === id)?.frame;
-
-const firstId = (history: History): string => history.present.processes[0]?.id ?? '';
-
-const drag = (id: string, steps: number): WorkspaceAction[] => [
-    { kind: 'raise', id },
-    ...Array.from({ length: steps }, (): WorkspaceAction => ({ kind: 'move', id, dx: 10, dy: 0 })),
-];
-
-describe('reduceHistory', () => {
-    it('makes one drag one undo step', () => {
-        const start = fresh();
-        const id = firstId(start);
-        const before = frameOf(start, id);
-        const dragged = run(start, drag(id, 20));
-
-        expect(frameOf(dragged, id)?.x).not.toBe(before?.x);
-
-        const undone = reduceHistory(dragged, { kind: 'undo' }, inputsFor);
-
-        expect(frameOf(undone, id)).toEqual(before);
-    });
-
-    it('makes two drags two steps, split by the raise that starts each', () => {
-        const start = fresh();
-        const id = firstId(start);
-        const twice = run(start, [...drag(id, 5), ...drag(id, 5)]);
-        const once = reduceHistory(twice, { kind: 'undo' }, inputsFor);
-
-        expect(once.past).toHaveLength(1);
-        expect(frameOf(once, id)?.x).toBe((frameOf(start, id)?.x ?? 0) + 50);
-    });
-
-    it('keeps the current camera through an undo', () => {
-        const start = fresh();
-        const id = firstId(start);
-        const moved = run(start, [...drag(id, 3), { kind: 'pan', dx: 200, dy: 0 }]);
-        const undone = reduceHistory(moved, { kind: 'undo' }, inputsFor);
-
-        expect(undone.present.camera).toEqual(moved.present.camera);
-    });
-
-    it('does not record camera moves as steps', () => {
-        const panned = run(fresh(), [{ kind: 'pan', dx: 40, dy: 0 }]);
-
-        expect(panned.past).toHaveLength(0);
-    });
-
-    it('redoes what was undone, and a new step drops the redo', () => {
-        const start = fresh();
-        const id = firstId(start);
-        const dragged = run(start, drag(id, 3));
-        const undone = reduceHistory(dragged, { kind: 'undo' }, inputsFor);
-
-        expect(frameOf(reduceHistory(undone, { kind: 'redo' }, inputsFor), id)).toEqual(
-            frameOf(dragged, id),
-        );
-
-        const diverged = run(undone, drag(id, 1));
-
-        expect(diverged.future).toHaveLength(0);
-    });
-
-    it('clamps a resize to the minimum the action carries', () => {
-        const start = fresh();
-        const id = firstId(start);
-        const shrunk = run(start, [
-            { kind: 'raise', id },
-            {
-                kind: 'resize',
-                id,
-                edge: 'se',
-                dx: -5000,
-                dy: -5000,
-                minimum: { width: 300, height: 250 },
-            },
-        ]);
-
-        expect(frameOf(shrunk, id)).toMatchObject({ width: 300, height: 250 });
-    });
+const run = (history: History, actions: readonly WorkspaceAction[]): History => ({
+    present: actions.reduce(
+        (workspace, action) => reduceWorkspace(workspace, action, inputsFor),
+        history.present,
+    ),
 });
+
+const fresh = (): History => ({ present: defaultWorkspace(viewport, inputsFor) });
 
 describe('parseWorkspace', () => {
     const saved = (program: string) => {
@@ -202,15 +124,6 @@ describe('stores', () => {
 
         expect(present(inUse).stores.some(({ id }) => id === 'store-1')).toBe(true);
         expect(present(unused).stores.some(({ id }) => id === 'bookmarks')).toBe(false);
-    });
-
-    it('undoes a split', () => {
-        const split = run(fresh(), [
-            launch('bookmarks'),
-            { kind: 'add-store', id: 'bookmarks-5', copy: true },
-        ]);
-
-        expect(storeOf(run(split, [{ kind: 'undo' }]), 'bookmarks-5')).toBe('bookmarks');
     });
 });
 
@@ -325,8 +238,8 @@ describe('resizing an attached edge', () => {
         measured: { width, height },
     });
     // a | b | c in a row, d under a.
-    const attached = (): History =>
-        startHistory({
+    const attached = (): History => ({
+        present: {
             ...defaultWorkspace(viewport, inputsFor),
             processes: [
                 box('a', 0, 0, 200, 200),
@@ -339,7 +252,8 @@ describe('resizing an attached edge', () => {
                 { a: 'b', b: 'c' },
                 { a: 'a', b: 'd' },
             ],
-        });
+        },
+    });
     const resize = (edge: 'e' | 'w' | 's' | 'se', dx: number, dy: number): WorkspaceAction => ({
         kind: 'resize',
         id: 'a',
@@ -400,7 +314,7 @@ describe('snapping while resizing', () => {
     const start = (
         processes: ReturnType<typeof box>[],
         links: { a: string; b: string }[] = [],
-    ): History => startHistory({ ...defaultWorkspace(viewport, inputsFor), processes, links });
+    ): History => ({ present: { ...defaultWorkspace(viewport, inputsFor), processes, links } });
     const resize = (
         id: string,
         edge: 'e' | 's' | 'se',
@@ -493,66 +407,6 @@ describe('snapping while resizing', () => {
     });
 });
 
-describe('history labels and travel', () => {
-    const launch: WorkspaceAction = {
-        kind: 'launch',
-        program: 'bookmarks',
-        size: { width: 300, height: 300 },
-        viewport,
-    };
-    const labels = (history: History) => ({
-        past: history.past.map(({ label }) => label),
-        present: history.label,
-        future: history.future.map(({ label }) => label),
-    });
-
-    it('labels each step by what it did, a whole drag as one', () => {
-        const history = run(fresh(), [
-            launch,
-            ...drag('bookmarks-5', 3),
-            { kind: 'quit', id: 'bookmarks-5' },
-        ]);
-
-        expect(labels(history)).toEqual({
-            past: ['Opened the app', 'Opened bookmarks', 'Moved bookmarks'],
-            present: 'Closed bookmarks',
-            future: [],
-        });
-    });
-
-    it('moves labels with their workspaces on undo and redo', () => {
-        const history = run(fresh(), [
-            launch,
-            { kind: 'quit', id: 'bookmarks-5' },
-            { kind: 'undo' },
-        ]);
-
-        expect(labels(history)).toEqual({
-            past: ['Opened the app'],
-            present: 'Opened bookmarks',
-            future: ['Closed bookmarks'],
-        });
-        expect(labels(run(history, [{ kind: 'redo' }])).present).toBe('Closed bookmarks');
-    });
-
-    it('travels several steps at once, as that many undos would', () => {
-        const steps: WorkspaceAction[] = [
-            launch,
-            ...drag('bookmarks-5', 2),
-            { kind: 'quit', id: 'bookmarks-5' },
-        ];
-        const travelled = run(fresh(), [...steps, { kind: 'travel', offset: -2 }]);
-        const undone = run(fresh(), [...steps, { kind: 'undo' }, { kind: 'undo' }]);
-
-        expect(travelled.present).toEqual(undone.present);
-        expect(labels(travelled).present).toBe('Opened bookmarks');
-        expect(labels(run(travelled, [{ kind: 'travel', offset: 5 }])).present).toBe(
-            'Closed bookmarks',
-        );
-        expect(run(travelled, [{ kind: 'travel', offset: -50 }]).past).toHaveLength(0);
-    });
-});
-
 describe('following', () => {
     const launchTimeline: WorkspaceAction = {
         kind: 'launch',
@@ -628,13 +482,19 @@ describe('following', () => {
         expect(history.present.stores.some(({ id }) => id === 'store-1')).toBe(true);
     });
 
-    it('is undoable and labelled', () => {
-        const history = twoClocks();
-
-        expect(history.label).toBe('Set sketch playback to follow Store 1');
-        expect(processOf(run(history, [{ kind: 'undo' }]), 'sketch-2')?.follows).toEqual({
-            playback: { kind: 'playback', store: 'timeline' },
-        });
+    it('is labelled by what it follows', () => {
+        expect(
+            labelOf(
+                {
+                    kind: 'follow',
+                    id: 'sketch-2',
+                    input: 'playback',
+                    source: 'playback',
+                    store: 'store-1',
+                },
+                twoClocks().present,
+            ),
+        ).toBe('Set sketch playback to follow Store 1');
     });
 
     it('is saved and read back, dropping what the program cannot follow', () => {
@@ -721,7 +581,9 @@ describe('knob inputs', () => {
         ]);
 
         expect(sketchOf(history)).toEqual({ playback: { kind: 'playback', store: 'timeline' } });
-        expect(history.label).toBe('Set sketch k2 to follow nothing');
+        expect(
+            labelOf({ kind: 'unfollow', id: 'sketch-2', input: 'k2' }, signalled().present),
+        ).toBe('Set sketch k2 to follow nothing');
     });
 
     it('refuse a clock on a knob and a signal on the clock', () => {
@@ -800,7 +662,6 @@ describe('focus progress bindings', () => {
         expect(back.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
             progress: { kind: 'playback', store: 'timeline' },
         });
-        expect(run(back, [{ kind: 'undo' }]).present.processes).toEqual(history.present.processes);
     });
 
     it('retains a followed focus store after its editor closes, including prune and delete', () => {

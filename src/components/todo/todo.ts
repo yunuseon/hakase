@@ -1,3 +1,4 @@
+import type { Logged } from '../../shared/logged.ts';
 export type Todo = {
     readonly id: string;
     readonly text: string;
@@ -20,7 +21,7 @@ export type TodoCommand =
 
 export const emptyTodos: TodoList = { items: [], made: 0 };
 
-export const reduceTodos = (list: TodoList, command: TodoCommand): TodoList => {
+export const reduceTodos = (list: TodoList, command: TodoCommand, logged?: Logged): TodoList => {
     switch (command.kind) {
         case 'add': {
             const text = command.text.trim();
@@ -28,7 +29,13 @@ export const reduceTodos = (list: TodoList, command: TodoCommand): TodoList => {
 
             return text === ''
                 ? list
-                : { made, items: [...list.items, { id: `todo-${made}`, text, done: false }] };
+                : {
+                      made,
+                      items: [
+                          ...list.items,
+                          { id: `todo-${logged?.seq ?? made}`, text, done: false },
+                      ],
+                  };
         }
         case 'toggle':
             return {

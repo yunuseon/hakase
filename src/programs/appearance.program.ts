@@ -1,6 +1,5 @@
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import {
-    distinctUntilChanged,
     ignoreElements,
     map,
     mergeMap,
@@ -9,16 +8,10 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import {
-    appearanceFrom,
-    sameAppearance,
-    tokenValues,
-    TOKENS,
-    type Appearance,
-} from '../appearance.ts';
-import { appearances, defaultLook, isAppearanceName } from '../appearances.ts';
+import { appearanceFrom, sameAppearance, tokenValues, TOKENS } from '../appearance.ts';
+import { appearances, isAppearanceName } from '../appearances.ts';
 import { HksAppearanceEditor } from '../components/appearance-editor/appearance-editor.component.ts';
-import type { AppInput, Program } from '../program.ts';
+import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
 
 const options = Object.keys(appearances).map(value => ({ value, label: value }));
 
@@ -40,12 +33,8 @@ export const appearanceProgram = {
                 const shown$ = look$.pipe(
                     switchMap(name =>
                         appearance$(name).pipe(
-                            scan(
-                                (shown: Appearance, written, index) =>
-                                    index === 0 || written.from !== self.id ? written.value : shown,
-                                appearances[defaultLook],
-                            ),
-                            distinctUntilChanged(sameAppearance),
+                            scan(seenBy(self.id, sameAppearance), unseen),
+                            mergeMap(({ write }) => (write === null ? [] : [write])),
                         ),
                     ),
                     shareReplay({ bufferSize: 1, refCount: true }),

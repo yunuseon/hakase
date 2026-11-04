@@ -21,6 +21,7 @@ import {
     defaultPanel,
     isCycles,
     isDrawMode,
+    samePanel,
     type Cycles,
     type Knob,
     type Knobs,
@@ -109,6 +110,35 @@ export const defaultSketch: SketchSettings = {
     tab: 'parameters',
     stripLevel: 2,
     export: defaultExport,
+};
+
+export const viewOnly = (stored: Settings | undefined, after: Settings) => {
+    // A window's first change is measured from its program's defaults, or opening a tab would count as an edit.
+    const before =
+        stored ??
+        (after.kind === 'sketch'
+            ? defaultSketch
+            : after.kind === 'state-map'
+              ? defaultStateMap
+              : after);
+
+    if (before.kind === 'sketch' && after.kind === 'sketch') {
+        return (
+            before.formula === after.formula &&
+            before.theme === after.theme &&
+            samePanel(before.panel, after.panel) &&
+            before.export.fps === after.export.fps &&
+            before.export.size === after.export.size &&
+            before.export.format === after.export.format &&
+            before.export.quality === after.export.quality
+        );
+    }
+
+    if (before.kind === 'state-map' && after.kind === 'state-map') {
+        return before.positions === after.positions;
+    }
+
+    return before.kind === after.kind && after.kind !== 'sketch' && after.kind !== 'state-map';
 };
 
 export const defaultFormulaEditor: FormulaEditorSettings = { kind: 'formula', formula: 'ripple' };
