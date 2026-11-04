@@ -761,7 +761,9 @@ open, lists the sections; clicking one emits a jump, and `main.ts` turns it into
 a stream of `set-camera` actions. `flight()` in `shared/camera.ts` is van Wijk
 and Nuij's smooth zoom-and-pan: one curve that pulls back, travels and closes in,
 pulling back further the further it goes (`RHO`), with a duration that grows
-with the distance. `animationFrames()` drives it through `switchMap`, so a
+with the **root** of the path's length, from 0.7 s up to a 2 s cap. Linear, as
+it first was, a short hop was over in a blink and a jump across the canvas was a
+wait; the root gives a hop time to read and keeps a long way brisk. `animationFrames()` drives it through `switchMap`, so a
 second jump replaces the first, and `takeUntil` any pan, zoom or key ends it, so
 the user can always take the camera back. A flight reads the camera from the
 fold it feeds, so it enters through a `defer` like the toolbar's gestures.
@@ -1610,7 +1612,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy-two of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

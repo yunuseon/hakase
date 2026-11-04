@@ -94,9 +94,9 @@ export type Flight = {
 };
 
 const RHO = 1.5;
-const MS_PER_UNIT = 650;
-const MIN_FLIGHT_MS = 600;
-const MAX_FLIGHT_MS = 2600;
+const BASE_FLIGHT_MS = 700;
+const MS_PER_ROOT_UNIT = 520;
+const MAX_FLIGHT_MS = 2000;
 
 export const flight = (from: Camera, to: Camera, viewport: Extent): Flight => {
     const centre = centreOf(viewport);
@@ -113,7 +113,9 @@ export const flight = (from: Camera, to: Camera, viewport: Extent): Flight => {
 
         return { zoom, x: centre.x - x * zoom, y: centre.y - y * zoom };
     };
-    const duration = (s: number): number => clamp(s * MS_PER_UNIT, MIN_FLIGHT_MS, MAX_FLIGHT_MS);
+    // By the root of the path's length: linear, a hop was a blink and a long way a wait.
+    const duration = (s: number): number =>
+        Math.min(BASE_FLIGHT_MS + MS_PER_ROOT_UNIT * Math.sqrt(s), MAX_FLIGHT_MS);
 
     if (u1 < 1e-6) {
         const s = Math.abs(Math.log(w1 / w0)) / RHO;
