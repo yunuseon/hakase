@@ -14,12 +14,6 @@ const patch = (actions: readonly WorkspaceAction[] = []) =>
     patchOf(run(actions), inputsFor, titles);
 const windowOf = (actions: readonly WorkspaceAction[], id: string) =>
     patch(actions).windows.find(window => window.id === id);
-const launchSketch: WorkspaceAction = {
-    kind: 'launch',
-    program: 'sketch',
-    size: { width: 640, height: 820 },
-    viewport,
-};
 
 describe('patchOf', () => {
     it('lists every window that keeps or follows state, with a port per input', () => {
@@ -45,17 +39,14 @@ describe('patchOf', () => {
         expect(windowOf([], 'playhead-4')?.own).toBeNull();
     });
 
-    it('folds a store only one window uses into a tag, and makes it a node once shared', () => {
-        expect(windowOf([], 'sketch-2')?.own?.shown).toBe('tag');
-        expect(patch().stores.map(({ id }) => id)).toEqual(['timeline']);
-
-        const shared: WorkspaceAction[] = [
-            launchSketch,
-            { kind: 'bind-store', id: 'sketch-5', store: 'sketch-2' },
-        ];
-
-        expect(windowOf(shared, 'sketch-2')?.own?.shown).toBe('node');
-        expect(patch(shared).stores.map(({ id }) => id)).toContain('sketch-2');
+    it('lists every store, private or shared, and wires each window to its own', () => {
+        expect(
+            patch()
+                .stores.map(({ id }) => id)
+                .sort(),
+        ).toEqual(['formula-1', 'sketch-2', 'timeline']);
+        expect(windowOf([], 'sketch-2')?.own).toBe('sketch-2');
+        expect(windowOf([], 'playhead-4')?.own).toBeNull();
     });
 
     it('always offers what can be followed, a clock first, and a main store once something follows it', () => {
@@ -69,8 +60,11 @@ describe('patchOf', () => {
             },
         ];
 
-        expect(windowOf([], 'timeline-3')?.own?.shown).toBe('node');
-        expect(patch(following).stores.map(({ id, kind }) => [id, kind])).toEqual([
+        expect(
+            patch(following)
+                .stores.map(({ id, kind }) => [id, kind])
+                .slice(0, 2),
+        ).toEqual([
             ['timeline', 'playback'],
             ['focus', 'focus'],
         ]);

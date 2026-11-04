@@ -4,6 +4,14 @@ import { layoutOf, NODE_WIDTH, relatedTo, type PatchView } from './patch.ts';
 const view: PatchView = {
     stores: [
         {
+            id: 'sketch-2',
+            program: 'sketch',
+            kind: null,
+            title: 'sketch',
+            name: 'sketch 2',
+            colour: 'green',
+        },
+        {
             id: 'timeline',
             program: 'timeline',
             kind: 'playback',
@@ -26,7 +34,7 @@ const view: PatchView = {
             program: 'signal',
             label: 'signal 1',
             icon: '',
-            own: { store: 'signal', name: 'Main', colour: 'blue', shown: 'node' },
+            own: 'signal',
             ports: [],
         },
         {
@@ -34,7 +42,7 @@ const view: PatchView = {
             program: 'sketch',
             label: 'sketch 1',
             icon: '',
-            own: { store: 'sketch-2', name: 'sketch 2', colour: 'green', shown: 'tag' },
+            own: 'sketch-2',
             ports: [
                 {
                     input: 'playback',
@@ -51,7 +59,7 @@ const view: PatchView = {
 };
 
 describe('layoutOf', () => {
-    it('wires own state into a header, follows into ports, and no wire for a tag', () => {
+    it('wires own state into a header and follows into ports', () => {
         const { wires } = layoutOf(view);
 
         expect(
@@ -64,6 +72,7 @@ describe('layoutOf', () => {
             ]),
         ).toEqual([
             ['own', 'signal-5', null, 'blue', false],
+            ['own', 'sketch-2', null, 'green', false],
             ['follow', 'sketch-2', 'playback', 'red', false],
             ['follow', 'sketch-2', 'k1', 'blue', true],
         ]);
@@ -71,7 +80,7 @@ describe('layoutOf', () => {
 
     it('runs every wire from a store edge to a window edge', () => {
         const { stores, windows, wires } = layoutOf(view);
-        const [, signal] = stores;
+        const [, , signal] = stores;
         const window = windows[0];
 
         expect(signal?.anchor.x).toBe((signal?.x ?? 0) + NODE_WIDTH);
@@ -96,7 +105,7 @@ describe('relatedTo', () => {
 
         expect(sorted(related.stores)).toEqual(['signal', 'sketch-2', 'timeline']);
         expect(sorted(related.windows)).toEqual(['sketch-2']);
-        expect(sorted(related.wires)).toEqual(['sketch-2:k1', 'sketch-2:playback']);
+        expect(sorted(related.wires)).toEqual(['sketch-2:', 'sketch-2:k1', 'sketch-2:playback']);
     });
 
     it('brings a store every window that keeps it or follows it', () => {
@@ -111,6 +120,6 @@ describe('relatedTo', () => {
         const related = relatedTo(layout, { kind: 'store', id: 'sketch-2' });
 
         expect(sorted(related.windows)).toEqual(['sketch-2']);
-        expect(related.wires.size).toBe(0);
+        expect(sorted(related.wires)).toEqual(['sketch-2:']);
     });
 });

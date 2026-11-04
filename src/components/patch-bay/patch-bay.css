@@ -133,25 +133,6 @@
     white-space: nowrap;
 }
 
-.tag {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 4px;
-    max-inline-size: 70px;
-    padding: 1px 6px;
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--label);
-    border: 1px solid var(--edge);
-    border-radius: 999px;
-}
-
-.tag .dot {
-    inline-size: 7px;
-    block-size: 7px;
-}
-
 .icon {
     inline-size: 14px;
     block-size: 14px;
@@ -236,11 +217,9 @@
     background: var(--well);
 }
 
-/* Children of the header, not the header: a tag inside it may be a target while the header is not. */
 .board[data-dragging] .store:not([data-ok]),
 .board[data-dragging] .port:not([data-ok]),
-.board[data-dragging] .head:not([data-ok]) > :not(.tag),
-.board[data-dragging] .tag:not([data-ok]) {
+.board[data-dragging] .head:not([data-ok]) {
     opacity: 0.4;
 }
 
@@ -248,8 +227,7 @@
     background: var(--well);
 }
 
-.store[data-ok][data-over],
-.tag[data-ok][data-over] {
+.store[data-ok][data-over] {
     border-color: var(--accent);
 }
 
@@ -280,12 +258,7 @@
     opacity: 0.18;
 }
 
-.board[data-focus] .tag:not([data-related]) {
-    opacity: 0.4;
-}
-
-.node[data-selected],
-.tag[data-selected] {
+.node[data-selected] {
     border-color: var(--ink);
     box-shadow: 0 0 0 1px var(--ink);
 }

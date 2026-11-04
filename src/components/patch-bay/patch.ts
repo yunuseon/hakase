@@ -15,19 +15,12 @@ export type PatchPort = {
     readonly bound: string | null;
 };
 
-export type OwnState = {
-    readonly store: string;
-    readonly name: string;
-    readonly colour: string;
-    readonly shown: 'tag' | 'node';
-};
-
 export type PatchWindow = {
     readonly id: string;
     readonly program: string;
     readonly label: string;
     readonly icon: string;
-    readonly own: OwnState | null;
+    readonly own: string | null;
     readonly ports: readonly PatchPort[];
 };
 
@@ -137,7 +130,7 @@ export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
     const storeAt = (id: string | null) => placedStores.find(store => store.id === id);
 
     const wires = placedWindows.flatMap(window => {
-        const own = window.own?.shown === 'node' ? storeAt(window.own.store) : undefined;
+        const own = storeAt(window.own);
         const owned: Wire[] =
             own === undefined
                 ? []
@@ -195,21 +188,15 @@ export type Related = {
     readonly wires: ReadonlySet<string>;
 };
 
-export const relatedTo = ({ windows, wires }: PatchLayout, focus: Focus): Related => {
+export const relatedTo = ({ wires }: PatchLayout, focus: Focus): Related => {
     const touching = wires.filter(wire =>
         focus.kind === 'window' ? wire.window === focus.id : wire.store === focus.id,
     );
-    const owner = windows.filter(window =>
-        focus.kind === 'window' ? window.id === focus.id : window.own?.store === focus.id,
-    );
+    const itself = (kind: Focus['kind']) => (focus.kind === kind ? [focus.id] : []);
 
     return {
-        stores: new Set([
-            ...(focus.kind === 'store' ? [focus.id] : []),
-            ...touching.map(({ store }) => store),
-            ...owner.flatMap(({ own }) => (own === null ? [] : [own.store])),
-        ]),
-        windows: new Set([...owner.map(({ id }) => id), ...touching.map(({ window }) => window)]),
+        stores: new Set([...itself('store'), ...touching.map(({ store }) => store)]),
+        windows: new Set([...itself('window'), ...touching.map(({ window }) => window)]),
         wires: new Set(touching.map(wireKey)),
     };
 };

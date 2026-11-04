@@ -139,7 +139,7 @@ const focusAt = (target: EventTarget | null): Focus | null | undefined => {
         return undefined;
     }
 
-    const store = target.closest('.tag, .store');
+    const store = target.closest('.store');
 
     if (store instanceof HTMLElement && store.dataset['store'] !== undefined) {
         return { kind: 'store', id: store.dataset['store'] };
@@ -239,18 +239,8 @@ const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: Plac
     if (own !== null) {
         head.dataset['own'] = id;
         head.dataset['program'] = program;
-        head.dataset['current'] = own.store;
+        head.dataset['current'] = own;
         head.prepend(span('jack'));
-
-        if (own.shown === 'tag') {
-            const tag = span('tag');
-            tag.dataset['store'] = own.store;
-            tag.dataset['program'] = program;
-            tag.style.setProperty('--store', own.colour);
-            tag.title = `${own.name}: only this window uses it; drag onto another window to share it`;
-            tag.append(span('dot'), span('name', own.name));
-            head.append(tag);
-        }
     }
 
     const locate = document.createElement('button');
@@ -442,8 +432,7 @@ export class HksPatchBay extends HTMLElement {
                     focus !== null &&
                     (focus.kind === 'window'
                         ? layout.windows.some(({ id }) => id === focus.id)
-                        : layout.stores.some(({ id }) => id === focus.id) ||
-                          layout.windows.some(({ own }) => own?.store === focus.id));
+                        : layout.stores.some(({ id }) => id === focus.id));
                 const related = shown ? relatedTo(layout, focus) : null;
                 board.toggleAttribute('data-focus', related !== null);
 

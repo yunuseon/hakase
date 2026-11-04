@@ -1057,13 +1057,13 @@ in `src/patch.ts` derives the graph from the workspace and `inputsFor`,
 window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
 reducer's checks, undo and labels all apply.
 
-**A store only one window uses is a tag, not a node.** Every sketch and editor
-has a private settings store, and a node for each with a single wire would
-bury the connections under one-to-one noise. So a store is a node when it can
-be followed (a clock, a timer, a signal, which are targets even unused), when
-something follows it, or when two windows share it; otherwise it is a coloured
-tag in its window's header. A tag is still a drag end, so dragging another
-window's header jack onto it shares it, and the tag becomes a node.
+**Every store is a node, private ones too.** Folding a store only one window
+used into a tag in its header was tried and dropped: it made private state a
+second kind of thing, hid exactly the state you would want to wire up, and
+squeezed the window's name. Now every store of a program that keeps state is on
+the left, used or not, so an orphaned store is one drag from a window. A
+program that keeps none (the dial) still has a registry entry, so stores are
+filtered by `HOLDING`, not by being registered.
 
 **Wires start only at the jacks** (the docks on a node's edge); a press
 anywhere else on a node **focuses** it instead. A focused window keeps lit its
@@ -1086,8 +1086,6 @@ window's own state cannot be unplugged, only moved. Each window's header has a
 **locate** button that flies the camera to it (below). One shared `drags$` feeds both the rubber-band wire and the
 command, for the todo grip's reason, and `patch$` dedupes with `samePatch`,
 which names every field, because the workspace emits on every pointer move.
-While dragging, the header's children dim rather than the header, or a tag
-inside an unlit header could never show that it is a target.
 
 ## The inspector
 

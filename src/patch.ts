@@ -6,7 +6,7 @@ import type {
 } from './components/patch-bay/patch.ts';
 import { followedBy, followedStores, SOURCES, type InputsFor } from './inputs.ts';
 import { PROGRAM_IDS, type ProgramId } from './program.ts';
-import { colourOf, HOLDING, MAIN, mainStore, type StoreEntry } from './stores.ts';
+import { colourOf, HOLDING, mainStore, type StoreEntry } from './stores.ts';
 import { listed, type Workspace } from './workspace.ts';
 
 type Titles = (program: ProgramId) => { readonly title: string; readonly icon: string };
@@ -22,7 +22,6 @@ export const patchOf = (
     titles: Titles,
 ): PatchView => {
     const followed = new Set(processes.flatMap(({ follows }) => followedStores(follows)));
-    const usersOf = (store: string) => processes.filter(process => process.store === store).length;
     // Followed before it has a window, a main store has no registry entry yet.
     const known: readonly StoreEntry[] = [
         ...stores,
@@ -32,11 +31,8 @@ export const patchOf = (
                 : [],
         ),
     ];
-    const isNode = ({ id, program }: StoreEntry) =>
-        sourceOf(program) !== undefined || followed.has(id) || usersOf(id) > 1;
-
     const nodes = known
-        .filter(isNode)
+        .filter(({ program }) => HOLDING[program] !== null)
         .map((store): PatchStore => ({
             id: store.id,
             program: store.program,
@@ -67,19 +63,7 @@ export const patchOf = (
                 ];
             },
         );
-        const entry = known.find(({ id }) => id === process.store);
-        const own =
-            HOLDING[process.program] === null
-                ? null
-                : {
-                      store: process.store,
-                      name: entry?.name ?? MAIN,
-                      colour: colourOf(process.store),
-                      shown:
-                          entry !== undefined && isNode(entry)
-                              ? ('node' as const)
-                              : ('tag' as const),
-                  };
+        const own = HOLDING[process.program] === null ? null : process.store;
         const { title, icon } = titles(process.program);
 
         return own === null && ports.length === 0
@@ -119,10 +103,7 @@ const sameWindow = (a: PatchWindow, b: PatchWindow) =>
     a.program === b.program &&
     a.label === b.label &&
     a.icon === b.icon &&
-    a.own?.store === b.own?.store &&
-    a.own?.name === b.own?.name &&
-    a.own?.colour === b.own?.colour &&
-    a.own?.shown === b.own?.shown &&
+    a.own === b.own &&
     a.ports.length === b.ports.length &&
     a.ports.every((port, index) => {
         const other = b.ports[index];
