@@ -13,6 +13,8 @@ import { noteProgram } from './programs/note.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { paintProgram } from './programs/paint.program.ts';
 import { penProgram } from './programs/pen.program.ts';
+import { voiceProgram } from './programs/voice.program.ts';
+import { piecesProgram } from './programs/pieces.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
@@ -32,6 +34,8 @@ export const programs = {
     plot: plotProgram,
     paint: paintProgram,
     pen: penProgram,
+    voice: voiceProgram,
+    pieces: piecesProgram,
     tasks: tasksProgram,
     todo: todoProgram,
     board: boardProgram,

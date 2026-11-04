@@ -1,0 +1,72 @@
+:host {
+    position: fixed;
+    /* Under the navigator and the toolbar, so zoom and fit still work while placing. */
+    z-index: 80;
+    inset: 0;
+    cursor: copy;
+}
+
+:host([hidden]) {
+    display: none;
+}
+
+.ghost {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border: 2px dashed var(--accent);
+    border-radius: 14px;
+    pointer-events: none;
+}
+
+.label {
+    position: absolute;
+    inset-block-end: 100%;
+    inset-inline-start: 12px;
+    padding-block-end: 4px;
+    font: 600 12px var(--font-ui);
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.window {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--panel) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--edge));
+    border-radius: 10px;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow) 14%, transparent);
+}
+
+.hint {
+    position: absolute;
+    inset-block-start: 16px;
+    inset-inline-start: 50%;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 0;
+    padding: 8px 14px;
+    font: 500 12px var(--font-ui);
+    color: var(--ink);
+    white-space: nowrap;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 999px;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--shadow) 18%, transparent);
+    translate: -50% 0;
+    pointer-events: none;
+}
+
+.hint b {
+    font-weight: 600;
+}
+
+.keys {
+    font-weight: 400;
+    color: var(--muted);
+}

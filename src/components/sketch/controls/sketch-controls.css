@@ -352,5 +352,5 @@
 .read[data-driven]::after {
     font: 500 11px var(--font-ui);
     color: var(--accent);
-    content: 'signal' attr(data-live);
+    content: 'follows' attr(data-live);
 }

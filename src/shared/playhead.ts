@@ -100,6 +100,12 @@ export type Clocks = ReadonlyMap<string, Clock>;
 type ClocksAction =
     | { readonly kind: 'clock'; readonly store: string; readonly command: ClockCommand }
     | { readonly kind: 'copy'; readonly from: string; readonly to: string }
+    | {
+          readonly kind: 'seed';
+          readonly to: string;
+          readonly duration: number;
+          readonly looping: boolean;
+      }
     | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> }
     | { readonly kind: 'advance'; readonly ms: number };
 
@@ -134,6 +140,14 @@ export const reduceClocks = (clocks: Clocks, action: ClocksAction): Clocks => {
                 ? clocks
                 : new Map(clocks).set(action.to, { ...source, playing: false, held: false });
         }
+        case 'seed':
+            return clocks.has(action.to)
+                ? clocks
+                : new Map(clocks).set(action.to, {
+                      ...initialClock,
+                      duration: action.duration,
+                      looping: action.looping,
+                  });
         case 'keep': {
             const kept = new Map([...clocks].filter(([store]) => action.stores.has(store)));
 
@@ -162,6 +176,12 @@ export const createClocks$ = (
     commands$: Observable<{ readonly store: string; readonly command: ClockCommand }>,
     events$: Observable<
         | { readonly kind: 'copy'; readonly from: string; readonly to: string }
+        | {
+              readonly kind: 'seed';
+              readonly to: string;
+              readonly duration: number;
+              readonly looping: boolean;
+          }
         | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> }
     >,
     initial: Clocks,

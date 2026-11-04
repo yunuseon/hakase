@@ -134,18 +134,18 @@ export const sketchProgram = {
                 );
 
                 const signals$ = combineLatest({
-                    k1: state.followedWave$('k1'),
-                    k2: state.followedWave$('k2'),
-                    k3: state.followedWave$('k3'),
-                    k4: state.followedWave$('k4'),
-                    turn: state.followedWave$('turn'),
-                    pitch: state.followedWave$('pitch'),
-                    distance: state.followedWave$('distance'),
-                    focus: state.followedWave$('focus'),
-                    colour: state.followedWave$('colour'),
-                    size: state.followedWave$('size'),
-                    depth: state.followedWave$('depth'),
-                    trails: state.followedWave$('trails'),
+                    k1: state.followedDriver$('k1'),
+                    k2: state.followedDriver$('k2'),
+                    k3: state.followedDriver$('k3'),
+                    k4: state.followedDriver$('k4'),
+                    turn: state.followedDriver$('turn'),
+                    pitch: state.followedDriver$('pitch'),
+                    distance: state.followedDriver$('distance'),
+                    focus: state.followedDriver$('focus'),
+                    colour: state.followedDriver$('colour'),
+                    size: state.followedDriver$('size'),
+                    depth: state.followedDriver$('depth'),
+                    trails: state.followedDriver$('trails'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
                 const params$ = combineLatest([

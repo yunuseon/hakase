@@ -34,7 +34,10 @@ export const inputGroups = (
             label: definition.title,
             title: [
                 source.title,
-                ...(definition.sources.length > 1 && source.access === 'read' ? ['read-only'] : []),
+                ...(definition.sources.some(other => other.access !== source.access) &&
+                source.access === 'read'
+                    ? ['read-only']
+                    : []),
             ].join(' · '),
             options: withMain(source.program, stores)
                 .filter(

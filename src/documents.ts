@@ -36,7 +36,16 @@ import {
     type Pen,
     type PenCommand,
 } from './components/pen/pen.ts';
+import {
+    defaultVoice,
+    isVoiceParam,
+    reduceVoice,
+    type Voice,
+    type VoiceCommand,
+} from './components/voice/voice.ts';
 import { isProgramId } from './program.ts';
+import { placed, reducePieces, type PieceCommand, type Pieces } from './pieces.ts';
+import type { Rect } from './shared/camera.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
     emptyTodos,
@@ -94,7 +103,9 @@ export type Documents = {
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly paintings: ReadonlyMap<StoreId, Picture>;
     readonly pens: ReadonlyMap<StoreId, Pen>;
+    readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly library: Library;
+    readonly pieces: Pieces;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
     readonly looks: ReadonlyMap<AppearanceName, Written<Appearance>>;
@@ -112,6 +123,7 @@ type StoreCommands = {
     readonly signals: SignalCommand;
     readonly paintings: PaintCommand;
     readonly pens: PenCommand;
+    readonly voices: VoiceCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -128,6 +140,8 @@ export type DocumentAction =
           };
       }[StoreDocument]
     | { readonly kind: 'library'; readonly command: LibraryCommand }
+    | { readonly kind: 'pieces'; readonly command: PieceCommand }
+    | { readonly kind: 'place'; readonly piece: string; readonly view: Rect }
     | {
           readonly kind: 'link';
           readonly store: StoreId;
@@ -181,10 +195,15 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     signals: storeEvent(documents.signals, event),
     paintings: storeEvent(documents.paintings, event),
     pens: storeEvent(documents.pens, event),
+    voices: storeEvent(documents.voices, event),
 });
 
-export const linkedOf = ({ signals, pens }: Pick<Documents, 'signals' | 'pens'>) =>
-    new Map<StoreId, Linked>([...signals, ...pens]);
+export const linkedOf = ({
+    signals,
+    pens,
+    voices,
+}: Pick<Documents, 'signals' | 'pens' | 'voices'>) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices]);
 
 const ownerOf = ({ stores }: Workspace, store: StoreId) =>
     stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
@@ -378,6 +397,18 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'voices':
+                return {
+                    ...documents,
+                    voices: commanded(
+                        documents.voices,
+                        action.store,
+                        defaultVoice,
+                        reduceVoice,
+                        action.command,
+                        seq,
+                    ),
+                };
             case 'link': {
                 const { store, param, source } = action;
                 const owner = ownerOf(documents.workspace, store);
@@ -394,12 +425,30 @@ export const reduceDocuments =
                             { kind: 'pens', store, command: { kind: 'source', param, source } },
                             seq,
                         )
-                      : documents;
+                      : owner === 'voice' && isVoiceParam(param)
+                        ? reduceDocuments(inputsFor)(
+                              documents,
+                              { kind: 'voices', store, command: { kind: 'source', param, source } },
+                              seq,
+                          )
+                        : documents;
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
 
                 return library === documents.library ? documents : { ...documents, library };
+            }
+            case 'pieces': {
+                const pieces = reducePieces(documents.pieces, action.command, { seq });
+
+                return pieces === documents.pieces ? documents : { ...documents, pieces };
+            }
+            case 'place': {
+                const piece = documents.pieces.items.find(({ id }) => id === action.piece);
+
+                return piece === undefined
+                    ? documents
+                    : placed(documents, piece, action.view, seq, inputsFor);
             }
             case 'formula':
                 return documents.formulas.get(action.formula)?.value === action.text
@@ -448,6 +497,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     signals: ['nudge', 'drag-wave', 'draw', 'set'],
     paintings: ['shift'],
     pens: ['weight'],
+    voices: ['decay', 'glide', 'volume'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -460,7 +510,12 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'prune':
         case 'library':
         case 'look':
+        case 'place':
             return { key: action.kind, joins: false };
+        case 'pieces':
+            return action.command.kind === 'rename'
+                ? { key: `piece:${action.command.id}`, joins: true }
+                : { key: action.kind, joins: false };
         case 'link':
             return { key: `link:${action.store}:${action.param}`, joins: false };
         case 'settings':
@@ -500,6 +555,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     signals: 'signal',
     paintings: 'painting',
     pens: 'pen',
+    voices: 'voice',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>
@@ -523,6 +579,20 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return action.command.kind === 'remove'
                 ? 'Deleted a formula'
                 : `Saved formula ${action.command.label}`;
+        case 'pieces': {
+            const { command } = action;
+            const was = before.pieces.items.find(
+                ({ id }) => command.kind !== 'add' && id === command.id,
+            );
+
+            return command.kind === 'add'
+                ? `Saved piece ${command.piece.name}`
+                : command.kind === 'rename'
+                  ? `Renamed piece ${was?.name ?? ''} to ${command.name}`
+                  : `Deleted piece ${was?.name ?? ''}`;
+        }
+        case 'place':
+            return `Placed piece ${before.pieces.items.find(({ id }) => id === action.piece)?.name ?? ''}`;
         case 'formula':
             return `Edited formula ${before.library.items.find(({ id }) => id === action.formula)?.label ?? action.formula}`;
         case 'theme':

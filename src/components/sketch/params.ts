@@ -8,7 +8,7 @@ import {
     type Space,
 } from './space.ts';
 import type { Theme } from './theme.ts';
-import { waveAt, type Wave } from '../../shared/signal.ts';
+import { driverAt, type Driver } from '../../shared/curve.ts';
 import type { Sheet } from '../../shared/stroke.ts';
 import { clamp } from '../../lib/math.ts';
 
@@ -62,7 +62,7 @@ export const DRIVES = [
 ] as const;
 export type Drive = (typeof DRIVES)[number];
 
-export type Signals = Readonly<Record<Drive, Wave | null>>;
+export type Signals = Readonly<Record<Drive, Driver | null>>;
 
 const MIN_FOCUS = 0.1;
 const MAX_FOCUS = 10;
@@ -71,8 +71,8 @@ const MAX_DEPTH = 4;
 // Below 1, or a frame would never quite clear and the picture would smear into one colour.
 const MAX_TRAILS = 0.97;
 
-const drivenOr = (signal: Wave | null, fallback: number, t: number) =>
-    signal === null ? fallback : waveAt(signal, t);
+const drivenOr = (signal: Driver | null, fallback: number, t: number) =>
+    signal === null ? fallback : driverAt(signal, t);
 
 export const orbitAt = ({ signals }: Pick<PanelParams, 'signals'>, orbit: Orbit, t: number) =>
     clampedOrbit({
@@ -83,7 +83,7 @@ export const orbitAt = ({ signals }: Pick<PanelParams, 'signals'>, orbit: Orbit,
 
 // Clamped, not mapped: below 0.1 the lattice collapses onto one point.
 export const focusAt = ({ focus, signals }: Pick<PanelParams, 'focus' | 'signals'>, t: number) =>
-    signals.focus === null ? focus : clamp(waveAt(signals.focus, t), MIN_FOCUS, MAX_FOCUS);
+    signals.focus === null ? focus : clamp(driverAt(signals.focus, t), MIN_FOCUS, MAX_FOCUS);
 
 export const colourShiftAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
     drivenOr(signals.colour, 0, t);
@@ -116,7 +116,7 @@ export const knobValue = (
 ) => {
     const signal = signals[knob];
 
-    return signal === null ? knobAt(knobs[knob], motion[knob], t) : waveAt(signal, t);
+    return signal === null ? knobAt(knobs[knob], motion[knob], t) : driverAt(signal, t);
 };
 
 export type PanelParams = {

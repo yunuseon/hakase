@@ -2,6 +2,7 @@ import {
     knobInputs,
     paintInput,
     penInputs,
+    voiceInputs,
     plotInputs,
     signalInputs,
     sceneInputs,
@@ -17,12 +18,14 @@ export const inputsFor: InputsFor = program =>
         ? { playback: playbackInput, ...knobInputs, ...sceneInputs, paint: paintInput }
         : program === 'pen'
           ? { playback: playbackInput, ...penInputs }
-          : program === 'plot'
-            ? { playback: playbackInput, ...plotInputs }
-            : program === 'signal'
-              ? { playback: playbackInput, ...signalInputs }
-              : program === 'timeline'
-                ? { playback: ownPlaybackInput }
-                : program === 'playhead'
-                  ? { progress: progressInput }
-                  : {};
+          : program === 'voice'
+            ? { playback: playbackInput, ...voiceInputs }
+            : program === 'plot'
+              ? { playback: playbackInput, ...plotInputs }
+              : program === 'signal'
+                ? { playback: playbackInput, ...signalInputs }
+                : program === 'timeline'
+                  ? { playback: ownPlaybackInput }
+                  : program === 'playhead'
+                    ? { progress: progressInput }
+                    : {};

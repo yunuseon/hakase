@@ -5,6 +5,7 @@ import type {
     PenBinding,
     PlaybackBinding,
     SignalBinding,
+    VoiceBinding,
 } from './inputs.ts';
 import type { Process } from './workspace.ts';
 
@@ -14,18 +15,18 @@ describe('Process', () => {
     it('gives each program the follows its own inputs declare, keyed by input', () => {
         expectTypeOf<Of<'sketch'>['follows']>().toEqualTypeOf<{
             readonly playback: PlaybackBinding;
-            readonly k1?: SignalBinding;
-            readonly k2?: SignalBinding;
-            readonly k3?: SignalBinding;
-            readonly k4?: SignalBinding;
-            readonly turn?: SignalBinding;
-            readonly pitch?: SignalBinding;
-            readonly distance?: SignalBinding;
-            readonly focus?: SignalBinding;
-            readonly colour?: SignalBinding;
-            readonly size?: SignalBinding;
-            readonly depth?: SignalBinding;
-            readonly trails?: SignalBinding;
+            readonly k1?: SignalBinding | VoiceBinding;
+            readonly k2?: SignalBinding | VoiceBinding;
+            readonly k3?: SignalBinding | VoiceBinding;
+            readonly k4?: SignalBinding | VoiceBinding;
+            readonly turn?: SignalBinding | VoiceBinding;
+            readonly pitch?: SignalBinding | VoiceBinding;
+            readonly distance?: SignalBinding | VoiceBinding;
+            readonly focus?: SignalBinding | VoiceBinding;
+            readonly colour?: SignalBinding | VoiceBinding;
+            readonly size?: SignalBinding | VoiceBinding;
+            readonly depth?: SignalBinding | VoiceBinding;
+            readonly trails?: SignalBinding | VoiceBinding;
             readonly paint?: PaintBinding | PenBinding;
         }>();
         expectTypeOf<Of<'playhead'>['follows']>().toEqualTypeOf<{

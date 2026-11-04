@@ -1,0 +1,134 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.empty {
+    margin: 0;
+    color: var(--muted);
+}
+
+.empty b {
+    font-weight: 600;
+    color: var(--label);
+}
+
+.empty[hidden] {
+    display: none;
+}
+
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+}
+
+.card {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 6px 6px 8px;
+    background: var(--well);
+    border-radius: 10px;
+}
+
+.preview {
+    inline-size: 64px;
+    block-size: 44px;
+    fill: color-mix(in srgb, var(--ink) 22%, transparent);
+    stroke: color-mix(in srgb, var(--ink) 55%, transparent);
+    stroke-width: 6;
+    vector-effect: non-scaling-stroke;
+}
+
+.preview rect {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1;
+}
+
+.text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+}
+
+.name {
+    min-inline-size: 0;
+    padding: 2px 4px;
+    margin-inline-start: -5px;
+    font: 600 13px var(--font-ui);
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+}
+
+.name:hover {
+    border-color: var(--edge);
+}
+
+.name:focus-visible {
+    outline: none;
+    background: var(--panel);
+    border-color: var(--rule);
+}
+
+.meta {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.place,
+.remove {
+    block-size: 28px;
+    font: 500 12px var(--font-ui);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.place {
+    padding: 0 12px;
+    color: var(--panel);
+    background: var(--accent);
+}
+
+.place:hover {
+    background: color-mix(in srgb, var(--accent) 85%, var(--ink));
+}
+
+.remove {
+    min-inline-size: 28px;
+    padding: 0 6px;
+    font-size: 15px;
+    color: var(--muted);
+    background: transparent;
+}
+
+.remove:hover {
+    color: var(--ink);
+    background: var(--panel);
+}
+
+.remove[data-armed] {
+    font-size: 12px;
+    color: var(--panel);
+    background: var(--accent);
+}
+
+button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

@@ -47,11 +47,23 @@ const sectionOf = (id: string): HTMLElement => {
     remove.textContent = '×';
     remove.setAttribute('aria-label', 'delete section');
 
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'save';
+    save.dataset['save'] = id;
+    save.textContent = 'Save as piece';
+    save.title = 'Keep everything in this section as a piece you can place again';
+
+    // Out of the flow together: the legend's width, and so the border's gap, is the name alone.
+    const actions = document.createElement('span');
+    actions.className = 'actions';
+    actions.append(save, remove);
+
     const corner = document.createElement('div');
     corner.className = 'corner';
     corner.dataset['resize'] = id;
 
-    label.append(name, remove);
+    label.append(name, actions);
     section.append(label, corner);
 
     return section;
@@ -116,9 +128,15 @@ export class HksSections extends HTMLElement {
             drags$('resize'),
             fromElementEvent$(this, 'click').pipe(
                 mergeMap((event): Observable<SectionGesture> => {
-                    const id = dataOf(pathTarget(event), 'remove');
+                    const target = pathTarget(event);
+                    const removed = dataOf(target, 'remove');
+                    const saved = dataOf(target, 'save');
 
-                    return id === undefined ? EMPTY : of({ kind: 'remove', id });
+                    return removed !== undefined
+                        ? of({ kind: 'remove', id: removed })
+                        : saved !== undefined
+                          ? of({ kind: 'save', id: saved })
+                          : EMPTY;
                 }),
             ),
             // On the layer, not the host: change is not composed, so it never leaves the shadow root.

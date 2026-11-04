@@ -54,31 +54,52 @@
     border-block-end: 1px dashed currentColor;
 }
 
-.remove {
+.actions {
     /* Out of the flow: the legend's width, and so the gap, is the name alone. */
     position: absolute;
     inset-inline-start: 100%;
     inset-block-start: 50%;
     translate: 0 -50%;
-    inline-size: 22px;
-    block-size: 22px;
-    padding: 0;
-    font-size: 15px;
-    line-height: 1;
-    color: inherit;
-    background: transparent;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    padding-inline-start: 4px;
     opacity: 0;
 }
 
-.label:hover .remove,
-.remove:focus-visible {
+.label:hover .actions,
+.actions:focus-within {
+    opacity: 1;
+}
+
+.remove,
+.save {
+    block-size: 22px;
+    padding: 0;
+    color: inherit;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+    border-radius: 11px;
+    cursor: pointer;
     opacity: 0.8;
 }
 
-.remove:hover {
+.remove {
+    inline-size: 22px;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.save {
+    padding-inline: 8px;
+    font: 500 11px var(--font-ui);
+}
+
+.remove:hover,
+.save:hover,
+.remove:focus-visible,
+.save:focus-visible {
     opacity: 1;
     background: color-mix(in srgb, var(--accent) 15%, transparent);
 }

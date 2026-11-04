@@ -184,7 +184,7 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     for each knob: a bound signal's value at the playhead, or the slider and its
     motion. The bound signals travel in `PanelParams.signals`, beside the panel
     rather than in it, so the live sketch, the thumbnails and an export all draw
-    the same frame; a bound knob's row shows **signal**, with its slider and
+    the same frame; a bound knob's row shows **follows**, with its slider and
     motion disabled but kept for when it is let go.
 
 - **The pointer, in world space.** TypeScript sends only the mouse's clip-space
@@ -1165,7 +1165,7 @@ longer touches, and `drawFrame` reads `trailsAt` — because they change with th
 playhead; both are shared by the live sketch, the thumbnails and an export, so
 all three see the same frame. A driven slider (focus, dot size, depth, trails)
 keeps its value for when it is let go, disabled, with the readout saying
-**signal** and the value it is playing (`signal · 3.6`). `liveReadouts` reads
+**follows** and the value it is playing (`follows · 3.6`). `liveReadouts` reads
 those from the same functions the renderer calls, at the window's playhead, and
 the program follows the playhead for it only while something is driven, so an
 undriven sketch does no work per frame for its readouts. **A still must let go of a driven trail too**: thumbnails and a
@@ -1299,11 +1299,112 @@ line. Two readers share the pass, which is why it and `program.ts` live in
   beneath (a WebGL canvas without `preserveDrawingBuffer` must be copied in the
   same task), then the part drawn so far on every playhead change.
 
+## Voice
+
+`voice` is the first sound: a synth whose `pitch`, `volume`, `filter` and
+`pan` are store inputs, like a pen's, so the signals that draw and drive
+sketches play it too, in time with the playhead. Each input takes the signal's
+value in its own unit: pitch in **octaves above the root**, snapped to the
+voice's scale (pentatonic, major, minor, chromatic, or free), so a steps signal
+is a melody; volume a gain 0 to 1 over the voice's own; filter a brightness 0
+to 1 (the cutoff sits six octaves above the note at 1); pan -1 to 1. A shape
+(the `OscillatorNode`'s own names), the root note, glide and volume complete
+it, and **pluck** strikes each new note and lets it decay where **drone**
+holds one tone that follows the pitch.
+
+**What it plays is a pure function of the playhead**, like everything else.
+`notesOf` samples the loop into notes, each starting where the pitch moves to
+another semitone **or the volume rises out of silence**: without the second,
+a repeated note was one long note, and no tune with C C G G could be played.
+A gate (a steps signal of 1s and 0s on volume) re-strikes a repeated note and,
+left open, holds a long one; two slots of the gate per note at twice the
+melody's rate do both. The note sounding at the loop's start is `carried`
+when it began before the end, so `onsetAt` reaches back into the loop before
+instead of striking it again at 0; and
+`levelAt` turns a moment into a frequency, gain, cutoff and pan. Notes travel
+with the sounding (`Heard`) into one `combineLatest`, never derived beside it,
+or a change would reach the levels by two paths.
+
+**A sketch can follow a voice.** Its knob and scene inputs accept a voice as
+well as a signal (`driveInput`), and read its **level**: how loud it is at each
+moment, so a struck note flares and fades exactly as it sounds. The envelope is
+in seconds, so the level is sampled over the loop at the follower's own loop
+length into a `Curve` (`voiceCurve`, `shared/curve.ts`), and the sketch's
+drives became `Driver`s, a wave or a curve, read by `driverAt`: still a pure
+function of the playhead, so thumbnails and exports flare on the same frames.
+The pitch is the signal the voice follows, plugged into another knob. A driven
+row reads **follows** now, since it may not be a signal. **Chladni**, in the
+library, is the worked example: the melody picks the plate's mode, so each note
+has its own figure, and the level shakes the plate and lights it on each strike.
+
+**Sound is the window's, and only while it listens.** Nothing reads a voice
+as data, so its output is a side effect of its open window, like a sketch's
+GL draws, and two windows on one voice play it twice. **Listen** is view state
+(not saved): a browser refuses to start audio outside a gesture, so the
+`AudioContext` is created inside the click's own subscription, never on load.
+It is one context for every voice (`context$`, `shareReplay` with refCount; a
+page may hold only a few), closed a moment after the last voice stops so the
+release fades are not cut off. Each listening window builds an oscillator →
+lowpass → gain → panner graph in `voiceGraph$`, torn down with a short release,
+and `applyLevel` sets each parameter with `setTargetAtTime` once per frame, so
+a voice sounds only while its clock plays and goes quiet when it pauses.
+Frame-rate updates mean a pluck can land up to a frame late; scheduling
+ahead of the playhead is the next step if that is ever heard.
+
 **Store inputs are one mechanism for every document that has them.** A
 document with sources is `Linked` (`{ sources }`), a `link` action is routed
 to whichever program owns the store (`ownerOf`), and `reachedFrom`,
 `closesLoop`, the prune and the state map read every linked map alike, so a
-signal feeding a pen is kept by a prune and a pen cannot be wired into a loop.
+signal feeding a pen or a voice is kept by a prune and a pen cannot be wired into a loop.
+
+## Pieces
+
+A **piece** is a creation kept to be placed again: everything inside a section,
+saved from the section label's **Save as piece**, listed in the **pieces**
+window and placed from there. It is a document like the formula library
+(`Documents.pieces`, saved in the snapshot), so saving, renaming, deleting and
+placing are ordinary steps; one undo takes a whole placement back.
+
+`pieceOf` (in `src/pieces.ts`, pure) captures the section's windows with frames
+relative to it, their settings, every store they keep or follow **and what
+those follow** (`reachedFrom`, so a signal that only modulates another comes
+along), the documents of those stores, the formulas they show (a saved formula,
+or a built-in's edited text, as label and source), and the links among them.
+Themes and the look are global and go by name.
+
+**A clock goes only with a timeline window to play it.** A copied clock with
+no transport could never be started, so a window following a clock that has
+no timeline in the section is placed on the main clock instead. A clock that
+does go carries its loop on its registry entry (`StoreEntry.clock`), because
+the clock it was saved from may be gone by the time it is placed; `seeds$`
+hands it to the clocks fold as the store first appears, the way `copy` does
+for a fork.
+
+**Placing makes a fresh copy, never a link.** `placed` names every store,
+window and section from the log's sequence (`store-<seq>-<n>`), so a piece
+placed twice is two pieces, and rewrites every reference to the copies:
+bindings, a signal's, pen's or voice's sources, the settings keys, the links.
+A formula is matched against the library by its source and added only if it
+is new. A copy of a program's Main store takes the piece's name, since it is
+not that program's main store.
+
+**Place picks the spot first.** **Place** starts **placing**, a mode, not a
+step: a ghost of the section and its windows follows the pointer (centred
+under it, `footprintAt`, in world units so the drop lands where the ghost was
+drawn), a click drops it there and Escape or a right-click cancels. It is one
+fold, `reducePlacing`, whose **dropped** state is what turns into the `place`
+action: a drop read by one listener while another ended the mode would race,
+the todo submit's lesson. The ghost is `hks-placement`, a screen-space overlay
+in the chrome slot, under the navigator and toolbar so zoom and fit still work,
+taking every other pointer event so nothing beneath is clicked by accident. It
+carries `data-ground`, which the canvas reads as ground, so the wheel still
+pans and zooms while placing. Nothing of it is saved or undone; only the drop
+is a step.
+
+A piece from storage is untrusted like the rest of the snapshot:
+`parsePieces` reads windows with the workspace's own `processFrom`, stores with
+`storeFrom`, settings and every document with their own parsers, and placing
+keeps only windows that `ownsInputs` accepts.
 
 ## State mode, on the canvas
 
@@ -1978,7 +2079,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and twenty-nine of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and fifty-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

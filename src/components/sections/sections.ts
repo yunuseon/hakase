@@ -15,7 +15,8 @@ export type SectionGesture =
           readonly dy: number;
       }
     | { readonly kind: 'rename'; readonly id: string; readonly name: string }
-    | { readonly kind: 'remove'; readonly id: string };
+    | { readonly kind: 'remove'; readonly id: string }
+    | { readonly kind: 'save'; readonly id: string };
 
 export const sameSections = (a: readonly SectionView[], b: readonly SectionView[]): boolean =>
     a.length === b.length &&

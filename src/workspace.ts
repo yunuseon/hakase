@@ -45,7 +45,15 @@ import {
 } from './components/window/frame.ts';
 import { clamp } from './lib/math.ts';
 import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
-import { ensured, HOLDING, mainStore, pruned, type StoreEntry, type StoreId } from './stores.ts';
+import {
+    ensured,
+    HOLDING,
+    mainStore,
+    pruned,
+    type StoreEntry,
+    type StoreId,
+    type ClockSeed,
+} from './stores.ts';
 
 export type Section = {
     readonly id: string;
@@ -67,9 +75,9 @@ type ProcessOf<K extends ProgramId> = ProcessBase & {
 
 export type Process = { readonly [K in ProgramId]: ProcessOf<K> }[ProgramId];
 
-type Draft = ProcessBase & { readonly program: ProgramId; readonly follows: Bindings };
+export type Draft = ProcessBase & { readonly program: ProgramId; readonly follows: Bindings };
 
-const ownsInputs =
+export const ownsInputs =
     (inputsFor: InputsFor) =>
     (draft: Draft): draft is Process =>
         fits(inputsFor(draft.program), draft.follows);
@@ -229,8 +237,22 @@ export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor
         sections: [],
         links: [],
         stores: [
-            { id: 'formula-1', program: 'formula', name: 'formula 1', kept: false, copy: null },
-            { id: 'sketch-2', program: 'sketch', name: 'sketch 2', kept: false, copy: null },
+            {
+                id: 'formula-1',
+                program: 'formula',
+                name: 'formula 1',
+                kept: false,
+                copy: null,
+                clock: null,
+            },
+            {
+                id: 'sketch-2',
+                program: 'sketch',
+                name: 'sketch 2',
+                kept: false,
+                copy: null,
+                clock: null,
+            },
             mainStore('timeline'),
             mainStore('playhead'),
         ],
@@ -649,6 +671,7 @@ const step = (
                       name: `${action.program} ${launched}`,
                       kept: false,
                       copy: null,
+                      clock: null,
                   }
                 : mainStore(action.program);
             const process = {
@@ -698,6 +721,7 @@ const step = (
                 name: `Store ${made}`,
                 kept: true,
                 copy: action.copy ? process.store : null,
+                clock: null,
             };
 
             return rebound(
@@ -743,6 +767,7 @@ const step = (
                           name: `Store ${made}`,
                           kept: true,
                           copy: null,
+                          clock: null,
                       }
                     : mainStore(program));
             const id = `${program}-${tag(launched)}`;
@@ -1002,7 +1027,9 @@ const rebound = (workspace: Workspace, id: ProcessId, store: StoreId): Workspace
     ),
 });
 
-export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
+export const sectionAction = (
+    gesture: Exclude<SectionGesture, { readonly kind: 'save' }>,
+): WorkspaceAction => {
     switch (gesture.kind) {
         case 'move':
             return { kind: 'move-section', id: gesture.id, dx: gesture.dx, dy: gesture.dy };
@@ -1064,7 +1091,7 @@ const RENAMED: Readonly<Record<string, ProgramId>> = {
 const renamed = (program: string): string =>
     Object.entries(RENAMED).find(([old]) => old === program)?.[1] ?? program;
 
-const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null => {
+export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
     }
@@ -1136,7 +1163,17 @@ const followFrom = (value: unknown): Follow[] => {
     return binding === null ? [] : [binding];
 };
 
-const storeFrom = (value: unknown): StoreEntry[] => {
+const clockSeedFrom = (value: unknown): ClockSeed | null =>
+    typeof value === 'object' &&
+    value !== null &&
+    'duration' in value &&
+    typeof value.duration === 'number' &&
+    value.duration > 0 &&
+    Number.isFinite(value.duration)
+        ? { duration: value.duration, looping: !('looping' in value) || value.looping !== false }
+        : null;
+
+export const storeFrom = (value: unknown): StoreEntry[] => {
     if (typeof value !== 'object' || value === null) {
         return [];
     }
@@ -1147,12 +1184,13 @@ const storeFrom = (value: unknown): StoreEntry[] => {
 
     const { id, program, name } = value;
     const copy = 'copy' in value && typeof value.copy === 'string' ? value.copy : null;
+    const clock = 'clock' in value ? clockSeedFrom(value.clock) : null;
 
     return typeof id === 'string' &&
         typeof program === 'string' &&
         isProgramId(program) &&
         typeof name === 'string'
-        ? [{ id, program, name, kept: !('kept' in value) || value.kept !== false, copy }]
+        ? [{ id, program, name, kept: !('kept' in value) || value.kept !== false, copy, clock }]
         : [];
 };
 
@@ -1167,7 +1205,14 @@ const enrolled = (
                 all,
                 store === program
                     ? mainStore(program)
-                    : { id: store, program, name: id.replace('-', ' '), kept: false, copy: null },
+                    : {
+                          id: store,
+                          program,
+                          name: id.replace('-', ' '),
+                          kept: false,
+                          copy: null,
+                          clock: null,
+                      },
             ),
         stores,
     );
@@ -1215,7 +1260,7 @@ const toolbarFrom = (value: unknown): ToolbarState | null => {
     return null;
 };
 
-const linkFrom = (value: unknown): Link[] =>
+export const linkFrom = (value: unknown): Link[] =>
     typeof value === 'object' &&
     value !== null &&
     'a' in value &&

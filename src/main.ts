@@ -26,7 +26,7 @@ import {
 import './styles.css';
 import { variables, type Appearance } from './appearance.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
-import { centredOn, fitted, flight, IDENTITY, zoomLabel } from './shared/camera.ts';
+import { centredOn, centreOf, fitted, flight, IDENTITY, zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
@@ -49,6 +49,8 @@ import {
 import type { StateCommand } from './shared/connections.ts';
 import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
+import { HksPlacement } from './components/placement/placement.component.ts';
+import { footprintAt, ghostOf, idle, reducePlacing, type PlacingAction } from './placing.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
@@ -77,7 +79,15 @@ import {
     type ProgramInputs,
     type PlaybackBinding,
 } from './inputs.ts';
-import { colourOf, HOLDING, inStore, withMain, type StoreEvent, type StoreId } from './stores.ts';
+import {
+    colourOf,
+    HOLDING,
+    inStore,
+    settingsKey,
+    withMain,
+    type StoreEvent,
+    type StoreId,
+} from './stores.ts';
 import { routePlayback$ } from './playback-routing.ts';
 import type { ProgressConnection } from './progress.ts';
 import { chime$ } from './chime.ts';
@@ -108,6 +118,8 @@ import {
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
 import { defaultPicture } from './shared/picture.ts';
 import { defaultPen, drawingOf, sameDrawing, strokeOf } from './components/pen/pen.ts';
+import { defaultVoice, sameSounding, soundingOf, voiceCurve } from './components/voice/voice.ts';
+import type { Driver } from './shared/curve.ts';
 import {
     documentsKit,
     linkedOf,
@@ -132,6 +144,7 @@ import {
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
+import { pieceOf } from './pieces.ts';
 
 type Jump = { readonly kind: 'section' | 'window'; readonly id: string };
 
@@ -151,11 +164,12 @@ type StoreKey =
     | 'bookmarks$'
     | 'signal$'
     | 'wave$'
-    | 'followedWave$'
+    | 'followedDriver$'
     | 'followedSignal$'
     | 'picture$'
     | 'followedPicture$'
-    | 'drawing$';
+    | 'drawing$'
+    | 'sounding$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -226,6 +240,10 @@ const bootstrap = () => {
     palette.slot = 'chrome';
     canvas.append(palette);
 
+    const placement = new HksPlacement();
+    placement.slot = 'chrome';
+    canvas.append(placement);
+
     const picked$ = palette.picks$.pipe(
         mergeMap(id => {
             const picked = pickedOf(id);
@@ -278,7 +296,9 @@ const bootstrap = () => {
             withLatestFrom(viewport$),
             map(([, viewport]): WorkspaceAction => ({ kind: 'add-section', viewport })),
         ),
-        sections.gestures$.pipe(map(sectionAction)),
+        sections.gestures$.pipe(
+            mergeMap(gesture => (gesture.kind === 'save' ? [] : [sectionAction(gesture)])),
+        ),
         picked$.pipe(
             withLatestFrom(viewport$),
             mergeMap(([picked, viewport]) => {
@@ -310,7 +330,9 @@ const bootstrap = () => {
         signals: stored.signals,
         paintings: stored.paint,
         pens: stored.pens,
+        voices: stored.voices,
         library: stored.library,
+        pieces: stored.pieces,
         formulas: restored(stored.formulas),
         themes: restored(stored.themes),
         looks: restored(stored.looks),
@@ -781,9 +803,22 @@ const bootstrap = () => {
         ),
     ).pipe(share());
 
-    // A program whose store holds settings keys them by store; any other keys them by window.
-    const settingsKey = (program: ProgramId, store: StoreId, from: ProcessId): string =>
-        HOLDING[program]?.holds === 'settings' ? store : from;
+    const placing$ = merge(
+        inputs$.pipe(
+            mergeMap(({ input }) => (input.kind === 'place-piece' ? [input.id] : [])),
+            withLatestFrom(viewport$),
+            map(([piece, viewport]): PlacingAction => ({
+                kind: 'start',
+                piece,
+                at: centreOf(viewport),
+            })),
+        ),
+        placement.changes$,
+    ).pipe(
+        scan(reducePlacing, idle),
+        startWith(idle),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
 
     const documentActions$: Observable<DocumentAction> = merge(
         inputs$.pipe(
@@ -817,6 +852,8 @@ const bootstrap = () => {
                         return [{ kind: 'paintings', store, command: input.command }];
                     case 'pen':
                         return [{ kind: 'pens', store, command: input.command }];
+                    case 'voice':
+                        return [{ kind: 'voices', store, command: input.command }];
                     case 'modulate':
                         return [
                             {
@@ -828,6 +865,8 @@ const bootstrap = () => {
                         ];
                     case 'library':
                         return [{ kind: 'library', command: input.command }];
+                    case 'piece':
+                        return [{ kind: 'pieces', command: input.command }];
                     case 'source':
                         return [
                             { kind: 'formula', formula: input.formula, text: input.text, from: id },
@@ -862,6 +901,36 @@ const bootstrap = () => {
                       ]
                     : [],
             ),
+        ),
+        placing$.pipe(
+            mergeMap(placing => (placing.mode === 'dropped' ? [placing] : [])),
+            withLatestFrom(documents$),
+            mergeMap(([{ piece, at }, { pieces, workspace }]): DocumentAction[] => {
+                const chosen = pieces.items.find(({ id }) => id === piece);
+
+                return chosen === undefined
+                    ? []
+                    : [
+                          {
+                              kind: 'place',
+                              piece,
+                              view: footprintAt(chosen.size, at, workspace.camera),
+                          },
+                      ];
+            }),
+        ),
+        // defer: the clocks fold is built from what this fold produces.
+        sections.gestures$.pipe(
+            mergeMap(gesture => (gesture.kind === 'save' ? [gesture.id] : [])),
+            withLatestFrom(
+                documents$,
+                defer(() => playbacks$),
+            ),
+            mergeMap(([section, documents, clocks]): DocumentAction[] => {
+                const piece = pieceOf(documents, clocks, section);
+
+                return piece === null ? [] : [{ kind: 'pieces', command: { kind: 'add', piece } }];
+            }),
         ),
         sharedFormulas$.pipe(
             map((shared): DocumentAction => ({
@@ -920,8 +989,14 @@ const bootstrap = () => {
         map(({ pens }) => pens),
         distinctUntilChanged(),
     );
+    const voices$ = documents$.pipe(
+        map(({ voices }) => voices),
+        distinctUntilChanged(),
+    );
     const linked$ = documents$.pipe(
-        distinctUntilChanged((a, b) => a.signals === b.signals && a.pens === b.pens),
+        distinctUntilChanged(
+            (a, b) => a.signals === b.signals && a.pens === b.pens && a.voices === b.voices,
+        ),
         map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
@@ -943,6 +1018,23 @@ const bootstrap = () => {
         map(({ library }) => library),
         distinctUntilChanged(),
     );
+    const pieces$ = documents$.pipe(
+        map(({ pieces }) => pieces),
+        distinctUntilChanged(),
+    );
+
+    const seeds$ = workspace$.pipe(
+        map(({ stores }) => stores),
+        distinctUntilChanged(),
+        pairwise(),
+        mergeMap(([before, after]) =>
+            after.flatMap(({ id, clock }) =>
+                clock === null || before.some(store => store.id === id)
+                    ? []
+                    : [{ kind: 'seed' as const, to: id, ...clock }],
+            ),
+        ),
+    );
 
     const playbacks$ = createClocks$(
         routePlayback$(
@@ -960,7 +1052,7 @@ const bootstrap = () => {
                 ),
             ),
         ),
-        storeEvents$,
+        merge(storeEvents$, seeds$),
         stored.playback,
     );
 
@@ -1020,6 +1112,7 @@ const bootstrap = () => {
         waves$,
         paintings$,
         pens$,
+        voices$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -1044,6 +1137,7 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
+        pieces$,
         inspect$: (id: string) => inspected$(id),
         graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
@@ -1099,6 +1193,12 @@ const bootstrap = () => {
             distinctUntilChanged(sameDrawing),
         );
 
+    const soundingIn = (store: StoreId) =>
+        documents$.pipe(
+            map(({ voices, signals }) => soundingOf(voices.get(store) ?? defaultVoice, signals)),
+            distinctUntilChanged(sameSounding),
+        );
+
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
     > = {
@@ -1113,6 +1213,7 @@ const bootstrap = () => {
         signal: signalIn,
         paint: pictureIn,
         pen: drawingIn,
+        voice: soundingIn,
         timeline: playbackIn,
     };
 
@@ -1171,6 +1272,11 @@ const bootstrap = () => {
         );
 
         const progress = definitionOf(inputs, 'progress');
+        // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
+        const seconds$ = clock.pipe(
+            map(({ duration }) => duration),
+            distinctUntilChanged(),
+        );
 
         return {
             ...state,
@@ -1208,14 +1314,21 @@ const bootstrap = () => {
             bookmarks$: narrowed(bookmarksIn),
             signal$: narrowed(signalIn),
             wave$: narrowed(waveIn),
-            followedWave$: input =>
+            followedDriver$: input =>
                 followed$(input).pipe(
-                    switchMap(binding =>
-                        binding?.kind === 'signal' ? waveIn(binding.store) : of(null),
+                    switchMap((binding): Observable<Driver | null> =>
+                        binding?.kind === 'signal'
+                            ? waveIn(binding.store)
+                            : binding?.kind === 'voice'
+                              ? combineLatest([soundingIn(binding.store), seconds$]).pipe(
+                                    map(([sounding, seconds]) => voiceCurve(sounding, seconds)),
+                                )
+                              : of(null),
                     ),
                 ),
             picture$: narrowed(pictureIn),
             drawing$: narrowed(drawingIn),
+            sounding$: narrowed(soundingIn),
             followedPicture$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
@@ -1279,7 +1392,9 @@ const bootstrap = () => {
                 signals: waves$,
                 paint: paintings$,
                 pens: pens$,
+                voices: voices$,
                 library: library$,
+                pieces: pieces$,
                 seq: history$.pipe(
                     map(({ seq }) => seq),
                     distinctUntilChanged(),
@@ -1297,6 +1412,20 @@ const bootstrap = () => {
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
         wiring.connect$(wiringView$),
+        placement.connect$(
+            combineLatest([placing$, camera$, pieces$]).pipe(
+                map(([placing, camera, { items }]) => {
+                    const piece =
+                        placing.mode === 'placing'
+                            ? items.find(({ id }) => id === placing.piece)
+                            : undefined;
+
+                    return placing.mode !== 'placing' || piece === undefined
+                        ? null
+                        : ghostOf(piece, placing.at, camera);
+                }),
+            ),
+        ),
         palette.connect$(
             workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
             paletteOpen$,

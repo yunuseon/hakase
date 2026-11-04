@@ -68,7 +68,7 @@ const knobRow = (knob: Knob) => `
                    value="${defaultPanel.knobs[knob]}" />
             <output class="read" data-read="${knob}"></output>
         </label>
-        <span class="driven" title="this knob follows a signal; set it to none in the window's state menu to turn it by hand">signal</span>
+        <span class="driven" title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand">follows</span>
         <select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
                 title="let it swing from 0 to its value and back, a whole number of times per loop">
             ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× per loop`}</option>`).join('')}
@@ -494,7 +494,7 @@ export class HksSketchControls extends HTMLElement {
                 for (const knob of KNOBS) {
                     const value = valueOf(knob);
                     requireChild(this.shadow, `[data-knob="${knob}"] .driven`).textContent =
-                        value === undefined ? 'signal' : `signal · ${value}`;
+                        value === undefined ? 'follows' : `follows · ${value}`;
                 }
 
                 for (const [, field] of DRIVEN_FIELDS) {

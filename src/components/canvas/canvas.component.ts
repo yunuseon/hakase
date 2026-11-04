@@ -91,8 +91,11 @@ export class HksCanvas extends HTMLElement {
                         deltaY: event.deltaY,
                         lines: event.deltaMode === WheelEvent.DOM_DELTA_LINE,
                         pinch: event.ctrlKey || event.metaKey,
-                        // Retargeted: a wheel over the ground reads as the canvas itself.
-                        onGround: event.target === this,
+                        // Retargeted: a wheel over the ground reads as the canvas itself, or an overlay standing in for it.
+                        onGround:
+                            event.target === this ||
+                            (event.target instanceof HTMLElement &&
+                                'ground' in event.target.dataset),
                         at: { x: event.clientX, y: event.clientY },
                     });
 

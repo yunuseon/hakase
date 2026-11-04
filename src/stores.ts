@@ -28,6 +28,8 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     plot: null,
     paint: document,
     pen: document,
+    voice: document,
+    pieces: null,
     tasks: null,
     todo: document,
     board: document,
@@ -49,9 +51,17 @@ export type StoreEntry = {
     readonly kept: boolean;
     // The store this one was split off from, so its content can be copied in once.
     readonly copy: StoreId | null;
+    // A clock placed from a piece: its loop as it was saved, since the clock it was saved from may be gone.
+    readonly clock: ClockSeed | null;
 };
 
+export type ClockSeed = { readonly duration: number; readonly looping: boolean };
+
 export const MAIN = 'Main';
+
+// A program whose store holds settings keys them by store; any other keys them by window.
+export const settingsKey = (program: ProgramId, store: StoreId, window: string): string =>
+    HOLDING[program]?.holds === 'settings' ? store : window;
 
 export const mainStore = (program: ProgramId): StoreEntry => ({
     id: program,
@@ -59,6 +69,7 @@ export const mainStore = (program: ProgramId): StoreEntry => ({
     name: MAIN,
     kept: true,
     copy: null,
+    clock: null,
 });
 
 export const ensured = (stores: readonly StoreEntry[], entry: StoreEntry): readonly StoreEntry[] =>

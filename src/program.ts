@@ -3,6 +3,7 @@ import type { Phase } from './shared/drag.ts';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { FormulaId, Library, LibraryCommand } from './library.ts';
+import type { PieceCommand, Pieces } from './pieces.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
@@ -15,8 +16,10 @@ import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
 import type { Picture } from './shared/picture.ts';
 import type { Sheet } from './shared/stroke.ts';
+import type { Driver } from './shared/curve.ts';
 import type { PaintCommand } from './components/paint/paint.ts';
 import type { Drawing, PenCommand } from './components/pen/pen.ts';
+import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -39,6 +42,8 @@ export const PROGRAM_IDS = [
     'plot',
     'paint',
     'pen',
+    'voice',
+    'pieces',
     'tasks',
     'todo',
     'board',
@@ -76,6 +81,8 @@ export type AppInput =
     | { readonly kind: 'take-back'; readonly id: number }
     | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
+    | { readonly kind: 'piece'; readonly command: PieceCommand }
+    | { readonly kind: 'place-piece'; readonly id: string }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
     | { readonly kind: 'board'; readonly command: BoardCommand }
     | { readonly kind: 'note'; readonly command: NoteCommand }
@@ -86,6 +93,7 @@ export type AppInput =
     | { readonly kind: 'signal'; readonly command: SignalCommand }
     | { readonly kind: 'paint'; readonly command: PaintCommand }
     | { readonly kind: 'pen'; readonly command: PenCommand }
+    | { readonly kind: 'voice'; readonly command: VoiceCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -127,6 +135,7 @@ export type AppState = {
     readonly error$: (formula: FormulaId) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
     readonly library$: Observable<Library>;
+    readonly pieces$: Observable<Pieces>;
     readonly tasks$: Observable<readonly Task[]>;
     readonly todos$: Observable<readonly Todo[]>;
     readonly board$: Observable<Board>;
@@ -139,9 +148,10 @@ export type AppState = {
     readonly wave$: Observable<Wave>;
     readonly picture$: Observable<Picture>;
     readonly drawing$: Observable<Drawing>;
+    readonly sounding$: Observable<Sounding>;
     readonly followedPicture$: (input: string) => Observable<Sheet | null>;
-    readonly followedWave$: (input: string) => Observable<Wave | null>;
-    // One stream, not followedWave$ beside a name: a rebind changes both, and two would fire twice.
+    readonly followedDriver$: (input: string) => Observable<Driver | null>;
+    // One stream, not followedDriver$ beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the state map alone: any store or global, which no other program can see.

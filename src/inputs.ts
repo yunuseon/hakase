@@ -11,7 +11,9 @@ export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
-export type Follow = PlaybackBinding | FocusBinding | SignalBinding | PaintBinding | PenBinding;
+export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
+export type Follow =
+    PlaybackBinding | FocusBinding | SignalBinding | PaintBinding | PenBinding | VoiceBinding;
 
 export type InputSources = {
     readonly playback$: (store: StoreId) => Observable<Clock>;
@@ -61,7 +63,21 @@ const penSource = {
     access: 'read',
 } as const;
 
-export const SOURCES = [playbackSource, focusSource, signalSource, paintSource, penSource] as const;
+const voiceSource = {
+    kind: 'voice',
+    program: 'voice',
+    title: 'Voice',
+    access: 'read',
+} as const;
+
+export const SOURCES = [
+    playbackSource,
+    focusSource,
+    signalSource,
+    paintSource,
+    penSource,
+    voiceSource,
+] as const;
 
 type Source = (typeof SOURCES)[number];
 
@@ -112,6 +128,15 @@ const signalInput = (title: string, group: string) =>
         initial: null,
     }) as const satisfies FollowedInput;
 
+const driveInput = (title: string, group: string) =>
+    ({
+        title,
+        from: 'followed',
+        group,
+        sources: [signalSource, voiceSource],
+        initial: null,
+    }) as const satisfies FollowedInput;
+
 const storedSignalInput = (param: string) =>
     ({
         title: param,
@@ -128,21 +153,21 @@ export const signalInputs = {
 };
 
 export const knobInputs = {
-    k1: signalInput('k1', 'Knobs'),
-    k2: signalInput('k2', 'Knobs'),
-    k3: signalInput('k3', 'Knobs'),
-    k4: signalInput('k4', 'Knobs'),
+    k1: driveInput('k1', 'Knobs'),
+    k2: driveInput('k2', 'Knobs'),
+    k3: driveInput('k3', 'Knobs'),
+    k4: driveInput('k4', 'Knobs'),
 };
 
 export const sceneInputs = {
-    turn: signalInput('turn', 'Camera'),
-    pitch: signalInput('pitch', 'Camera'),
-    distance: signalInput('distance', 'Camera'),
-    focus: signalInput('focus', 'Look'),
-    colour: signalInput('colour', 'Look'),
-    size: signalInput('dot size', 'Look'),
-    depth: signalInput('depth', 'Look'),
-    trails: signalInput('trails', 'Look'),
+    turn: driveInput('turn', 'Camera'),
+    pitch: driveInput('pitch', 'Camera'),
+    distance: driveInput('distance', 'Camera'),
+    focus: driveInput('focus', 'Look'),
+    colour: driveInput('colour', 'Look'),
+    size: driveInput('dot size', 'Look'),
+    depth: driveInput('depth', 'Look'),
+    trails: driveInput('trails', 'Look'),
 };
 
 export const paintInput = {
@@ -158,6 +183,13 @@ export const penInputs = {
     y: storedSignalInput('y'),
     size: storedSignalInput('size'),
     ink: storedSignalInput('ink'),
+};
+
+export const voiceInputs = {
+    pitch: storedSignalInput('pitch'),
+    volume: storedSignalInput('volume'),
+    filter: storedSignalInput('filter'),
+    pan: storedSignalInput('pan'),
 };
 
 export const plotInputs = {
@@ -243,6 +275,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return paintSource.program;
         case 'pen':
             return penSource.program;
+        case 'voice':
+            return voiceSource.program;
     }
 };
 
@@ -257,6 +291,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'paint':
             return { kind, store };
         case 'pen':
+            return { kind, store };
+        case 'voice':
             return { kind, store };
         default:
             return null;

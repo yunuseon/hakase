@@ -10,6 +10,7 @@ import {
 } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
+import { emptyPieces } from './pieces.ts';
 import { defaultSketch } from './settings.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { entriesOf, startTimeline } from './timeline.ts';
@@ -30,7 +31,9 @@ const started = (): Documents => ({
     signals: new Map(),
     paintings: new Map(),
     pens: new Map(),
+    voices: new Map(),
     library: emptyLibrary,
+    pieces: emptyPieces,
     formulas: new Map(),
     themes: new Map(),
     looks: new Map(),

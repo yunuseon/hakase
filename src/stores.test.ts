@@ -48,6 +48,7 @@ describe('pruned', () => {
         name: id,
         kept,
         copy: null,
+        clock: null,
     });
 
     it('keeps named stores and bound ones', () => {
@@ -71,7 +72,7 @@ describe('keptStores', () => {
             ['store-9', 3],
         ]);
         const stores: StoreEntry[] = [
-            { id: 'store-4', program: 'board', name: 'x', kept: true, copy: null },
+            { id: 'store-4', program: 'board', name: 'x', kept: true, copy: null, clock: null },
         ];
 
         expect([...keptStores(all, stores).keys()]).toEqual(['board', 'store-4']);
