@@ -772,7 +772,7 @@ a pan like any flight and a second jump replaces the first. A window's target is
 `centredOn(IDENTITY, …)`: centred at 100%, zoomed out only as far as it takes
 to fit, because where the view stood says nothing about how to read the window.
 The same `locate` input also raises the window, as a plain `raise` beside the
-flight. The patch bay's locate buttons are the first to send it.
+flight. The state map's locate buttons are the first to send it.
 
 **Sections are also slides.** With nothing editable focused, ←/→ and
 PageUp/PageDown step to the previous or next section in reading order (top to
@@ -1044,15 +1044,17 @@ playhead, so a sketch on a second clock plays the same wave on its own time.
 `AppState.followedSignal$(input)` hands a program the signal its input is bound
 to, or null, already resolved from the store.
 
-## The patch bay
+## The state map
 
-`patch` draws the app's dataflow as one graph: stores on the left, windows on
-the right, and two kinds of wire between them. A window's **own state** runs
+`state` draws the app's dataflow as one graph, inspects any of it and prunes
+what nothing uses. It replaced both the patch bay and the inspector, whose
+windows come back as state windows (`RENAMED` in `workspace.ts`). Stores sit
+on the left, windows on the right, with two kinds of wire between them. A window's **own state** runs
 into its header (a thick wire: what the window reads and writes), and each
 **follow** runs into the jack of the input it binds (what the window only
 reads). Where they meet the chain shows whole: signal 1 edits Signal Main,
 which drives sketch 1's k1. It holds no state and adds no behaviour: `patchOf`
-in `src/patch.ts` derives the graph from the workspace and `inputsFor`,
+in `src/state-graph.ts` derives the graph from the workspace and `inputsFor`,
 `layoutOf` in the component folder places it, and every edit is an action the
 window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
 reducer's checks, undo and labels all apply.
@@ -1084,46 +1086,46 @@ same `commandOf` that turns the drop into a command. Drag a bound optional
 port's jack into empty space, or click its ×, to unplug it; a clock input and a
 window's own state cannot be unplugged, only moved. Each window's header has a
 **locate** button that flies the camera to it (below). One shared `drags$` feeds both the rubber-band wire and the
-command, for the todo grip's reason, and `patch$` dedupes with `samePatch`,
+command, for the todo grip's reason, and `graph$` dedupes with `sameGraph`,
 which names every field, because the workspace emits on every pointer move.
 
-## The inspector
+**Below the graph's stores are the app's globals** (workspace, appearance,
+formulas, themes, library), dashed and without a jack, since nothing binds to
+them; and a main store that holds data with no window open is listed too
+(`held$`, the folds' keys as one sorted string, so a ticking timer does not
+churn it), so it can be inspected, bound or pruned.
 
-`inspector` shows any state in the app: a tree of the programs that keep state,
-each with its stores and how many windows use them, plus a **global** group
-(workspace, transport, appearance, formulas, themes, library), and a JSON tree of
-the selected one beside it. It is the one program that sees past its own store:
-`AppState.catalog$` and `AppState.inspect$(id)` exist for it alone and are
-read-only, so nothing can be edited around the reducers. `catalogOf` and
-`parseTarget` in `src/inventory.ts` are pure; target ids are
-`store:<program>:<store>` and `global:<name>`.
+**Focusing inspects.** Under the graph, every state the focus keeps lit is
+shown as a JSON tree (`focusedStores`, in the left column's order), so a window
+shows its own state and everything it follows, and a store shows itself. The
+program reads them through `AppState.inspect$(target)`, which exists for this
+program alone and is read-only, so nothing can be edited around the reducers;
+target ids are `store:<program>:<store>` and `global:<name>` (`inventory.ts`).
+It stays cheap for the inspector's three reasons:
 
-It is cheap because of three choices, all needed:
-
-- **Only the selected state is followed**, never all of them, and an unchanged
-  value is skipped by reference, which is exact here because a fold makes a new
+- **Only the focused states are followed**, never all of them, and an unchanged
+  value is skipped by reference, which is exact because a fold makes a new
   object only when something changed.
 - **A busy state is read at most four times a second** (`throttleTime`, leading
   and trailing): playback changes the transport every frame, and the rows were
   measured touching the DOM 8 times in 2 s of it.
-- **Only expanded branches are walked** (`rowsOf`), and rows are kept in place by
-  path, so values update without a rebuild and an open branch stays open. The
-  catalog dedupes with `sameCatalog`, because the workspace emits on every
-  pointer move of a drag.
+- **Only expanded branches are walked** (`rowsOf`), and rows and sections are
+  kept in place by path and target, so values update without a rebuild and an
+  open branch stays open.
 
-**Prune** (under the tree) deletes every store no window is bound to, data and
-all, and says how many first; one click arms it, a second within three seconds
+`displayable` turns the folds' `Map`s into objects first: `JSON.stringify`
+writes a `Map` as `{}`. Which branches are open is view state, keyed by target
+and path together so two states never share one; it is not saved, like the
+focus. The component's `focus$` is replayed, because the map fades by it and the
+program inspects by it, and both must see the same one.
+
+**Prune** (in the bar above) deletes every store no wire touches, data and all,
+and says how many first; one click arms it, a second within three seconds
 prunes. It is one `prune` input routed twice: the workspace drops the unbound
 registry entries (`prune-stores`, undoable), and every fold receives a `keep`
 store event with the bound stores and window ids, read from the same workspace,
 so it cannot matter which listener runs first. A document's data does not come
-back on undo. The catalog lists a main store only while it holds data
-(`held$`, the folds' keys as one sorted string, so a ticking timer does not
-churn it), so an empty Main is neither shown nor counted.
-
-`displayable` turns the folds' `Map`s into objects first: `JSON.stringify` writes
-a `Map` as `{}`. What a window has selected and expanded is its own settings, so
-every inspector window can watch something different, and it can inspect itself.
+back on undo.
 
 ## Switching a window's program
 
@@ -1608,7 +1610,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

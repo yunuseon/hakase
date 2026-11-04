@@ -1,5 +1,9 @@
-export type PatchStore = {
+import type { Row } from './rows.ts';
+
+export type GraphStore = {
     readonly id: string;
+    readonly target: string;
+    readonly global: boolean;
     readonly program: string;
     readonly kind: string | null;
     readonly title: string;
@@ -7,7 +11,7 @@ export type PatchStore = {
     readonly colour: string;
 };
 
-export type PatchPort = {
+export type GraphPort = {
     readonly input: string;
     readonly title: string;
     readonly accepts: readonly string[];
@@ -15,21 +19,21 @@ export type PatchPort = {
     readonly bound: string | null;
 };
 
-export type PatchWindow = {
+export type GraphWindow = {
     readonly id: string;
     readonly program: string;
     readonly label: string;
     readonly icon: string;
     readonly own: string | null;
-    readonly ports: readonly PatchPort[];
+    readonly ports: readonly GraphPort[];
 };
 
-export type PatchView = {
-    readonly stores: readonly PatchStore[];
-    readonly windows: readonly PatchWindow[];
+export type StateGraph = {
+    readonly stores: readonly GraphStore[];
+    readonly windows: readonly GraphWindow[];
 };
 
-export type PatchCommand =
+export type StateCommand =
     | {
           readonly kind: 'connect';
           readonly window: string;
@@ -39,7 +43,8 @@ export type PatchCommand =
       }
     | { readonly kind: 'disconnect'; readonly window: string; readonly input: string }
     | { readonly kind: 'bind'; readonly window: string; readonly store: string }
-    | { readonly kind: 'locate'; readonly window: string };
+    | { readonly kind: 'locate'; readonly window: string }
+    | { readonly kind: 'prune' };
 
 export type Point = { readonly x: number; readonly y: number };
 
@@ -50,10 +55,11 @@ const HEADER = 30;
 const PORT_HEIGHT = 24;
 const SPACING = 10;
 const PAD = 12;
+const GROUP_GAP = 14;
 
-export type PlacedStore = PatchStore & Point & { readonly height: number; readonly anchor: Point };
-export type PlacedPort = PatchPort & { readonly y: number; readonly anchor: Point };
-export type PlacedWindow = Omit<PatchWindow, 'ports'> &
+export type PlacedStore = GraphStore & Point & { readonly height: number; readonly anchor: Point };
+export type PlacedPort = GraphPort & { readonly y: number; readonly anchor: Point };
+export type PlacedWindow = Omit<GraphWindow, 'ports'> &
     Point & {
         readonly height: number;
         readonly anchor: Point;
@@ -70,7 +76,7 @@ export type Wire = {
     readonly removable: boolean;
 };
 
-export type PatchLayout = {
+export type GraphLayout = {
     readonly width: number;
     readonly height: number;
     readonly stores: readonly PlacedStore[];
@@ -84,18 +90,30 @@ export const wirePath = (from: Point, to: Point) => {
     return `M${from.x} ${from.y} C${from.x + pull} ${from.y} ${to.x - pull} ${to.y} ${to.x} ${to.y}`;
 };
 
-const stacked = <T>(items: readonly T[], height: (item: T) => number) =>
+const stacked = <T>(
+    items: readonly T[],
+    height: (item: T) => number,
+    gapBefore: (item: T, index: number) => number = () => 0,
+) =>
     items.reduce<{ readonly tops: readonly number[]; readonly next: number }>(
-        ({ tops, next }, item) => ({ tops: [...tops, next], next: next + height(item) + SPACING }),
+        ({ tops, next }, item, index) => {
+            const top = next + gapBefore(item, index);
+
+            return { tops: [...tops, top], next: top + height(item) + SPACING };
+        },
         { tops: [], next: PAD },
     );
 
-const windowHeight = (window: PatchWindow) => HEADER + window.ports.length * PORT_HEIGHT + 6;
+const windowHeight = (window: GraphWindow) => HEADER + window.ports.length * PORT_HEIGHT + 6;
 
-export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
+export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
     const left = PAD;
     const right = PAD + NODE_WIDTH + GAP;
-    const storeTops = stacked(stores, () => STORE_HEIGHT);
+    const storeTops = stacked(
+        stores,
+        () => STORE_HEIGHT,
+        (store, index) => (store.global && stores[index - 1]?.global === false ? GROUP_GAP : 0),
+    );
     const windowTops = stacked(windows, windowHeight);
 
     const placedStores = stores.map((store, index): PlacedStore => {
@@ -188,7 +206,7 @@ export type Related = {
     readonly wires: ReadonlySet<string>;
 };
 
-export const relatedTo = ({ wires }: PatchLayout, focus: Focus): Related => {
+export const relatedTo = ({ wires }: GraphLayout, focus: Focus): Related => {
     const touching = wires.filter(wire =>
         focus.kind === 'window' ? wire.window === focus.id : wire.store === focus.id,
     );
@@ -199,4 +217,31 @@ export const relatedTo = ({ wires }: PatchLayout, focus: Focus): Related => {
         windows: new Set([...itself('window'), ...touching.map(({ window }) => window)]),
         wires: new Set(touching.map(wireKey)),
     };
+};
+
+export const focusedStores = (layout: GraphLayout, focus: Focus | null) => {
+    const present =
+        focus !== null &&
+        (focus.kind === 'window'
+            ? layout.windows.some(({ id }) => id === focus.id)
+            : layout.stores.some(({ id }) => id === focus.id));
+
+    if (!present) {
+        return [];
+    }
+
+    const { stores } = relatedTo(layout, focus);
+
+    return layout.stores.filter(({ id }) => stores.has(id));
+};
+
+export const unusedOf = ({ stores, wires }: GraphLayout) =>
+    stores.filter(({ id, global }) => !global && !wires.some(wire => wire.store === id)).length;
+
+export type Inspected = {
+    readonly target: string;
+    readonly title: string;
+    readonly name: string;
+    readonly colour: string;
+    readonly rows: readonly Row[];
 };

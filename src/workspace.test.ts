@@ -123,8 +123,10 @@ describe('parseWorkspace', () => {
         );
     });
 
-    it('brings a links window back as bookmarks', () => {
+    it('brings a renamed program back as the one that replaced it', () => {
         expect(parseWorkspace(saved('links'), inputsFor)?.processes[0]?.program).toBe('bookmarks');
+        expect(parseWorkspace(saved('patch'), inputsFor)?.processes[0]?.program).toBe('state');
+        expect(parseWorkspace(saved('inspector'), inputsFor)?.processes[0]?.program).toBe('state');
     });
 });
 

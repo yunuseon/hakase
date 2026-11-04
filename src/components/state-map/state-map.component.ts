@@ -1,5 +1,16 @@
-import { combineLatest, merge, type Observable } from 'rxjs';
-import { filter, map, mergeMap, scan, share, startWith, tap } from 'rxjs/operators';
+import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
+import {
+    distinctUntilChanged,
+    filter,
+    map,
+    mergeMap,
+    scan,
+    share,
+    shareReplay,
+    startWith,
+    switchMap,
+    tap,
+} from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
@@ -8,25 +19,135 @@ import {
     wireKey,
     wirePath,
     type Focus,
-    type PatchCommand,
-    type PatchLayout,
+    type StateCommand,
+    type GraphLayout,
     type PlacedPort,
     type PlacedStore,
     type PlacedWindow,
+    type Inspected,
     type Point,
-} from './patch.ts';
-import css from './patch-bay.css?inline';
+} from './state-map.ts';
+import type { Row } from './rows.ts';
+import css from './state-map.css?inline';
 
 const sheet = styleSheet(css);
 const SVG = 'http://www.w3.org/2000/svg';
 
+const COPIED_MS = 1500;
+const ARM_MS = 3000;
+
 const TEMPLATE = `
-    <div class="board">
-        <svg class="wires" aria-hidden="true"><path class="rubber" /></svg>
-        <div class="nodes"></div>
+    <div class="bar">
+        <span class="hint">Click a state or a window to inspect it.</span>
+        <button class="prune" type="button"></button>
     </div>
-    <p class="empty">No window keeps or follows any state yet.</p>
+    <div class="graph">
+        <div class="board">
+            <svg class="wires" aria-hidden="true"><path class="rubber" /></svg>
+            <div class="nodes"></div>
+        </div>
+    </div>
+    <div class="inspect"></div>
 `;
+
+type Arming = { readonly armed: number | null; readonly fire: boolean };
+
+const treeRow = (path: string): HTMLElement => {
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.dataset['path'] = path;
+    row.setAttribute('role', 'treeitem');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'toggle';
+    row.append(toggle, span('tree-key'), span('tree-value'));
+
+    return row;
+};
+
+const filledRow = (row: HTMLElement, { depth, key, kind, text, open }: Row): void => {
+    const container = kind === 'object' || kind === 'array';
+    row.style.setProperty('--depth', String(depth));
+    row.dataset['kind'] = kind;
+    row.toggleAttribute('data-open', open);
+
+    if (container) {
+        row.setAttribute('aria-expanded', String(open));
+    } else {
+        row.removeAttribute('aria-expanded');
+    }
+
+    const toggle = row.querySelector('.toggle');
+    const name = row.querySelector('.tree-key');
+    const value = row.querySelector('.tree-value');
+
+    if (toggle instanceof HTMLButtonElement) {
+        toggle.hidden = !container;
+        toggle.setAttribute('aria-label', open ? `collapse ${key}` : `expand ${key}`);
+    }
+
+    if (name !== null && name.textContent !== key) {
+        name.textContent = key;
+    }
+
+    if (value !== null && value.textContent !== text) {
+        value.textContent = text;
+    }
+};
+
+const sectionOf = (target: string): HTMLElement => {
+    const section = document.createElement('section');
+    section.className = 'section';
+    section.dataset['target'] = target;
+
+    const head = document.createElement('header');
+    head.className = 'section-head';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'copy';
+    copy.dataset['copy'] = target;
+    copy.textContent = 'Copy JSON';
+    head.append(span('dot'), span('section-title'), copy);
+
+    const rows = document.createElement('div');
+    rows.className = 'tree';
+    rows.setAttribute('role', 'tree');
+    section.append(head, rows);
+
+    return section;
+};
+
+const filledSection = (section: HTMLElement, { title, name, colour, rows }: Inspected): void => {
+    section.style.setProperty('--store', colour);
+    const heading = section.querySelector('.section-title');
+
+    if (heading !== null && heading.textContent !== `${title} · ${name}`) {
+        heading.textContent = `${title} · ${name}`;
+    }
+
+    const tree = section.querySelector('.tree');
+
+    if (!(tree instanceof HTMLElement)) {
+        return;
+    }
+
+    const existing = new Map(
+        [...tree.children]
+            .filter(child => child instanceof HTMLElement)
+            .map(child => [child.dataset['path'], child]),
+    );
+    const shown = rows.map(row => {
+        const element = existing.get(row.path) ?? treeRow(row.path);
+        filledRow(element, row);
+
+        return element;
+    });
+    const current = [...tree.children];
+
+    if (current.length !== shown.length || shown.some((row, index) => current[index] !== row)) {
+        tree.replaceChildren(...shown);
+    }
+};
 
 type End =
     | {
@@ -99,7 +220,7 @@ const sameEnd = (a: End, b: End): boolean => {
     }
 };
 
-const commandOf = (a: End, b: End | null): PatchCommand | null => {
+const commandOf = (a: End, b: End | null): StateCommand | null => {
     if (b === null) {
         return a.kind === 'port' && a.cuttable
             ? { kind: 'disconnect', window: a.window, input: a.input }
@@ -184,18 +305,32 @@ const placed = (element: HTMLElement, x: number, y: number, height: number): HTM
     return element;
 };
 
-const storeNode = ({ id, program, kind, title, name, colour, x, y, height }: PlacedStore) => {
+const storeNode = ({
+    id,
+    global,
+    program,
+    kind,
+    title,
+    name,
+    colour,
+    x,
+    y,
+    height,
+}: PlacedStore) => {
     const node = placed(document.createElement('div'), x, y, height);
     node.className = 'node store';
     node.dataset['store'] = id;
     node.dataset['program'] = program;
+    node.toggleAttribute('data-global', global);
 
     if (kind !== null) {
         node.dataset['feeds'] = kind;
     }
 
     node.style.setProperty('--store', colour);
-    node.title = `${title} · ${name}: drag onto a window to bind or follow it`;
+    node.title = global
+        ? `${name}: state of the whole app; click to inspect it`
+        : `${title} · ${name}: click to inspect it, drag its jack onto a window to bind or follow it`;
 
     const label = span('label');
     label.append(span('kind', title), span('name', name));
@@ -257,12 +392,16 @@ const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: Plac
     return node;
 };
 
-export class HksPatchBay extends HTMLElement {
-    readonly commands$: Observable<PatchCommand>;
+export class HksStateMap extends HTMLElement {
+    readonly commands$: Observable<StateCommand>;
+    readonly focus$: Observable<Focus | null>;
+    // A branch of an inspected state, as its target and its path, so two states never share one.
+    readonly toggles$: Observable<{ readonly target: string; readonly path: string }>;
+    readonly copies$: Observable<string>;
 
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
-    private readonly focus$: Observable<Focus | null>;
+    private readonly arming$: Observable<Arming>;
 
     constructor() {
         super();
@@ -334,9 +473,53 @@ export class HksPatchBay extends HTMLElement {
                 return focus === undefined ? [] : [focus];
             }),
             startWith(unfocused),
+            // Replayed: the map fades by it and the program inspects by it, and both must see the same one.
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
+
+        const inspect = requireChild(shadow, '.inspect');
+
+        this.toggles$ = fromElementEvent$(inspect, 'click').pipe(
+            mergeMap(({ target }) => {
+                const row = target instanceof Element ? target.closest('.tree-row') : null;
+                const section = row?.closest('[data-target]');
+                const path = row instanceof HTMLElement ? row.dataset['path'] : undefined;
+                const owner =
+                    section instanceof HTMLElement ? section.dataset['target'] : undefined;
+
+                return path === undefined ||
+                    owner === undefined ||
+                    row?.querySelector('.toggle[hidden]') !== null
+                    ? []
+                    : [{ target: owner, path }];
+            }),
+        );
+        this.copies$ = fromElementEvent$(inspect, 'click').pipe(
+            mergeMap(({ target }) => {
+                const button = target instanceof Element ? target.closest('[data-copy]') : null;
+                const owner = button instanceof HTMLElement ? button.dataset['copy'] : undefined;
+
+                return owner === undefined ? [] : [owner];
+            }),
+        );
+
+        // Shared: the button's label and the prune itself must read one sequence of clicks.
+        this.arming$ = fromElementEvent$(requireChild(shadow, '.prune'), 'click').pipe(
+            scan(
+                ({ armed }: Arming, { timeStamp }): Arming =>
+                    armed !== null && timeStamp - armed < ARM_MS
+                        ? { armed: null, fire: true }
+                        : { armed: timeStamp, fire: false },
+                { armed: null, fire: false },
+            ),
+            share(),
         );
 
         this.commands$ = merge(
+            this.arming$.pipe(
+                filter(({ fire }) => fire),
+                map((): StateCommand => ({ kind: 'prune' })),
+            ),
             this.drags$.pipe(
                 filter(({ phase }) => phase === 'release'),
                 mergeMap(({ start, over }) => {
@@ -346,7 +529,7 @@ export class HksPatchBay extends HTMLElement {
                 }),
             ),
             fromElementEvent$(board, 'click').pipe(
-                mergeMap(({ target }): PatchCommand[] => {
+                mergeMap(({ target }): StateCommand[] => {
                     const cut = target instanceof Element ? target.closest('[data-cut]') : null;
                     const port = cut?.closest('[data-input]');
 
@@ -364,7 +547,7 @@ export class HksPatchBay extends HTMLElement {
                 }),
             ),
             fromElementEvent$(board, 'click').pipe(
-                mergeMap(({ target }): PatchCommand[] => {
+                mergeMap(({ target }): StateCommand[] => {
                     const button =
                         target instanceof Element ? target.closest('[data-locate]') : null;
 
@@ -376,7 +559,90 @@ export class HksPatchBay extends HTMLElement {
         );
     }
 
-    connect$(layout$: Observable<PatchLayout>): Observable<void> {
+    connect$(
+        layout$: Observable<GraphLayout>,
+        inspected$: Observable<readonly Inspected[]>,
+        unused$: Observable<number>,
+        copied$: Observable<{ readonly target: string; readonly text: string }>,
+    ): Observable<void> {
+        const inspect = requireChild(this.shadow, '.inspect');
+        const prune = requireElement(this.shadow, '.prune', HTMLButtonElement);
+
+        const shownInspection$ = inspected$.pipe(
+            tap(list => {
+                const existing = new Map(
+                    [...inspect.children]
+                        .filter(child => child instanceof HTMLElement)
+                        .map(child => [child.dataset['target'], child]),
+                );
+                const sections = list.map(item => {
+                    const section = existing.get(item.target) ?? sectionOf(item.target);
+                    filledSection(section, item);
+
+                    return section;
+                });
+                const current = [...inspect.children];
+
+                if (
+                    current.length !== sections.length ||
+                    sections.some((section, index) => current[index] !== section)
+                ) {
+                    inspect.replaceChildren(...sections);
+                }
+
+                this.toggleAttribute('data-inspecting', list.length > 0);
+            }),
+        );
+
+        const pruning$ = combineLatest([
+            unused$.pipe(distinctUntilChanged()),
+            this.arming$.pipe(
+                switchMap(({ armed }) =>
+                    armed === null
+                        ? of(false)
+                        : concat(of(true), timer(ARM_MS).pipe(map(() => false))),
+                ),
+                startWith(false),
+            ),
+        ]).pipe(
+            tap(([count, armed]) => {
+                const states = count === 1 ? '1 unused state' : `${count} unused states`;
+                prune.disabled = count === 0;
+                prune.toggleAttribute('data-armed', armed && count > 0);
+                prune.textContent =
+                    count === 0
+                        ? 'Nothing to prune'
+                        : armed
+                          ? `Delete ${states}?`
+                          : `Prune ${states}`;
+                prune.title =
+                    count === 0
+                        ? ''
+                        : 'deletes every state no window keeps or follows, with its data';
+            }),
+        );
+
+        const copying$ = copied$.pipe(
+            tap(({ text }) => {
+                void navigator.clipboard?.writeText(text).catch(() => undefined);
+            }),
+            switchMap(({ target }) => concat(of(target), timer(COPIED_MS).pipe(map(() => null)))),
+            tap(target => {
+                for (const button of inspect.querySelectorAll('[data-copy]')) {
+                    if (button instanceof HTMLElement) {
+                        button.textContent =
+                            button.dataset['copy'] === target ? 'Copied' : 'Copy JSON';
+                    }
+                }
+            }),
+        );
+
+        return merge(this.mapped$(layout$), shownInspection$, pruning$, copying$).pipe(
+            map(() => undefined),
+        );
+    }
+
+    private mapped$(layout$: Observable<GraphLayout>): Observable<unknown> {
         const shadow = this.shadow;
         const board = requireChild(shadow, '.board');
         const nodes = requireChild(shadow, '.nodes');
@@ -389,7 +655,6 @@ export class HksPatchBay extends HTMLElement {
                 board.style.height = `${height}px`;
                 wires.setAttribute('width', String(width));
                 wires.setAttribute('height', String(height));
-                this.toggleAttribute('data-empty', windows.length === 0);
 
                 const paths = list.map(({ kind, window, input, path, colour, removable }) => {
                     const wire = document.createElementNS(SVG, 'path');
@@ -469,8 +734,8 @@ export class HksPatchBay extends HTMLElement {
             }),
         );
 
-        return merge(focused$, dragged$).pipe(map(() => undefined));
+        return merge(focused$, dragged$);
     }
 }
 
-customElements.define('hks-patch-bay', HksPatchBay);
+customElements.define('hks-state-map', HksStateMap);

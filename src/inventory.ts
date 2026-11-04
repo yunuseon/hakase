@@ -1,7 +1,5 @@
-import { isProgramId, PROGRAM_IDS, type ProgramId } from './program.ts';
-import { followedStores } from './inputs.ts';
-import { colourOf, HOLDING, MAIN, type StoreEntry, type StoreId } from './stores.ts';
-import type { Process } from './workspace.ts';
+import { isProgramId, type ProgramId } from './program.ts';
+import type { StoreId } from './stores.ts';
 
 export const GLOBALS = ['workspace', 'appearance', 'formulas', 'themes', 'library'] as const;
 export type Global = (typeof GLOBALS)[number];
@@ -26,84 +24,3 @@ export const parseTarget = (id: string): Target | null => {
         ? { kind: 'store', program: first, store: rest.join(':') }
         : null;
 };
-
-export type CatalogItem = {
-    readonly id: string;
-    readonly label: string;
-    readonly colour: string | null;
-    readonly users: number | null;
-};
-
-export type CatalogGroup = {
-    readonly title: string;
-    readonly items: readonly CatalogItem[];
-};
-
-const storesOf = (
-    program: ProgramId,
-    stores: readonly StoreEntry[],
-    held: ReadonlySet<StoreId>,
-): readonly StoreEntry[] => {
-    const own = stores.filter(store => store.program === program);
-
-    // A main store holding data is listed with no window open; an empty one is nothing to show or prune.
-    return held.has(program) && !own.some(({ id }) => id === program)
-        ? [{ id: program, program, name: MAIN, kept: true, copy: null }, ...own]
-        : own;
-};
-
-export const sameCatalog = (a: readonly CatalogGroup[], b: readonly CatalogGroup[]): boolean =>
-    a.length === b.length &&
-    a.every((group, index) => {
-        const other = b[index];
-
-        return (
-            other !== undefined &&
-            group.title === other.title &&
-            group.items.length === other.items.length &&
-            group.items.every((item, at) => {
-                const twin = other.items[at];
-
-                return (
-                    twin !== undefined &&
-                    item.id === twin.id &&
-                    item.label === twin.label &&
-                    item.colour === twin.colour &&
-                    item.users === twin.users
-                );
-            })
-        );
-    });
-
-export const catalogOf = (
-    stores: readonly StoreEntry[],
-    processes: readonly Process[],
-    titleOf: (program: ProgramId) => string,
-    held: ReadonlySet<StoreId>,
-): readonly CatalogGroup[] => [
-    ...PROGRAM_IDS.flatMap((program): CatalogGroup[] => {
-        const items = storesOf(program, stores, held).map((store): CatalogItem => ({
-            id: targetId({ kind: 'store', program, store: store.id }),
-            label: store.name,
-            colour: colourOf(store.id),
-            users: processes.filter(
-                process =>
-                    process.store === store.id ||
-                    followedStores(process.follows).includes(store.id),
-            ).length,
-        }));
-
-        return HOLDING[program] === null || items.length === 0
-            ? []
-            : [{ title: titleOf(program), items }];
-    }),
-    {
-        title: 'global',
-        items: GLOBALS.map((name): CatalogItem => ({
-            id: targetId({ kind: 'global', name }),
-            label: name,
-            colour: null,
-            users: null,
-        })),
-    },
-];

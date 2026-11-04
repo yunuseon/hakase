@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inputsFor } from './inputs.fixture.ts';
-import { patchOf } from './patch.ts';
+import { graphOf } from './state-graph.ts';
 import { defaultWorkspace, reduceWorkspace, type WorkspaceAction } from './workspace.ts';
 
 const viewport = { width: 1400, height: 900 };
@@ -10,14 +10,14 @@ const run = (actions: readonly WorkspaceAction[]) =>
         (workspace, action) => reduceWorkspace(workspace, action, inputsFor),
         defaultWorkspace(viewport, inputsFor),
     );
-const patch = (actions: readonly WorkspaceAction[] = []) =>
-    patchOf(run(actions), inputsFor, titles);
+const graph = (actions: readonly WorkspaceAction[] = []) =>
+    graphOf(run(actions), inputsFor, titles, new Set());
 const windowOf = (actions: readonly WorkspaceAction[], id: string) =>
-    patch(actions).windows.find(window => window.id === id);
+    graph(actions).windows.find(window => window.id === id);
 
-describe('patchOf', () => {
+describe('graphOf', () => {
     it('lists every window that keeps or follows state, with a port per input', () => {
-        const { windows } = patch();
+        const { windows } = graph();
 
         expect(windows.map(({ id }) => id).sort()).toEqual([
             'formula-1',
@@ -41,12 +41,26 @@ describe('patchOf', () => {
 
     it('lists every store, private or shared, and wires each window to its own', () => {
         expect(
-            patch()
-                .stores.map(({ id }) => id)
+            graph()
+                .stores.filter(({ global }) => !global)
+                .map(({ id }) => id)
                 .sort(),
         ).toEqual(['formula-1', 'sketch-2', 'timeline']);
         expect(windowOf([], 'sketch-2')?.own).toBe('sketch-2');
         expect(windowOf([], 'playhead-4')?.own).toBeNull();
+    });
+
+    it('lists the app-wide globals last, and a main store that only holds data', () => {
+        const held = graphOf(run([]), inputsFor, titles, new Set(['board']));
+
+        expect(held.stores.map(({ target }) => target).slice(-6)).toEqual([
+            'store:board:board',
+            'global:workspace',
+            'global:appearance',
+            'global:formulas',
+            'global:themes',
+            'global:library',
+        ]);
     });
 
     it('always offers what can be followed, a clock first, and a main store once something follows it', () => {
@@ -61,7 +75,7 @@ describe('patchOf', () => {
         ];
 
         expect(
-            patch(following)
+            graph(following)
                 .stores.map(({ id, kind }) => [id, kind])
                 .slice(0, 2),
         ).toEqual([

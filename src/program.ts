@@ -13,9 +13,8 @@ import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand } from './shared/signal.ts';
-import type { PatchCommand, PatchView } from './components/patch-bay/patch.ts';
+import type { StateCommand, StateGraph } from './components/state-map/state-map.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
-import type { CatalogGroup } from './inventory.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
 import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
@@ -41,9 +40,8 @@ export const PROGRAM_IDS = [
     'habits',
     'clocks',
     'bookmarks',
-    'inspector',
     'history',
-    'patch',
+    'state',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];
@@ -77,7 +75,10 @@ export type AppInput =
     | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
-    | { readonly kind: 'patch'; readonly command: Exclude<PatchCommand, { kind: 'locate' }> }
+    | {
+          readonly kind: 'wiring';
+          readonly command: Exclude<StateCommand, { kind: 'locate' | 'prune' }>;
+      }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {
@@ -120,11 +121,10 @@ export type AppState = {
     readonly signal$: Observable<Signal>;
     readonly followedSignal$: (input: string) => Observable<Signal | null>;
     readonly bookmarks$: Observable<Bookmarks>;
-    // Read-only, for the inspector alone: every store and every global, which no other program can see.
-    readonly catalog$: Observable<readonly CatalogGroup[]>;
+    // Read-only, for the state map alone: any store or global, which no other program can see.
     readonly inspect$: (target: string) => Observable<unknown>;
     readonly history$: Observable<readonly HistoryEntry[]>;
-    readonly patch$: Observable<PatchView>;
+    readonly graph$: Observable<StateGraph>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 

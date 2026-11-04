@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { layoutOf, NODE_WIDTH, relatedTo, type PatchView } from './patch.ts';
+import {
+    focusedStores,
+    layoutOf,
+    NODE_WIDTH,
+    relatedTo,
+    unusedOf,
+    type StateGraph,
+} from './state-map.ts';
 
-const view: PatchView = {
+const view: StateGraph = {
     stores: [
         {
             id: 'sketch-2',
+            target: 'store:sketch:sketch-2',
+            global: false,
             program: 'sketch',
             kind: null,
             title: 'sketch',
@@ -13,6 +22,8 @@ const view: PatchView = {
         },
         {
             id: 'timeline',
+            target: 'store:x:timeline',
+            global: false,
             program: 'timeline',
             kind: 'playback',
             title: 'Playback',
@@ -21,6 +32,8 @@ const view: PatchView = {
         },
         {
             id: 'signal',
+            target: 'store:x:signal',
+            global: false,
             program: 'signal',
             kind: 'signal',
             title: 'Signal',
@@ -121,5 +134,50 @@ describe('relatedTo', () => {
 
         expect(sorted(related.windows)).toEqual(['sketch-2']);
         expect(sorted(related.wires)).toEqual(['sketch-2:']);
+    });
+});
+
+describe('focusedStores', () => {
+    const layout = layoutOf(view);
+
+    it('lists what a focus inspects in the left column order, and nothing once it is gone', () => {
+        expect(
+            focusedStores(layout, { kind: 'window', id: 'sketch-2' }).map(({ id }) => id),
+        ).toEqual(['sketch-2', 'timeline', 'signal']);
+        expect(focusedStores(layout, { kind: 'window', id: 'gone' })).toEqual([]);
+        expect(focusedStores(layout, null)).toEqual([]);
+    });
+});
+
+describe('unusedOf', () => {
+    it('counts the stores no wire touches, never a global', () => {
+        const lonely = layoutOf({
+            ...view,
+            stores: [
+                ...view.stores,
+                {
+                    id: 'spare',
+                    target: 'store:sketch:spare',
+                    global: false,
+                    program: 'sketch',
+                    kind: null,
+                    title: 'sketch',
+                    name: 'spare',
+                    colour: 'grey',
+                },
+                {
+                    id: 'global:library',
+                    target: 'global:library',
+                    global: true,
+                    program: '',
+                    kind: null,
+                    title: 'app',
+                    name: 'library',
+                    colour: 'grey',
+                },
+            ],
+        });
+
+        expect(unusedOf(lonely)).toBe(1);
     });
 });

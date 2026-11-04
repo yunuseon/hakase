@@ -8,8 +8,7 @@ import { focusProgram } from './programs/focus.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
 import { historyProgram } from './programs/history.program.ts';
-import { patchProgram } from './programs/patch.program.ts';
-import { inspectorProgram } from './programs/inspector.program.ts';
+import { stateProgram } from './programs/state.program.ts';
 import { noteProgram } from './programs/note.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
@@ -36,7 +35,6 @@ export const programs = {
     habits: habitsProgram,
     clocks: clocksProgram,
     bookmarks: bookmarksProgram,
-    inspector: inspectorProgram,
     history: historyProgram,
-    patch: patchProgram,
+    state: stateProgram,
 } satisfies { readonly [K in ProgramId]: Program<K> };

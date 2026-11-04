@@ -1,10 +1,196 @@
 :host {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     block-size: 100%;
     min-block-size: 0;
-    overflow: auto;
     font: 12px/1.3 var(--font-ui);
     color: var(--label);
+}
+
+.bar {
+    display: flex;
+    flex: none;
+    gap: 8px;
+    align-items: center;
+}
+
+.hint {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:host([data-inspecting]) .hint {
+    visibility: hidden;
+}
+
+.prune {
+    flex: none;
+    padding: 5px 10px;
+    font: 500 11px var(--font-ui);
+    color: var(--ink);
+    background: var(--well);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.prune:hover:not(:disabled),
+.prune[data-armed] {
+    background: color-mix(in srgb, var(--accent) 25%, var(--well));
+}
+
+.prune:disabled {
+    color: var(--muted);
+    background: transparent;
+    cursor: default;
+}
+
+.prune:focus-visible,
+.copy:focus-visible,
+.toggle:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
+.graph {
+    flex: 1 1 60%;
+    min-block-size: 80px;
+    overflow: auto;
+}
+
+.inspect {
+    display: none;
+    flex: 1 1 40%;
+    flex-direction: column;
+    gap: 10px;
+    min-block-size: 0;
+    padding: 8px 10px;
+    overflow: auto;
+    background: var(--well);
+    border-radius: 10px;
+}
+
+:host([data-inspecting]) .inspect {
+    display: flex;
+}
+
+.section-head {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    margin-block-end: 2px;
+}
+
+.section-title {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    font-weight: 600;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.copy {
+    flex: none;
+    padding: 3px 8px;
+    font: 500 11px var(--font-ui);
+    color: var(--ink);
+    background: var(--panel);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.tree {
+    font: 11.5px/1.6 var(--font-mono);
+}
+
+.tree-row {
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+    padding-inline-start: calc(var(--depth) * 14px);
+    white-space: nowrap;
+    border-radius: 4px;
+}
+
+.tree-row[data-kind='object'],
+.tree-row[data-kind='array'] {
+    cursor: pointer;
+}
+
+.tree-row:hover {
+    background: color-mix(in srgb, var(--rule) 25%, transparent);
+}
+
+.toggle {
+    flex: none;
+    inline-size: 14px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.toggle::before {
+    content: '▸';
+}
+
+.tree-row[data-open] .toggle::before {
+    content: '▾';
+}
+
+.toggle[hidden] {
+    display: inline-block;
+    visibility: hidden;
+}
+
+.tree-key {
+    color: var(--code-keyword);
+}
+
+.tree-key::after {
+    color: var(--muted);
+    content: ':';
+}
+
+.tree-value {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-row[data-kind='string'] .tree-value {
+    color: var(--code-text);
+}
+
+.tree-row[data-kind='number'] .tree-value {
+    color: var(--code-number);
+}
+
+.tree-row[data-kind='boolean'] .tree-value,
+.tree-row[data-kind='null'] .tree-value {
+    color: var(--code-function);
+}
+
+.tree-row[data-kind='object'] .tree-value,
+.tree-row[data-kind='array'] .tree-value {
+    color: var(--muted);
+}
+
+.store[data-global] .jack {
+    display: none;
+}
+
+.store[data-global] {
+    border-style: dashed;
 }
 
 .board {
@@ -229,16 +415,6 @@
 
 .store[data-ok][data-over] {
     border-color: var(--accent);
-}
-
-.empty {
-    display: none;
-    margin: 16px;
-    color: var(--muted);
-}
-
-:host([data-empty]) .empty {
-    display: block;
 }
 
 /* Wider than it looks, so a wire can be started without pixel aim. */

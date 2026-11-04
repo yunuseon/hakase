@@ -1030,6 +1030,16 @@ const sizeFrom = (value: unknown): Size | null => {
     return width === null || height === null ? null : { width, height };
 };
 
+// Programs that grew into others: their open windows come back as the program that replaced them.
+const RENAMED: Readonly<Record<string, ProgramId>> = {
+    links: 'bookmarks',
+    patch: 'state',
+    inspector: 'state',
+};
+
+const renamed = (program: string): string =>
+    Object.entries(RENAMED).find(([old]) => old === program)?.[1] ?? program;
+
 const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null => {
     if (typeof value !== 'object' || value === null) {
         return null;
@@ -1047,8 +1057,7 @@ const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null => {
 
     // Optional: saved before windows were measured, the frame's own size is the best guess.
     const measured = ('measured' in value ? sizeFrom(value.measured) : null) ?? frame;
-    // The links shelf grew into bookmarks; its open windows come back as bookmarks windows.
-    const program = value.program === 'links' ? 'bookmarks' : value.program;
+    const program = renamed(value.program);
 
     if (!isProgramId(program)) {
         return null;

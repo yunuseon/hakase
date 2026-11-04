@@ -45,7 +45,7 @@ import { reduceNotes } from './components/note/note.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import { defaultSignal, reduceSignal } from './shared/signal.ts';
-import { patchOf, samePatch } from './patch.ts';
+import { graphOf, sameGraph } from './state-graph.ts';
 import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
@@ -93,7 +93,7 @@ import type {
     SwitchGroup,
     SwitchItem,
 } from './components/window/frame.ts';
-import { catalogOf, parseTarget, sameCatalog, type Global } from './inventory.ts';
+import { parseTarget, type Global } from './inventory.ts';
 import { liveProcess$, type ProcessSignal } from './process.ts';
 import { programs } from './programs.ts';
 import {
@@ -303,7 +303,7 @@ const bootstrap = () => {
             ),
         ),
         defer(() => inputs$).pipe(
-            mergeMap(({ input }) => (input.kind === 'patch' ? of(input.command) : EMPTY)),
+            mergeMap(({ input }) => (input.kind === 'wiring' ? of(input.command) : EMPTY)),
             map((command): WorkspaceAction => {
                 switch (command.kind) {
                     case 'connect':
@@ -938,7 +938,7 @@ const bootstrap = () => {
     const appearance$ = (name: AppearanceName): Observable<Written<Appearance>> =>
         looks$.pipe(map(all => all.get(name) ?? { value: appearances[name], from: null }));
 
-    // Which stores hold any data, read as one sorted key so a ticking timer does not churn the catalog.
+    // Which stores hold any data, read as one sorted key so a ticking timer does not churn the graph.
     const held$: Observable<ReadonlySet<StoreId>> = combineLatest([
         todos$,
         boards$,
@@ -973,17 +973,10 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
-        catalog$: combineLatest([workspace$, held$]).pipe(
-            map(([{ stores, processes }, held]) =>
-                catalogOf(stores, processes, program => programOf(program)?.title ?? program, held),
-            ),
-            // The workspace emits on every pointer move of a drag; the tree changes far less often.
-            distinctUntilChanged(sameCatalog),
-        ),
         inspect$: (id: string) => inspected$(id),
-        patch$: workspace$.pipe(
-            map(workspace => patchOf(workspace, inputsFor, programOf)),
-            distinctUntilChanged(samePatch),
+        graph$: combineLatest([workspace$, held$]).pipe(
+            map(([workspace, held]) => graphOf(workspace, inputsFor, programOf, held)),
+            distinctUntilChanged(sameGraph),
         ),
         history$: history$.pipe(
             map(({ past, label, future }) => [

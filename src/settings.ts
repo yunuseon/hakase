@@ -70,24 +70,13 @@ export type NoteSettings = {
     readonly note: string | null;
 };
 
-export type InspectorSettings = {
-    readonly kind: 'inspector';
-    readonly selected: string | null;
-    readonly expanded: readonly string[];
-};
-
 export type AgendaSettings = {
     readonly kind: 'agenda';
     readonly day: string | null;
 };
 
 export type Settings =
-    | SketchSettings
-    | FormulaEditorSettings
-    | ThemeEditorSettings
-    | NoteSettings
-    | AgendaSettings
-    | InspectorSettings;
+    SketchSettings | FormulaEditorSettings | ThemeEditorSettings | NoteSettings | AgendaSettings;
 
 export const defaultSketch: SketchSettings = {
     kind: 'sketch',
@@ -117,9 +106,6 @@ export const asNote = (settings: Settings | undefined): NoteSettings =>
 
 export const asAgenda = (settings: Settings | undefined): AgendaSettings =>
     settings?.kind === 'agenda' ? settings : { kind: 'agenda', day: null };
-
-export const asInspector = (settings: Settings | undefined): InspectorSettings =>
-    settings?.kind === 'inspector' ? settings : { kind: 'inspector', selected: null, expanded: [] };
 
 export const asThemeEditor = (settings: Settings | undefined): ThemeEditorSettings =>
     settings?.kind === 'theme' ? settings : defaultThemeEditor;
@@ -320,18 +306,6 @@ export const parseSettings = (value: unknown): Settings | null => {
             const day = field(value, 'day');
 
             return { kind: 'agenda', day: typeof day === 'string' && isDay(day) ? day : null };
-        }
-        case 'inspector': {
-            const selected = field(value, 'selected');
-            const expanded = field(value, 'expanded');
-
-            return {
-                kind: 'inspector',
-                selected: typeof selected === 'string' ? selected : null,
-                expanded: Array.isArray(expanded)
-                    ? expanded.filter((path): path is string => typeof path === 'string')
-                    : [],
-            };
         }
         default:
             return null;
