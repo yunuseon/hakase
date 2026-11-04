@@ -154,6 +154,8 @@ const focusAt = (target: EventTarget | null): Focus | null | undefined => {
 
 const unfocused: Focus | null = null;
 
+const LOCATE = 'M12 4 V7 M12 17 V20 M4 12 H7 M17 12 H20 M12 8 A4 4 0 1 1 12 16 A4 4 0 1 1 12 8';
+
 const iconOf = (path: string): SVGSVGElement => {
     const icon = document.createElementNS(SVG, 'svg');
     icon.setAttribute('viewBox', '0 0 24 24');
@@ -232,7 +234,6 @@ const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: Plac
 
     const head = document.createElement('div');
     head.className = 'head';
-    head.title = 'double-click to show this window';
     head.append(iconOf(icon), span('label', label));
 
     if (own !== null) {
@@ -251,6 +252,15 @@ const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: Plac
             head.append(tag);
         }
     }
+
+    const locate = document.createElement('button');
+    locate.type = 'button';
+    locate.className = 'locate';
+    locate.dataset['locate'] = id;
+    locate.title = `fly to ${label}`;
+    locate.setAttribute('aria-label', `fly to ${label}`);
+    locate.append(iconOf(LOCATE));
+    head.append(locate);
 
     node.append(head, ...ports.map(port => portRow(id, port)));
 
@@ -363,13 +373,13 @@ export class HksPatchBay extends HTMLElement {
                         : [];
                 }),
             ),
-            fromElementEvent$(board, 'dblclick').pipe(
+            fromElementEvent$(board, 'click').pipe(
                 mergeMap(({ target }): PatchCommand[] => {
-                    const head = target instanceof Element ? target.closest('.head') : null;
-                    const node = head?.closest('[data-window-node]');
+                    const button =
+                        target instanceof Element ? target.closest('[data-locate]') : null;
 
-                    return node instanceof HTMLElement && node.dataset['windowNode'] !== undefined
-                        ? [{ kind: 'reveal', window: node.dataset['windowNode'] }]
+                    return button instanceof HTMLElement && button.dataset['locate'] !== undefined
+                        ? [{ kind: 'locate', window: button.dataset['locate'] }]
                         : [];
                 }),
             ),

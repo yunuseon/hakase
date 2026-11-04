@@ -63,6 +63,7 @@ export type AppInput =
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
+    | { readonly kind: 'locate'; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
     | { readonly kind: 'prune' }
     | { readonly kind: 'travel'; readonly offset: number }
@@ -76,7 +77,7 @@ export type AppInput =
     | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
-    | { readonly kind: 'patch'; readonly command: Exclude<PatchCommand, { kind: 'reveal' }> }
+    | { readonly kind: 'patch'; readonly command: Exclude<PatchCommand, { kind: 'locate' }> }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
     | {

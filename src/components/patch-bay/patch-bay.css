@@ -189,6 +189,31 @@
     flex: 1;
 }
 
+.locate {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    margin-inline-end: -4px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.locate:hover {
+    color: var(--ink);
+    background: var(--well);
+}
+
+.locate:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
 .cut {
     inline-size: 18px;
     block-size: 18px;

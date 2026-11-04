@@ -22,8 +22,8 @@ export const patchProgram = {
                     bay.connect$(patch$.pipe(map(layoutOf))).pipe(ignoreElements()),
                     bay.commands$.pipe(
                         map((command): AppInput =>
-                            command.kind === 'reveal'
-                                ? { kind: 'task', command: 'reveal', id: command.window }
+                            command.kind === 'locate'
+                                ? { kind: 'locate', id: command.window }
                                 : { kind: 'patch', command },
                         ),
                     ),

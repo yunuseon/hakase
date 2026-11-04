@@ -46,7 +46,7 @@ export type PatchCommand =
       }
     | { readonly kind: 'disconnect'; readonly window: string; readonly input: string }
     | { readonly kind: 'bind'; readonly window: string; readonly store: string }
-    | { readonly kind: 'reveal'; readonly window: string };
+    | { readonly kind: 'locate'; readonly window: string };
 
 export type Point = { readonly x: number; readonly y: number };
 

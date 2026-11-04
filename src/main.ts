@@ -26,7 +26,7 @@ import {
 import './styles.css';
 import { variables, type Appearance } from './appearance.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
-import { fitted, flight, zoomLabel } from './shared/camera.ts';
+import { centredOn, fitted, flight, IDENTITY, zoomLabel } from './shared/camera.ts';
 import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
@@ -125,6 +125,8 @@ import {
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
+
+type Jump = { readonly kind: 'section' | 'window'; readonly id: string };
 
 type StoreKey =
     | 'progress$'
@@ -271,6 +273,7 @@ const bootstrap = () => {
         ),
         // defer: a flight starts from the camera this very fold holds.
         defer(() => flights$),
+        defer(() => located$).pipe(map((id): WorkspaceAction => ({ kind: 'raise', id }))),
         // defer: the toolbar's window is opened from the state this very fold produces.
         defer(() => toolbarGestures$).pipe(
             map((gesture): WorkspaceAction => ({ kind: 'toolbar-window', gesture })),
@@ -345,32 +348,50 @@ const bootstrap = () => {
 
     const interrupted$ = merge(canvas.gestures$, zoomSteps$);
 
-    const jumps$ = merge(
-        navigator.jumps$,
-        picked$.pipe(mergeMap(picked => (picked.kind === 'section' ? of(picked.id) : EMPTY))),
-        merge(
-            canvas.steps$,
-            picked$.pipe(
-                mergeMap(picked => (picked.kind === 'step' ? of(picked.direction) : EMPTY)),
-            ),
-        ).pipe(
-            withLatestFrom(workspace$, viewport$),
-            mergeMap(([direction, { sections: all, camera }, viewport]) => {
-                const id = steppedSection(all, camera, viewport, direction);
+    const located$ = defer(() => inputs$).pipe(
+        mergeMap(({ input }) => (input.kind === 'locate' ? of(input.id) : EMPTY)),
+        share(),
+    );
 
-                return id === null ? EMPTY : of(id);
-            }),
-        ),
+    const jumps$: Observable<Jump> = merge(
+        located$.pipe(map((id): Jump => ({ kind: 'window', id }))),
+        merge(
+            navigator.jumps$,
+            picked$.pipe(mergeMap(picked => (picked.kind === 'section' ? of(picked.id) : EMPTY))),
+            merge(
+                canvas.steps$,
+                picked$.pipe(
+                    mergeMap(picked => (picked.kind === 'step' ? of(picked.direction) : EMPTY)),
+                ),
+            ).pipe(
+                withLatestFrom(workspace$, viewport$),
+                mergeMap(([direction, { sections: all, camera }, viewport]) => {
+                    const id = steppedSection(all, camera, viewport, direction);
+
+                    return id === null ? EMPTY : of(id);
+                }),
+            ),
+        ).pipe(map((id): Jump => ({ kind: 'section', id }))),
     );
 
     const flights$: Observable<WorkspaceAction> = jumps$.pipe(
         withLatestFrom(workspace$, viewport$),
-        mergeMap(([id, { sections: all, camera }, viewport]) => {
-            const section = all.find(candidate => candidate.id === id);
+        mergeMap(([jump, { sections: all, processes, camera }, viewport]) => {
+            const section = all.find(
+                candidate => jump.kind === 'section' && candidate.id === jump.id,
+            );
+            const process = processes.find(
+                candidate => jump.kind === 'window' && candidate.id === jump.id,
+            );
+            // At 100% unless the window would not fit: where the view stood says nothing about how to read it.
+            const target =
+                section !== undefined
+                    ? fitted([section.rect], viewport)
+                    : process !== undefined
+                      ? centredOn(IDENTITY, boxOf(process), viewport)
+                      : null;
 
-            return section === undefined
-                ? EMPTY
-                : of(flight(camera, fitted([section.rect], viewport), viewport));
+            return target === null ? EMPTY : of(flight(camera, target, viewport));
         }),
         switchMap(path =>
             animationFrames().pipe(

@@ -766,6 +766,14 @@ second jump replaces the first, and `takeUntil` any pan, zoom or key ends it, so
 the user can always take the camera back. A flight reads the camera from the
 fold it feeds, so it enters through a `defer` like the toolbar's gestures.
 
+**Locating a window flies there too.** A jump is a `Jump`, a section or a
+window, and both run through the one `flights$`, so a locate is interrupted by
+a pan like any flight and a second jump replaces the first. A window's target is
+`centredOn(IDENTITY, …)`: centred at 100%, zoomed out only as far as it takes
+to fit, because where the view stood says nothing about how to read the window.
+The same `locate` input also raises the window, as a plain `raise` beside the
+flight. The patch bay's locate buttons are the first to send it.
+
 **Sections are also slides.** With nothing editable focused, ←/→ and
 PageUp/PageDown step to the previous or next section in reading order (top to
 bottom, then left to right). `steppedSection` in `src/commands.ts` decides from
@@ -1074,8 +1082,8 @@ program only, and not the store it already has), or between a store and a port
 to follow it; only ends that would make a valid action stay lit, judged by the
 same `commandOf` that turns the drop into a command. Drag a bound optional
 port's jack into empty space, or click its ×, to unplug it; a clock input and a
-window's own state cannot be unplugged, only moved. Double-clicking a header
-reveals the window. One shared `drags$` feeds both the rubber-band wire and the
+window's own state cannot be unplugged, only moved. Each window's header has a
+**locate** button that flies the camera to it (below). One shared `drags$` feeds both the rubber-band wire and the
 command, for the todo grip's reason, and `patch$` dedupes with `samePatch`,
 which names every field, because the workspace emits on every pointer move.
 While dragging, the header's children dim rather than the header, or a tag
@@ -1602,7 +1610,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy-two of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
