@@ -89,8 +89,7 @@ export type Wire = {
 };
 
 export type GraphLayout = {
-    readonly width: number;
-    readonly height: number;
+    readonly bounds: Spot & { readonly width: number; readonly height: number };
     readonly stores: readonly PlacedStore[];
     readonly windows: readonly PlacedWindow[];
     readonly wires: readonly Wire[];
@@ -146,7 +145,15 @@ const placedPorts = (ports: readonly GraphPort[], x: number, top: number) =>
         return { ...port, y, anchor: { x, y: y + PORT_HEIGHT / 2 } };
     });
 
-export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
+export type Spot = { readonly x: number; readonly y: number };
+export type Spots = Readonly<Record<string, Spot>>;
+
+export const nodeKey = (kind: 'store' | 'window', id: string) => `${kind}:${id}`;
+
+// Not spots[key]: the keys come from storage, and every object has a `constructor`.
+const spotOf = (spots: Spots, key: string) => Object.entries(spots).find(([at]) => at === key)?.[1];
+
+export const layoutOf = ({ stores, windows }: StateGraph, spots: Spots = {}): GraphLayout => {
     const depths = depthsOf(stores);
     const columns = Math.max(0, ...depths.values()) + 1;
     const columnX = (column: number) => PAD + column * (NODE_WIDTH + GAP);
@@ -159,8 +166,9 @@ export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
         );
 
         return here.map((store, index): PlacedStore => {
-            const x = columnX(column);
-            const y = tops.tops[index] ?? PAD;
+            const spot = spotOf(spots, nodeKey('store', store.id));
+            const x = spot?.x ?? columnX(column);
+            const y = spot?.y ?? tops.tops[index] ?? PAD;
 
             return {
                 ...store,
@@ -175,15 +183,17 @@ export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
 
     const windowTops = stacked(windows, windowHeight);
     const placedWindows = windows.map((window, index): PlacedWindow => {
-        const y = windowTops.tops[index] ?? PAD;
+        const spot = spotOf(spots, nodeKey('window', window.id));
+        const x = spot?.x ?? right;
+        const y = spot?.y ?? windowTops.tops[index] ?? PAD;
 
         return {
             ...window,
-            x: right,
+            x,
             y,
             height: windowHeight(window),
-            anchor: { x: right, y: y + HEADER / 2 },
-            ports: placedPorts(window.ports, right, y + HEADER),
+            anchor: { x, y: y + HEADER / 2 },
+            ports: placedPorts(window.ports, x, y + HEADER),
         };
     });
 
@@ -236,14 +246,20 @@ export const layoutOf = ({ stores, windows }: StateGraph): GraphLayout => {
         }),
     ];
 
+    const boxes = [...placedStores, ...placedWindows];
+    const left = Math.min(...boxes.map(({ x }) => x));
+    const top = Math.min(...boxes.map(({ y }) => y));
+
     return {
-        width: right + NODE_WIDTH + PAD,
-        height:
-            Math.max(
-                PAD,
-                ...placedStores.map(({ y, height }) => y + height),
-                ...placedWindows.map(({ y, height }) => y + height),
-            ) + PAD,
+        bounds:
+            boxes.length === 0
+                ? { x: 0, y: 0, width: 0, height: 0 }
+                : {
+                      x: left,
+                      y: top,
+                      width: Math.max(...boxes.map(({ x }) => x + NODE_WIDTH)) - left,
+                      height: Math.max(...boxes.map(({ y, height }) => y + height)) - top,
+                  },
         stores: placedStores,
         windows: placedWindows,
         wires,
@@ -325,3 +341,8 @@ export type Inspected = {
     readonly colour: string;
     readonly rows: readonly Row[];
 };
+
+export const placedAt = ({ stores, windows }: GraphLayout, key: string): Spot | null =>
+    stores.find(({ id }) => nodeKey('store', id) === key) ??
+    windows.find(({ id }) => nodeKey('window', id) === key) ??
+    null;

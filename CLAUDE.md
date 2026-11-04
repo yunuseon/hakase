@@ -1092,6 +1092,27 @@ store's jack is a `source` wire; focusing a store lights both what follows it
 and what it follows. A store a used one follows counts as used, the same rule
 the prune keeps by.
 
+**The map is a small canvas of its own.** Drag a node's body to move it, empty
+space to pan, the wheel to pan and a pinch (ctrl/cmd+wheel) to zoom around the
+pointer; **Fit** frames every node and **Tidy** forgets the moves. A wire still
+starts only at a jack. The camera maths is the canvas's own (`panned`,
+`zoomedAround`, `centredOn`), and `wheelGesture` moved to `shared/wheel.ts` once
+the map became its second reader. The map claims its wheels with
+`preventDefault`, so the canvas behind skips them, the frame strip's contract.
+
+What a window has arranged is that window's `StateMapSettings`: the camera, and
+`positions` for **only the nodes moved by hand**, keyed `store:<id>` and
+`window:<id>`, so a node never touched keeps its automatic place as the graph
+grows. `layoutOf(graph, spots)` lets a spot override the automatic one and
+derives every anchor and wire from the result, so a wire follows its node. A
+move is a delta in the map's own units (read through the board's scale, which
+includes both zooms) added to where the node is drawn now (`placedAt`), folded
+with `withLatestFrom` over the window's settings. Spots come from storage, so
+they are looked up by entry, never `spots[key]`. The board is sized to reach
+every node even though the camera moves it: the pointer maths reads its scale
+from its box, and a box of no size has none. Focus listens on the viewport, not
+the board, or a press on empty space beside the board would never clear it.
+
 **Every store is a node, private ones too.** Folding a store only one window
 used into a tag in its header was tried and dropped: it made private state a
 second kind of thing, hid exactly the state you would want to wire up, and
@@ -1643,7 +1664,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy-nine of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and eighty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

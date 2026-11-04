@@ -1,6 +1,7 @@
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
 import type { Camera } from '../../shared/camera.ts';
@@ -11,8 +12,6 @@ import {
     keyStep,
     keyZoom,
     sameVariables,
-    wheelGesture,
-    type CanvasGesture,
     type KeyEdit,
     type KeyStep,
     type KeyZoom,
@@ -28,7 +27,7 @@ const TEMPLATE = `
 `;
 
 export class HksCanvas extends HTMLElement {
-    readonly gestures$: Observable<CanvasGesture>;
+    readonly gestures$: Observable<ViewGesture>;
     readonly keys$: Observable<KeyZoom>;
     readonly edits$: Observable<KeyEdit>;
     readonly steps$: Observable<KeyStep>;
@@ -48,7 +47,7 @@ export class HksCanvas extends HTMLElement {
 
         this.gestures$ = merge(
             pointerDelta$(this.ground).pipe(
-                map(({ dx, dy }): CanvasGesture => ({ kind: 'pan', dx, dy })),
+                map(({ dx, dy }): ViewGesture => ({ kind: 'pan', dx, dy })),
             ),
             fromElementEvent$(this, 'wheel').pipe(
                 mergeMap(event => {

@@ -28,6 +28,26 @@
     visibility: hidden;
 }
 
+.tool {
+    flex: none;
+    padding: 5px 10px;
+    font: 500 11px var(--font-ui);
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.tool:hover {
+    background: var(--well);
+}
+
+.tool:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+
 .prune {
     flex: none;
     padding: 5px 10px;
@@ -58,9 +78,19 @@
 }
 
 .graph {
+    position: relative;
     flex: 1 1 60%;
     min-block-size: 80px;
-    overflow: auto;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+    background: var(--well);
+    border-radius: 10px;
+}
+
+.graph:active {
+    cursor: grabbing;
 }
 
 .inspect {
@@ -194,9 +224,10 @@
 }
 
 .board {
-    position: relative;
-    margin-inline: auto;
-    touch-action: none;
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    transform-origin: 0 0;
 }
 
 .wires {
@@ -451,4 +482,15 @@
 
 .board[data-focus] .wire.own[data-related] {
     stroke-width: 4.5;
+}
+
+/* Last, over the rules above: a node's body moves it, a jack starts a wire. */
+.store,
+.head,
+.port {
+    cursor: grab;
+}
+
+.jack {
+    cursor: crosshair;
 }

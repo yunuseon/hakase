@@ -14,7 +14,9 @@ import {
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
+import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import {
+    nodeKey,
     relatedTo,
     wireKey,
     wirePath,
@@ -39,6 +41,8 @@ const ARM_MS = 3000;
 const TEMPLATE = `
     <div class="bar">
         <span class="hint">Click a state or a window to inspect it.</span>
+        <button class="tool" data-tool="tidy" type="button" title="put every node back where the map would place it">Tidy</button>
+        <button class="tool" data-tool="fit" type="button" title="frame the whole map">Fit</button>
         <button class="prune" type="button"></button>
     </div>
     <div class="graph">
@@ -419,6 +423,14 @@ export class HksStateMap extends HTMLElement {
     // A branch of an inspected state, as its target and its path, so two states never share one.
     readonly toggles$: Observable<{ readonly target: string; readonly path: string }>;
     readonly copies$: Observable<string>;
+    readonly moves$: Observable<{
+        readonly node: string;
+        readonly dx: number;
+        readonly dy: number;
+    }>;
+    readonly views$: Observable<ViewGesture>;
+    readonly fits$: Observable<{ readonly width: number; readonly height: number }>;
+    readonly tidies$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
@@ -433,6 +445,7 @@ export class HksStateMap extends HTMLElement {
         shadow.innerHTML = TEMPLATE;
 
         const board = requireChild(shadow, '.board');
+        const graph = requireChild(shadow, '.graph');
         // Through the board's own scale: the canvas zoom shrinks its rect but not its layout.
         const local = (clientX: number, clientY: number): Point => {
             const rect = board.getBoundingClientRect();
@@ -488,7 +501,7 @@ export class HksStateMap extends HTMLElement {
             share(),
         );
 
-        this.focus$ = fromElementEvent$(board, 'pointerdown').pipe(
+        this.focus$ = fromElementEvent$(graph, 'pointerdown').pipe(
             mergeMap(({ target }): (Focus | null)[] => {
                 const focus = focusAt(target);
 
@@ -537,6 +550,101 @@ export class HksStateMap extends HTMLElement {
             share(),
         );
 
+        // In the viewport's own units: the canvas zoom shrinks its rect but not its layout.
+        const viewport = (clientX: number, clientY: number): Point => {
+            const rect = graph.getBoundingClientRect();
+            const scale = rect.width === 0 ? 1 : graph.offsetWidth / rect.width;
+
+            return { x: (clientX - rect.left) * scale, y: (clientY - rect.top) * scale };
+        };
+        const nodeOf = (target: EventTarget | null) => {
+            const node = target instanceof Element ? target.closest('.node') : null;
+
+            if (!(node instanceof HTMLElement)) {
+                return null;
+            }
+
+            const { store, windowNode } = node.dataset;
+
+            return store !== undefined
+                ? nodeKey('store', store)
+                : windowNode !== undefined
+                  ? nodeKey('window', windowNode)
+                  : null;
+        };
+        const free = (target: EventTarget | null) =>
+            target instanceof Element &&
+            target.closest('.jack') === null &&
+            target.closest('button') === null;
+
+        type Held = { readonly node: string | null; readonly at: Point; readonly by: Point | null };
+
+        this.moves$ = pointerGesture$(
+            board,
+            ({ target }) => free(target) && nodeOf(target) !== null,
+        ).pipe(
+            scan(
+                (held: Held, { phase, event }): Held => {
+                    const at = local(event.clientX, event.clientY);
+
+                    return phase === 'grab'
+                        ? { node: nodeOf(event.target), at, by: null }
+                        : { ...held, at, by: { x: at.x - held.at.x, y: at.y - held.at.y } };
+                },
+                { node: null, at: { x: 0, y: 0 }, by: null },
+            ),
+            mergeMap(({ node, by }) =>
+                node === null || by === null ? [] : [{ node, dx: by.x, dy: by.y }],
+            ),
+        );
+
+        this.views$ = merge(
+            pointerGesture$(graph, ({ target }) => free(target) && nodeOf(target) === null).pipe(
+                scan(
+                    (held: Held, { phase, event }): Held => {
+                        const at = viewport(event.clientX, event.clientY);
+
+                        return phase === 'grab'
+                            ? { node: null, at, by: null }
+                            : { ...held, at, by: { x: at.x - held.at.x, y: at.y - held.at.y } };
+                    },
+                    { node: null, at: { x: 0, y: 0 }, by: null },
+                ),
+                mergeMap(({ by }): ViewGesture[] =>
+                    by === null ? [] : [{ kind: 'pan', dx: by.x, dy: by.y }],
+                ),
+            ),
+            fromElementEvent$(graph, 'wheel', { passive: false }).pipe(
+                mergeMap(event => {
+                    const gesture = wheelGesture({
+                        deltaX: event.deltaX,
+                        deltaY: event.deltaY,
+                        lines: event.deltaMode === WheelEvent.DOM_DELTA_LINE,
+                        pinch: event.ctrlKey || event.metaKey,
+                        onGround: true,
+                        at: viewport(event.clientX, event.clientY),
+                    });
+
+                    if (gesture === null) {
+                        return [];
+                    }
+
+                    // Claimed, so the canvas behind leaves this wheel to the map, as the frame strip's.
+                    event.preventDefault();
+
+                    return [gesture];
+                }),
+            ),
+        );
+
+        const tool = (name: string) =>
+            fromElementEvent$(requireChild(shadow, `[data-tool="${name}"]`), 'click');
+
+        this.fits$ = tool('fit').pipe(
+            map(() => ({ width: graph.clientWidth, height: graph.clientHeight })),
+        );
+        this.tidies$ = tool('tidy').pipe(map(() => undefined));
+
         this.commands$ = merge(
             this.arming$.pipe(
                 filter(({ fire }) => fire),
@@ -574,11 +682,13 @@ export class HksStateMap extends HTMLElement {
 
     connect$(
         layout$: Observable<GraphLayout>,
+        camera$: Observable<{ readonly x: number; readonly y: number; readonly zoom: number }>,
         inspected$: Observable<readonly Inspected[]>,
         unused$: Observable<number>,
         copied$: Observable<{ readonly target: string; readonly text: string }>,
     ): Observable<void> {
         const inspect = requireChild(this.shadow, '.inspect');
+        const board = requireChild(this.shadow, '.board');
         const prune = requireElement(this.shadow, '.prune', HTMLButtonElement);
 
         const shownInspection$ = inspected$.pipe(
@@ -650,7 +760,15 @@ export class HksStateMap extends HTMLElement {
             }),
         );
 
-        return merge(this.mapped$(layout$), shownInspection$, pruning$, copying$).pipe(
+        const viewed$ = camera$.pipe(
+            map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),
+            distinctUntilChanged(),
+            tap(transform => {
+                board.style.transform = transform;
+            }),
+        );
+
+        return merge(this.mapped$(layout$), viewed$, shownInspection$, pruning$, copying$).pipe(
             map(() => undefined),
         );
     }
@@ -663,7 +781,10 @@ export class HksStateMap extends HTMLElement {
         const rubber = requireElement(shadow, '.rubber', SVGPathElement);
 
         const drawn$ = layout$.pipe(
-            tap(({ width, height, stores, windows, wires: list }) => {
+            tap(({ bounds, stores, windows, wires: list }) => {
+                // Sized to reach every node: the pointer maths reads the board's scale from its box.
+                const width = Math.max(1, bounds.x + bounds.width);
+                const height = Math.max(1, bounds.y + bounds.height);
                 board.style.width = `${width}px`;
                 board.style.height = `${height}px`;
                 wires.setAttribute('width', String(width));

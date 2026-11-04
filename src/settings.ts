@@ -75,8 +75,30 @@ export type AgendaSettings = {
     readonly day: string | null;
 };
 
+export type Spot = { readonly x: number; readonly y: number };
+
+export type StateMapSettings = {
+    readonly kind: 'state-map';
+    readonly positions: Readonly<Record<string, Spot>>;
+    readonly camera: { readonly x: number; readonly y: number; readonly zoom: number };
+};
+
+export const defaultStateMap: StateMapSettings = {
+    kind: 'state-map',
+    positions: {},
+    camera: { x: 0, y: 0, zoom: 1 },
+};
+
 export type Settings =
-    SketchSettings | FormulaEditorSettings | ThemeEditorSettings | NoteSettings | AgendaSettings;
+    | SketchSettings
+    | FormulaEditorSettings
+    | ThemeEditorSettings
+    | NoteSettings
+    | AgendaSettings
+    | StateMapSettings;
+
+export const asStateMap = (settings: Settings | undefined): StateMapSettings =>
+    settings?.kind === 'state-map' ? settings : defaultStateMap;
 
 export const defaultSketch: SketchSettings = {
     kind: 'sketch',
@@ -306,6 +328,43 @@ export const parseSettings = (value: unknown): Settings | null => {
             const day = field(value, 'day');
 
             return { kind: 'agenda', day: typeof day === 'string' && isDay(day) ? day : null };
+        }
+        case 'state-map': {
+            const positions = field(value, 'positions');
+            const camera = field(value, 'camera');
+            const spot = (stored: unknown): Spot | null => {
+                if (typeof stored !== 'object' || stored === null) {
+                    return null;
+                }
+
+                const x = field(stored, 'x');
+                const y = field(stored, 'y');
+
+                return typeof x === 'number' &&
+                    Number.isFinite(x) &&
+                    typeof y === 'number' &&
+                    Number.isFinite(y)
+                    ? { x, y }
+                    : null;
+            };
+            const at = spot(camera);
+            const zoom =
+                typeof camera === 'object' && camera !== null ? field(camera, 'zoom') : null;
+
+            return {
+                kind: 'state-map',
+                positions: Object.fromEntries(
+                    typeof positions === 'object' && positions !== null
+                        ? Object.entries(positions).flatMap(([node, stored]) => {
+                              const found = spot(stored);
+
+                              return found === null ? [] : [[node, found] as const];
+                          })
+                        : [],
+                ),
+                camera:
+                    at === null ? defaultStateMap.camera : { ...at, zoom: finite(zoom, 1, 0.1, 4) },
+            };
         }
         default:
             return null;

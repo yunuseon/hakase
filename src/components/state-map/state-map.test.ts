@@ -3,6 +3,7 @@ import {
     focusedStores,
     layoutOf,
     NODE_WIDTH,
+    placedAt,
     relatedTo,
     unusedOf,
     type StateGraph,
@@ -245,5 +246,35 @@ describe('chains in the map', () => {
     it('counts a store that only feeds a used one as used, and a chain nothing reads as unused', () => {
         expect(unusedOf(layoutOf(chain))).toBe(0);
         expect(unusedOf(layoutOf({ ...chain, windows: [] }))).toBe(2);
+    });
+});
+
+describe('moved nodes', () => {
+    it('keeps a moved node where it was put, and wires follow it', () => {
+        const auto = layoutOf(view);
+        const moved = layoutOf(view, { 'window:sketch-2': { x: 900, y: 40 } });
+        const sketch = moved.windows.find(({ id }) => id === 'sketch-2');
+
+        expect(sketch).toMatchObject({ x: 900, y: 40 });
+        expect(placedAt(moved, 'window:sketch-2')).toMatchObject({ x: 900, y: 40 });
+        expect(moved.windows.find(({ id }) => id === 'signal-5')?.x).toBe(
+            auto.windows.find(({ id }) => id === 'signal-5')?.x,
+        );
+        expect(
+            moved.wires
+                .find(({ input }) => input === 'k1')
+                ?.path.endsWith(`900 ${40 + 30 + 24 + 12}`),
+        ).toBe(true);
+    });
+
+    it('frames every node, wherever it was moved', () => {
+        const { bounds } = layoutOf(view, { 'store:timeline': { x: -200, y: -50 } });
+
+        expect(bounds.x).toBe(-200);
+        expect(bounds.y).toBe(-50);
+    });
+
+    it('ignores a stored spot named after something every object has', () => {
+        expect(() => layoutOf(view, { constructor: { x: 1, y: 1 } })).not.toThrow();
     });
 });

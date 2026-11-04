@@ -3,6 +3,7 @@ import {
     distinctUntilChanged,
     ignoreElements,
     map,
+    mergeMap,
     scan,
     shareReplay,
     startWith,
@@ -15,10 +16,13 @@ import { displayable, rowsOf, toggled, type Plain } from '../components/state-ma
 import {
     focusedStores,
     layoutOf,
+    placedAt,
     unusedOf,
     type GraphStore,
 } from '../components/state-map/state-map.ts';
 import type { AppInput, Program } from '../program.ts';
+import { asStateMap } from '../settings.ts';
+import { centredOn, IDENTITY, panned, zoomedAround } from '../shared/camera.ts';
 
 const READ_MS = 250;
 
@@ -37,10 +41,24 @@ export const stateProgram = {
 
         return {
             element: stateMap,
-            run$: ({ graph$, inspect$ }) => {
-                const layout$ = graph$.pipe(
-                    map(layoutOf),
+            run$: ({ graph$, inspect$ }, self) => {
+                const settings$ = self.settings$.pipe(
+                    map(asStateMap),
                     shareReplay({ bufferSize: 1, refCount: true }),
+                );
+                const layout$ = combineLatest([
+                    graph$,
+                    settings$.pipe(
+                        map(({ positions }) => positions),
+                        distinctUntilChanged(),
+                    ),
+                ]).pipe(
+                    map(([graph, positions]) => layoutOf(graph, positions)),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+                const camera$ = settings$.pipe(
+                    map(({ camera }) => camera),
+                    distinctUntilChanged(),
                 );
                 const stores$ = combineLatest([layout$, stateMap.focus$]).pipe(
                     map(([layout, focus]) => focusedStores(layout, focus)),
@@ -85,6 +103,7 @@ export const stateProgram = {
                     stateMap
                         .connect$(
                             layout$,
+                            camera$,
                             combineLatest([values$, expanded$]).pipe(
                                 map(([values, open]) =>
                                     values.map(([{ target, title, name, colour }, value]) => ({
@@ -118,6 +137,47 @@ export const stateProgram = {
                             ),
                         )
                         .pipe(ignoreElements()),
+                    merge(
+                        stateMap.moves$.pipe(
+                            withLatestFrom(settings$, layout$),
+                            mergeMap(([{ node, dx, dy }, current, layout]) => {
+                                const at = placedAt(layout, node);
+
+                                return at === null
+                                    ? []
+                                    : [
+                                          {
+                                              ...current,
+                                              positions: {
+                                                  ...current.positions,
+                                                  [node]: { x: at.x + dx, y: at.y + dy },
+                                              },
+                                          },
+                                      ];
+                            }),
+                        ),
+                        stateMap.views$.pipe(
+                            withLatestFrom(settings$),
+                            map(([gesture, current]) => ({
+                                ...current,
+                                camera:
+                                    gesture.kind === 'pan'
+                                        ? panned(current.camera, gesture.dx, gesture.dy)
+                                        : zoomedAround(current.camera, gesture.factor, gesture.at),
+                            })),
+                        ),
+                        stateMap.fits$.pipe(
+                            withLatestFrom(settings$, layout$),
+                            map(([size, current, { bounds }]) => ({
+                                ...current,
+                                camera: centredOn(IDENTITY, bounds, size),
+                            })),
+                        ),
+                        stateMap.tidies$.pipe(
+                            withLatestFrom(settings$),
+                            map(([, current]) => ({ ...current, positions: {} })),
+                        ),
+                    ).pipe(map((settings): AppInput => ({ kind: 'settings', settings }))),
                     stateMap.commands$.pipe(
                         map((command): AppInput => {
                             switch (command.kind) {
