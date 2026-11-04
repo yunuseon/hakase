@@ -1159,6 +1159,33 @@ enters an input level from the left, even when the target lies behind its
 source, so which end is which reads at a glance; a backward wire's pull grows with
 how far apart the jacks are, capped, so both ends stay readable.
 
+**Inputs come in groups, so a window's jacks always fit inside it.** A
+followed input may name a `group` in its definition (the sketch's Knobs, Camera
+and Look); a group of one is not a group. A closed group is one line with a
+bundled jack (a second ring behind it), its name, how many of its inputs are
+bound, and a chevron; it opens to its members, indented on a rail from that
+jack. **One group is open per window**, which is what keeps the smallest sketch
+(320 x 420) inside its frame whichever group is open, and is tested at that
+size. Three rules make it feel right:
+
+- **A closed group's wires still land.** Its members stay in the view as
+  `hidden` sockets placed on the group's jack, so every wire has an end and
+  the wire logic needs no case for groups.
+- **A drag springs a group open.** Hovering a group's line while dragging opens
+  it, but only if one of its members could take the wire (`hover`, resolved
+  by `commandFor` against the view, never by the component); a drop inside it
+  keeps it open, and anything else lets it close again (`settle`). The sprung
+  group stands in for the window's own open one only for the drag.
+- **Open groups outlive the mode.** They live in the session fold (`open`,
+  `sprung`) beside the mode's locks, not in the component, because the layout
+  that places every wire reads them. Closing the mode keeps them, closing a
+  window drops its own, and nothing is saved.
+
+The rows are rebuilt on every change, so they are appended in reading order
+(window by window, top to bottom) for Tab to follow, and focus is restored to
+the matching row afterwards, or a click on a group line would drop the
+keyboard's place.
+
 `state-mode.ts` derives the world-space sockets and wires. `hks-state-wiring`
 owns their DOM, and compact output selectors offer a manage button for the
 existing name, new-state and fork controls. States without an open window
@@ -1777,7 +1804,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-seven of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

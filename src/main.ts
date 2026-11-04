@@ -671,7 +671,7 @@ const bootstrap = () => {
         share(),
     );
 
-    const mode$: Observable<StateMode> = merge(
+    const session$ = merge(
         signals$.pipe(
             mergeMap((signal): ModeAction[] =>
                 signal.to === 'state-mode' ? [{ kind: 'enter', origin: signal.id }] : [],
@@ -691,22 +691,29 @@ const bootstrap = () => {
         canvas.escapes$.pipe(map((): ModeAction => ({ kind: 'close' }))),
         defer(() => wiringEvents$).pipe(
             mergeMap((event): ModeAction[] =>
-                event.kind === 'close' ? [{ kind: 'close' }] : event.kind === 'busy' ? [event] : [],
+                event.kind === 'close'
+                    ? [{ kind: 'close' }]
+                    : event.kind === 'busy' ||
+                        event.kind === 'expand' ||
+                        event.kind === 'spring' ||
+                        event.kind === 'settle'
+                      ? [event]
+                      : [],
             ),
         ),
     ).pipe(
         scan(reduceSession, defaultSession),
         startWith(defaultSession),
-        map(modeOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
+    const mode$: Observable<StateMode> = session$.pipe(map(modeOf));
 
     const wiringView$: Observable<WiringView | null> = combineLatest([
         workspace$,
         defer(() => waves$),
-        mode$,
+        session$,
     ]).pipe(
-        map(([workspace, signals, mode]) => wiringOf(workspace, signals, inputsFor, mode)),
+        map(([workspace, signals, session]) => wiringOf(workspace, signals, inputsFor, session)),
         distinctUntilChanged(sameWiring),
         shareReplay({ bufferSize: 1, refCount: true }),
     );

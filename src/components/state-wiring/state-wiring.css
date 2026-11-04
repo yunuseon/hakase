@@ -233,3 +233,132 @@ path.shared {
     background: var(--wiring-well);
     outline: none;
 }
+
+.group {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    inline-size: max-content;
+    max-inline-size: var(--socket-width);
+    block-size: 28px;
+    margin: 0;
+    padding: 3px 6px 3px 28px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--wiring-ink);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    pointer-events: auto;
+}
+.hub {
+    position: absolute;
+    inset-inline-start: 3px;
+    inset-block-start: 6px;
+    inline-size: 14px;
+    block-size: 14px;
+    box-sizing: border-box;
+    border: 2px solid var(--store);
+    border-radius: 50%;
+    background: var(--wiring-panel);
+    box-shadow: 0 0 0 3px var(--wiring-panel);
+}
+/* A second ring behind the first: this jack stands for several. */
+.hub::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px solid var(--store);
+    border-radius: 50%;
+    transform: translate(5px, 0);
+    opacity: 0.5;
+    z-index: -1;
+}
+.group[data-bound] .hub {
+    background: radial-gradient(circle, var(--store) 0 2.5px, var(--wiring-panel) 3px);
+}
+.pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-inline-size: 0;
+    padding: 2px 4px 2px 5px;
+    border-radius: 4px;
+    background: var(--wiring-panel);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    font: 600 10px var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.count {
+    display: none;
+    min-inline-size: 14px;
+    block-size: 14px;
+    padding: 0 3px;
+    box-sizing: border-box;
+    border-radius: 7px;
+    background: var(--store);
+    color: var(--wiring-panel);
+    font: 700 9px/14px var(--font-mono);
+    text-align: center;
+    letter-spacing: 0;
+}
+.group[data-bound] .count {
+    display: block;
+}
+.chevron {
+    inline-size: 0;
+    block-size: 0;
+    border-block: 3.5px solid transparent;
+    border-inline-start: 5px solid currentColor;
+    opacity: 0.7;
+}
+.group[aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
+}
+.group:hover,
+.group:focus-visible,
+.group[aria-expanded='true'],
+:host([data-dragging]) .group[data-compatible] {
+    inline-size: var(--socket-width);
+    background: var(--wiring-panel);
+    border-color: var(--wiring-edge);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--shadow) 8%, transparent);
+    outline: none;
+}
+.group:hover .pill,
+.group:focus-visible .pill,
+.group[aria-expanded='true'] .pill,
+:host([data-dragging]) .group[data-compatible] .pill {
+    flex: 1;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.group:hover .chevron,
+.group:focus-visible .chevron,
+.group[aria-expanded='true'] .chevron,
+:host([data-dragging]) .group[data-compatible] .chevron {
+    margin-inline-start: auto;
+}
+.group:focus-visible {
+    border-color: var(--accent);
+}
+:host([data-dragging]) .group {
+    opacity: 0.3;
+}
+:host([data-dragging]) .group[data-compatible] {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.rail {
+    position: absolute;
+    inline-size: 2px;
+    margin-inline-start: -1px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--wiring-panel) 45%, transparent);
+    pointer-events: none;
+}

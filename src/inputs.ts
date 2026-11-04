@@ -53,6 +53,7 @@ type Source = (typeof SOURCES)[number];
 export type FollowedInput = {
     readonly title: string;
     readonly from: 'followed';
+    readonly group: string | null;
     readonly sources: readonly Source[];
     readonly initial: Follow | null;
 };
@@ -74,6 +75,7 @@ export type InputsFor = (program: ProgramId) => ProgramInputs;
 export const playbackInput = {
     title: 'Playback',
     from: 'followed',
+    group: null,
     sources: [playbackSource],
     initial: { kind: 'playback', store: 'timeline' },
 } as const satisfies FollowedInput;
@@ -81,20 +83,28 @@ export const playbackInput = {
 export const progressInput = {
     title: 'Progress',
     from: 'followed',
+    group: null,
     sources: [playbackSource, focusSource],
     initial: { kind: 'playback', store: 'timeline' },
 } as const satisfies FollowedInput;
 
-const signalInput = (title: string) =>
+const signalInput = (title: string, group: string) =>
     ({
         title,
         from: 'followed',
+        group,
         sources: [signalSource],
         initial: null,
     }) as const satisfies FollowedInput;
 
 const storedSignalInput = (param: Param) =>
-    ({ ...signalInput(param), from: 'store', param }) satisfies StoreInput;
+    ({
+        title: param,
+        from: 'store',
+        param,
+        sources: [signalSource],
+        initial: null,
+    }) satisfies StoreInput;
 
 export const signalInputs = {
     phase: storedSignalInput('phase'),
@@ -103,21 +113,21 @@ export const signalInputs = {
 };
 
 export const knobInputs = {
-    k1: signalInput('k1'),
-    k2: signalInput('k2'),
-    k3: signalInput('k3'),
-    k4: signalInput('k4'),
+    k1: signalInput('k1', 'Knobs'),
+    k2: signalInput('k2', 'Knobs'),
+    k3: signalInput('k3', 'Knobs'),
+    k4: signalInput('k4', 'Knobs'),
 };
 
 export const sceneInputs = {
-    turn: signalInput('turn'),
-    pitch: signalInput('pitch'),
-    distance: signalInput('distance'),
-    focus: signalInput('focus'),
-    colour: signalInput('colour'),
-    size: signalInput('dot size'),
-    depth: signalInput('depth'),
-    trails: signalInput('trails'),
+    turn: signalInput('turn', 'Camera'),
+    pitch: signalInput('pitch', 'Camera'),
+    distance: signalInput('distance', 'Camera'),
+    focus: signalInput('focus', 'Look'),
+    colour: signalInput('colour', 'Look'),
+    size: signalInput('dot size', 'Look'),
+    depth: signalInput('depth', 'Look'),
+    trails: signalInput('trails', 'Look'),
 };
 
 export const ownPlaybackInput = {
