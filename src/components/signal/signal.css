@@ -92,7 +92,8 @@
 }
 
 .shapes,
-.rates {
+.rates,
+.counts {
     display: flex;
     gap: 2px;
     padding: 2px;
@@ -101,7 +102,8 @@
 }
 
 .shapes button,
-.rates button {
+.rates button,
+.counts button {
     display: grid;
     place-items: center;
     min-inline-size: 26px;
@@ -116,12 +118,14 @@
 }
 
 .shapes button:hover,
-.rates button:hover {
+.rates button:hover,
+.counts button:hover {
     color: var(--ink);
 }
 
 .shapes button[aria-checked='true'],
-.rates button[aria-checked='true'] {
+.rates button[aria-checked='true'],
+.counts button[aria-checked='true'] {
     color: var(--ink);
     background: var(--panel);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
@@ -143,8 +147,58 @@
 
 .params {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 6px;
+}
+
+/* The rows below set their own display, which would otherwise win over the hidden attribute. */
+.steps[hidden],
+.param[hidden] {
+    display: none;
+}
+
+.steps {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.bars {
+    flex: 1;
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    min-inline-size: 0;
+    block-size: 56px;
+    overflow: hidden;
+    background: var(--well);
+    border-radius: 9px;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+
+.bar {
+    flex: 1;
+    block-size: calc(var(--value, 0.5) * 100%);
+    min-block-size: 2px;
+    background: var(--ink);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.counts {
+    flex-direction: column;
+    flex-wrap: wrap;
+    block-size: 56px;
+    box-sizing: border-box;
+}
+
+.counts button {
+    min-inline-size: 22px;
+    block-size: 16px;
+    font-size: 10px;
 }
 
 .param {
@@ -188,7 +242,8 @@
 }
 
 .shapes button:focus-visible,
-.rates button:focus-visible {
+.rates button:focus-visible,
+.counts button:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }

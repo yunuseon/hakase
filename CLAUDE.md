@@ -1028,7 +1028,7 @@ receives them as plain `StoreOption`s and knows nothing else.
 ## Signals
 
 `signal` is a document program: a low-frequency wave, `Signal = { shape, rate,
-phase, offset, depth }`, with `signalAt(signal, t)` a **pure function of the
+phase, offset, depth, steps, glide }`, with `signalAt(signal, t)` a **pure function of the
 playhead** (`src/shared/signal.ts`, shared because the sketch reads it too).
 That is what keeps a signal honest about time: it loops seamlessly, a scrub
 lands exactly, and an export or a thumbnail evaluates it at its own frame with
@@ -1057,6 +1057,23 @@ for the phase, `typedValue`), the arrow keys nudge it. A drag is reported as a
 not reach for the value the fold owns. A field being typed into is not written
 over, and leaving it writes the fold's value back, which is how Escape and a
 refused entry restore it.
+
+**A step sequencer is a shape, not a program.** `steps` reads the wave from a
+table of 4 to 16 values in 0 to 1 (`STEP_COUNTS`), each held for its share of
+the cycle and, with **glide**, easing into the next over the last part of it,
+the last step into the first so a loop still loops. Offset, depth, phase and
+rate apply to it like any other shape, so it chains, drives knobs and is saved
+and pruned with no code of its own. A separate `sequence` program was weighed
+and dropped: every input, the follow kinds, a second fold, its parser, the
+prune and every chain lookup would have had to know two kinds of modulator for
+what is one more way of drawing a wave. The table and glide stay on a signal
+whatever its shape, so switching away and back keeps them. They are edited
+in a bar strip shown only for that shape (`data-only`, like the sketch's
+mode rows): a stroke is reported as `draw`, from and to as fractions of the
+strip, and `drawn` sets every step between the two, so a fast stroke leaves no
+gaps. Changing the count resamples the table rather than clearing it. Glide is
+a fourth drag-number, a `Field` but not a `Param`, because it cannot follow
+another signal.
 
 A signal window shows its wave and marks the moment of the clock it follows
 (it takes `playbackInput` like a sketch). A sketch's four knobs are inputs
@@ -1738,7 +1755,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

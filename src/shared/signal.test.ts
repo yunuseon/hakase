@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
     closesLoop,
     defaultSignal,
+    drawn,
     parseSignal,
     RATES,
     reachedFrom,
     reduceSignal,
+    resampled,
     SHAPES,
     signalAt,
     waveAt,
@@ -37,6 +39,51 @@ describe('signalAt', () => {
         expect(signalAt(defaultSignal, 0.5)).toBeCloseTo(1);
         expect(signalAt({ ...defaultSignal, phase: 0.5 }, 0)).toBeCloseTo(1);
         expect(signalAt({ ...defaultSignal, depth: -0.5 }, 0)).toBeCloseTo(1);
+    });
+});
+
+describe('steps', () => {
+    const steps: Signal = {
+        ...defaultSignal,
+        shape: 'steps',
+        steps: [0, 1, 0.5, 0.25],
+        offset: 0.5,
+        depth: 0.5,
+    };
+
+    it('holds each step for its share of the cycle', () => {
+        expect(signalAt(steps, 0.1)).toBeCloseTo(0);
+        expect(signalAt(steps, 0.3)).toBeCloseTo(1);
+        expect(signalAt(steps, 0.6)).toBeCloseTo(0.5);
+        expect(signalAt(steps, 0.99)).toBeCloseTo(0.25);
+    });
+
+    it('glides into the next step over the end of each one, the last back into the first', () => {
+        const gliding = { ...steps, glide: 0.5 };
+
+        expect(signalAt(gliding, 0.1)).toBeCloseTo(0);
+        expect(signalAt(gliding, 0.1875)).toBeCloseTo(0.5);
+        expect(signalAt(gliding, 0.2499)).toBeCloseTo(1, 2);
+        expect(signalAt(gliding, 1)).toBeCloseTo(signalAt(gliding, 0), 9);
+    });
+
+    it('sets every step a stroke crossed, however fast it went', () => {
+        expect(
+            drawn([0, 0, 0, 0], { x: 0.05, y: 1 }, { x: 0.95, y: 0 }).map(
+                value => Math.round(value * 1000) / 1000,
+            ),
+        ).toEqual([0, 0.333, 0.667, 1]);
+        expect(drawn([0, 0, 0, 0], { x: 0.6, y: 0.25 }, { x: 0.6, y: 0.25 })).toEqual([
+            0, 0, 0.75, 0,
+        ]);
+        expect(drawn([0, 0], { x: -1, y: 2 }, { x: -1, y: 2 })).toEqual([0, 0]);
+    });
+
+    it('keeps the pattern when the count changes', () => {
+        expect(resampled([0.1, 0.9], 4)).toEqual([0.1, 0.1, 0.9, 0.9]);
+        expect(resampled([0.1, 0.2, 0.3, 0.4], 2)).toEqual([0.1, 0.3]);
+        expect(reduceSignal(steps, { kind: 'step-count', count: 8 }).steps).toHaveLength(8);
+        expect(reduceSignal(steps, { kind: 'set', param: 'glide', value: 3 }).glide).toBe(1);
     });
 });
 
@@ -75,6 +122,11 @@ describe('parseSignal', () => {
             depth: 40,
         });
         expect(parseSignal(null)).toEqual(defaultSignal);
+        expect(parseSignal({ steps: [0.5, 2, 'x', 0.1, -1], glide: 0.3 })).toMatchObject({
+            steps: [0.5, 1, 0.1, 0],
+            glide: 0.3,
+        });
+        expect(parseSignal({ steps: [0.5, 0.5, 0.5] }).steps).toEqual(defaultSignal.steps);
     });
 
     it('reads a signal saved as low and high as the same wave', () => {

@@ -36,12 +36,14 @@ describe('values', () => {
         expect(valueText('depth', 0.5)).toBe('0.50');
         expect(valueText('offset', 12.34)).toBe('12.3');
         expect(valueText('offset', -250)).toBe('-250');
+        expect(valueText('glide', 0.25)).toBe('25%');
     });
 
     it('read typed text, degrees for the phase, and refuse what is no number', () => {
         expect(typedValue('phase', '90°')).toBeCloseTo(0.25);
         expect(typedValue('offset', ' 3,5 ')).toBe(3.5);
         expect(typedValue('depth', 'loud')).toBeNull();
+        expect(typedValue('glide', '40%')).toBeCloseTo(0.4);
     });
 
     it('drag ten times finer with shift', () => {

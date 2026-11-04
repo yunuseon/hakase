@@ -1,4 +1,4 @@
-import { samplesOf, waveAt, type Param, type Wave } from '../../shared/signal.ts';
+import { samplesOf, waveAt, type Field, type Wave } from '../../shared/signal.ts';
 
 export const WIDTH = 200;
 export const HEIGHT = 80;
@@ -37,21 +37,35 @@ export const markerOf = (wave: Wave, { min, max }: Plot, t: number) => ({
     y: HEIGHT - ((waveAt(wave, t) - min) / (max - min)) * HEIGHT,
 });
 
-export const valueText = (param: Param, value: number) => {
-    if (param === 'phase') {
-        return `${Math.round(value * 360)}°`;
+export const valueText = (field: Field, value: number) => {
+    switch (field) {
+        case 'phase':
+            return `${Math.round(value * 360)}°`;
+        case 'glide':
+            return `${Math.round(value * 100)}%`;
+        default: {
+            const size = Math.abs(value);
+
+            return size >= 100
+                ? value.toFixed(0)
+                : size >= 10
+                  ? value.toFixed(1)
+                  : value.toFixed(2);
+        }
     }
-
-    const size = Math.abs(value);
-
-    return size >= 100 ? value.toFixed(0) : size >= 10 ? value.toFixed(1) : value.toFixed(2);
 };
 
-export const typedValue = (param: Param, text: string): number | null => {
-    const value = Number.parseFloat(text.replace('°', '').replace(',', '.').trim());
+export const typedValue = (field: Field, text: string): number | null => {
+    const value = Number.parseFloat(text.replace(/[°%]/, '').replace(',', '.').trim());
 
-    return Number.isFinite(value) ? (param === 'phase' ? value / 360 : value) : null;
+    return !Number.isFinite(value)
+        ? null
+        : field === 'phase'
+          ? value / 360
+          : field === 'glide'
+            ? value / 100
+            : value;
 };
 
-export const dragStep = (param: Param, fine: boolean) =>
-    (param === 'phase' ? 1 / 360 : 0.01) * (fine ? 0.1 : 1);
+export const dragStep = (field: Field, fine: boolean) =>
+    (field === 'phase' ? 1 / 360 : field === 'glide' ? 1 / 200 : 0.01) * (fine ? 0.1 : 1);

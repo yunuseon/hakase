@@ -14,13 +14,16 @@ import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
 import {
+    FIELDS,
+    isField,
     isParam,
     isRate,
     isShape,
-    PARAMS,
+    isStepCount,
     RATES,
     SHAPES,
-    type Param,
+    STEP_COUNTS,
+    type Field,
     type Shape,
     type Signal,
     type SignalCommand,
@@ -38,12 +41,14 @@ const GLYPHS: Readonly<Record<Shape, string>> = {
     saw: 'M1 10 L12 2 V10 L23 2 V10',
     square: 'M1 10 V2 H12 V10 H23 V2',
     noise: 'M1 7 L4 3 L7 8 L10 5 L13 9 L16 2 L19 6 L23 4',
+    steps: 'M1 10 V5 H7 V8 H13 V2 H19 V6 H23',
 };
 
-const HINTS: Readonly<Record<Param, string>> = {
+const HINTS: Readonly<Record<Field, string>> = {
     phase: 'where in its cycle the loop starts: drag, or click to type degrees',
     offset: 'the centre the wave swings around: drag, or click to type any number',
     depth: 'how far the wave swings either side, negative flips it: drag, or click to type',
+    glide: 'how much of each step eases into the next: drag, or click to type a percentage',
 };
 
 const TEMPLATE = `
@@ -72,10 +77,19 @@ const TEMPLATE = `
             ).join('')}
         </div>
     </div>
+    <div class="steps" data-only="steps">
+        <div class="bars" title="draw the steps"></div>
+        <div class="counts" role="radiogroup" aria-label="steps" title="steps per cycle">
+            ${STEP_COUNTS.map(
+                count =>
+                    `<button type="button" role="radio" data-count="${count}">${count}</button>`,
+            ).join('')}
+        </div>
+    </div>
     <div class="params">
-        ${PARAMS.map(
+        ${FIELDS.map(
             param => `
-            <label class="param" title="${HINTS[param]}">
+            <label class="param" title="${HINTS[param]}"${param === 'glide' ? ' data-only="steps"' : ''}>
                 <span class="key">${param}</span>
                 <input class="num" data-param="${param}" type="text" inputmode="decimal"
                        spellcheck="false" autocomplete="off" />
@@ -86,17 +100,26 @@ const TEMPLATE = `
 
 type Pull = {
     readonly phase: Phase;
-    readonly param: Param | null;
+    readonly param: Field | null;
     readonly x: number;
     readonly y: number;
     readonly moved: number;
     readonly by: number;
 };
 
-const paramOf = (target: EventTarget | null): Param | null => {
+const paramOf = (target: EventTarget | null): Field | null => {
     const param = target instanceof HTMLElement ? target.dataset['param'] : undefined;
 
-    return param !== undefined && isParam(param) ? param : null;
+    return param !== undefined && isField(param) ? param : null;
+};
+
+const fractionIn = (element: Element, { clientX, clientY }: PointerEvent) => {
+    const rect = element.getBoundingClientRect();
+
+    return {
+        x: (clientX - rect.left) / Math.max(rect.width, 1),
+        y: (clientY - rect.top) / Math.max(rect.height, 1),
+    };
 };
 
 export class HksSignal extends HTMLElement {
@@ -115,6 +138,7 @@ export class HksSignal extends HTMLElement {
 
         const scope = requireChild(shadow, '.scope');
         const params = requireChild(shadow, '.params');
+        const bars = requireChild(shadow, '.bars');
 
         // Shared: the nudges and the click that opens the field for typing must read one gesture.
         this.pulls$ = pointerGesture$(
@@ -163,6 +187,31 @@ export class HksSignal extends HTMLElement {
 
                     return shape !== undefined && isShape(shape) ? [{ kind: 'shape', shape }] : [];
                 }),
+            ),
+            fromElementEvent$(requireChild(shadow, '.counts'), 'click').pipe(
+                mergeMap(({ target }): SignalCommand[] => {
+                    const count =
+                        target instanceof HTMLElement ? Number(target.dataset['count']) : NaN;
+
+                    return isStepCount(count) ? [{ kind: 'step-count', count }] : [];
+                }),
+            ),
+            pointerGesture$(bars).pipe(
+                map(({ phase, event }) => ({ phase, at: fractionIn(bars, event) })),
+                // Or the very first stroke's grab has nothing to pair with and is lost.
+                startWith({ phase: 'release' as const, at: { x: 0, y: 0 } }),
+                pairwise(),
+                mergeMap(([before, { phase, at }]): SignalCommand[] =>
+                    phase === 'release'
+                        ? []
+                        : [
+                              {
+                                  kind: 'draw',
+                                  from: phase === 'grab' ? at : before.at,
+                                  to: at,
+                              },
+                          ],
+                ),
             ),
             fromElementEvent$(requireChild(shadow, '.rates'), 'click').pipe(
                 mergeMap(({ target }): SignalCommand[] => {
@@ -235,6 +284,7 @@ export class HksSignal extends HTMLElement {
     ): Observable<void> {
         const shadow = this.shadow;
         const params = requireChild(shadow, '.params');
+        const bars = requireChild(shadow, '.bars');
         const line = requireElement(shadow, '.wave', SVGPathElement);
         const now = requireElement(shadow, '.now', SVGLineElement);
         const zero = requireElement(shadow, '.zero', SVGLineElement);
@@ -255,6 +305,39 @@ export class HksSignal extends HTMLElement {
             distinctUntilChanged(),
             tap(shape => {
                 checked('[data-shape]', 'shape', shape);
+
+                for (const element of shadow.querySelectorAll('[data-only]')) {
+                    if (element instanceof HTMLElement) {
+                        element.hidden = element.dataset['only'] !== shape;
+                    }
+                }
+            }),
+        );
+
+        const steps$ = signal$.pipe(
+            map(({ steps }) => steps),
+            distinctUntilChanged(),
+            tap(steps => {
+                checked('[data-count]', 'count', String(steps.length));
+
+                if (bars.children.length !== steps.length) {
+                    bars.replaceChildren(
+                        ...steps.map(() => {
+                            const bar = document.createElement('span');
+                            bar.className = 'bar';
+
+                            return bar;
+                        }),
+                    );
+                }
+
+                steps.forEach((value, index) => {
+                    const bar = bars.children[index];
+
+                    if (bar instanceof HTMLElement) {
+                        bar.style.setProperty('--value', String(value));
+                    }
+                });
             }),
         );
 
@@ -269,11 +352,11 @@ export class HksSignal extends HTMLElement {
         // A field that loses focus is written again, so Escape or a refused entry shows the value it had.
         const left$ = fromElementEvent$(params, 'focusout').pipe(startWith(null));
 
-        const fields$ = PARAMS.map(param =>
+        const fields$ = FIELDS.map(param =>
             combineLatest([
                 combineLatest([
                     signal$.pipe(map(signal => valueText(param, signal[param]))),
-                    wave$.pipe(map(({ mods }) => mods[param] !== null)),
+                    wave$.pipe(map(({ mods }) => isParam(param) && mods[param] !== null)),
                 ]).pipe(distinctUntilChanged(([a, x], [b, y]) => a === b && x === y)),
                 left$,
             ]).pipe(
@@ -348,7 +431,7 @@ export class HksSignal extends HTMLElement {
             }),
         );
 
-        return merge(shape$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
+        return merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
             map(() => undefined),
         );
     }

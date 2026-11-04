@@ -1,6 +1,6 @@
-import { wrap01 } from '../lib/math.ts';
+import { clamp, wrap01 } from '../lib/math.ts';
 
-export const SHAPES = ['sine', 'triangle', 'saw', 'square', 'noise'] as const;
+export const SHAPES = ['sine', 'triangle', 'saw', 'square', 'noise', 'steps'] as const;
 export type Shape = (typeof SHAPES)[number];
 export const isShape = (value: string): value is Shape => SHAPES.some(shape => shape === value);
 
@@ -14,6 +14,15 @@ export const PARAMS = ['phase', 'offset', 'depth'] as const;
 export type Param = (typeof PARAMS)[number];
 export const isParam = (value: string): value is Param => PARAMS.some(param => param === value);
 
+export const FIELDS = [...PARAMS, 'glide'] as const;
+export type Field = (typeof FIELDS)[number];
+export const isField = (value: string): value is Field => FIELDS.some(field => field === value);
+
+export const STEP_COUNTS = [4, 6, 8, 12, 16] as const;
+export type StepCount = (typeof STEP_COUNTS)[number];
+export const isStepCount = (value: number): value is StepCount =>
+    STEP_COUNTS.some(count => count === value);
+
 export type Sources = Readonly<Record<Param, string | null>>;
 
 export type Signal = {
@@ -22,6 +31,9 @@ export type Signal = {
     readonly phase: number;
     readonly offset: number;
     readonly depth: number;
+    // Kept whatever the shape, so switching away from steps and back finds them as they were.
+    readonly steps: readonly number[];
+    readonly glide: number;
     readonly sources: Sources;
 };
 
@@ -33,24 +45,62 @@ export const defaultSignal: Signal = {
     phase: 0,
     offset: 0.5,
     depth: 0.5,
+    steps: [0.2, 0.9, 0.5, 1, 0.1, 0.7, 0.35, 0.8],
+    glide: 0,
     sources: unsourced,
 };
 
 export type SignalCommand =
     | { readonly kind: 'shape'; readonly shape: Shape }
     | { readonly kind: 'rate'; readonly rate: Rate }
-    | { readonly kind: 'set'; readonly param: Param; readonly value: number }
+    | { readonly kind: 'set'; readonly param: Field; readonly value: number }
     // Relative, so a control reports how far it was dragged and never reads the value it moves.
-    | { readonly kind: 'nudge'; readonly param: Param; readonly by: number }
+    | { readonly kind: 'nudge'; readonly param: Field; readonly by: number }
     | { readonly kind: 'drag-wave'; readonly dx: number; readonly dy: number }
+    | { readonly kind: 'step-count'; readonly count: StepCount }
+    // From and to as fractions of the editor, so a fast stroke still sets every step it crossed.
+    | { readonly kind: 'draw'; readonly from: Point; readonly to: Point }
     | { readonly kind: 'source'; readonly param: Param; readonly source: string | null };
 
-const withParam = (signal: Signal, param: Param, value: number): Signal =>
-    !Number.isFinite(value)
-        ? signal
-        : param === 'phase'
-          ? { ...signal, phase: wrap01(value) }
-          : { ...signal, [param]: value };
+type Point = { readonly x: number; readonly y: number };
+
+const withParam = (signal: Signal, param: Field, value: number): Signal => {
+    if (!Number.isFinite(value)) {
+        return signal;
+    }
+
+    switch (param) {
+        case 'phase':
+            return { ...signal, phase: wrap01(value) };
+        case 'glide':
+            return { ...signal, glide: clamp(value, 0, 1) };
+        default:
+            return { ...signal, [param]: value };
+    }
+};
+
+export const resampled = (steps: readonly number[], count: number) =>
+    Array.from(
+        { length: count },
+        (_, index) => steps[Math.floor((index * steps.length) / count)] ?? 0.5,
+    );
+
+export const drawn = (steps: readonly number[], from: Point, to: Point) => {
+    const indexAt = (x: number) => clamp(Math.floor(x * steps.length), 0, steps.length - 1);
+    const [a, b] = from.x <= to.x ? [from, to] : [to, from];
+    const first = indexAt(a.x);
+    const last = indexAt(b.x);
+
+    return steps.map((value, index) => {
+        if (index < first || index > last) {
+            return value;
+        }
+
+        const along = last === first ? 1 : (index - first) / (last - first);
+
+        return clamp(1 - (a.y + (b.y - a.y) * along), 0, 1);
+    });
+};
 
 export const reduceSignal = (signal: Signal, command: SignalCommand): Signal => {
     switch (command.kind) {
@@ -68,6 +118,10 @@ export const reduceSignal = (signal: Signal, command: SignalCommand): Signal => 
                 'phase',
                 signal.phase - command.dx * signal.rate,
             );
+        case 'step-count':
+            return { ...signal, steps: resampled(signal.steps, command.count) };
+        case 'draw':
+            return { ...signal, steps: drawn(signal.steps, command.from, command.to) };
         case 'source':
             return { ...signal, sources: { ...signal.sources, [command.param]: command.source } };
     }
@@ -84,7 +138,20 @@ const hashed = (index: number) => {
     return x - Math.floor(x);
 };
 
-const wave = (shape: Shape, rate: Rate, cycle: number) => {
+const eased = (blend: number) => blend * blend * (3 - 2 * blend);
+
+const stepped = (steps: readonly number[], glide: number, at: number) => {
+    const position = at * steps.length;
+    const index = Math.floor(position) % steps.length;
+    const here = steps[index] ?? 0;
+    const next = steps[(index + 1) % steps.length] ?? here;
+    const into =
+        glide <= 0 ? 0 : clamp((position - Math.floor(position) - (1 - glide)) / glide, 0, 1);
+
+    return here + (next - here) * eased(into);
+};
+
+const wave = ({ shape, rate, steps, glide }: Signal, cycle: number) => {
     const at = cycle - Math.floor(cycle);
 
     switch (shape) {
@@ -101,16 +168,19 @@ const wave = (shape: Shape, rate: Rate, cycle: number) => {
             const count = rate * NOISE_POINTS;
             const position = (cycle * NOISE_POINTS) % count;
             const index = Math.floor(position);
-            const blend = position - index;
-            const eased = blend * blend * (3 - 2 * blend);
 
-            return hashed(index) + (hashed((index + 1) % count) - hashed(index)) * eased;
+            return (
+                hashed(index) +
+                (hashed((index + 1) % count) - hashed(index)) * eased(position - index)
+            );
         }
+        case 'steps':
+            return stepped(steps, glide, at);
     }
 };
 
-export const signalAt = ({ shape, rate, phase, offset, depth }: Signal, t: number) =>
-    offset + depth * (2 * wave(shape, rate, rate * t + phase) - 1);
+export const signalAt = (signal: Signal, t: number) =>
+    signal.offset + signal.depth * (2 * wave(signal, signal.rate * t + signal.phase) - 1);
 
 export type Wave = {
     readonly signal: Signal;
@@ -208,6 +278,16 @@ const sourcesFrom = (value: unknown): Sources => {
     return { phase: source('phase'), offset: source('offset'), depth: source('depth') };
 };
 
+const stepsFrom = (value: unknown) => {
+    const steps = Array.isArray(value)
+        ? value.flatMap((step: unknown) =>
+              typeof step === 'number' && Number.isFinite(step) ? [clamp(step, 0, 1)] : [],
+          )
+        : [];
+
+    return isStepCount(steps.length) ? steps : defaultSignal.steps;
+};
+
 export const parseSignal = (value: unknown): Signal => {
     if (typeof value !== 'object' || value === null) {
         return defaultSignal;
@@ -224,6 +304,8 @@ export const parseSignal = (value: unknown): Signal => {
         phase: wrap01(finiteOr(field(value, 'phase'), defaultSignal.phase)),
         offset: finiteOr(field(value, 'offset'), (low + high) / 2),
         depth: finiteOr(field(value, 'depth'), (high - low) / 2),
+        steps: stepsFrom(field(value, 'steps')),
+        glide: clamp(finiteOr(field(value, 'glide'), defaultSignal.glide), 0, 1),
         sources: sourcesFrom(field(value, 'sources')),
     };
 };
