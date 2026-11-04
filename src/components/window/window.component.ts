@@ -49,7 +49,7 @@ const TEMPLATE = `
             <span class="direction" aria-hidden="true">→</span>
             <span>Output</span>
             <button class="add connections" type="button" title="Show every connection on the canvas (state mode, or hold W)" aria-label="show connections">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6 H9 M15 18 H19 M9 6 C15 6 9 18 15 18 M6 4 V8 M18 16 V20"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M17 17 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M7 7 C13 7 11 17 17 17"/></svg>
             </button>
             <button class="add" type="button" data-copy="false" title="New empty state" aria-label="new empty state">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>

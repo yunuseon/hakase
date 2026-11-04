@@ -144,7 +144,7 @@
 
 .readout {
     flex: 1;
-    min-inline-size: 0;
+    min-inline-size: 6ch;
     font: 500 12px var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--ink);
@@ -193,7 +193,7 @@ svg {
 
 .state-mode {
     inline-size: auto;
-    gap: 4px;
-    padding-inline: 7px;
+    gap: 6px;
+    padding-inline: 8px 10px;
     font: 500 11px var(--font-ui);
 }

@@ -34,7 +34,7 @@ const TEMPLATE = `
         <button class="add" type="button" data-add title="new section around the view">+ section</button>
     </div>
     <div class="row">
-        <button class="key state-mode" type="button" aria-label="state mode" aria-pressed="false" title="State mode (hold W)">${glyph('M5 6 H9 M15 18 H19 M9 6 C15 6 9 18 15 18 M6 4 V8 M18 16 V20')}<span>State</span></button>
+        <button class="key state-mode" type="button" aria-label="state mode" aria-pressed="false" title="State mode (hold W)">${glyph('M3 7 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M17 17 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M7 7 C13 7 11 17 17 17')}<span>State</span></button>
         <button class="key edit" type="button" data-edit="undo" aria-label="undo" title="undo (⌘Z)" disabled>${glyph('M9 14 L4 9 L9 4 M4 9 H15 A5 5 0 0 1 15 19 H11')}</button>
         <button class="key edit" type="button" data-edit="redo" aria-label="redo" title="redo (⇧⌘Z)" disabled>${glyph('M15 14 L20 9 L15 4 M20 9 H9 A5 5 0 0 0 9 19 H13')}</button>
         <span class="divider" aria-hidden="true"></span>

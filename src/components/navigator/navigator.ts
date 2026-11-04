@@ -7,7 +7,7 @@ export type ZoomCommand = (typeof ZOOM_COMMANDS)[number];
 export const isZoomCommand = (value: string): value is ZoomCommand =>
     ZOOM_COMMANDS.some(command => command === value);
 
-export const MINIMAP: Extent = { width: 284, height: 156 };
+export const MINIMAP: Extent = { width: 328, height: 180 };
 
 const PADDING = 0.08;
 

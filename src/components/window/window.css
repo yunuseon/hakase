@@ -419,7 +419,7 @@
 }
 
 input.option-name {
-    margin: -3px 0;
+    margin: -3px 0 -3px -6px;
     padding: 2px 5px;
     font: inherit;
     color: var(--ink);
