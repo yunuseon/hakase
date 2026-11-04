@@ -13,6 +13,8 @@ import type { WorkspaceAction } from './workspace.ts';
 
 export type ProcessSignal =
     | { readonly to: 'workspace'; readonly action: WorkspaceAction }
+    // Apart from the workspace's actions: an open menu is neither saved nor a step to undo.
+    | { readonly to: 'peek'; readonly id: ProcessId; readonly open: boolean }
     // Stamped here so a process can tell its own edits from everyone else's.
     | {
           readonly to: 'app';
@@ -54,6 +56,7 @@ export const liveProcess$ = (
                             : { ...gesture, id: self.id },
                 })),
             ),
+            element.peeks$.pipe(map((open): ProcessSignal => ({ to: 'peek', id: self.id, open }))),
             view.run$(state, self).pipe(
                 withLatestFrom(self.store$, self.clock$),
                 map(([input, store, clock]): ProcessSignal => ({

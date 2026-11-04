@@ -31,6 +31,8 @@ import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
 import { HksSeams } from './components/seams/seams.component.ts';
+import { HksLinks } from './components/links/links.component.ts';
+import { linksOf } from './links.ts';
 import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
@@ -212,6 +214,8 @@ const bootstrap = () => {
 
     const seams = new HksSeams();
     canvas.append(seams);
+    const links = new HksLinks();
+    canvas.append(links);
 
     const sections = new HksSections();
     canvas.append(sections);
@@ -489,10 +493,9 @@ const bootstrap = () => {
                               input: name,
                               optional: index === 0 && definition.initial === null,
                               source: source.kind,
-                              // Only where there is a choice of sources: "Playback · Playback" says nothing.
+                              label: definition.title,
                               title: [
-                                  definition.title,
-                                  ...(choice ? [source.title] : []),
+                                  source.title,
                                   ...(choice && source.access === 'read' ? ['read-only'] : []),
                               ].join(' · '),
                               options: withMain(source.program, stores).map(
@@ -665,6 +668,19 @@ const bootstrap = () => {
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
+    );
+
+    // The window whose state menu is open; a close only counts from that window, so opening another first wins.
+    const peeked$: Observable<ProcessId | null> = signals$.pipe(
+        mergeMap(signal => (signal.to === 'peek' ? of(signal) : EMPTY)),
+        scan(
+            (current: ProcessId | null, { id, open }): ProcessId | null =>
+                open ? id : current === id ? null : current,
+            null,
+        ),
+        startWith(null),
+        distinctUntilChanged(),
+        shareReplay({ bufferSize: 1, refCount: true }),
     );
 
     const inputs$ = signals$.pipe(
@@ -1219,6 +1235,12 @@ const bootstrap = () => {
         ),
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
+        links.connect$(
+            combineLatest([workspace$, waves$, peeked$]).pipe(
+                map(([workspace, signals, peeked]) => linksOf(workspace, signals, peeked)),
+                distinctUntilChanged((a, b) => a.length === 0 && b.length === 0),
+            ),
+        ),
         palette.connect$(
             workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
             paletteOpen$,

@@ -354,8 +354,17 @@
     letter-spacing: 0.04em;
 }
 
-.stores-head span {
+.stores-head span:not(.direction) {
     flex: 1;
+}
+
+/* An output points out of the window, an input into it: the window as a function of its inputs. */
+.direction {
+    flex: none;
+    inline-size: 14px;
+    font: 600 12px var(--font-mono);
+    color: var(--accent);
+    text-align: center;
 }
 
 .options {
@@ -516,6 +525,96 @@ input.option-name:focus-visible {
 .stores[data-own] .follow-title {
     padding-block-start: 8px;
     border-block-start: 1px solid var(--edge);
+}
+
+.follow-title {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+
+.follow-title::before {
+    inline-size: 14px;
+    font: 600 12px var(--font-mono);
+    color: var(--accent);
+    text-align: center;
+    content: '←';
+}
+
+.input-line {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    inline-size: 100%;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--ink);
+    text-align: start;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.input-line:hover,
+.input-line[aria-expanded='true'] {
+    background: var(--well);
+}
+
+.input-line .direction {
+    display: none;
+}
+
+.input-name {
+    flex: none;
+    min-inline-size: 52px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.input-line .option-name {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.input-line .dot[data-none] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--muted);
+}
+
+.chevron {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-inline-end: 1.5px solid var(--muted);
+    border-block-end: 1.5px solid var(--muted);
+    transform: rotate(-45deg);
+    transition: transform 0.12s;
+}
+
+.input-line[aria-expanded='true'] .chevron {
+    transform: rotate(45deg);
+}
+
+.input-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0 0 4px 16px;
+    padding-inline-start: 8px;
+    border-inline-start: 1px solid var(--edge);
+}
+
+.source-title {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: var(--muted);
 }
 
 .follow.none .dot {

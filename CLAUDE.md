@@ -1104,6 +1104,29 @@ what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
 
+## A window's connections, on the canvas
+
+**While a window's state menu is open, the canvas draws what it is connected
+to**: dashed links that flow from every window keeping a state this one reads,
+into it, and from it to every window that reads its state; a dotted tie to
+windows that keep the same state. The canvas knows windows, not stores, so
+`linksOf` in `src/links.ts` resolves the stores between them: a follow, a
+signal's own sources (a chain of signals reads window to window), and a shared
+binding. `hks-links` sits zero-sized at the world origin like the seams and
+takes no pointer events; a link leaves the side of a window that faces the
+other, across or up and down, whichever way they lie apart.
+
+Which menu is open is a **peek**, its own process signal beside the workspace
+actions: it is momentary, so it is neither saved nor a step to undo, and a
+close counts only from the window that opened, so opening another first wins.
+
+The menu itself reads as a function's signature: **Output** (→) is the state the
+window keeps, **Inputs** (←) what it reads. Each input is **one line** showing
+what it follows; clicking it opens that input's list, the current one marked,
+and only one list is open at a time, closed again by a pick or by closing the
+menu. Which line is open is the window's own view state, so a program never
+learns it.
+
 ## The state map
 
 `state` draws the app's dataflow as one graph, inspects any of it and prunes
@@ -1704,7 +1727,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-four of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -45,8 +45,9 @@ const TEMPLATE = `
     </div>
     <div class="body"><slot></slot></div>
     <div class="stores" role="dialog" aria-label="window state" hidden>
-        <header class="stores-head">
-            <span>State</span>
+        <header class="stores-head" title="the state this window keeps: what it reads and writes">
+            <span class="direction" aria-hidden="true">→</span>
+            <span>Output</span>
             <button class="add" type="button" data-copy="false" title="New empty state" aria-label="new empty state">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
             </button>
@@ -248,6 +249,104 @@ const noneRow = (input: string, current: boolean): HTMLElement => {
     return row;
 };
 
+const inputLine = (
+    input: string,
+    label: string,
+    current: StoreOption | undefined,
+    open: boolean,
+): HTMLElement => {
+    const line = document.createElement('button');
+    line.type = 'button';
+    line.className = 'input-line';
+    line.dataset['expand'] = input;
+    line.setAttribute('aria-expanded', String(open));
+    line.title = open ? 'close the list' : `choose what ${label} follows`;
+
+    const direction = document.createElement('span');
+    direction.className = 'direction';
+    direction.setAttribute('aria-hidden', 'true');
+    direction.textContent = '←';
+
+    const key = document.createElement('span');
+    key.className = 'input-name';
+    key.textContent = label;
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+
+    if (current === undefined) {
+        dot.toggleAttribute('data-none', true);
+    } else {
+        dot.style.setProperty('--store', current.colour);
+    }
+
+    const value = document.createElement('span');
+    value.className = 'option-name';
+    value.textContent = current?.name ?? 'None';
+
+    const chevron = document.createElement('span');
+    chevron.className = 'chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+
+    line.append(direction, key, dot, value, chevron);
+
+    return line;
+};
+
+const inputsView = (follows: readonly FollowGroup[], expanded: string | null): HTMLElement[] => {
+    const inputs = [...new Set(follows.map(({ input }) => input))];
+
+    if (inputs.length === 0) {
+        return [];
+    }
+
+    const heading = document.createElement('p');
+    heading.className = 'follow-title';
+    heading.title = 'what this window reads from other state';
+    heading.textContent = 'Inputs';
+
+    return [
+        heading,
+        ...inputs.flatMap(input => {
+            const groups = follows.filter(group => group.input === input);
+            const current = groups
+                .flatMap(({ options: list }) => list)
+                .find(option => option.current);
+            const open = expanded === input;
+            const line = inputLine(input, groups[0]?.label ?? input, current, open);
+
+            if (!open) {
+                return [line];
+            }
+
+            const list = document.createElement('div');
+            list.className = 'input-list';
+            list.append(
+                ...(groups[0]?.optional === true ? [noneRow(input, current === undefined)] : []),
+                ...groups.flatMap(({ source, title, options: rows }) => [
+                    ...(groups.length > 1
+                        ? [
+                              Object.assign(document.createElement('p'), {
+                                  className: 'source-title',
+                                  textContent: title,
+                              }),
+                          ]
+                        : []),
+                    ...rows.map(option => {
+                        const row = followRow(option);
+                        row.dataset['followInput'] = input;
+                        row.dataset['followSource'] = source;
+
+                        return row;
+                    }),
+                ]),
+            );
+
+            return [line, list];
+        }),
+    ];
+};
+
 const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
 
@@ -258,6 +357,8 @@ export class HksWindow extends HTMLElement {
     private readonly glyph: HTMLElement;
     private readonly shadow: ShadowRoot;
     private readonly open$: Observable<boolean>;
+    private readonly expanded$: Observable<string | null>;
+    readonly peeks$: Observable<boolean>;
     private readonly switching$: Observable<SwitchAction>;
 
     constructor() {
@@ -307,6 +408,38 @@ export class HksWindow extends HTMLElement {
             startWith(false),
             distinctUntilChanged(),
             share(),
+        );
+
+        this.peeks$ = this.open$;
+
+        this.expanded$ = merge(
+            fromElementEvent$(popover, 'click').pipe(
+                mergeMap(({ target }) => {
+                    const input = dataOf(target, 'expand');
+
+                    return input === undefined ? EMPTY : of({ kind: 'toggle' as const, input });
+                }),
+            ),
+            fromElementEvent$(popover, 'click').pipe(
+                filter(
+                    ({ target }) =>
+                        dataOf(target, 'follow-store') !== undefined ||
+                        dataOf(target, 'unfollow') !== undefined,
+                ),
+                map(() => ({ kind: 'close' as const, input: null })),
+            ),
+            this.open$.pipe(
+                filter(open => !open),
+                map(() => ({ kind: 'close' as const, input: null })),
+            ),
+        ).pipe(
+            scan(
+                (open: string | null, action): string | null =>
+                    action.kind === 'toggle' && open !== action.input ? action.input : null,
+                null,
+            ),
+            startWith(null),
+            distinctUntilChanged(),
         );
 
         const name = this.name;
@@ -620,8 +753,8 @@ export class HksWindow extends HTMLElement {
                     );
                 }),
             ),
-            combineLatest([stores$, follows$]).pipe(
-                tap(([stores, follows]) => {
+            combineLatest([stores$, follows$, this.expanded$]).pipe(
+                tap(([stores, follows, expanded]) => {
                     // A window with no store of its own shows the one it runs on: the dial shows its clock.
                     const current =
                         stores?.find(option => option.current) ??
@@ -637,27 +770,7 @@ export class HksWindow extends HTMLElement {
 
                     if (!(shadow.activeElement instanceof HTMLInputElement)) {
                         requireChild(shadow, '.follows').replaceChildren(
-                            ...(follows ?? []).flatMap(
-                                ({ input, optional, source, title, options: list }) => {
-                                    const heading = document.createElement('p');
-                                    heading.className = 'follow-title';
-                                    heading.textContent = title;
-
-                                    return [
-                                        heading,
-                                        ...(optional
-                                            ? [noneRow(input, !list.some(({ current }) => current))]
-                                            : []),
-                                        ...list.map(option => {
-                                            const row = followRow(option);
-                                            row.dataset['followInput'] = input;
-                                            row.dataset['followSource'] = source;
-
-                                            return row;
-                                        }),
-                                    ];
-                                },
-                            ),
+                            ...inputsView(follows ?? [], expanded),
                         );
                     }
 
