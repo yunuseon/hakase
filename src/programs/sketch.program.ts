@@ -138,8 +138,13 @@ export const sketchProgram = {
                     k3: state.followedWave$('k3'),
                     k4: state.followedWave$('k4'),
                     turn: state.followedWave$('turn'),
+                    pitch: state.followedWave$('pitch'),
+                    distance: state.followedWave$('distance'),
                     focus: state.followedWave$('focus'),
                     colour: state.followedWave$('colour'),
+                    size: state.followedWave$('size'),
+                    depth: state.followedWave$('depth'),
+                    trails: state.followedWave$('trails'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
                 const params$ = combineLatest([panel$, size$, theme$, signals$]).pipe(

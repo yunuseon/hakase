@@ -21,7 +21,7 @@ import {
     tap,
 } from 'rxjs/operators';
 import { fitted, supersampleFor, type StripLayout, type TileRange } from '../animation.ts';
-import { centre, type SketchParams } from '../params.ts';
+import { centre, withoutTrails, type SketchParams } from '../params.ts';
 import type { Orbit } from '../space.ts';
 import { createSketch, drawFrame, prepare } from '../gl/sketch-program.ts';
 import { offscreen$ } from '../gl/still.ts';
@@ -126,7 +126,7 @@ export const thumbnails$ = (
                         };
                         const box = fitted(slot, params);
                         // The sketch's own parameters, size included: a thumbnail is the frame scaled down, not reframed.
-                        const still = { ...params, trails: 0 };
+                        const still = withoutTrails(params);
                         const { gl } = surface;
 
                         growSurface(

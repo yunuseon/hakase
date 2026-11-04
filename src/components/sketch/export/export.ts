@@ -8,7 +8,7 @@ import {
     frameCount,
     type ExportSettings,
 } from '../animation.ts';
-import { centre, type SketchParams } from '../params.ts';
+import { centre, hasTrails, withoutTrails, type SketchParams } from '../params.ts';
 import type { Orbit } from '../space.ts';
 import { createSketch, drawFrame, type Sketch } from '../gl/sketch-program.ts';
 import { bindState, evolve, simulation$, type Simulation } from '../gl/simulation.ts';
@@ -173,7 +173,7 @@ export const export$ = ({
     settings,
 }: ExportRequest): Observable<ExportEvent> => {
     const pixels = exportPixels(params, settings.size);
-    const frames = exportFrames(frameCount(seconds, settings.fps), params.trails > 0);
+    const frames = exportFrames(frameCount(seconds, settings.fps), hasTrails(params));
 
     return offscreen$(pixels).pipe(
         switchMap((surface): Observable<ExportEvent> => {
@@ -265,7 +265,7 @@ export const still$ = (
     t: number,
 ): Observable<ExportEvent> => {
     const pixels = exportPixels(params, settings.size);
-    const alone = { ...params, trails: 0 };
+    const alone = withoutTrails(params);
 
     return offscreen$(pixels).pipe(
         switchMap((surface): Observable<ExportEvent> => {

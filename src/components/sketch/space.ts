@@ -24,6 +24,12 @@ export const REFERENCE_DISTANCE = 1 / Math.tan(FOV / 2);
 
 export const DEFAULT_ORBIT: Orbit = { yaw: 0, pitch: 0, distance: REFERENCE_DISTANCE };
 
+export const clampedOrbit = ({ yaw, pitch, distance }: Orbit) => ({
+    yaw,
+    pitch: clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT),
+    distance: clamp(distance, MIN_DISTANCE, MAX_DISTANCE),
+});
+
 export const sameOrbit = (a: Orbit, b: Orbit): boolean =>
     a.yaw === b.yaw && a.pitch === b.pitch && a.distance === b.distance;
 

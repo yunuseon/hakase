@@ -1086,16 +1086,28 @@ to, or null, with its whole chain already resolved.
 
 **A sketch's scene can follow signals too**, and every input takes the signal's
 value **as it is, in its own unit**: a knob gets the raw value (a hand-set knob
-stays 0 to 1, a signal can push it anywhere), `turn` is in turns (yaw added to
-the viewer's own), `focus` is the focus itself, clamped to 0.1 to 10 so the
-lattice cannot collapse, and `colour` is an offset along the theme ramp
-(`uColourShift`, added to the tint before the lookup). Rescaling per input, as
-they first did, only made sense while signals were stuck between 0 and 1. They are optional inputs like the knobs
-(`sceneInputs`) and travel in the same `PanelParams.signals`, keyed by `DRIVES`.
-All three are set in `setMoment` every frame, not in `prepare`, because they
-change with the playhead; `setMoment` is shared by the live sketch, the
-thumbnails and an export, so all three see the same frame. A driven focus keeps
-its slider for when it is let go, with the readout saying **signal**.
+stays 0 to 1, a signal can push it anywhere); `turn` and `pitch` are in turns,
+added to the viewer's own drag; `distance` replaces the dolly; `focus`, `dot
+size`, `depth` and `trails` are the setting itself; and `colour` is an offset
+along the theme ramp (`uColourShift`, added to the tint before the lookup).
+Rescaling per input, as they first did, only made sense while signals were stuck
+between 0 and 1. A value is clamped only where the picture would break: focus to
+0.1 to 10 so the lattice cannot collapse, pitch and distance to the orbit's own
+limits (`clampedOrbit`), trails below 0.97 so a frame still clears, dots to
+sane sizes. Lattice density is deliberately not an input: it sizes the state
+textures, so moving it every frame would rebuild them every frame.
+
+They are optional inputs like the knobs (`sceneInputs`) and travel in the same
+`PanelParams.signals`, keyed by `DRIVES`. All of them are read every frame —
+`setMoment` sets the orbit, focus, colour and dot uniforms, which `prepare` no
+longer touches, and `drawFrame` reads `trailsAt` — because they change with the
+playhead; both are shared by the live sketch, the thumbnails and an export, so
+all three see the same frame. A driven slider (focus, dot size, depth, trails)
+keeps its value for when it is let go, disabled, with the readout saying
+**signal**. **A still must let go of a driven trail too**: thumbnails and a
+saved frame used to drop trails with `trails: 0`, which a driven trail would
+override, so they go through `withoutTrails`, and an export's warm-up loop asks
+`hasTrails`.
 
 **A signal's phase, offset and depth can follow another signal** (`Signal.sources`),
 so an LFO can swell another's range. The followed value stands in for the
@@ -1755,7 +1767,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-three of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

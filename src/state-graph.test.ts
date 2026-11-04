@@ -36,8 +36,13 @@ describe('graphOf', () => {
             ['k3', true, null],
             ['k4', true, null],
             ['turn', true, null],
+            ['pitch', true, null],
+            ['distance', true, null],
             ['focus', true, null],
             ['colour', true, null],
+            ['size', true, null],
+            ['depth', true, null],
+            ['trails', true, null],
         ]);
         expect(windowOf([], 'playhead-4')?.own).toBeNull();
     });

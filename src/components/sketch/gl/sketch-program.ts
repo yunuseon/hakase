@@ -2,9 +2,11 @@ import {
     DRAW_MODES,
     KNOBS,
     colourShiftAt,
+    dotsAt,
     focusAt,
     knobValue,
-    turnAt,
+    orbitAt,
+    trailsAt,
     type DrawMode,
     type Knob,
     type PanelParams,
@@ -223,10 +225,6 @@ export const prepare = (
     // The index must match the MODE_* defines in both shader stages.
     gl.uniform1i(uniforms.mode, DRAW_MODES.indexOf(params.draw.mode));
 
-    if (params.draw.mode === 'dots') {
-        gl.uniform1f(uniforms.depthScalar, params.draw.depthScalar);
-        gl.uniform1f(uniforms.baseSize, params.draw.baseSize);
-    }
     gl.uniform1f(uniforms.pixelRatio, pixelRatio);
     gl.uniform1f(uniforms.dotScale, dotScale);
     gl.uniform1f(uniforms.reference, REFERENCE_DISTANCE);
@@ -288,7 +286,7 @@ export const PASS_SEED = 4;
 export const setMoment = (
     gl: WebGL2RenderingContext,
     { uniforms }: Sketch,
-    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus'>,
+    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus' | 'draw'>,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
@@ -300,12 +298,16 @@ export const setMoment = (
     });
     gl.uniform2f(uniforms.pointer, x, y);
     gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
-    gl.uniform3f(
-        uniforms.orbit,
-        ...orbitUniform({ ...orbit, yaw: orbit.yaw + turnAt(params, playhead) }),
-    );
+    gl.uniform3f(uniforms.orbit, ...orbitUniform(orbitAt(params, orbit, playhead)));
     gl.uniform1f(uniforms.focus, focusAt(params, playhead));
     gl.uniform1f(uniforms.colourShift, colourShiftAt(params, playhead));
+
+    const dots = dotsAt(params, playhead);
+
+    if (dots !== null) {
+        gl.uniform1f(uniforms.depthScalar, dots.depthScalar);
+        gl.uniform1f(uniforms.baseSize, dots.baseSize);
+    }
 };
 // Must match axisVertex in sketch.vert: 7 lines of 48 pieces of two vertices, then 12 ticks of two.
 const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
@@ -323,10 +325,11 @@ export const drawFrame = (
         draw: { mode },
         dimension,
         axes,
-        trails,
         lattice,
         space,
     } = params;
+    const trails = trailsAt(params, playhead);
+
     if (trails > 0) {
         // Fade towards the backdrop instead of clearing; depth must not keep the fade from covering.
         gl.clear(gl.DEPTH_BUFFER_BIT);

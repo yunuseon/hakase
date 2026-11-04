@@ -1,5 +1,12 @@
 import type { Size } from '../window/frame.ts';
-import type { Fit, Lattice, Lens, Space } from './space.ts';
+import {
+    clampedOrbit,
+    type Fit,
+    type Lattice,
+    type Lens,
+    type Orbit,
+    type Space,
+} from './space.ts';
 import type { Theme } from './theme.ts';
 import { waveAt, type Wave } from '../../shared/signal.ts';
 import { clamp } from '../../lib/math.ts';
@@ -41,23 +48,65 @@ export type Motion = Readonly<Record<Knob, Cycles>>;
 export const knobAt = (value: number, cycles: Cycles, t: number): number =>
     cycles === 0 ? value : value * (0.5 - 0.5 * Math.cos(2 * Math.PI * cycles * t));
 
-export const DRIVES = [...KNOBS, 'turn', 'focus', 'colour'] as const;
+export const DRIVES = [
+    ...KNOBS,
+    'turn',
+    'pitch',
+    'distance',
+    'focus',
+    'colour',
+    'size',
+    'depth',
+    'trails',
+] as const;
 export type Drive = (typeof DRIVES)[number];
 
 export type Signals = Readonly<Record<Drive, Wave | null>>;
 
 const MIN_FOCUS = 0.1;
 const MAX_FOCUS = 10;
+const MAX_DOT = 64;
+const MAX_DEPTH = 4;
+// Below 1, or a frame would never quite clear and the picture would smear into one colour.
+const MAX_TRAILS = 0.97;
 
-export const turnAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
-    signals.turn === null ? 0 : 2 * Math.PI * waveAt(signals.turn, t);
+const drivenOr = (signal: Wave | null, fallback: number, t: number) =>
+    signal === null ? fallback : waveAt(signal, t);
+
+export const orbitAt = ({ signals }: Pick<PanelParams, 'signals'>, orbit: Orbit, t: number) =>
+    clampedOrbit({
+        yaw: orbit.yaw + 2 * Math.PI * drivenOr(signals.turn, 0, t),
+        pitch: orbit.pitch + 2 * Math.PI * drivenOr(signals.pitch, 0, t),
+        distance: drivenOr(signals.distance, orbit.distance, t),
+    });
 
 // Clamped, not mapped: below 0.1 the lattice collapses onto one point.
 export const focusAt = ({ focus, signals }: Pick<PanelParams, 'focus' | 'signals'>, t: number) =>
     signals.focus === null ? focus : clamp(waveAt(signals.focus, t), MIN_FOCUS, MAX_FOCUS);
 
 export const colourShiftAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
-    signals.colour === null ? 0 : waveAt(signals.colour, t);
+    drivenOr(signals.colour, 0, t);
+
+export const dotsAt = ({ draw, signals }: Pick<PanelParams, 'draw' | 'signals'>, t: number) =>
+    draw.mode !== 'dots'
+        ? null
+        : {
+              baseSize: clamp(drivenOr(signals.size, draw.baseSize, t), 0, MAX_DOT),
+              depthScalar: clamp(drivenOr(signals.depth, draw.depthScalar, t), 0, MAX_DEPTH),
+          };
+
+export const trailsAt = ({ trails, signals }: Pick<PanelParams, 'trails' | 'signals'>, t: number) =>
+    clamp(drivenOr(signals.trails, trails, t), 0, MAX_TRAILS);
+
+export const hasTrails = ({ trails, signals }: Pick<PanelParams, 'trails' | 'signals'>) =>
+    trails > 0 || signals.trails !== null;
+
+// A still has no previous frame to fade: a driven trail must be let go as well as the slider's.
+export const withoutTrails = <P extends Pick<PanelParams, 'trails' | 'signals'>>(params: P) => ({
+    ...params,
+    trails: 0,
+    signals: { ...params.signals, trails: null },
+});
 
 export const knobValue = (
     { knobs, motion, signals }: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,

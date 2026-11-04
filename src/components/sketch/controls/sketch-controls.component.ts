@@ -32,6 +32,13 @@ import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);
 
+const DRIVEN_FIELDS = [
+    ['focus', 'focus'],
+    ['size', 'baseSize'],
+    ['depth', 'depthScalar'],
+    ['trails', 'trails'],
+] as const;
+
 const RESET_ICON =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>';
 
@@ -442,13 +449,20 @@ export class HksSketchControls extends HTMLElement {
             distinctUntilChanged(),
             tap(joined => {
                 const knobs = joined.split(',');
-                const focus = requireElement(this.shadow, '[data-field="focus"]', HTMLInputElement);
-                focus.disabled = knobs.includes('focus');
-                requireElement(
-                    this.shadow,
-                    '[data-read="focus"]',
-                    HTMLOutputElement,
-                ).toggleAttribute('data-driven', focus.disabled);
+
+                for (const [drive, field] of DRIVEN_FIELDS) {
+                    const input = requireElement(
+                        this.shadow,
+                        `[data-field="${field}"]`,
+                        HTMLInputElement,
+                    );
+                    input.disabled = knobs.includes(drive);
+                    requireElement(
+                        this.shadow,
+                        `[data-read="${field}"]`,
+                        HTMLOutputElement,
+                    ).toggleAttribute('data-driven', input.disabled);
+                }
 
                 for (const knob of KNOBS) {
                     const driven = knobs.includes(knob);

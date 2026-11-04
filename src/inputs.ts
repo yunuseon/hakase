@@ -111,8 +111,13 @@ export const knobInputs = {
 
 export const sceneInputs = {
     turn: signalInput('turn'),
+    pitch: signalInput('pitch'),
+    distance: signalInput('distance'),
     focus: signalInput('focus'),
     colour: signalInput('colour'),
+    size: signalInput('dot size'),
+    depth: signalInput('depth'),
+    trails: signalInput('trails'),
 };
 
 export const ownPlaybackInput = {
