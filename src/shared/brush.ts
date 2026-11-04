@@ -119,35 +119,6 @@ const stamped = (
     }
 };
 
-export const spacingOf = (brush: Brush) => Math.max(0.5, brush.size / 6);
-
-// Stamps into `ink` in place, unrounded, so a long run of segments copies and rounds once at its end.
-export const strokeInto = (
-    ink: number[],
-    before: Frame,
-    side: number,
-    from: Point,
-    to: Point,
-    brush: Brush,
-    symmetry: Symmetry,
-    fromStamped = false,
-) => {
-    const length = Math.hypot((to.x - from.x) * side, (to.y - from.y) * side);
-    const count = Math.max(1, Math.ceil(length / spacingOf(brush)));
-
-    for (let step = fromStamped ? 1 : 0; step <= count; step += 1) {
-        const along = step / count;
-        const at = { x: from.x + (to.x - from.x) * along, y: from.y + (to.y - from.y) * along };
-
-        for (const copy of copiesOf(at, symmetry)) {
-            stamped(ink, before, side, { x: copy.x * side, y: copy.y * side }, brush);
-        }
-    }
-};
-
-export const rounded = (ink: readonly number[]): Frame =>
-    ink.map(value => Math.round(clampInk(value)));
-
 export const strokeOn = (
     frame: Frame,
     side: number,
@@ -157,10 +128,19 @@ export const strokeOn = (
     symmetry: Symmetry,
 ): Frame => {
     const ink = [...frame];
+    const length = Math.hypot((to.x - from.x) * side, (to.y - from.y) * side);
+    const count = Math.max(1, Math.ceil(length / Math.max(0.5, brush.size / 6)));
 
-    strokeInto(ink, frame, side, from, to, brush, symmetry);
+    for (let step = 0; step <= count; step += 1) {
+        const along = step / count;
+        const at = { x: from.x + (to.x - from.x) * along, y: from.y + (to.y - from.y) * along };
 
-    return rounded(ink);
+        for (const copy of copiesOf(at, symmetry)) {
+            stamped(ink, frame, side, { x: copy.x * side, y: copy.y * side }, brush);
+        }
+    }
+
+    return ink.map(value => Math.round(clampInk(value)));
 };
 
 export const guidesOf = (symmetry: Symmetry): readonly string[] => {

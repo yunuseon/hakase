@@ -140,7 +140,7 @@ export class HksSketch extends HTMLElement {
                 const { gl } = this.surface;
 
                 if (simulation !== null) {
-                    evolve(gl, sketch, simulation, evolution, {
+                    evolve(this.surface, sketch, simulation, evolution, {
                         params,
                         seconds: clock.seconds,
                         pointer,
@@ -149,7 +149,7 @@ export class HksSketch extends HTMLElement {
                     bindState(gl, sketch, simulation, evolution.end.front);
                 }
 
-                drawFrame(gl, sketch, params, clock.t, pointer, orbit);
+                drawFrame(this.surface, sketch, params, clock.t, pointer, orbit);
             }),
         );
 

@@ -1,13 +1,6 @@
-import {
-    isSymmetry,
-    rounded,
-    spacingOf,
-    strokeInto,
-    type Point,
-    type Symmetry,
-} from '../../shared/brush.ts';
-import { blank, isSide, type Frame, type Picture, type Side } from '../../shared/picture.ts';
+import { copiesOf, isSymmetry, type Point, type Symmetry } from '../../shared/brush.ts';
 import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
+import { INK_SIDE, type Stroke } from '../../shared/stroke.ts';
 
 export const PEN_PARAMS = ['x', 'y', 'size', 'ink'] as const;
 export type PenParam = (typeof PEN_PARAMS)[number];
@@ -18,10 +11,10 @@ export const MODES = ['whole', 'draw'] as const;
 export type Mode = (typeof MODES)[number];
 export const isMode = (value: string): value is Mode => MODES.some(mode => mode === value);
 
+export const MIN_WEIGHT = 0.25;
 export const MAX_WEIGHT = 12;
 
 export type Pen = {
-    readonly side: Side;
     readonly weight: number;
     readonly mode: Mode;
     readonly symmetry: Symmetry;
@@ -31,7 +24,6 @@ export type Pen = {
 const unsourced = { x: null, y: null, size: null, ink: null };
 
 export const defaultPen: Pen = {
-    side: 64,
     weight: 2,
     mode: 'draw',
     symmetry: 'none',
@@ -41,7 +33,6 @@ export const defaultPen: Pen = {
 export type PenCommand =
     | { readonly kind: 'mode'; readonly mode: Mode }
     | { readonly kind: 'weight'; readonly weight: number }
-    | { readonly kind: 'side'; readonly side: Side }
     | { readonly kind: 'symmetry'; readonly symmetry: Symmetry }
     | { readonly kind: 'source'; readonly param: PenParam; readonly source: string | null };
 
@@ -50,12 +41,10 @@ export const reducePen = (pen: Pen, command: PenCommand): Pen => {
         case 'mode':
             return command.mode === pen.mode ? pen : { ...pen, mode: command.mode };
         case 'weight': {
-            const weight = Math.min(MAX_WEIGHT, Math.max(0.5, command.weight));
+            const weight = Math.min(MAX_WEIGHT, Math.max(MIN_WEIGHT, command.weight));
 
             return Number.isFinite(weight) && weight !== pen.weight ? { ...pen, weight } : pen;
         }
-        case 'side':
-            return command.side === pen.side ? pen : { ...pen, side: command.side };
         case 'symmetry':
             return command.symmetry === pen.symmetry ? pen : { ...pen, symmetry: command.symmetry };
         case 'source':
@@ -97,52 +86,60 @@ export const penAt = ({ waves }: Drawing, t: number) => ({
 });
 
 export const SAMPLES = 720;
-export const DRAW_FRAMES = 24;
 
-export const traced = (drawing: Drawing): Picture => {
-    const { side, weight, mode, symmetry } = drawing.pen;
+const WEIGHT_UNIT = 1 / 64;
+const HARDNESS = 0.6;
+
+type Mark = { readonly at: Point; readonly t: number };
+
+export const strokeOf = (drawing: Drawing): Stroke => {
+    const { weight, mode, symmetry } = drawing.pen;
     const { size, ink } = drawing.waves;
+    const dabs: number[] = [];
+    const lay = (at: Point, radius: number, flow: number, t: number) => {
+        for (const copy of copiesOf(at, symmetry)) {
+            dabs.push(copy.x, copy.y, radius, flow, t);
+        }
+    };
+    let last: Mark | null = null;
 
-    const working = [...blank(side)];
-    const frames: Frame[] = [];
-    let last: Point | null = null;
-
-    // Stamped by distance, not per sample: a slow pen would otherwise lay hundreds of discs on one spot.
     for (let index = 0; index <= SAMPLES; index += 1) {
         const t = index / SAMPLES;
         const at = penAt(drawing, t);
-        const brush = {
-            tool: 'brush' as const,
-            size: size === null ? weight : weight * Math.max(0, waveAt(size, t)),
-            hardness: 0.6,
-            flow: ink === null ? 1 : Math.min(1, Math.max(0, waveAt(ink, t))),
-        };
-        const boundary =
-            index > 0 &&
-            Math.floor((index * DRAW_FRAMES) / SAMPLES) >
-                Math.floor(((index - 1) * DRAW_FRAMES) / SAMPLES);
+        const radius =
+            ((size === null ? weight : weight * Math.max(0, waveAt(size, t))) * WEIGHT_UNIT) / 2;
+        const flow = ink === null ? 1 : Math.min(1, Math.max(0, waveAt(ink, t)));
+        // Stamped by distance, not per sample: a slow pen would otherwise lay hundreds of dabs on one spot.
+        const spacing = Math.max(radius / 3, 0.5 / INK_SIDE);
 
-        if (brush.size <= 0 || brush.flow <= 0) {
+        if (radius <= 0 || flow <= 0) {
             last = null;
         } else if (last === null) {
-            strokeInto(working, working, side, at, at, brush, symmetry, true);
-            last = at;
-        } else if (
-            boundary ||
-            Math.hypot((at.x - last.x) * side, (at.y - last.y) * side) >= spacingOf(brush)
-        ) {
-            strokeInto(working, working, side, last, at, brush, symmetry, true);
-            last = at;
-        }
+            lay(at, radius, flow, t);
+            last = { at, t };
+        } else {
+            const from: Mark = last;
+            const count = Math.floor(Math.hypot(at.x - from.at.x, at.y - from.at.y) / spacing);
 
-        if (mode === 'draw' && boundary) {
-            frames.push(rounded(working));
+            for (let step = 1; step <= count; step += 1) {
+                const along = step / count;
+
+                lay(
+                    {
+                        x: from.at.x + (at.x - from.at.x) * along,
+                        y: from.at.y + (at.y - from.at.y) * along,
+                    },
+                    radius,
+                    flow,
+                    from.t + (t - from.t) * along,
+                );
+            }
+
+            last = count > 0 ? { at, t } : from;
         }
     }
 
-    return mode === 'draw'
-        ? { side, frames, fade: true }
-        : { side, frames: [rounded(working)], fade: false };
+    return { dabs: Float32Array.from(dabs), whole: mode === 'whole', hardness: HARDNESS };
 };
 
 const field = (value: object, key: string): unknown =>
@@ -153,7 +150,6 @@ export const parsePen = (value: unknown): Pen => {
         return defaultPen;
     }
 
-    const side = field(value, 'side');
     const weight = field(value, 'weight');
     const mode = field(value, 'mode');
     const symmetry = field(value, 'symmetry');
@@ -165,10 +161,9 @@ export const parsePen = (value: unknown): Pen => {
     };
 
     return {
-        side: typeof side === 'number' && isSide(side) ? side : defaultPen.side,
         weight:
             typeof weight === 'number' && Number.isFinite(weight)
-                ? Math.min(MAX_WEIGHT, Math.max(0.5, weight))
+                ? Math.min(MAX_WEIGHT, Math.max(MIN_WEIGHT, weight))
                 : defaultPen.weight,
         mode: typeof mode === 'string' && isMode(mode) ? mode : defaultPen.mode,
         symmetry:

@@ -14,6 +14,7 @@ import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
 import type { Picture } from './shared/picture.ts';
+import type { Sheet } from './shared/stroke.ts';
 import type { PaintCommand } from './components/paint/paint.ts';
 import type { Drawing, PenCommand } from './components/pen/pen.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
@@ -138,7 +139,7 @@ export type AppState = {
     readonly wave$: Observable<Wave>;
     readonly picture$: Observable<Picture>;
     readonly drawing$: Observable<Drawing>;
-    readonly followedPicture$: (input: string) => Observable<Picture | null>;
+    readonly followedPicture$: (input: string) => Observable<Sheet | null>;
     readonly followedWave$: (input: string) => Observable<Wave | null>;
     // One stream, not followedWave$ beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;

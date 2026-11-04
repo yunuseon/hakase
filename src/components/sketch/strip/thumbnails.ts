@@ -156,7 +156,7 @@ export const thumbnails$ = (
                                     : evolutionTo(done, stepAt(t, seconds, sketch.steps));
 
                             if (simulation !== null && evolution !== null) {
-                                evolve(gl, sketch, simulation, evolution, {
+                                evolve(surface, sketch, simulation, evolution, {
                                     params: still,
                                     seconds,
                                     pointer: centre,
@@ -167,7 +167,7 @@ export const thumbnails$ = (
 
                             gl.scissor(at * slot.width, 0, slot.width, slot.height);
                             gl.viewport(at * slot.width + box.x, box.y, box.width, box.height);
-                            drawFrame(gl, sketch, still, t, centre, orbit);
+                            drawFrame(surface, sketch, still, t, centre, orbit);
 
                             return evolution?.end ?? null;
                         }, null);

@@ -207,7 +207,7 @@ export const export$ = ({
                                     const evolution = evolutions[step];
 
                                     if (simulation !== null && evolution !== undefined) {
-                                        evolve(surface.gl, sketch, simulation, evolution, {
+                                        evolve(surface, sketch, simulation, evolution, {
                                             params,
                                             seconds,
                                             pointer: centre,
@@ -222,7 +222,7 @@ export const export$ = ({
                                     }
 
                                     drawFrame(
-                                        surface.gl,
+                                        surface,
                                         compiled.sketch,
                                         params,
                                         frame.t,
@@ -288,7 +288,7 @@ export const still$ = (
                 switchMap(simulation => {
                     if (simulation !== null) {
                         const evolution = evolutionTo(null, stepAt(t, seconds, sketch.steps));
-                        evolve(surface.gl, sketch, simulation, evolution, {
+                        evolve(surface, sketch, simulation, evolution, {
                             params: alone,
                             seconds,
                             pointer: centre,
@@ -297,7 +297,7 @@ export const still$ = (
                         bindState(surface.gl, sketch, simulation, evolution.end.front);
                     }
 
-                    drawFrame(surface.gl, sketch, alone, t, centre, orbit);
+                    drawFrame(surface, sketch, alone, t, centre, orbit);
 
                     return from(surface.canvas.convertToBlob({ type: 'image/png' }));
                 }),

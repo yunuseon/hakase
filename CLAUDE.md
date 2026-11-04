@@ -1261,22 +1261,43 @@ kaleidoscope brush.
 `pen` draws a picture with signals instead of a hand. Its inputs `x`, `y`,
 `size` and `ink` are store inputs (`from: 'store'`), like a signal's phase,
 offset and depth, so they belong to the pen document and keep drawing with no
-window open. `traced` walks the loop in `SAMPLES` steps, puts the pen where the
-signals say (`penAt`, y up, so a rising signal moves it up the page; unplugged
-it goes round a circle) and stamps the shared brush (`shared/brush.ts`) with
-the pen's symmetry. **Whole** gives one frame of the whole figure, **draw** 24
-frames, each holding the line up to its part of the loop and fading into the
-next, so a sketch's `paint` input, which accepts a pen as well as a paint
-store, watches it being drawn and starts again with the loop.
+window open. It puts the pen where the signals say (`penAt`, y up, so a rising
+signal moves it up the page; unplugged it goes round a circle), at the
+symmetry's copies, with size scaling the line and ink its flow, which lifts the
+pen at 0. **Whole** shows the finished figure, **draw** the line up to the
+playhead, starting again with the loop; a sketch's `paint` input accepts a pen
+as well as a paint store.
 
-The picture is derived, never stored: it is a pure function of the pen and the
-waves it follows (`drawingOf`, compared by `sameDrawing`), so editing a signal
-redraws it, and an export or a thumbnail traces the same picture. That makes
-tracing hot. It stamps into one working array and rounds only when it keeps a
-frame (`strokeInto`, `rounded`): rounding a copy per segment cost 30 to 70 ms.
-It also stamps **by distance**, at the brush's spacing, not once per sample,
-since a slow signal would otherwise lay hundreds of discs on one spot. A heavy
-kaleidoscope trace takes about 7 ms.
+**A pen's output is a stroke, never pixels.** It was a `Picture` once, 24
+snapshots of a 64-pixel square traced on the CPU, so a sketch could read it
+with no new code: the line was blocky, ran ahead of the tip and caught up in
+jumps, and every signal edit re-rasterised it. Now `strokeOf` walks the loop
+and lays **dabs** (`shared/stroke.ts`: x, y, radius, flow and the moment each
+is laid, in loop order), spaced by distance at a third of the radius, so a slow
+pen does not pile hundreds on one spot. Nothing is stored or rasterised ahead:
+`dabsAt(stroke, t)` is the prefix the playhead has reached, by halving, and
+whoever shows the stroke draws that many.
+
+**The dabs are drawn on the GPU, in one instanced pass** (`shared/gl/ink.ts`,
+`dab.vert`/`dab.frag`), a soft disc per instance blended
+`ONE_MINUS_DST_ALPHA, ONE`, which is the brush's own rule, ink + (1 − ink) ×
+dab, in premultiplied colour and alpha alike. A dab thinner than half a pixel
+draws fainter instead of being clamped, or a size signal could not thin the
+line. Two readers share the pass, which is why it and `program.ts` live in
+`shared/gl/`:
+
+- **A sketch** draws the stroke into layer 0 of its paint texture (RGBA8,
+  `INK_SIDE` = 512, through its own framebuffer) in `setMoment`, so the live
+  sketch, the thumbnails, an export and every simulation step all see the line
+  at their own moment. `setMoment` therefore takes the `Surface`, and so do
+  `drawFrame` and `evolve`. The pass puts back every piece of GL state it
+  touches — framebuffer, viewport, scissor, depth, blend, clear colour, program —
+  because a simulation step or a strip tile may be mid-way through its own. The
+  formula still reads `paint(x, y)`; it never learns which kind fed it.
+- **The window** draws it onto a WebGL canvas flipped for the screen, the
+  whole figure once per stroke, copied straight onto a 2D canvas shown faintly
+  beneath (a WebGL canvas without `preserveDrawingBuffer` must be copied in the
+  same task), then the part drawn so far on every playhead change.
 
 **Store inputs are one mechanism for every document that has them.** A
 document with sources is `Linked` (`{ sources }`), a `link` action is routed
@@ -1957,7 +1978,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and twenty-three of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and twenty-nine of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

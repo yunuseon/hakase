@@ -1,7 +1,7 @@
 import { merge } from 'rxjs';
 import { ignoreElements, map, shareReplay } from 'rxjs/operators';
 import { HksPen } from '../components/pen/pen.component.ts';
-import { traced } from '../components/pen/pen.ts';
+import { strokeOf } from '../components/pen/pen.ts';
 import { penInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
@@ -20,13 +20,13 @@ export const penProgram = {
             element: pen,
             run$: ({ drawing$, playhead$ }) => {
                 const shared$ = drawing$.pipe(shareReplay({ bufferSize: 1, refCount: true }));
-                const picture$ = shared$.pipe(
-                    map(traced),
+                const stroke$ = shared$.pipe(
+                    map(strokeOf),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
                 return merge(
-                    pen.connect$(shared$, picture$, playhead$).pipe(ignoreElements()),
+                    pen.connect$(shared$, stroke$, playhead$).pipe(ignoreElements()),
                     pen.changes$.pipe(map((command): AppInput => ({ kind: 'pen', command }))),
                 );
             },

@@ -26,7 +26,9 @@ import {
 import { RAMP_SIZE } from '../theme.ts';
 import { PAINT_UNIT, type Surface } from './surface.ts';
 import { frameAt } from '../../../shared/picture.ts';
-import { createProgram, type ProgramResult } from './program.ts';
+import { inked, loadStroke } from '../../../shared/gl/ink.ts';
+import { dabsAt, INK_SIDE, isStroke, type Stroke } from '../../../shared/stroke.ts';
+import { createProgram, type ProgramResult } from '../../../shared/gl/program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
 
@@ -220,7 +222,7 @@ const closesSeam = (
 ): boolean => declared || wraps(lattice, space);
 
 export const prepare = (
-    { gl, palette, paint }: Surface,
+    { gl, palette, paint, ink, inkTarget }: Surface,
     sketch: Sketch,
     params: SketchParams,
     ramp: Uint8Array,
@@ -256,21 +258,46 @@ export const prepare = (
     const { picture } = params;
     gl.activeTexture(gl.TEXTURE0 + PAINT_UNIT);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, paint);
-    gl.texImage3D(
-        gl.TEXTURE_2D_ARRAY,
-        0,
-        gl.R8,
-        picture?.side ?? 1,
-        picture?.side ?? 1,
-        picture?.frames.length ?? 1,
-        0,
-        gl.RED,
-        gl.UNSIGNED_BYTE,
-        picture === null ? new Uint8Array(1) : Uint8Array.from(picture.frames.flat()),
-    );
+
+    if (picture !== null && isStroke(picture)) {
+        gl.texImage3D(
+            gl.TEXTURE_2D_ARRAY,
+            0,
+            gl.RGBA8,
+            INK_SIDE,
+            INK_SIDE,
+            1,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null,
+        );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, inkTarget);
+        gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, paint, 0, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        loadStroke(ink, picture);
+    } else {
+        gl.texImage3D(
+            gl.TEXTURE_2D_ARRAY,
+            0,
+            gl.R8,
+            picture?.side ?? 1,
+            picture?.side ?? 1,
+            picture?.frames.length ?? 1,
+            0,
+            gl.RED,
+            gl.UNSIGNED_BYTE,
+            picture === null ? new Uint8Array(1) : Uint8Array.from(picture.frames.flat()),
+        );
+    }
+
+    const layers = picture === null || isStroke(picture) ? 1 : picture.frames.length;
     gl.uniform1i(uniforms.paint, PAINT_UNIT);
-    gl.uniform1f(uniforms.paintFrames, picture?.frames.length ?? 1);
-    gl.uniform1i(uniforms.paintFade, picture?.fade === true ? 1 : 0);
+    gl.uniform1f(uniforms.paintFrames, layers);
+    gl.uniform1i(
+        uniforms.paintFade,
+        picture !== null && !isStroke(picture) && picture.fade ? 1 : 0,
+    );
     // Back to the palette's unit, which every later bind assumes is active.
     gl.activeTexture(gl.TEXTURE0);
 
@@ -313,14 +340,68 @@ const PASS_FADE = 2;
 export const PASS_STEP = 3;
 export const PASS_SEED = 4;
 
+const toggled = (gl: WebGL2RenderingContext, capability: number, on: boolean): void => {
+    if (on) {
+        gl.enable(capability);
+    } else {
+        gl.disable(capability);
+    }
+};
+
+// Every moment, since a drawn stroke grows with the playhead; GL state is put back as it was, a pass or a tile may be mid-way.
+const inkAt = (
+    { gl, ink, inkTarget }: Surface,
+    { program }: Sketch,
+    stroke: Stroke,
+    playhead: number,
+): void => {
+    const viewport: unknown = gl.getParameter(gl.VIEWPORT);
+    const clear: unknown = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+    const framebuffer: unknown = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    const scissor = gl.isEnabled(gl.SCISSOR_TEST);
+    const depth = gl.isEnabled(gl.DEPTH_TEST);
+    const blend = gl.isEnabled(gl.BLEND);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, inkTarget);
+    gl.viewport(0, 0, INK_SIDE, INK_SIDE);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.disable(gl.DEPTH_TEST);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    inked(ink, stroke, dabsAt(stroke, playhead), { side: INK_SIDE, colour: [1, 1, 1], flip: 1 });
+
+    gl.bindFramebuffer(
+        gl.FRAMEBUFFER,
+        framebuffer instanceof WebGLFramebuffer ? framebuffer : null,
+    );
+    if (viewport instanceof Int32Array) {
+        gl.viewport(viewport[0] ?? 0, viewport[1] ?? 0, viewport[2] ?? 0, viewport[3] ?? 0);
+    }
+    if (clear instanceof Float32Array) {
+        gl.clearColor(clear[0] ?? 0, clear[1] ?? 0, clear[2] ?? 0, clear[3] ?? 1);
+    }
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    toggled(gl, gl.SCISSOR_TEST, scissor);
+    toggled(gl, gl.DEPTH_TEST, depth);
+    toggled(gl, gl.BLEND, blend);
+    gl.useProgram(program);
+};
+
 export const setMoment = (
-    gl: WebGL2RenderingContext,
-    { uniforms }: Sketch,
+    surface: Surface,
+    sketch: Sketch,
     params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus' | 'draw' | 'picture'>,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
 ): void => {
+    const { gl } = surface;
+    const { uniforms } = sketch;
+
+    if (params.picture !== null && isStroke(params.picture)) {
+        inkAt(surface, sketch, params.picture, playhead);
+    }
+
     gl.uniform1f(uniforms.playhead, playhead);
     // Every frame, not in prepare: a moving knob changes with the playhead, not with its settings.
     KNOBS.forEach((knob, index) => {
@@ -331,7 +412,10 @@ export const setMoment = (
     gl.uniform3f(uniforms.orbit, ...orbitUniform(orbitAt(params, orbit, playhead)));
     gl.uniform1f(uniforms.focus, focusAt(params, playhead));
     gl.uniform1f(uniforms.colourShift, colourShiftAt(params, playhead));
-    gl.uniform1f(uniforms.paintAt, params.picture === null ? 0 : frameAt(params.picture, playhead));
+    gl.uniform1f(
+        uniforms.paintAt,
+        params.picture === null || isStroke(params.picture) ? 0 : frameAt(params.picture, playhead),
+    );
 
     const dots = dotsAt(params, playhead);
 
@@ -344,13 +428,14 @@ export const setMoment = (
 const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
 
 export const drawFrame = (
-    gl: WebGL2RenderingContext,
+    surface: Surface,
     sketch: Sketch,
     params: PanelParams,
     playhead: number,
     pointer: Pointer,
     orbit: Orbit,
 ): void => {
+    const { gl } = surface;
     const { uniforms } = sketch;
     const {
         draw: { mode },
@@ -373,7 +458,7 @@ export const drawFrame = (
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     }
 
-    setMoment(gl, sketch, params, playhead, pointer, orbit);
+    setMoment(surface, sketch, params, playhead, pointer, orbit);
     gl.uniform1i(uniforms.pass, PASS_LATTICE);
     gl.drawArrays(
         primitive(gl, mode),

@@ -107,7 +107,7 @@ import {
 } from './program.ts';
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
 import { defaultPicture } from './shared/picture.ts';
-import { defaultPen, drawingOf, sameDrawing, traced } from './components/pen/pen.ts';
+import { defaultPen, drawingOf, sameDrawing, strokeOf } from './components/pen/pen.ts';
 import {
     documentsKit,
     linkedOf,
@@ -1222,7 +1222,7 @@ const bootstrap = () => {
                         binding?.kind === 'paint'
                             ? pictureIn(binding.store)
                             : binding?.kind === 'pen'
-                              ? drawingIn(binding.store).pipe(map(traced))
+                              ? drawingIn(binding.store).pipe(map(strokeOf))
                               : of(null),
                     ),
                 ),

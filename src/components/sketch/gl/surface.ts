@@ -1,3 +1,4 @@
+import { createInkPass, type InkPass } from '../../../shared/gl/ink.ts';
 import type { Size } from '../../window/frame.ts';
 import { RAMP_SIZE } from '../theme.ts';
 
@@ -8,6 +9,8 @@ export type Surface<
     readonly gl: WebGL2RenderingContext;
     readonly palette: WebGLTexture;
     readonly paint: WebGLTexture;
+    readonly ink: InkPass;
+    readonly inkTarget: WebGLFramebuffer;
 };
 
 // Its own unit: the palette is read from 0 and a formula's state from 1.
@@ -72,7 +75,14 @@ const surfaceOn = <C extends HTMLCanvasElement | OffscreenCanvas>(canvas: C): Su
     );
     gl.activeTexture(gl.TEXTURE0);
 
-    return { canvas, gl, palette, paint };
+    return {
+        canvas,
+        gl,
+        palette,
+        paint,
+        ink: createInkPass(gl),
+        inkTarget: gl.createFramebuffer(),
+    };
 };
 
 export const createSurface = (parent: HTMLElement): Surface<HTMLCanvasElement> => {

@@ -4,12 +4,22 @@ import { parseHexColor } from '../../lib/color.ts';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { guidesOf, isSymmetry, symmetryGlyph, SYMMETRIES } from '../../shared/brush.ts';
-import { frameAt, isSide, SIZES, type Frame, type Picture } from '../../shared/picture.ts';
-import { isMode, MAX_WEIGHT, MODES, penAt, type Drawing, type PenCommand } from './pen.ts';
+import { createInkPass, inked, loadStroke, type InkPass } from '../../shared/gl/ink.ts';
+import { dabCount, dabsAt, type Stroke } from '../../shared/stroke.ts';
+import {
+    isMode,
+    MAX_WEIGHT,
+    MIN_WEIGHT,
+    MODES,
+    penAt,
+    type Drawing,
+    type PenCommand,
+} from './pen.ts';
 import css from './pen.css?inline';
 
 const sheet = styleSheet(css);
 const SVG = 'http://www.w3.org/2000/svg';
+const SHEET = 768;
 
 const TEMPLATE = `
     <div class="bar">
@@ -25,7 +35,7 @@ const TEMPLATE = `
         </div>
         <label class="dial" title="how thick the line is; a size signal swells it">
             <span>weight</span>
-            <input type="range" data-weight min="0.5" max="${MAX_WEIGHT}" step="0.5" />
+            <input type="range" data-weight min="${MIN_WEIGHT}" max="${MAX_WEIGHT}" step="0.25" />
             <output></output>
         </label>
         <div class="symmetries" role="radiogroup" aria-label="symmetry">
@@ -37,19 +47,14 @@ const TEMPLATE = `
     </div>
     <div class="stage">
         <div class="sheet">
-            <canvas class="whole" width="1" height="1"></canvas>
-            <canvas class="ink" width="1" height="1"></canvas>
+            <canvas class="whole" width="${SHEET}" height="${SHEET}"></canvas>
+            <canvas class="ink" width="${SHEET}" height="${SHEET}"></canvas>
             <svg class="guides" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
             <span class="tip"></span>
         </div>
     </div>
     <div class="foot">
         <p class="hint">Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the pen follows them. Unplugged, it goes round in a circle.</p>
-        <div class="sides" role="radiogroup" aria-label="resolution">
-            ${SIZES.map(
-                size => `<button type="button" role="radio" data-side="${size}">${size}</button>`,
-            ).join('')}
-        </div>
     </div>
 `;
 
@@ -58,34 +63,26 @@ const dataOf = (target: EventTarget | null, name: string) =>
         ? (target.closest(`[data-${name}]`)?.getAttribute(`data-${name}`) ?? null)
         : null;
 
-const drawn = (canvas: HTMLCanvasElement, frame: Frame, side: number, hex: string) => {
-    const context = canvas.getContext('2d');
-
-    if (context === null) {
-        return;
-    }
-
-    if (canvas.width !== side) {
-        canvas.width = side;
-        canvas.height = side;
-    }
-
+const rgbOf = (hex: string): readonly [number, number, number] => {
     const { r, g, b } = parseHexColor(hex);
-    const image = context.createImageData(side, side);
 
-    frame.forEach((ink, index) => {
-        image.data[index * 4] = Math.round(r * 255);
-        image.data[index * 4 + 1] = Math.round(g * 255);
-        image.data[index * 4 + 2] = Math.round(b * 255);
-        image.data[index * 4 + 3] = ink;
-    });
-    context.putImageData(image, 0, 0);
+    return [r, g, b];
+};
+
+const drawn = (pass: InkPass, stroke: Stroke, count: number, colour: string) => {
+    const { gl } = pass;
+
+    gl.viewport(0, 0, SHEET, SHEET);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    inked(pass, stroke, count, { side: SHEET, colour: rgbOf(colour), flip: -1 });
 };
 
 export class HksPen extends HTMLElement {
     readonly changes$: Observable<PenCommand>;
 
     private readonly shadow: ShadowRoot;
+    private readonly pass: InkPass;
 
     constructor() {
         super();
@@ -95,21 +92,27 @@ export class HksPen extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
+        const gl = requireElement(shadow, '.ink', HTMLCanvasElement).getContext('webgl2', {
+            premultipliedAlpha: true,
+            antialias: false,
+        });
+        if (!(gl instanceof WebGL2RenderingContext)) {
+            throw new Error('This browser does not support WebGL2');
+        }
+        this.pass = createInkPass(gl);
+
         // From the host, as what was really clicked: inside a shadow root the event is retargeted to it.
         const picked$ = fromElementEvent$(this, 'click').pipe(
             mergeMap((event): PenCommand[] => {
                 const target = event.composedPath()[0] ?? null;
                 const mode = dataOf(target, 'mode');
                 const symmetry = dataOf(target, 'symmetry');
-                const side = Number(dataOf(target, 'side'));
 
                 return mode !== null && isMode(mode)
                     ? [{ kind: 'mode', mode }]
                     : symmetry !== null && isSymmetry(symmetry)
                       ? [{ kind: 'symmetry', symmetry }]
-                      : isSide(side)
-                        ? [{ kind: 'side', side }]
-                        : [];
+                      : [];
             }),
         );
 
@@ -126,12 +129,13 @@ export class HksPen extends HTMLElement {
 
     connect$(
         drawing$: Observable<Drawing>,
-        picture$: Observable<Picture>,
+        stroke$: Observable<Stroke>,
         t$: Observable<number>,
     ): Observable<void> {
         const shadow = this.shadow;
         const whole = requireElement(shadow, '.whole', HTMLCanvasElement);
         const ink = requireElement(shadow, '.ink', HTMLCanvasElement);
+        const pass = this.pass;
         const guides = requireElement(shadow, '.guides', SVGSVGElement);
         const tip = requireChild(shadow, '.tip');
         const hint = requireChild(shadow, '.hint');
@@ -152,7 +156,6 @@ export class HksPen extends HTMLElement {
             tap(({ pen, plugged }) => {
                 checked('mode', pen.mode);
                 checked('symmetry', pen.symmetry);
-                checked('side', String(pen.side));
 
                 const weight = requireElement(shadow, '[data-weight]', HTMLInputElement);
 
@@ -173,20 +176,21 @@ export class HksPen extends HTMLElement {
             }),
         );
 
-        const figure$ = picture$.pipe(
-            tap(({ frames, side }) => {
-                drawn(whole, frames.at(-1) ?? [], side, colour('--ink'));
+        // Drawn whole once per stroke and copied out at once, before the live drawing replaces it.
+        const figure$ = stroke$.pipe(
+            tap(stroke => {
+                loadStroke(pass, stroke);
+                drawn(pass, stroke, dabCount(stroke), colour('--ink'));
+                whole.getContext('2d')?.clearRect(0, 0, SHEET, SHEET);
+                whole.getContext('2d')?.drawImage(ink, 0, 0);
             }),
         );
 
-        const now$ = combineLatest([picture$, t$]).pipe(
-            map(([picture, t]) => ({
-                picture,
-                frame: picture.frames[Math.floor(frameAt(picture, t))] ?? picture.frames[0] ?? [],
-            })),
-            distinctUntilChanged((a, b) => a.frame === b.frame),
-            tap(({ picture, frame }) => {
-                drawn(ink, frame, picture.side, colour('--ink'));
+        const now$ = combineLatest([stroke$, t$]).pipe(
+            map(([stroke, t]) => ({ stroke, count: dabsAt(stroke, t) })),
+            distinctUntilChanged((a, b) => a.stroke === b.stroke && a.count === b.count),
+            tap(({ stroke, count }) => {
+                drawn(pass, stroke, count, colour('--ink'));
             }),
         );
 

@@ -4,6 +4,7 @@ import { momentOf, type Evolution, type Front } from '../evolution.ts';
 import type { PanelParams, Pointer } from '../params.ts';
 import type { Orbit } from '../space.ts';
 import { PASS_SEED, PASS_STEP, setMoment, type Sketch } from './sketch-program.ts';
+import type { Surface } from './surface.ts';
 
 export type Simulation = {
     readonly side: number;
@@ -86,7 +87,7 @@ export type Moment = {
 };
 
 const pass = (
-    gl: WebGL2RenderingContext,
+    surface: Surface,
     sketch: Sketch,
     simulation: Simulation,
     from: Front,
@@ -94,9 +95,10 @@ const pass = (
     t: number,
     { params, pointer, orbit }: Moment,
 ): Front => {
+    const { gl } = surface;
     const into: Front = from === 0 ? 1 : 0;
     bindState(gl, sketch, simulation, from);
-    setMoment(gl, sketch, params, t, pointer, orbit);
+    setMoment(surface, sketch, params, t, pointer, orbit);
     gl.bindFramebuffer(gl.FRAMEBUFFER, simulation.framebuffers[into]);
     gl.uniform1i(sketch.uniforms.pass, kind);
     gl.drawArrays(gl.POINTS, 0, simulation.side * simulation.side);
@@ -105,7 +107,7 @@ const pass = (
 };
 
 export const evolve = (
-    gl: WebGL2RenderingContext,
+    surface: Surface,
     sketch: Sketch,
     simulation: Simulation,
     evolution: Evolution,
@@ -115,6 +117,7 @@ export const evolve = (
         return;
     }
 
+    const { gl } = surface;
     const viewport: unknown = gl.getParameter(gl.VIEWPORT);
     const scissor = gl.isEnabled(gl.SCISSOR_TEST);
     gl.viewport(0, 0, simulation.side, simulation.side);
@@ -123,7 +126,7 @@ export const evolve = (
     gl.disable(gl.SCISSOR_TEST);
 
     const seeded = evolution.reset
-        ? pass(gl, sketch, simulation, evolution.start, PASS_SEED, 0, moment)
+        ? pass(surface, sketch, simulation, evolution.start, PASS_SEED, 0, moment)
         : evolution.start;
     const steps = Array.from(
         { length: evolution.to - evolution.from },
@@ -132,7 +135,7 @@ export const evolve = (
     steps.reduce<Front>(
         (front, step) =>
             pass(
-                gl,
+                surface,
                 sketch,
                 simulation,
                 front,
