@@ -679,7 +679,10 @@ describe('pruning signal chains', () => {
             { kind: 'follow', id: 'sketch-2', input: 'k1', source: 'signal', store: 'store-1' },
         ]);
         const followed = new Map([
-            ['store-1', { ...defaultSignal, sources: { phase: null, low: null, high: 'signal' } }],
+            [
+                'store-1',
+                { ...defaultSignal, sources: { phase: null, offset: null, depth: 'signal' } },
+            ],
         ]);
         const kept = (map: typeof followed) =>
             reduceWorkspace(

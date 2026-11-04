@@ -11,20 +11,28 @@
 .scope {
     position: relative;
     flex: 1;
-    min-block-size: 64px;
+    min-block-size: 72px;
     background: var(--well);
     border-radius: 10px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
 }
 
-svg {
+.scope:active {
+    cursor: grabbing;
+}
+
+.scope > svg {
     position: absolute;
-    inset: 8px 10px;
+    inset: 16px 10px;
     inline-size: calc(100% - 20px);
-    block-size: calc(100% - 16px);
+    block-size: calc(100% - 32px);
     overflow: visible;
+    pointer-events: none;
 }
 
-.axis {
+.zero {
     stroke: var(--edge);
     stroke-width: 1;
     stroke-dasharray: 2 3;
@@ -45,11 +53,28 @@ svg {
     vector-effect: non-scaling-stroke;
 }
 
+.bound {
+    position: absolute;
+    inset-inline-start: 10px;
+    font: 500 10px var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.max {
+    inset-block-start: 2px;
+}
+
+.min {
+    inset-block-end: 2px;
+}
+
 /* Drawn outside the stretched svg, or the wave's aspect would squash it into an ellipse. */
 .dot {
     position: absolute;
     inset-inline-start: calc(10px + var(--x, 0) * (100% - 20px));
-    inset-block-start: calc(8px + var(--y, 1) * (100% - 16px));
+    inset-block-start: calc(16px + var(--y, 1) * (100% - 32px));
     inline-size: 8px;
     block-size: 8px;
     margin: -4px 0 0 -4px;
@@ -58,103 +83,112 @@ svg {
     pointer-events: none;
 }
 
-.rows {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 4px 10px;
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     align-items: center;
+    justify-content: space-between;
 }
 
-.row {
-    display: contents;
+.shapes,
+.rates {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--well);
+    border-radius: 9px;
+}
+
+.shapes button,
+.rates button {
+    display: grid;
+    place-items: center;
+    min-inline-size: 26px;
+    block-size: 24px;
+    padding: 0 5px;
+    font: 500 11px var(--font-mono);
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.shapes button:hover,
+.rates button:hover {
+    color: var(--ink);
+}
+
+.shapes button[aria-checked='true'],
+.rates button[aria-checked='true'] {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.shapes svg {
+    inline-size: 22px;
+    block-size: 11px;
+    overflow: visible;
+}
+
+.shapes path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.params {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.param {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 5px 8px 6px;
+    background: var(--well);
+    border-radius: 9px;
 }
 
 .key {
+    font-size: 10px;
     color: var(--muted);
 }
 
-.row:has(select) .pick {
-    grid-column: 2 / 4;
-    justify-self: start;
-}
-
-.read {
-    min-inline-size: 2.4em;
-    text-align: end;
-    font: 500 11px var(--font-mono);
+/* Reads as a value, not a text box: it is dragged first and typed into only on a click. */
+.num {
+    inline-size: 100%;
+    padding: 0;
+    font: 500 14px var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--ink);
-}
-
-.pick {
-    font: 500 12px var(--font-ui);
-    padding: 4px 6px;
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.pick:hover {
-    background: var(--well);
-}
-
-.pick:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
-}
-
-.dial {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 100%;
-    block-size: 16px;
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-}
-
-.dial::-webkit-slider-runnable-track {
-    block-size: 4px;
-    background: var(--edge);
-    border-radius: 2px;
-}
-
-.dial::-moz-range-track {
-    block-size: 4px;
-    background: var(--edge);
-    border-radius: 2px;
-}
-
-.dial::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 14px;
-    block-size: 14px;
-    margin-block-start: -5px;
-    background: var(--panel);
     border: none;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1.5px var(--ink);
+    outline: none;
+    cursor: ns-resize;
 }
 
-.dial::-moz-range-thumb {
-    inline-size: 14px;
-    block-size: 14px;
-    background: var(--panel);
-    border: none;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1.5px var(--ink);
+.num:focus {
+    cursor: text;
 }
 
-.dial:disabled {
-    opacity: 0.4;
+.param:focus-within {
+    box-shadow: 0 0 0 2px var(--highlight);
+}
+
+.param[data-driven] .num {
+    color: var(--accent);
     cursor: default;
 }
 
-.dial:focus-visible {
+.shapes button:focus-visible,
+.rates button:focus-visible {
     outline: 2px solid var(--highlight);
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline-offset: 1px;
 }

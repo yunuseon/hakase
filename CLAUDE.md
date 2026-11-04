@@ -1028,14 +1028,35 @@ receives them as plain `StoreOption`s and knows nothing else.
 ## Signals
 
 `signal` is a document program: a low-frequency wave, `Signal = { shape, rate,
-phase, low, high }`, with `signalAt(signal, t)` a **pure function of the
+phase, offset, depth }`, with `signalAt(signal, t)` a **pure function of the
 playhead** (`src/shared/signal.ts`, shared because the sketch reads it too).
 That is what keeps a signal honest about time: it loops seamlessly, a scrub
 lands exactly, and an export or a thumbnail evaluates it at its own frame with
 no recording. Rates are whole cycles per loop (`RATES`), for the same reason as
 knob motion; `noise` eases between hashed points whose index wraps at the
-loop's point count, or its last point would jump back to the first. `low` above
-`high` inverts the wave.
+loop's point count, or its last point would jump back to the first.
+
+**A signal is set like an LFO, and it is not bounded.** It swings `depth` either
+side of `offset`, both any number (a negative depth flips it), so it can output
+-5 to 30 as easily as 0 to 1; only the phase wraps, as a fraction of a cycle.
+It was first `low` and `high` clamped to 0 to 1, which made it a knob value and
+nothing else; `parseSignal` still reads a saved low and high as the same wave,
+and a source that followed `high` as one that follows `depth`. Offset and depth
+are also what chaining wants: a slow signal on another's depth is amplitude
+modulation, on its offset a drifting centre.
+
+The window is built like an instrument rather than a form. The scope fits
+itself to whatever the wave reaches and labels its bounds, and the wave can be
+**grabbed**: up and down moves the offset by the plot's span, left and right
+slides the phase by the cycle (`drag-wave`, as fractions of the scope, so the
+fold does the scaling). Shapes are glyph buttons and rates a row of chips. The
+three values are **drag-numbers**: drag up or right to raise one (shift is ten
+times finer, `dragStep`), a click without a drag opens it for typing (degrees
+for the phase, `typedValue`), the arrow keys nudge it. A drag is reported as a
+`nudge`, how far, never as a value read from the field, because a control must
+not reach for the value the fold owns. A field being typed into is not written
+over, and leaving it writes the fold's value back, which is how Escape and a
+refused entry restore it.
 
 A signal window shows its wave and marks the moment of the clock it follows
 (it takes `playbackInput` like a sketch). A sketch's four knobs are inputs
@@ -1046,18 +1067,20 @@ playhead, so a sketch on a second clock plays the same wave on its own time.
 `AppState.followedWave$(input)` hands a program the signal its input is bound
 to, or null, with its whole chain already resolved.
 
-**A sketch's scene can follow signals too**: `turn` spins the camera a whole
-turn over the signal's range (yaw added to the viewer's own), `focus` plays the
-lattice focus on the slider's log scale (0.3 to 3), and `colour` slides the
-picture along its theme ramp by up to half of it (`uColourShift`, added to the
-tint before the ramp lookup). They are optional inputs like the knobs
+**A sketch's scene can follow signals too**, and every input takes the signal's
+value **as it is, in its own unit**: a knob gets the raw value (a hand-set knob
+stays 0 to 1, a signal can push it anywhere), `turn` is in turns (yaw added to
+the viewer's own), `focus` is the focus itself, clamped to 0.1 to 10 so the
+lattice cannot collapse, and `colour` is an offset along the theme ramp
+(`uColourShift`, added to the tint before the lookup). Rescaling per input, as
+they first did, only made sense while signals were stuck between 0 and 1. They are optional inputs like the knobs
 (`sceneInputs`) and travel in the same `PanelParams.signals`, keyed by `DRIVES`.
 All three are set in `setMoment` every frame, not in `prepare`, because they
 change with the playhead; `setMoment` is shared by the live sketch, the
 thumbnails and an export, so all three see the same frame. A driven focus keeps
 its slider for when it is let go, with the readout saying **signal**.
 
-**A signal's phase, low and high can follow another signal** (`Signal.sources`),
+**A signal's phase, offset and depth can follow another signal** (`Signal.sources`),
 so an LFO can swell another's range. The followed value stands in for the
 parameter, evaluated at the same moment, so a chain still loops and still
 replays exactly. Three choices hold it together:
@@ -1681,7 +1704,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and eighty-five of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

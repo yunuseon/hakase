@@ -2,6 +2,7 @@ import type { Size } from '../window/frame.ts';
 import type { Fit, Lattice, Lens, Space } from './space.ts';
 import type { Theme } from './theme.ts';
 import { waveAt, type Wave } from '../../shared/signal.ts';
+import { clamp } from '../../lib/math.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
 
@@ -45,18 +46,18 @@ export type Drive = (typeof DRIVES)[number];
 
 export type Signals = Readonly<Record<Drive, Wave | null>>;
 
-const FOCUS_LOW = 0.3;
-const FOCUS_RANGE = 10;
+const MIN_FOCUS = 0.1;
+const MAX_FOCUS = 10;
 
-// A whole turn over the signal's range, so a looping signal brings the camera back where it began.
 export const turnAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
     signals.turn === null ? 0 : 2 * Math.PI * waveAt(signals.turn, t);
 
+// Clamped, not mapped: below 0.1 the lattice collapses onto one point.
 export const focusAt = ({ focus, signals }: Pick<PanelParams, 'focus' | 'signals'>, t: number) =>
-    signals.focus === null ? focus : FOCUS_LOW * FOCUS_RANGE ** waveAt(signals.focus, t);
+    signals.focus === null ? focus : clamp(waveAt(signals.focus, t), MIN_FOCUS, MAX_FOCUS);
 
 export const colourShiftAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
-    signals.colour === null ? 0 : waveAt(signals.colour, t) - 0.5;
+    signals.colour === null ? 0 : waveAt(signals.colour, t);
 
 export const knobValue = (
     { knobs, motion, signals }: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,

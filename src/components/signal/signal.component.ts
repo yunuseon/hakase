@@ -1,67 +1,109 @@
 import { combineLatest, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import {
+    distinctUntilChanged,
+    filter,
+    map,
+    mergeMap,
+    pairwise,
+    scan,
+    share,
+    startWith,
+    tap,
+} from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
+import { pointerGesture$, type Phase } from '../../shared/drag.ts';
 import {
+    isParam,
     isRate,
     isShape,
+    PARAMS,
     RATES,
     SHAPES,
+    type Param,
+    type Shape,
     type Signal,
     type SignalCommand,
     type Wave,
 } from '../../shared/signal.ts';
-import { HEIGHT, markerOf, pathOf, WIDTH } from './signal.ts';
+import { dragStep, HEIGHT, markerOf, plotOf, typedValue, valueText, WIDTH } from './signal.ts';
 import css from './signal.css?inline';
 
 const sheet = styleSheet(css);
+const MOVE_SLOP = 3;
 
-const UNITS = ['phase', 'low', 'high'] as const;
-type Unit = (typeof UNITS)[number];
+const GLYPHS: Readonly<Record<Shape, string>> = {
+    sine: 'M1 6 C5 -1 7 -1 12 6 S19 13 23 6',
+    triangle: 'M1 10 L6.5 2 L17.5 10 L23 2',
+    saw: 'M1 10 L12 2 V10 L23 2 V10',
+    square: 'M1 10 V2 H12 V10 H23 V2',
+    noise: 'M1 7 L4 3 L7 8 L10 5 L13 9 L16 2 L19 6 L23 4',
+};
 
-const unitRow = (unit: Unit, label: string, hint: string) => `
-    <label class="row" title="${hint}">
-        <span class="key">${label}</span>
-        <input class="dial" data-unit="${unit}" type="range" min="0" max="1" step="0.01" />
-        <output class="read" data-read="${unit}"></output>
-    </label>
-`;
+const HINTS: Readonly<Record<Param, string>> = {
+    phase: 'where in its cycle the loop starts: drag, or click to type degrees',
+    offset: 'the centre the wave swings around: drag, or click to type any number',
+    depth: 'how far the wave swings either side, negative flips it: drag, or click to type',
+};
 
 const TEMPLATE = `
-    <div class="scope">
+    <div class="scope" title="drag the wave: up and down moves its offset, left and right its phase">
         <svg viewBox="0 -4 ${WIDTH} ${HEIGHT + 8}" preserveAspectRatio="none" aria-hidden="true">
-            <line class="axis" x1="0" y1="${HEIGHT}" x2="${WIDTH}" y2="${HEIGHT}" />
-            <line class="axis" x1="0" y1="0" x2="${WIDTH}" y2="0" />
+            <line class="zero" x1="0" x2="${WIDTH}" />
             <path class="wave" />
             <line class="now" y1="-4" y2="${HEIGHT + 4}" />
         </svg>
+        <span class="bound max"></span>
+        <span class="bound min"></span>
         <span class="dot"></span>
     </div>
-    <div class="rows">
-        <label class="row">
-            <span class="key">shape</span>
-            <select class="pick" data-pick="shape" aria-label="shape">
-                ${SHAPES.map(shape => `<option value="${shape}">${shape}</option>`).join('')}
-            </select>
-        </label>
-        <label class="row" title="a whole number of cycles, so every loop ends where it began">
-            <span class="key">rate</span>
-            <select class="pick" data-pick="rate" aria-label="rate">
-                ${RATES.map(rate => `<option value="${rate}">${rate}× per loop</option>`).join('')}
-            </select>
-        </label>
-        ${unitRow('phase', 'phase', 'where in its cycle the loop starts')}
-        ${unitRow('low', 'low', 'the value at the bottom of the wave')}
-        ${unitRow('high', 'high', 'the value at the top of the wave; below low turns it upside down')}
+    <div class="row">
+        <div class="shapes" role="radiogroup" aria-label="shape">
+            ${SHAPES.map(
+                shape => `
+                <button type="button" role="radio" data-shape="${shape}" title="${shape}" aria-label="${shape}">
+                    <svg viewBox="0 0 24 12" aria-hidden="true"><path d="${GLYPHS[shape]}" /></svg>
+                </button>`,
+            ).join('')}
+        </div>
+        <div class="rates" role="radiogroup" aria-label="cycles per loop" title="cycles per loop">
+            ${RATES.map(
+                rate => `<button type="button" role="radio" data-rate="${rate}">${rate}</button>`,
+            ).join('')}
+        </div>
+    </div>
+    <div class="params">
+        ${PARAMS.map(
+            param => `
+            <label class="param" title="${HINTS[param]}">
+                <span class="key">${param}</span>
+                <input class="num" data-param="${param}" type="text" inputmode="decimal"
+                       spellcheck="false" autocomplete="off" />
+            </label>`,
+        ).join('')}
     </div>
 `;
 
-const isUnit = (value: string): value is Unit => UNITS.some(unit => unit === value);
+type Pull = {
+    readonly phase: Phase;
+    readonly param: Param | null;
+    readonly x: number;
+    readonly y: number;
+    readonly moved: number;
+    readonly by: number;
+};
+
+const paramOf = (target: EventTarget | null): Param | null => {
+    const param = target instanceof HTMLElement ? target.dataset['param'] : undefined;
+
+    return param !== undefined && isParam(param) ? param : null;
+};
 
 export class HksSignal extends HTMLElement {
     readonly commands$: Observable<SignalCommand>;
 
     private readonly shadow: ShadowRoot;
+    private readonly pulls$: Observable<Pull>;
 
     constructor() {
         super();
@@ -71,48 +113,117 @@ export class HksSignal extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
-        const rows = requireChild(shadow, '.rows');
+        const scope = requireChild(shadow, '.scope');
+        const params = requireChild(shadow, '.params');
+
+        // Shared: the nudges and the click that opens the field for typing must read one gesture.
+        this.pulls$ = pointerGesture$(
+            params,
+            ({ target }) =>
+                paramOf(target) !== null &&
+                !(target instanceof HTMLInputElement && target.disabled) &&
+                shadow.activeElement !== target,
+        ).pipe(
+            scan(
+                (pull: Pull, { phase, event }): Pull =>
+                    phase === 'grab'
+                        ? {
+                              phase,
+                              param: paramOf(event.target),
+                              x: event.clientX,
+                              y: event.clientY,
+                              moved: 0,
+                              by: 0,
+                          }
+                        : {
+                              ...pull,
+                              phase,
+                              x: event.clientX,
+                              y: event.clientY,
+                              moved:
+                                  pull.moved +
+                                  Math.abs(event.clientX - pull.x) +
+                                  Math.abs(event.clientY - pull.y),
+                              by:
+                                  (event.clientX - pull.x - (event.clientY - pull.y)) *
+                                  (pull.param === null ? 0 : dragStep(pull.param, event.shiftKey)),
+                          },
+                { phase: 'release', param: null, x: 0, y: 0, moved: 0, by: 0 },
+            ),
+            share(),
+        );
 
         this.commands$ = merge(
-            fromElementEvent$(rows, 'change').pipe(
+            fromElementEvent$(requireChild(shadow, '.shapes'), 'click').pipe(
                 mergeMap(({ target }): SignalCommand[] => {
-                    if (!(target instanceof HTMLSelectElement)) {
-                        return [];
-                    }
+                    const button =
+                        target instanceof Element ? target.closest('[data-shape]') : null;
+                    const shape =
+                        button instanceof HTMLElement ? button.dataset['shape'] : undefined;
 
-                    const value = target.value;
-                    const rate = Number(value);
-
-                    return target.dataset['pick'] === 'shape' && isShape(value)
-                        ? [{ kind: 'shape', shape: value }]
-                        : target.dataset['pick'] === 'rate' && isRate(rate)
-                          ? [{ kind: 'rate', rate }]
-                          : [];
+                    return shape !== undefined && isShape(shape) ? [{ kind: 'shape', shape }] : [];
                 }),
             ),
-            fromElementEvent$(rows, 'input').pipe(
+            fromElementEvent$(requireChild(shadow, '.rates'), 'click').pipe(
                 mergeMap(({ target }): SignalCommand[] => {
-                    const unit = target instanceof HTMLInputElement ? target.dataset['unit'] : '';
+                    const rate =
+                        target instanceof HTMLElement ? Number(target.dataset['rate']) : NaN;
 
-                    if (
-                        !(target instanceof HTMLInputElement) ||
-                        unit === undefined ||
-                        !isUnit(unit)
-                    ) {
+                    return isRate(rate) ? [{ kind: 'rate', rate }] : [];
+                }),
+            ),
+            this.pulls$.pipe(
+                mergeMap(({ phase, param, moved, by }): SignalCommand[] =>
+                    phase === 'move' && param !== null && moved >= MOVE_SLOP && by !== 0
+                        ? [{ kind: 'nudge', param, by }]
+                        : [],
+                ),
+            ),
+            fromElementEvent$(params, 'change').pipe(
+                mergeMap(({ target }): SignalCommand[] => {
+                    const param = paramOf(target);
+                    const value =
+                        param !== null && target instanceof HTMLInputElement
+                            ? typedValue(param, target.value)
+                            : null;
+
+                    return param === null || value === null ? [] : [{ kind: 'set', param, value }];
+                }),
+            ),
+            fromElementEvent$(params, 'keydown').pipe(
+                mergeMap((event): SignalCommand[] => {
+                    const param = paramOf(event.target);
+                    const step = event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0;
+
+                    if (param === null || step === 0) {
                         return [];
                     }
 
-                    const value = target.valueAsNumber;
+                    // Taken, or the canvas reads the arrow as a step between sections.
+                    event.preventDefault();
 
-                    switch (unit) {
-                        case 'phase':
-                            return [{ kind: 'phase', phase: value }];
-                        case 'low':
-                            return [{ kind: 'low', low: value }];
-                        case 'high':
-                            return [{ kind: 'high', high: value }];
-                    }
+                    return [
+                        { kind: 'nudge', param, by: step * dragStep(param, event.shiftKey) * 10 },
+                    ];
                 }),
+            ),
+            pointerGesture$(scope).pipe(
+                map(({ phase, event }) => {
+                    const rect = scope.getBoundingClientRect();
+
+                    return {
+                        phase,
+                        x: event.clientX / Math.max(rect.width, 1),
+                        y: event.clientY / Math.max(rect.height, 1),
+                    };
+                }),
+                pairwise(),
+                filter(([from, to]) => from.phase !== 'release' && to.phase === 'move'),
+                map(([from, to]): SignalCommand => ({
+                    kind: 'drag-wave',
+                    dx: to.x - from.x,
+                    dy: to.y - from.y,
+                })),
             ),
         );
     }
@@ -123,47 +234,112 @@ export class HksSignal extends HTMLElement {
         t$: Observable<number>,
     ): Observable<void> {
         const shadow = this.shadow;
+        const params = requireChild(shadow, '.params');
         const line = requireElement(shadow, '.wave', SVGPathElement);
         const now = requireElement(shadow, '.now', SVGLineElement);
+        const zero = requireElement(shadow, '.zero', SVGLineElement);
         const dot = requireChild(shadow, '.dot');
+        const max = requireChild(shadow, '.max');
+        const min = requireChild(shadow, '.min');
 
-        const picks$ = (['shape', 'rate'] as const).map(key =>
-            signal$.pipe(
-                map(signal => String(signal[key])),
-                distinctUntilChanged(),
-                tap(value => {
-                    requireElement(shadow, `[data-pick="${key}"]`, HTMLSelectElement).value = value;
-                }),
-            ),
-        );
+        const checked = (selector: string, key: string, value: string) => {
+            for (const button of shadow.querySelectorAll(selector)) {
+                if (button instanceof HTMLElement) {
+                    button.setAttribute('aria-checked', String(button.dataset[key] === value));
+                }
+            }
+        };
 
-        const units$ = UNITS.map(unit =>
-            combineLatest([
-                signal$.pipe(map(signal => signal[unit])),
-                wave$.pipe(map(({ mods }) => mods[unit] !== null)),
-            ]).pipe(
-                distinctUntilChanged(([a, x], [b, y]) => a === b && x === y),
-                tap(([value, driven]) => {
-                    const input = requireElement(shadow, `[data-unit="${unit}"]`, HTMLInputElement);
-                    input.value = String(value);
-                    input.disabled = driven;
-                    requireElement(shadow, `[data-read="${unit}"]`, HTMLOutputElement).textContent =
-                        driven ? 'signal' : value.toFixed(2);
-                    input.closest('.row')?.toggleAttribute('data-driven', driven);
-                }),
-            ),
-        );
-
-        const path$ = wave$.pipe(
-            map(pathOf),
+        const shape$ = signal$.pipe(
+            map(({ shape }) => shape),
             distinctUntilChanged(),
-            tap(path => {
-                line.setAttribute('d', path);
+            tap(shape => {
+                checked('[data-shape]', 'shape', shape);
             }),
         );
 
-        const marker$ = combineLatest([wave$, t$]).pipe(
-            map(([wave, t]) => markerOf(wave, t)),
+        const rate$ = signal$.pipe(
+            map(({ rate }) => String(rate)),
+            distinctUntilChanged(),
+            tap(rate => {
+                checked('[data-rate]', 'rate', rate);
+            }),
+        );
+
+        // A field that loses focus is written again, so Escape or a refused entry shows the value it had.
+        const left$ = fromElementEvent$(params, 'focusout').pipe(startWith(null));
+
+        const fields$ = PARAMS.map(param =>
+            combineLatest([
+                combineLatest([
+                    signal$.pipe(map(signal => valueText(param, signal[param]))),
+                    wave$.pipe(map(({ mods }) => mods[param] !== null)),
+                ]).pipe(distinctUntilChanged(([a, x], [b, y]) => a === b && x === y)),
+                left$,
+            ]).pipe(
+                tap(([[text, driven]]) => {
+                    const input = requireElement(
+                        shadow,
+                        `[data-param="${param}"]`,
+                        HTMLInputElement,
+                    );
+                    input.disabled = driven;
+                    input.closest('.param')?.toggleAttribute('data-driven', driven);
+
+                    // Not while it is being typed into: the fold's value would overwrite the draft.
+                    if (shadow.activeElement !== input) {
+                        input.value = driven ? 'signal' : text;
+                    }
+                }),
+            ),
+        );
+
+        const typing$ = this.pulls$.pipe(
+            filter(
+                ({ phase, param, moved }) =>
+                    phase === 'release' && param !== null && moved < MOVE_SLOP,
+            ),
+            tap(({ param }) => {
+                const input = shadow.querySelector(`[data-param="${param}"]`);
+
+                if (input instanceof HTMLInputElement) {
+                    input.focus();
+                    input.select();
+                }
+            }),
+        );
+
+        const keys$ = fromElementEvent$(params, 'keydown').pipe(
+            tap(({ key, target }) => {
+                if (target instanceof HTMLInputElement && (key === 'Enter' || key === 'Escape')) {
+                    // Escape empties it first, so the change that the blur raises is refused.
+                    if (key === 'Escape') {
+                        target.value = '';
+                    }
+
+                    target.blur();
+                }
+            }),
+        );
+
+        const plot$ = wave$.pipe(
+            map(wave => ({ wave, plot: plotOf(wave) })),
+            tap(({ plot }) => {
+                line.setAttribute('d', plot.path);
+                max.textContent = valueText('offset', plot.max);
+                min.textContent = valueText('offset', plot.min);
+                zero.style.visibility = plot.zero === null ? 'hidden' : 'visible';
+
+                if (plot.zero !== null) {
+                    zero.setAttribute('y1', String(plot.zero));
+                    zero.setAttribute('y2', String(plot.zero));
+                }
+            }),
+            share(),
+        );
+
+        const marker$ = combineLatest([plot$, t$]).pipe(
+            map(([{ wave, plot }, t]) => markerOf(wave, plot, t)),
             tap(({ x, y }) => {
                 now.setAttribute('x1', String(x));
                 now.setAttribute('x2', String(x));
@@ -172,7 +348,9 @@ export class HksSignal extends HTMLElement {
             }),
         );
 
-        return merge(...picks$, ...units$, path$, marker$).pipe(map(() => undefined));
+        return merge(shape$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
+            map(() => undefined),
+        );
     }
 }
 

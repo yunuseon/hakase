@@ -24,55 +24,74 @@ describe('signalAt', () => {
         }
     });
 
-    it('stays within its range', () => {
-        const signal = {
-            ...defaultSignal,
-            shape: 'noise' as const,
-            rate: 3 as const,
-            low: 0.2,
-            high: 0.6,
-        };
+    it('swings depth either side of offset, however large', () => {
+        const signal: Signal = { ...defaultSignal, shape: 'noise', rate: 3, offset: 10, depth: 20 };
         const values = Array.from({ length: 200 }, (_, index) => signalAt(signal, index / 200));
 
-        expect(Math.min(...values)).toBeGreaterThanOrEqual(0.2);
-        expect(Math.max(...values)).toBeLessThanOrEqual(0.6);
+        expect(Math.min(...values)).toBeGreaterThanOrEqual(-10);
+        expect(Math.max(...values)).toBeLessThanOrEqual(30);
     });
 
-    it('runs a sine from low through high and back', () => {
+    it('is a 0 to 1 sine by default, and inverts with a negative depth', () => {
         expect(signalAt(defaultSignal, 0)).toBeCloseTo(0);
         expect(signalAt(defaultSignal, 0.5)).toBeCloseTo(1);
         expect(signalAt({ ...defaultSignal, phase: 0.5 }, 0)).toBeCloseTo(1);
-    });
-
-    it('inverts when low is above high', () => {
-        expect(signalAt({ ...defaultSignal, low: 1, high: 0 }, 0)).toBeCloseTo(1);
+        expect(signalAt({ ...defaultSignal, depth: -0.5 }, 0)).toBeCloseTo(1);
     });
 });
 
 describe('reduceSignal', () => {
-    it('clamps what it is given', () => {
-        expect(reduceSignal(defaultSignal, { kind: 'phase', phase: 3 }).phase).toBe(1);
-        expect(reduceSignal(defaultSignal, { kind: 'low', low: -1 }).low).toBe(0);
+    it('sets and nudges without bounds, wrapping only the phase', () => {
+        expect(reduceSignal(defaultSignal, { kind: 'set', param: 'depth', value: 30 }).depth).toBe(
+            30,
+        );
+        expect(reduceSignal(defaultSignal, { kind: 'nudge', param: 'offset', by: -4 }).offset).toBe(
+            -3.5,
+        );
+        expect(
+            reduceSignal(defaultSignal, { kind: 'nudge', param: 'phase', by: 1.25 }).phase,
+        ).toBeCloseTo(0.25);
+        expect(reduceSignal(defaultSignal, { kind: 'set', param: 'depth', value: NaN })).toBe(
+            defaultSignal,
+        );
+    });
+
+    it('moves the offset by the plot and the phase by the cycle when the wave is dragged', () => {
+        const dragged = reduceSignal(
+            { ...defaultSignal, depth: 2, rate: 4 },
+            { kind: 'drag-wave', dx: 0.0625, dy: 0.25 },
+        );
+
+        expect(dragged.offset).toBeCloseTo(0.5 - 0.25 * 4);
+        expect(dragged.phase).toBeCloseTo(0.75);
     });
 });
 
 describe('parseSignal', () => {
-    it('falls back field by field', () => {
-        expect(parseSignal({ shape: 'saw', rate: 5, phase: 'x', high: 0.4 })).toEqual({
+    it('falls back field by field, with no bounds on offset and depth', () => {
+        expect(parseSignal({ shape: 'saw', rate: 5, phase: 'x', depth: 40 })).toEqual({
             ...defaultSignal,
             shape: 'saw',
-            high: 0.4,
+            depth: 40,
         });
         expect(parseSignal(null)).toEqual(defaultSignal);
+    });
+
+    it('reads a signal saved as low and high as the same wave', () => {
+        const saved = parseSignal({ low: 0.2, high: 0.8, sources: { high: 'slow' } });
+
+        expect(saved.offset).toBeCloseTo(0.5);
+        expect(saved.depth).toBeCloseTo(0.3);
+        expect(saved.sources).toEqual({ phase: null, offset: null, depth: 'slow' });
     });
 });
 
 describe('chains', () => {
-    const slow: Signal = { ...defaultSignal, rate: 1, low: 0.2, high: 0.8 };
+    const slow: Signal = { ...defaultSignal, rate: 1, offset: 0.5, depth: 0.3 };
     const fast: Signal = {
         ...defaultSignal,
         rate: 4,
-        sources: { phase: null, low: null, high: 'slow' },
+        sources: { phase: null, offset: null, depth: 'slow' },
     };
     const all = new Map([
         ['slow', slow],
@@ -82,9 +101,9 @@ describe('chains', () => {
     it('lets a followed signal stand in for a parameter, at the same moment', () => {
         const chained = waveOf(all, 'fast');
 
-        expect(chained.mods.high?.signal).toBe(slow);
+        expect(chained.mods.depth?.signal).toBe(slow);
         expect(waveAt(chained, 0.125)).toBeCloseTo(
-            signalAt({ ...fast, high: signalAt(slow, 0.125) }, 0.125),
+            signalAt({ ...fast, depth: signalAt(slow, 0.125) }, 0.125),
         );
     });
 
@@ -99,9 +118,9 @@ describe('chains', () => {
         expect(closesLoop(all, 'fast', 'fast')).toBe(true);
         expect(closesLoop(all, 'fast', 'slow')).toBe(false);
 
-        const looped = new Map([
-            ['a', { ...defaultSignal, sources: { phase: 'b', low: null, high: null } }],
-            ['b', { ...defaultSignal, sources: { phase: 'a', low: null, high: null } }],
+        const looped = new Map<string, Signal>([
+            ['a', { ...defaultSignal, sources: { phase: 'b', offset: null, depth: null } }],
+            ['b', { ...defaultSignal, sources: { phase: 'a', offset: null, depth: null } }],
         ]);
 
         expect(waveOf(looped, 'a').mods.phase?.mods.phase).toBeNull();
@@ -110,13 +129,5 @@ describe('chains', () => {
     it('reaches every store a chain follows, so a prune keeps them', () => {
         expect([...reachedFrom(all, ['fast'])].sort()).toEqual(['fast', 'slow']);
         expect([...reachedFrom(all, ['slow'])]).toEqual(['slow']);
-    });
-
-    it('reads sources back from storage, dropping what is not a store id', () => {
-        expect(parseSignal({ sources: { high: 'slow', low: 3 } }).sources).toEqual({
-            phase: null,
-            low: null,
-            high: 'slow',
-        });
     });
 });

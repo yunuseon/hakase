@@ -199,7 +199,7 @@ describe('chains in the map', () => {
         title: 'Signal',
         name: id,
         colour: id,
-        ports: [{ input: 'high', title: 'high', accepts: ['signal'], optional: true, bound }],
+        ports: [{ input: 'depth', title: 'depth', accepts: ['signal'], optional: true, bound }],
     });
     const chain: StateGraph = {
         stores: [signalStore('slow', null), signalStore('fast', 'slow')],
@@ -281,7 +281,7 @@ describe('moved nodes', () => {
 });
 
 describe('closesLoop', () => {
-    const fast = { kind: 'source' as const, store: 'slow', param: 'high', source: 'fast' };
+    const fast = { kind: 'source' as const, store: 'slow', param: 'depth', source: 'fast' };
 
     it('finds a source that already follows its target, however deep', () => {
         const layout = layoutOf({
@@ -308,8 +308,8 @@ describe('closesLoop', () => {
                     colour: 'blue',
                     ports: [
                         {
-                            input: 'high',
-                            title: 'high',
+                            input: 'depth',
+                            title: 'depth',
                             accepts: ['signal'],
                             optional: true,
                             bound: 'slow',

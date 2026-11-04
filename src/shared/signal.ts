@@ -1,4 +1,4 @@
-import { clamp } from '../lib/math.ts';
+import { wrap01 } from '../lib/math.ts';
 
 export const SHAPES = ['sine', 'triangle', 'saw', 'square', 'noise'] as const;
 export type Shape = (typeof SHAPES)[number];
@@ -10,7 +10,7 @@ export type Rate = (typeof RATES)[number];
 export const isRate = (value: number): value is Rate => RATES.some(rate => rate === value);
 
 // Not rate: a rate that moved would stop being a whole number of cycles, and the loop would not loop.
-export const PARAMS = ['phase', 'low', 'high'] as const;
+export const PARAMS = ['phase', 'offset', 'depth'] as const;
 export type Param = (typeof PARAMS)[number];
 export const isParam = (value: string): value is Param => PARAMS.some(param => param === value);
 
@@ -20,46 +20,61 @@ export type Signal = {
     readonly shape: Shape;
     readonly rate: Rate;
     readonly phase: number;
-    readonly low: number;
-    readonly high: number;
+    readonly offset: number;
+    readonly depth: number;
     readonly sources: Sources;
 };
 
-const unsourced: Sources = { phase: null, low: null, high: null };
+const unsourced: Sources = { phase: null, offset: null, depth: null };
 
 export const defaultSignal: Signal = {
     shape: 'sine',
     rate: 1,
     phase: 0,
-    low: 0,
-    high: 1,
+    offset: 0.5,
+    depth: 0.5,
     sources: unsourced,
 };
 
 export type SignalCommand =
     | { readonly kind: 'shape'; readonly shape: Shape }
     | { readonly kind: 'rate'; readonly rate: Rate }
-    | { readonly kind: 'phase'; readonly phase: number }
-    | { readonly kind: 'low'; readonly low: number }
-    | { readonly kind: 'high'; readonly high: number }
+    | { readonly kind: 'set'; readonly param: Param; readonly value: number }
+    // Relative, so a control reports how far it was dragged and never reads the value it moves.
+    | { readonly kind: 'nudge'; readonly param: Param; readonly by: number }
+    | { readonly kind: 'drag-wave'; readonly dx: number; readonly dy: number }
     | { readonly kind: 'source'; readonly param: Param; readonly source: string | null };
 
-export const reduceSignal = (signal: Signal, command: SignalCommand) => {
+const withParam = (signal: Signal, param: Param, value: number): Signal =>
+    !Number.isFinite(value)
+        ? signal
+        : param === 'phase'
+          ? { ...signal, phase: wrap01(value) }
+          : { ...signal, [param]: value };
+
+export const reduceSignal = (signal: Signal, command: SignalCommand): Signal => {
     switch (command.kind) {
         case 'shape':
             return { ...signal, shape: command.shape };
         case 'rate':
             return { ...signal, rate: command.rate };
-        case 'phase':
-            return { ...signal, phase: clamp(command.phase, 0, 1) };
-        case 'low':
-            return { ...signal, low: clamp(command.low, 0, 1) };
-        case 'high':
-            return { ...signal, high: clamp(command.high, 0, 1) };
+        case 'set':
+            return withParam(signal, command.param, command.value);
+        case 'nudge':
+            return withParam(signal, command.param, signal[command.param] + command.by);
+        case 'drag-wave':
+            return withParam(
+                withParam(signal, 'offset', signal.offset - command.dy * spanOf(signal)),
+                'phase',
+                signal.phase - command.dx * signal.rate,
+            );
         case 'source':
             return { ...signal, sources: { ...signal.sources, [command.param]: command.source } };
     }
 };
+
+// What the plot spans for a signal of no depth, so a flat line can still be dragged.
+const spanOf = ({ depth }: Signal) => Math.max(2 * Math.abs(depth), 1);
 
 const NOISE_POINTS = 4;
 
@@ -94,8 +109,8 @@ const wave = (shape: Shape, rate: Rate, cycle: number) => {
     }
 };
 
-export const signalAt = ({ shape, rate, phase, low, high }: Signal, t: number) =>
-    low + (high - low) * wave(shape, rate, rate * t + phase);
+export const signalAt = ({ shape, rate, phase, offset, depth }: Signal, t: number) =>
+    offset + depth * (2 * wave(shape, rate, rate * t + phase) - 1);
 
 export type Wave = {
     readonly signal: Signal;
@@ -116,7 +131,7 @@ export const waveOf = (
         return source === null || below.has(source) ? null : waveOf(all, source, below);
     };
 
-    return { signal, mods: { phase: mod('phase'), low: mod('low'), high: mod('high') } };
+    return { signal, mods: { phase: mod('phase'), offset: mod('offset'), depth: mod('depth') } };
 };
 
 export const waveAt = ({ signal, mods }: Wave, t: number): number =>
@@ -124,8 +139,8 @@ export const waveAt = ({ signal, mods }: Wave, t: number): number =>
         {
             ...signal,
             phase: mods.phase === null ? signal.phase : waveAt(mods.phase, t),
-            low: mods.low === null ? signal.low : waveAt(mods.low, t),
-            high: mods.high === null ? signal.high : waveAt(mods.high, t),
+            offset: mods.offset === null ? signal.offset : waveAt(mods.offset, t),
+            depth: mods.depth === null ? signal.depth : waveAt(mods.depth, t),
         },
         t,
     );
@@ -170,11 +185,14 @@ export const closesLoop = (all: ReadonlyMap<string, Signal>, target: string, sou
 export const samplesOf = (wave: Wave, count: number) =>
     Array.from({ length: count + 1 }, (_, index) => waveAt(wave, index / count));
 
-const unit = (value: unknown, fallback: number) =>
-    typeof value === 'number' && Number.isFinite(value) ? clamp(value, 0, 1) : fallback;
+const finiteOr = (value: unknown, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
 const field = (value: object, key: string): unknown =>
     Object.entries(value).find(([name]) => name === key)?.[1];
+
+// Saved as low and high before signals were offset and depth: the same wave, rewritten.
+const LEGACY: Readonly<Record<Param, string>> = { phase: 'phase', offset: 'low', depth: 'high' };
 
 const sourcesFrom = (value: unknown): Sources => {
     if (typeof value !== 'object' || value === null) {
@@ -182,12 +200,12 @@ const sourcesFrom = (value: unknown): Sources => {
     }
 
     const source = (param: Param) => {
-        const id = field(value, param);
+        const id = field(value, param) ?? field(value, LEGACY[param]);
 
         return typeof id === 'string' ? id : null;
     };
 
-    return { phase: source('phase'), low: source('low'), high: source('high') };
+    return { phase: source('phase'), offset: source('offset'), depth: source('depth') };
 };
 
 export const parseSignal = (value: unknown): Signal => {
@@ -197,13 +215,15 @@ export const parseSignal = (value: unknown): Signal => {
 
     const shape = field(value, 'shape');
     const rate = field(value, 'rate');
+    const low = finiteOr(field(value, 'low'), 0);
+    const high = finiteOr(field(value, 'high'), 1);
 
     return {
         shape: typeof shape === 'string' && isShape(shape) ? shape : defaultSignal.shape,
         rate: typeof rate === 'number' && isRate(rate) ? rate : defaultSignal.rate,
-        phase: unit(field(value, 'phase'), defaultSignal.phase),
-        low: unit(field(value, 'low'), defaultSignal.low),
-        high: unit(field(value, 'high'), defaultSignal.high),
+        phase: wrap01(finiteOr(field(value, 'phase'), defaultSignal.phase)),
+        offset: finiteOr(field(value, 'offset'), (low + high) / 2),
+        depth: finiteOr(field(value, 'depth'), (high - low) / 2),
         sources: sourcesFrom(field(value, 'sources')),
     };
 };

@@ -20,19 +20,24 @@ describe('scene drives', () => {
         expect(colourShiftAt({ signals: none }, 0.3)).toBe(0);
     });
 
-    it('turn the camera a whole turn over the signal, ending where it began', () => {
+    it('take the value as it is: turns, the focus itself, an offset along the ramp', () => {
+        const three = waveOf(new Map([['s', { ...defaultSignal, offset: 3, depth: 0 }]]), 's');
+        const signals = { ...none, turn: three, focus: three, colour: three };
+
+        expect(turnAt({ signals }, 0.2)).toBeCloseTo(6 * Math.PI);
+        expect(focusAt({ focus: 1, signals }, 0.2)).toBeCloseTo(3);
+        expect(colourShiftAt({ signals }, 0.2)).toBeCloseTo(3);
+    });
+
+    it('turn back to where they began when the signal loops', () => {
         const signals = { ...none, turn: sine };
 
-        expect(turnAt({ signals }, 0.5)).toBeCloseTo(2 * Math.PI);
         expect(turnAt({ signals }, 1)).toBeCloseTo(turnAt({ signals }, 0));
     });
 
-    it('read focus on a log scale from 0.3 to 3, and centre the colour shift', () => {
-        const signals = { ...none, focus: sine, colour: sine };
+    it('keep the focus where the lattice still has room', () => {
+        const far = waveOf(new Map([['s', { ...defaultSignal, offset: 50, depth: 0 }]]), 's');
 
-        expect(focusAt({ focus: 1, signals }, 0)).toBeCloseTo(0.3);
-        expect(focusAt({ focus: 1, signals }, 0.5)).toBeCloseTo(3);
-        expect(colourShiftAt({ signals }, 0)).toBeCloseTo(-0.5);
-        expect(colourShiftAt({ signals }, 0.5)).toBeCloseTo(0.5);
+        expect(focusAt({ focus: 1, signals: { ...none, focus: far } }, 0)).toBe(10);
     });
 });
