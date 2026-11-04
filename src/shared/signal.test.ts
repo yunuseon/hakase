@@ -10,6 +10,7 @@ import {
     resampled,
     SHAPES,
     signalAt,
+    stepAt,
     waveAt,
     waveOf,
     type Signal,
@@ -77,6 +78,15 @@ describe('steps', () => {
             0, 0, 0.75, 0,
         ]);
         expect(drawn([0, 0], { x: -1, y: 2 }, { x: -1, y: 2 })).toEqual([0, 0]);
+    });
+
+    it('names the step being played, after the phase', () => {
+        const wave = waveOf(new Map([['s', steps]]), 's');
+
+        expect(stepAt(wave, 0.1)).toBe(0);
+        expect(stepAt(wave, 0.8)).toBe(3);
+        expect(stepAt(waveOf(new Map([['s', { ...steps, phase: 0.5 }]]), 's'), 0.1)).toBe(2);
+        expect(stepAt(waveOf(new Map([['s', defaultSignal]]), 's'), 0.1)).toBeNull();
     });
 
     it('keeps the pattern when the count changes', () => {

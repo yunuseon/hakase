@@ -215,6 +215,15 @@ export const waveAt = ({ signal, mods }: Wave, t: number): number =>
         t,
     );
 
+export const stepAt = ({ signal, mods }: Wave, t: number) =>
+    signal.shape !== 'steps'
+        ? null
+        : Math.floor(
+              wrap01(
+                  signal.rate * t + (mods.phase === null ? signal.phase : waveAt(mods.phase, t)),
+              ) * signal.steps.length,
+          ) % signal.steps.length;
+
 // By reference on each signal: the fold makes a new one only when it changed.
 export const sameWave = (a: Wave, b: Wave): boolean =>
     a.signal === b.signal &&

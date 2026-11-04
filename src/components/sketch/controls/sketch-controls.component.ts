@@ -337,6 +337,7 @@ export class HksSketchControls extends HTMLElement {
         knobs$: Observable<readonly KnobView[]>,
         formulas$: Observable<readonly PresetOption[]>,
         driven$: Observable<readonly string[]>,
+        live$: Observable<ReadonlyMap<string, string>>,
     ): Observable<void> {
         // Together: options rebuilt after the value was set would drop the selection.
         const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
@@ -484,6 +485,29 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
+        const readings$ = live$.pipe(
+            map(values => [...values]),
+            distinctUntilChanged((a, b) => a.join() === b.join()),
+            tap(values => {
+                const valueOf = (field: string) => values.find(([key]) => key === field)?.[1];
+
+                for (const knob of KNOBS) {
+                    const value = valueOf(knob);
+                    requireChild(this.shadow, `[data-knob="${knob}"] .driven`).textContent =
+                        value === undefined ? 'signal' : `signal · ${value}`;
+                }
+
+                for (const [, field] of DRIVEN_FIELDS) {
+                    const value = valueOf(field);
+                    requireElement(
+                        this.shadow,
+                        `[data-read="${field}"]`,
+                        HTMLOutputElement,
+                    ).dataset['live'] = value === undefined ? '' : ` · ${value}`;
+                }
+            }),
+        );
+
         const resets$ = GROUPS.map(name =>
             view$.pipe(
                 map(({ changed }) => changed[name]),
@@ -532,6 +556,7 @@ export class HksSketchControls extends HTMLElement {
             only$,
             shown$,
             drivers$,
+            readings$,
             turned$,
         ).pipe(map(() => undefined));
     }

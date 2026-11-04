@@ -188,6 +188,10 @@
     pointer-events: none;
 }
 
+.bar[data-current] {
+    background: var(--accent);
+}
+
 .counts {
     flex-direction: column;
     flex-wrap: wrap;

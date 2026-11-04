@@ -1071,7 +1071,10 @@ whatever its shape, so switching away and back keeps them. They are edited
 in a bar strip shown only for that shape (`data-only`, like the sketch's
 mode rows): a stroke is reported as `draw`, from and to as fractions of the
 strip, and `drawn` sets every step between the two, so a fast stroke leaves no
-gaps. Changing the count resamples the table rather than clearing it. Glide is
+gaps. Changing the count resamples the table rather than clearing it. The step the
+playhead is on is lit (`stepAt`, after the phase, modulated or not), in the same
+pipe that builds the bars: two pipes, one rebuilding and one marking, could
+leave a rebuilt strip without its mark. Glide is
 a fourth drag-number, a `Field` but not a `Param`, because it cannot follow
 another signal.
 
@@ -1104,7 +1107,10 @@ longer touches, and `drawFrame` reads `trailsAt` — because they change with th
 playhead; both are shared by the live sketch, the thumbnails and an export, so
 all three see the same frame. A driven slider (focus, dot size, depth, trails)
 keeps its value for when it is let go, disabled, with the readout saying
-**signal**. **A still must let go of a driven trail too**: thumbnails and a
+**signal** and the value it is playing (`signal · 3.6`). `liveReadouts` reads
+those from the same functions the renderer calls, at the window's playhead, and
+the program follows the playhead for it only while something is driven, so an
+undriven sketch does no work per frame for its readouts. **A still must let go of a driven trail too**: thumbnails and a
 saved frame used to drop trails with `trails: 0`, which a driven trail would
 override, so they go through `withoutTrails`, and an export's warm-up loop asks
 `hasTrails`.
@@ -1147,7 +1153,10 @@ the selector; both resolve through the pure connection rules in
 `shared/connections.ts`, shared with the State program. Optional inputs offer
 None, and a signal input never offers a source that would close a cycle.
 Output-to-output connections bind a window to the source's state only when
-both programs match. A dotted wire joins windows that share a state.
+both programs match. A dotted wire joins windows that share a state. A wire whose
+target lies behind its source (`wirePath`, shared with the state map) hangs
+below both jacks like a cable, since a level pull out of each would loop past
+them.
 
 `state-mode.ts` derives the world-space sockets and wires. `hks-state-wiring`
 owns their DOM, and compact output selectors offer a manage button for the
@@ -1767,7 +1776,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-five of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety-seven of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

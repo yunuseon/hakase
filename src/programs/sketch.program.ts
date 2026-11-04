@@ -25,6 +25,7 @@ import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { sameTheme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
+import { liveReadouts } from '../components/sketch/controls/controls.ts';
 import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
 import { thumbnails$ } from '../components/sketch/strip/thumbnails.ts';
 import {
@@ -361,6 +362,13 @@ export const sketchProgram = {
                             state.library$.pipe(map(optionsOf)),
                             signals$.pipe(
                                 map(signals => DRIVES.filter(drive => signals[drive] !== null)),
+                            ),
+                            params$.pipe(
+                                switchMap(params =>
+                                    DRIVES.some(drive => params.signals[drive] !== null)
+                                        ? playhead$.pipe(map(t => liveReadouts(params, t)))
+                                        : of(new Map<string, string>()),
+                                ),
                             ),
                         )
                         .pipe(ignoreElements()),

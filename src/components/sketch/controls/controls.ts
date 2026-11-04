@@ -1,12 +1,18 @@
 import type { Tab } from '../animation.ts';
 import {
     defaultPanel,
+    dotsAt,
+    focusAt,
     isCycles,
     isDrawMode,
     isKnob,
+    KNOBS,
+    knobValue,
     samePanel,
+    trailsAt,
     type Knob,
     type Panel,
+    type PanelParams,
 } from '../params.ts';
 import { isFit, isLattice, isLens, isSpace } from '../space.ts';
 
@@ -139,4 +145,20 @@ export const withChange = (panel: Panel, change: ControlChange): Panel => {
         case 'k4':
             return { ...panel, knobs: { ...panel.knobs, [change.field]: change.value } };
     }
+};
+
+const shown = (field: string, driven: boolean, value: number | undefined, digits = 2) =>
+    driven && value !== undefined ? [[field, value.toFixed(digits)] as const] : [];
+
+export const liveReadouts = (params: PanelParams, t: number) => {
+    const { signals } = params;
+    const dots = dotsAt(params, t);
+
+    return new Map([
+        ...KNOBS.flatMap(knob => shown(knob, signals[knob] !== null, knobValue(params, knob, t))),
+        ...shown('focus', signals.focus !== null, focusAt(params, t)),
+        ...shown('baseSize', signals.size !== null, dots?.baseSize, 1),
+        ...shown('depthScalar', signals.depth !== null, dots?.depthScalar),
+        ...shown('trails', signals.trails !== null, trailsAt(params, t)),
+    ]);
 };

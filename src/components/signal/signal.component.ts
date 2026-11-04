@@ -26,6 +26,7 @@ import {
     type Field,
     type Shape,
     type Signal,
+    stepAt,
     type SignalCommand,
     type Wave,
 } from '../../shared/signal.ts';
@@ -314,33 +315,6 @@ export class HksSignal extends HTMLElement {
             }),
         );
 
-        const steps$ = signal$.pipe(
-            map(({ steps }) => steps),
-            distinctUntilChanged(),
-            tap(steps => {
-                checked('[data-count]', 'count', String(steps.length));
-
-                if (bars.children.length !== steps.length) {
-                    bars.replaceChildren(
-                        ...steps.map(() => {
-                            const bar = document.createElement('span');
-                            bar.className = 'bar';
-
-                            return bar;
-                        }),
-                    );
-                }
-
-                steps.forEach((value, index) => {
-                    const bar = bars.children[index];
-
-                    if (bar instanceof HTMLElement) {
-                        bar.style.setProperty('--value', String(value));
-                    }
-                });
-            }),
-        );
-
         const rate$ = signal$.pipe(
             map(({ rate }) => String(rate)),
             distinctUntilChanged(),
@@ -428,6 +402,35 @@ export class HksSignal extends HTMLElement {
                 now.setAttribute('x2', String(x));
                 dot.style.setProperty('--x', String(x / WIDTH));
                 dot.style.setProperty('--y', String((y + 4) / (HEIGHT + 8)));
+            }),
+        );
+
+        // One pipe for the bars and the mark, or a rebuilt strip could lose the step being played.
+        const steps$ = combineLatest([wave$, t$]).pipe(
+            map(([wave, t]) => ({ steps: wave.signal.steps, current: stepAt(wave, t) })),
+            distinctUntilChanged((a, b) => a.steps === b.steps && a.current === b.current),
+            tap(({ steps, current }) => {
+                checked('[data-count]', 'count', String(steps.length));
+
+                if (bars.children.length !== steps.length) {
+                    bars.replaceChildren(
+                        ...steps.map(() => {
+                            const bar = document.createElement('span');
+                            bar.className = 'bar';
+
+                            return bar;
+                        }),
+                    );
+                }
+
+                steps.forEach((value, index) => {
+                    const bar = bars.children[index];
+
+                    if (bar instanceof HTMLElement) {
+                        bar.style.setProperty('--value', String(value));
+                        bar.toggleAttribute('data-current', index === current);
+                    }
+                });
             }),
         );
 

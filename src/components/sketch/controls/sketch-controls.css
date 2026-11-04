@@ -344,7 +344,7 @@
     gap: 8px;
 }
 
-/* A driven focus keeps its slider for when it is let go; the readout says a signal plays it. */
+/* A driven slider keeps its value for when it is let go; the readout says a signal plays it. */
 .read[data-driven] {
     font-size: 0;
 }
@@ -352,5 +352,5 @@
 .read[data-driven]::after {
     font: 500 11px var(--font-ui);
     color: var(--accent);
-    content: 'signal';
+    content: 'signal' attr(data-live);
 }
