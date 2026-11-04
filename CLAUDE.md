@@ -1219,6 +1219,43 @@ Reading `followedWave$` beside a separate name stream was the first version and
 is the two-paths trap: a rebind changes both, and the legend would show one
 signal's name over another's line for a frame.
 
+## Paint
+
+`paint` is a document program for pictures a sketch can read: a square of
+16, 32 or 64 pixels of ink (0 to 255, row by row from the top, bytes so a
+frame uploads as it is) and up to twelve **frames**, played across the loop,
+held or faded one into the next (`Picture` in `shared/picture.ts`, shared
+because the sketch reads it too). Strokes stamp soft discs (brush, erase,
+soften) along the segment, so a fast stroke leaves no gaps, at every copy its
+**symmetry** places (mirror, quad, three or six turns, kaleidoscope: six turns
+mirrored); fill floods ink of like value; clear, invert, soften, noise and
+shift act on a whole frame. All of it is `reducePicture`, pure, and noise is
+seeded from the log's sequence, so taking an earlier step back draws the same
+noise again.
+
+**A stroke is one undo step**: its first segment carries `start`, which opens
+a new step, and the rest join it, so two strokes in a row are two steps
+(`stepOfDocument`). Brush, symmetry, the frame being worked on and the onion
+skin are the window's own settings, view-only, so not steps; `painting.ts`
+turns what the window saw into commands with them (`paintInputsOf`), and the
+component never learns the settings exist beyond showing them.
+
+**A sketch reads it through its `paint` input**, a new source kind. Each
+surface keeps the picture as a `TEXTURE_2D_ARRAY` of R8 layers on its own unit
+(`PAINT_UNIT`, 2: the palette is on 0 and a formula's state on 1), uploaded in
+`prepare`, so thumbnails and exports get it too; `setMoment` sets which frame
+the playhead is at. A formula reads `paint(x, y)`, 0 to 1 and bilinear, with
+-1..1 covering the picture and its top row at y = 1; unplugged it reads 0.
+**Relief**, **Stencil** and **Drift** are the worked examples: height, a
+mask, and motion along the contour lines.
+
+The window draws with plain canvases: the ink in the appearance's `--ink`,
+pixel-crisp, over the previous frame in `--accent` (the onion skin), symmetry
+guides as dashed rays and a cursor the size of the brush. A soften stroke
+averages each pixel's neighbours, and that average is a plain loop: it ran on
+an array per pixel at first and took 17 ms a segment at 64 with a big
+kaleidoscope brush.
+
 ## State mode, on the canvas
 
 **A window's state chip opens its state menu**, and nothing else: switching,
@@ -1892,7 +1929,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and eleven of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and eighteen of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

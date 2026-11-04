@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import type { FocusBinding, PlaybackBinding, SignalBinding } from './inputs.ts';
+import type { FocusBinding, PaintBinding, PlaybackBinding, SignalBinding } from './inputs.ts';
 import type { Process } from './workspace.ts';
 
 type Of<P extends Process['program']> = Extract<Process, { program: P }>;
@@ -20,6 +20,7 @@ describe('Process', () => {
             readonly size?: SignalBinding;
             readonly depth?: SignalBinding;
             readonly trails?: SignalBinding;
+            readonly paint?: PaintBinding;
         }>();
         expectTypeOf<Of<'playhead'>['follows']>().toEqualTypeOf<{
             readonly progress: PlaybackBinding | FocusBinding;

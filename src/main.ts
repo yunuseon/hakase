@@ -113,6 +113,7 @@ import {
     valuesOf,
 } from './program.ts';
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
+import { defaultPicture } from './shared/picture.ts';
 import {
     documentsKit,
     reduceHistory,
@@ -156,7 +157,9 @@ type StoreKey =
     | 'signal$'
     | 'wave$'
     | 'followedWave$'
-    | 'followedSignal$';
+    | 'followedSignal$'
+    | 'picture$'
+    | 'followedPicture$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -309,6 +312,7 @@ const bootstrap = () => {
         clocks: stored.clocks,
         bookmarks: stored.bookmarks,
         signals: stored.signals,
+        paintings: stored.paint,
         library: stored.library,
         formulas: restored(stored.formulas),
         themes: restored(stored.themes),
@@ -817,6 +821,8 @@ const bootstrap = () => {
                         return [{ kind: 'bookmarks', store, command: input.command }];
                     case 'signal':
                         return [{ kind: 'signals', store, command: input.command }];
+                    case 'paint':
+                        return [{ kind: 'paintings', store, command: input.command }];
                     case 'modulate':
                         return sourced(input.store, input.param, input.source);
                     case 'library':
@@ -896,6 +902,10 @@ const bootstrap = () => {
     );
     const bookmarks$ = documents$.pipe(
         map(({ bookmarks }) => bookmarks),
+        distinctUntilChanged(),
+    );
+    const paintings$ = documents$.pipe(
+        map(({ paintings }) => paintings),
         distinctUntilChanged(),
     );
 
@@ -991,6 +1001,7 @@ const bootstrap = () => {
         clocks$,
         bookmarks$,
         waves$,
+        paintings$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -1063,6 +1074,7 @@ const bootstrap = () => {
             distinctUntilChanged(sameWave),
         );
     const timerIn = inStore(timers$, initialFocus);
+    const pictureIn = inStore(paintings$, defaultPicture);
 
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
@@ -1076,6 +1088,7 @@ const bootstrap = () => {
         clocks: clocksIn,
         bookmarks: bookmarksIn,
         signal: signalIn,
+        paint: pictureIn,
         timeline: playbackIn,
     };
 
@@ -1177,6 +1190,13 @@ const bootstrap = () => {
                         binding?.kind === 'signal' ? waveIn(binding.store) : of(null),
                     ),
                 ),
+            picture$: narrowed(pictureIn),
+            followedPicture$: input =>
+                followed$(input).pipe(
+                    switchMap(binding =>
+                        binding?.kind === 'paint' ? pictureIn(binding.store) : of(null),
+                    ),
+                ),
             followedSignal$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
@@ -1228,6 +1248,7 @@ const bootstrap = () => {
                 clocks: clocks$,
                 bookmarks: bookmarks$,
                 signals: waves$,
+                paint: paintings$,
                 library: library$,
                 seq: history$.pipe(
                     map(({ seq }) => seq),

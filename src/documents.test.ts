@@ -28,6 +28,7 @@ const started = (): Documents => ({
     clocks: new Map(),
     bookmarks: new Map(),
     signals: new Map(),
+    paintings: new Map(),
     library: emptyLibrary,
     formulas: new Map(),
     themes: new Map(),

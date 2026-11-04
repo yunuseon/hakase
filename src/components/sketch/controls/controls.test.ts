@@ -74,19 +74,23 @@ describe('liveReadouts', () => {
         trails: null,
     };
     const constant = waveOf(new Map([['s', { ...defaultSignal, offset: 3.5, depth: 0 }]]), 's');
-    const unbound = panelParams(defaultPanel, none);
+    const unbound = panelParams(defaultPanel, none, null);
 
     it('reads nothing while nothing is driven', () => {
         expect(liveReadouts(unbound, 0.3).size).toBe(0);
     });
 
     it('reads each driven row at the playhead, as the sketch draws it', () => {
-        const driven = panelParams(defaultPanel, {
-            ...none,
-            k2: constant,
-            size: constant,
-            trails: constant,
-        });
+        const driven = panelParams(
+            defaultPanel,
+            {
+                ...none,
+                k2: constant,
+                size: constant,
+                trails: constant,
+            },
+            null,
+        );
 
         expect([...liveReadouts(driven, 0.3)]).toEqual([
             ['k2', '3.50'],

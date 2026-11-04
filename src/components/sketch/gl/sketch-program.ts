@@ -24,7 +24,8 @@ import {
     type Orbit,
 } from '../space.ts';
 import { RAMP_SIZE } from '../theme.ts';
-import type { Surface } from './surface.ts';
+import { PAINT_UNIT, type Surface } from './surface.ts';
+import { frameAt } from '../../../shared/picture.ts';
 import { createProgram, type ProgramResult } from './program.ts';
 import fragmentSource from './shaders/sketch.frag?raw';
 import vertexSource from './shaders/sketch.vert?raw';
@@ -125,6 +126,10 @@ export type Uniforms = {
     readonly wrap: WebGLUniformLocation | null;
     readonly reference: WebGLUniformLocation | null;
     readonly state: WebGLUniformLocation | null;
+    readonly paint: WebGLUniformLocation | null;
+    readonly paintAt: WebGLUniformLocation | null;
+    readonly paintFrames: WebGLUniformLocation | null;
+    readonly paintFade: WebGLUniformLocation | null;
 };
 
 export type Sketch = {
@@ -190,6 +195,10 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 wrap: at('uWrap'),
                 reference: at('uReference'),
                 state: at('uState'),
+                paint: at('uPaint'),
+                paintAt: at('uPaintAt'),
+                paintFrames: at('uPaintFrames'),
+                paintFade: at('uPaintFade'),
             },
         },
     };
@@ -211,7 +220,7 @@ const closesSeam = (
 ): boolean => declared || wraps(lattice, space);
 
 export const prepare = (
-    { gl, palette }: Surface,
+    { gl, palette, paint }: Surface,
     sketch: Sketch,
     params: SketchParams,
     ramp: Uint8Array,
@@ -243,6 +252,27 @@ export const prepare = (
     gl.bindTexture(gl.TEXTURE_2D, palette);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RAMP_SIZE, 1, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
     gl.uniform1i(uniforms.palette, 0);
+
+    const { picture } = params;
+    gl.activeTexture(gl.TEXTURE0 + PAINT_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, paint);
+    gl.texImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        gl.R8,
+        picture?.side ?? 1,
+        picture?.side ?? 1,
+        picture?.frames.length ?? 1,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        picture === null ? new Uint8Array(1) : Uint8Array.from(picture.frames.flat()),
+    );
+    gl.uniform1i(uniforms.paint, PAINT_UNIT);
+    gl.uniform1f(uniforms.paintFrames, picture?.frames.length ?? 1);
+    gl.uniform1i(uniforms.paintFade, picture?.fade === true ? 1 : 0);
+    // Back to the palette's unit, which every later bind assumes is active.
+    gl.activeTexture(gl.TEXTURE0);
 
     // The backdrop is the ramp's first entry, so a theme owns the whole canvas.
     gl.clearColor((ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255, 1);
@@ -286,7 +316,7 @@ export const PASS_SEED = 4;
 export const setMoment = (
     gl: WebGL2RenderingContext,
     { uniforms }: Sketch,
-    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus' | 'draw'>,
+    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus' | 'draw' | 'picture'>,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
@@ -301,6 +331,7 @@ export const setMoment = (
     gl.uniform3f(uniforms.orbit, ...orbitUniform(orbitAt(params, orbit, playhead)));
     gl.uniform1f(uniforms.focus, focusAt(params, playhead));
     gl.uniform1f(uniforms.colourShift, colourShiftAt(params, playhead));
+    gl.uniform1f(uniforms.paintAt, params.picture === null ? 0 : frameAt(params.picture, playhead));
 
     const dots = dotsAt(params, playhead);
 

@@ -13,6 +13,8 @@ import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
+import type { Picture } from './shared/picture.ts';
+import type { PaintCommand } from './components/paint/paint.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -33,6 +35,7 @@ export const PROGRAM_IDS = [
     'playhead',
     'signal',
     'plot',
+    'paint',
     'tasks',
     'todo',
     'board',
@@ -78,6 +81,7 @@ export type AppInput =
     | { readonly kind: 'habit'; readonly command: HabitCommand }
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
+    | { readonly kind: 'paint'; readonly command: PaintCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -129,6 +133,8 @@ export type AppState = {
     readonly clocks$: Observable<Clocks>;
     readonly signal$: Observable<Signal>;
     readonly wave$: Observable<Wave>;
+    readonly picture$: Observable<Picture>;
+    readonly followedPicture$: (input: string) => Observable<Picture | null>;
     readonly followedWave$: (input: string) => Observable<Wave | null>;
     // One stream, not followedWave$ beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;

@@ -1,4 +1,4 @@
-import { knobInputs, playbackInput, sceneInputs } from '../inputs.ts';
+import { knobInputs, paintInput, playbackInput, sceneInputs } from '../inputs.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -78,7 +78,7 @@ const statusOf = (event: ExportEvent): ExportStatus => {
 
 export const sketchProgram = {
     id: 'sketch',
-    inputs: { playback: playbackInput, ...knobInputs, ...sceneInputs },
+    inputs: { playback: playbackInput, ...knobInputs, ...sceneInputs, paint: paintInput },
     title: 'sketch',
     category: 'make',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
@@ -148,9 +148,15 @@ export const sketchProgram = {
                     trails: state.followedWave$('trails'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
-                const params$ = combineLatest([panel$, size$, theme$, signals$]).pipe(
-                    map(([panel, size, theme, signals]): SketchParams => ({
-                        ...panelParams(panel, signals),
+                const params$ = combineLatest([
+                    panel$,
+                    size$,
+                    theme$,
+                    signals$,
+                    state.followedPicture$('paint'),
+                ]).pipe(
+                    map(([panel, size, theme, signals, picture]): SketchParams => ({
+                        ...panelParams(panel, signals, picture),
                         ...size,
                         theme,
                     })),

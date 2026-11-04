@@ -1,3 +1,4 @@
+import { parsePicture, type Picture } from './shared/picture.ts';
 import type { Observable } from 'rxjs';
 import { debounceTime, map, tap } from 'rxjs/operators';
 import { parseAppearance, type Appearance } from './appearance.ts';
@@ -52,6 +53,7 @@ export type Snapshot = {
     readonly clocks: ReadonlyMap<StoreId, Clocks>;
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly signals: ReadonlyMap<StoreId, Signal>;
+    readonly paint: ReadonlyMap<StoreId, Picture>;
     readonly library: Library;
     readonly seq: number;
 };
@@ -142,6 +144,7 @@ const fresh: Restored = {
     clocks: new Map(),
     bookmarks: new Map(),
     signals: new Map(),
+    paint: new Map(),
     library: emptyLibrary,
     seq: 0,
 };
@@ -198,6 +201,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
                 ? new Map([['bookmarks', parseBookmarks(undefined, field(stored, 'links'))]])
                 : byStore(field(stored, 'bookmarks'), 'bookmarks', value => parseBookmarks(value)),
         signals: byStore(field(stored, 'signals'), 'signal', parseSignal),
+        paint: byStore(field(stored, 'paint'), 'paint', parsePicture),
         library: parseLibrary(field(stored, 'library')),
         seq: seqFrom(field(stored, 'seq')),
     };
@@ -231,6 +235,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         clocks: saved(snapshot.clocks),
         bookmarks: saved(snapshot.bookmarks),
         signals: saved(snapshot.signals),
+        paint: saved(snapshot.paint),
         library: snapshot.library,
         seq: snapshot.seq,
     };

@@ -10,7 +10,8 @@ import type { StoreId } from './stores.ts';
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
-export type Follow = PlaybackBinding | FocusBinding | SignalBinding;
+export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
+export type Follow = PlaybackBinding | FocusBinding | SignalBinding | PaintBinding;
 
 export type InputSources = {
     readonly playback$: (store: StoreId) => Observable<Clock>;
@@ -46,7 +47,14 @@ const signalSource = {
     access: 'read',
 } as const;
 
-export const SOURCES = [playbackSource, focusSource, signalSource] as const;
+const paintSource = {
+    kind: 'paint',
+    program: 'paint',
+    title: 'Painting',
+    access: 'read',
+} as const;
+
+export const SOURCES = [playbackSource, focusSource, signalSource, paintSource] as const;
 
 type Source = (typeof SOURCES)[number];
 
@@ -130,6 +138,14 @@ export const sceneInputs = {
     trails: signalInput('trails', 'Look'),
 };
 
+export const paintInput = {
+    title: 'paint',
+    from: 'followed',
+    group: null,
+    sources: [paintSource],
+    initial: null,
+} as const satisfies FollowedInput;
+
 export const plotInputs = {
     a: signalInput('a', 'Signals'),
     b: signalInput('b', 'Signals'),
@@ -209,6 +225,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return focusSource.program;
         case 'signal':
             return signalSource.program;
+        case 'paint':
+            return paintSource.program;
     }
 };
 
@@ -219,6 +237,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'focus':
             return { kind, store };
         case 'signal':
+            return { kind, store };
+        case 'paint':
             return { kind, store };
         default:
             return null;

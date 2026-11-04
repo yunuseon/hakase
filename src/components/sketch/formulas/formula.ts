@@ -48,6 +48,10 @@ export const FORMULA_GUIDE: readonly GuideEntry[] = [
         text: 'Four knobs from 0 to 1, set by the sliders under each sketch. Use them for any number you want to play with live, like sin(x * k1 * 20.0). Every sketch has its own. Name one with a line like #define K1 feed_rate and its slider is labelled feed rate; only the knobs a formula really reads get a slider. Give a knob a motion of 1×, 2×, 4× or 8× per loop and it swings from 0 up to the value of its slider and back, so it animates without any code.',
     },
     {
+        term: 'paint(x, y), paint(p)',
+        text: 'The painting plugged into the sketch, from 0 where it is bare to 1 where it is fully inked. The square from -1 to 1 covers it, with its top row at y = 1, and it reads smoothly between pixels. A painting with several frames plays them across the loop, held or fading one into the next. Plug a paint window into the paint input in the state menu; with none plugged in, paint is 0 everywhere.',
+    },
+    {
         term: 'pointer, pointerOnGround',
         text: 'The point under the mouse as a vec2 in the same coordinates as x and y, so pointer - vec2(x, y) stays under the cursor however the camera turns and whichever space is picked: in polar, cylindrical and spherical space it is read where the mouse meets the shape z = 0 becomes. When the mouse misses it, pointerOnGround is 0.0 instead of 1.0. A formula with its own space() gets the point on the flat ground instead.',
     },

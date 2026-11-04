@@ -21,6 +21,9 @@ import { terrain } from './terrain.ts';
 import { torus } from './torus.ts';
 import { trefoil } from './trefoil.ts';
 import { weave } from './weave.ts';
+import { relief } from './relief.ts';
+import { stencil } from './stencil.ts';
+import { drift } from './drift.ts';
 
 export const formulas = {
     ripple,
@@ -45,6 +48,9 @@ export const formulas = {
     life,
     sandpile,
     cycles,
+    relief,
+    stencil,
+    drift,
 } satisfies Record<string, Formula>;
 
 export type FormulaName = keyof typeof formulas;

@@ -1,5 +1,6 @@
 import {
     knobInputs,
+    paintInput,
     plotInputs,
     signalInputs,
     sceneInputs,
@@ -12,7 +13,7 @@ import {
 // What the program table declares, for tests: the programs themselves pull in the DOM.
 export const inputsFor: InputsFor = program =>
     program === 'sketch'
-        ? { playback: playbackInput, ...knobInputs, ...sceneInputs }
+        ? { playback: playbackInput, ...knobInputs, ...sceneInputs, paint: paintInput }
         : program === 'plot'
           ? { playback: playbackInput, ...plotInputs }
           : program === 'signal'

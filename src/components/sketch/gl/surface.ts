@@ -7,7 +7,11 @@ export type Surface<
     readonly canvas: C;
     readonly gl: WebGL2RenderingContext;
     readonly palette: WebGLTexture;
+    readonly paint: WebGLTexture;
 };
+
+// Its own unit: the palette is read from 0 and a formula's state from 1.
+export const PAINT_UNIT = 2;
 
 export type SurfaceGeometry = {
     width: number;
@@ -43,7 +47,32 @@ const surfaceOn = <C extends HTMLCanvasElement | OffscreenCanvas>(canvas: C): Su
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RAMP_SIZE, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
-    return { canvas, gl, palette };
+    const paint = gl.createTexture();
+    if (!paint) {
+        throw new Error('This browser refused a paint texture');
+    }
+
+    gl.activeTexture(gl.TEXTURE0 + PAINT_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, paint);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        gl.R8,
+        1,
+        1,
+        1,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array(1),
+    );
+    gl.activeTexture(gl.TEXTURE0);
+
+    return { canvas, gl, palette, paint };
 };
 
 export const createSurface = (parent: HTMLElement): Surface<HTMLCanvasElement> => {

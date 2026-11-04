@@ -1,3 +1,10 @@
+import {
+    isSymmetry,
+    isTool,
+    MAX_BRUSH,
+    type Symmetry,
+    type Tool,
+} from './components/paint/paint.ts';
 import { isLayout, type Layout } from './components/plot/plot.ts';
 import {
     defaultExport,
@@ -79,6 +86,31 @@ export type AgendaSettings = {
 
 export type Spot = { readonly x: number; readonly y: number };
 
+export type PaintSettings = {
+    readonly kind: 'paint';
+    readonly tool: Tool;
+    readonly size: number;
+    readonly hardness: number;
+    readonly flow: number;
+    readonly symmetry: Symmetry;
+    readonly frame: number;
+    readonly onion: boolean;
+};
+
+export const defaultPaint: PaintSettings = {
+    kind: 'paint',
+    tool: 'brush',
+    size: 4,
+    hardness: 0.4,
+    flow: 0.6,
+    symmetry: 'none',
+    frame: 0,
+    onion: true,
+};
+
+export const asPaint = (settings: Settings | undefined): PaintSettings =>
+    settings?.kind === 'paint' ? settings : defaultPaint;
+
 export type PlotSettings = {
     readonly kind: 'plot';
     readonly layout: Layout;
@@ -108,7 +140,8 @@ export type Settings =
     | NoteSettings
     | AgendaSettings
     | StateMapSettings
-    | PlotSettings;
+    | PlotSettings
+    | PaintSettings;
 
 export const asStateMap = (settings: Settings | undefined): StateMapSettings =>
     settings?.kind === 'state-map' ? settings : defaultStateMap;
@@ -370,6 +403,31 @@ export const parseSettings = (value: unknown): Settings | null => {
             const day = field(value, 'day');
 
             return { kind: 'agenda', day: typeof day === 'string' && isDay(day) ? day : null };
+        }
+        case 'paint': {
+            const tool = field(value, 'tool');
+            const symmetry = field(value, 'symmetry');
+            const number = (key: string, min: number, max: number, fallback: number) => {
+                const read = field(value, key);
+
+                return typeof read === 'number' && Number.isFinite(read)
+                    ? clamp(read, min, max)
+                    : fallback;
+            };
+
+            return {
+                kind: 'paint',
+                tool: typeof tool === 'string' && isTool(tool) ? tool : defaultPaint.tool,
+                size: number('size', 1, MAX_BRUSH, defaultPaint.size),
+                hardness: number('hardness', 0, 1, defaultPaint.hardness),
+                flow: number('flow', 0.05, 1, defaultPaint.flow),
+                symmetry:
+                    typeof symmetry === 'string' && isSymmetry(symmetry)
+                        ? symmetry
+                        : defaultPaint.symmetry,
+                frame: Math.round(number('frame', 0, 64, 0)),
+                onion: field(value, 'onion') !== false,
+            };
         }
         case 'plot': {
             const layout = field(value, 'layout');

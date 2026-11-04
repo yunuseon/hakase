@@ -1,5 +1,6 @@
 #version 300 es
 precision highp float;
+precision highp sampler2DArray;
 
 #define PI 3.141592653589793
 
@@ -37,6 +38,11 @@ uniform float pointerDown;
 uniform vec2 uPointer;
 // One texel per lattice point: the state evolve() left there on the step before.
 uniform sampler2D uState;
+// A painting's frames as layers; uPaintAt is where the loop is among them.
+uniform sampler2DArray uPaint;
+uniform float uPaintAt;
+uniform float uPaintFrames;
+uniform int uPaintFade;
 
 // Globals, not uniforms: main() fills them from the camera before the formula runs.
 vec2 pointer;
@@ -81,6 +87,25 @@ vec3 placed(vec3 p);
 bool ownSpace();
 vec4 evolved(float x, float y, float t);
 vec4 seeded(float x, float y);
+
+// The painting under x and y, 0 to 1: -1..1 covers it, its top row at y = 1.
+float paint(vec2 p) {
+    vec2 uv = vec2(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5);
+    float layer = floor(uPaintAt);
+    float here = texture(uPaint, vec3(uv, layer)).r;
+
+    if (uPaintFade == 0) {
+        return here;
+    }
+
+    float next = texture(uPaint, vec3(uv, mod(layer + 1.0, max(uPaintFrames, 1.0)))).r;
+
+    return mix(here, next, smoothstep(0.0, 1.0, fract(uPaintAt)));
+}
+
+float paint(float x, float y) {
+    return paint(vec2(x, y));
+}
 
 vec4 state() {
     return texelFetch(uState, stateIndex, 0);

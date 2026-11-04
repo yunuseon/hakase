@@ -9,6 +9,7 @@ import {
 } from './space.ts';
 import type { Theme } from './theme.ts';
 import { waveAt, type Wave } from '../../shared/signal.ts';
+import type { Picture } from '../../shared/picture.ts';
 import { clamp } from '../../lib/math.ts';
 
 export const DRAW_MODES = ['dots', 'lines', 'surface'] as const;
@@ -131,6 +132,7 @@ export type PanelParams = {
     readonly trails: number;
     readonly motion: Motion;
     readonly signals: Signals;
+    readonly picture: Picture | null;
 };
 
 // Flat, unlike PanelParams: a dot setting must outlive a switch to lines, so it is kept, not dropped.
@@ -184,6 +186,7 @@ export const panelParams = (
         motion,
     }: Panel,
     signals: Signals,
+    picture: Picture | null,
 ): PanelParams => ({
     dimension,
     draw: mode === 'dots' ? { mode, baseSize, depthScalar } : { mode },
@@ -197,6 +200,7 @@ export const panelParams = (
     trails,
     motion,
     signals,
+    picture,
 });
 
 export type Pointer = {

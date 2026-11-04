@@ -1,0 +1,299 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+}
+
+.tools,
+.symmetries,
+.sides {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--well);
+    border-radius: 9px;
+}
+
+.tools button,
+.symmetries button,
+.sides button {
+    display: grid;
+    place-items: center;
+    min-inline-size: 26px;
+    block-size: 26px;
+    padding: 0 4px;
+    font: 500 11px var(--font-mono);
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.tools button:hover,
+.symmetries button:hover,
+.sides button:hover {
+    color: var(--ink);
+}
+
+.tools button[aria-checked='true'],
+.symmetries button[aria-checked='true'],
+.sides button[aria-checked='true'] {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.tools svg {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.symmetries svg {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 7;
+    stroke-linecap: round;
+}
+
+.symmetries .rim {
+    stroke-width: 5;
+    opacity: 0.35;
+}
+
+.symmetries circle:not(.rim) {
+    fill: currentColor;
+    stroke: none;
+}
+
+.dial {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    color: var(--muted);
+}
+
+.dial input {
+    inline-size: 64px;
+    accent-color: var(--accent);
+}
+
+.dial output {
+    min-inline-size: 3ch;
+    font: 500 11px var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+}
+
+.stage {
+    flex: 1;
+    min-block-size: 120px;
+    display: grid;
+    place-items: center;
+    container-type: size;
+    border-radius: 10px;
+    outline: none;
+}
+
+.stage:focus-visible {
+    box-shadow: 0 0 0 2px var(--highlight);
+}
+
+/* Square and as large as fits: the size container measures whichever side is shorter. */
+.sheet {
+    position: relative;
+    inline-size: min(100cqi, 100cqb);
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--well);
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+
+.sheet[data-tool='fill'] {
+    cursor: cell;
+}
+
+.sheet canvas {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+
+.onion {
+    opacity: 0.3;
+}
+
+.onion[hidden] {
+    display: none;
+}
+
+.guides {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.guides path {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.6;
+}
+
+.cursor {
+    position: absolute;
+    inset-inline-start: calc(var(--x, 0) * 100%);
+    inset-block-start: calc(var(--y, 0) * 100%);
+    inline-size: calc(var(--across, 0) * 100%);
+    aspect-ratio: 1;
+    border: 1px solid var(--ink);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--panel) 70%, transparent);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.cursor[hidden] {
+    display: none;
+}
+
+.frames {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-inline-size: 0;
+}
+
+.strip {
+    display: flex;
+    flex: 1;
+    gap: 4px;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 2px;
+    overflow-x: auto;
+    list-style: none;
+}
+
+.strip button {
+    position: relative;
+    display: block;
+    inline-size: 36px;
+    block-size: 36px;
+    padding: 2px;
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.strip button[aria-current='true'] {
+    border-color: var(--ink);
+}
+
+/* The frame a sketch is showing right now. */
+.strip button[data-playing]::after {
+    position: absolute;
+    inset-block-end: -4px;
+    inset-inline-start: 50%;
+    inline-size: 5px;
+    block-size: 5px;
+    content: '';
+    background: var(--accent);
+    border-radius: 50%;
+    transform: translateX(-50%);
+}
+
+.strip canvas {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    image-rendering: pixelated;
+}
+
+.key,
+.toggle,
+.actions button {
+    block-size: 26px;
+    padding: 0 9px;
+    font: 500 11px var(--font-ui);
+    color: var(--label);
+    background: var(--well);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.key {
+    min-inline-size: 26px;
+    padding: 0;
+    font: 500 14px var(--font-mono);
+}
+
+.key:hover,
+.toggle:hover,
+.actions button:hover {
+    color: var(--ink);
+}
+
+.key:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.toggle[aria-pressed='true'] {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.actions button {
+    text-transform: capitalize;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

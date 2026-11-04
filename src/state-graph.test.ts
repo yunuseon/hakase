@@ -43,6 +43,7 @@ describe('graphOf', () => {
             ['size', true, null],
             ['depth', true, null],
             ['trails', true, null],
+            ['paint', true, null],
         ]);
         expect(windowOf([], 'playhead-4')?.own).toBeNull();
     });

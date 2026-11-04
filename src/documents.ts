@@ -27,6 +27,8 @@ import {
 } from './components/habits/habits.ts';
 import { emptyNotes, reduceNotes, type NoteCommand, type Notes } from './components/note/note.ts';
 import type { Theme } from './components/sketch/theme.ts';
+import { reducePicture, type PaintCommand } from './components/paint/paint.ts';
+import { defaultPicture, type Picture } from './shared/picture.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
     emptyTodos,
@@ -80,6 +82,7 @@ export type Documents = {
     readonly clocks: ReadonlyMap<StoreId, Clocks>;
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly signals: ReadonlyMap<StoreId, Signal>;
+    readonly paintings: ReadonlyMap<StoreId, Picture>;
     readonly library: Library;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
@@ -96,6 +99,7 @@ type StoreCommands = {
     readonly clocks: ClockCommand;
     readonly bookmarks: BookmarkCommand;
     readonly signals: SignalCommand;
+    readonly paintings: PaintCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -157,6 +161,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     clocks: storeEvent(documents.clocks, event),
     bookmarks: storeEvent(documents.bookmarks, event),
     signals: storeEvent(documents.signals, event),
+    paintings: storeEvent(documents.paintings, event),
 });
 
 // A fork's copy belongs to the step that made the fork, so undoing one undoes both.
@@ -323,6 +328,18 @@ export const reduceDocuments =
                           ),
                       };
             }
+            case 'paintings':
+                return {
+                    ...documents,
+                    paintings: commanded(
+                        documents.paintings,
+                        action.store,
+                        defaultPicture,
+                        reducePicture,
+                        action.command,
+                        seq,
+                    ),
+                };
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
 
@@ -373,6 +390,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     clocks: [],
     bookmarks: ['rename', 'readdress', 'rename-group'],
     signals: ['nudge', 'drag-wave', 'draw', 'set'],
+    paintings: ['shift'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -399,6 +417,11 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         default: {
             const kind = action.command.kind;
 
+            // A stroke joins only the moves of its own gesture: two strokes in a row are two steps.
+            if (action.kind === 'paintings' && action.command.kind === 'stroke') {
+                return { key: `paintings:${action.store}:stroke`, joins: !action.command.start };
+            }
+
             return {
                 key: `${action.kind}:${action.store}:${kind}:${idOf(action.command)}`,
                 joins: JOINING[action.kind].includes(kind),
@@ -416,6 +439,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     clocks: 'world clock',
     bookmarks: 'bookmarks',
     signals: 'signal',
+    paintings: 'painting',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>
