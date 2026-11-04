@@ -1256,6 +1256,34 @@ averages each pixel's neighbours, and that average is a plain loop: it ran on
 an array per pixel at first and took 17 ms a segment at 64 with a big
 kaleidoscope brush.
 
+## Pen
+
+`pen` draws a picture with signals instead of a hand. Its inputs `x`, `y`,
+`size` and `ink` are store inputs (`from: 'store'`), like a signal's phase,
+offset and depth, so they belong to the pen document and keep drawing with no
+window open. `traced` walks the loop in `SAMPLES` steps, puts the pen where the
+signals say (`penAt`, y up, so a rising signal moves it up the page; unplugged
+it goes round a circle) and stamps the shared brush (`shared/brush.ts`) with
+the pen's symmetry. **Whole** gives one frame of the whole figure, **draw** 24
+frames, each holding the line up to its part of the loop and fading into the
+next, so a sketch's `paint` input, which accepts a pen as well as a paint
+store, watches it being drawn and starts again with the loop.
+
+The picture is derived, never stored: it is a pure function of the pen and the
+waves it follows (`drawingOf`, compared by `sameDrawing`), so editing a signal
+redraws it, and an export or a thumbnail traces the same picture. That makes
+tracing hot. It stamps into one working array and rounds only when it keeps a
+frame (`strokeInto`, `rounded`): rounding a copy per segment cost 30 to 70 ms.
+It also stamps **by distance**, at the brush's spacing, not once per sample,
+since a slow signal would otherwise lay hundreds of discs on one spot. A heavy
+kaleidoscope trace takes about 7 ms.
+
+**Store inputs are one mechanism for every document that has them.** A
+document with sources is `Linked` (`{ sources }`), a `link` action is routed
+to whichever program owns the store (`ownerOf`), and `reachedFrom`,
+`closesLoop`, the prune and the state map read every linked map alike, so a
+signal feeding a pen is kept by a prune and a pen cannot be wired into a loop.
+
 ## State mode, on the canvas
 
 **A window's state chip opens its state menu**, and nothing else: switching,
@@ -1929,7 +1957,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and eighteen of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and twenty-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

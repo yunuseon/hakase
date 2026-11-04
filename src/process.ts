@@ -87,7 +87,7 @@ export const liveProcess$ = (
                               store,
                               clock,
                               program: program.id,
-                              input: { kind: 'signal', command },
+                              input: { kind: 'modulate', store, ...command },
                           };
                 }),
             ),

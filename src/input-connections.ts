@@ -1,15 +1,19 @@
 import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
 import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
-import { closesLoop, defaultSignal, type Signal, type SignalCommand } from './shared/signal.ts';
+import { closesLoop, type Linked } from './shared/signal.ts';
 import { colourOf, withMain, type StoreEntry } from './stores.ts';
 import type { Process } from './workspace.ts';
+
+// Read by entry, not sources[param]: the documents come from storage.
+export const sourceIn = (linked: ReadonlyMap<string, Linked>, store: string, param: string) =>
+    Object.entries(linked.get(store)?.sources ?? {}).find(([key]) => key === param)?.[1] ?? null;
 
 export const inputGroups = (
     process: Process,
     inputs: ProgramInputs,
     processes: readonly Process[],
     stores: readonly StoreEntry[],
-    signals: ReadonlyMap<string, Signal>,
+    linked: ReadonlyMap<string, Linked>,
 ): readonly FollowGroup[] =>
     Object.entries(inputs).flatMap(([name, definition]) => {
         if (definition.from === 'own') {
@@ -18,7 +22,7 @@ export const inputGroups = (
 
         const bound =
             definition.from === 'store'
-                ? (signals.get(process.store) ?? defaultSignal).sources[definition.param]
+                ? sourceIn(linked, process.store, definition.param)
                 : (followedBy(process.follows, name)?.store ?? null);
         const kind =
             definition.from === 'store' ? 'signal' : followedBy(process.follows, name)?.kind;
@@ -35,8 +39,7 @@ export const inputGroups = (
             options: withMain(source.program, stores)
                 .filter(
                     store =>
-                        definition.from !== 'store' ||
-                        !closesLoop(signals, process.store, store.id),
+                        definition.from !== 'store' || !closesLoop(linked, process.store, store.id),
                 )
                 .map(store => ({
                     id: store.id,
@@ -52,10 +55,7 @@ export const inputGroups = (
         }));
     });
 
-export const storeInputCommand = (
-    inputs: ProgramInputs,
-    gesture: WindowGesture,
-): SignalCommand | null => {
+export const storeInputCommand = (inputs: ProgramInputs, gesture: WindowGesture) => {
     if (gesture.kind !== 'follow' && gesture.kind !== 'unfollow') {
         return null;
     }
@@ -65,9 +65,5 @@ export const storeInputCommand = (
     return definition?.from !== 'store' ||
         (gesture.kind === 'follow' && gesture.source !== 'signal')
         ? null
-        : {
-              kind: 'source',
-              param: definition.param,
-              source: gesture.kind === 'follow' ? gesture.store : null,
-          };
+        : { param: definition.param, source: gesture.kind === 'follow' ? gesture.store : null };
 };

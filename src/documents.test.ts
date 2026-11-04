@@ -29,6 +29,7 @@ const started = (): Documents => ({
     bookmarks: new Map(),
     signals: new Map(),
     paintings: new Map(),
+    pens: new Map(),
     library: emptyLibrary,
     formulas: new Map(),
     themes: new Map(),
@@ -229,5 +230,38 @@ describe('one log for every document', () => {
         };
 
         expect(seqFloor(documents)).toBe(40);
+    });
+});
+
+describe('links', () => {
+    const launched = (program: 'pen' | 'signal') =>
+        act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
+
+    it('set a store input on whichever document owns the store, a signal or a pen', () => {
+        const history = run(fresh(), [
+            launched('pen'),
+            launched('signal'),
+            { kind: 'link', store: 'pen', param: 'x', source: 'signal' },
+            { kind: 'link', store: 'signal', param: 'depth', source: 'other' },
+            { kind: 'link', store: 'pen', param: 'nonsense', source: 'signal' },
+        ]);
+
+        expect(history.present.pens.get('pen')?.sources.x).toBe('signal');
+        expect(history.present.signals.get('signal')?.sources.depth).toBe('other');
+        expect(history.steps).toHaveLength(4);
+        expect(labels(history).at(-1)).toBe('Set Main depth to follow other');
+    });
+
+    it('keep a signal a pen follows through a prune, though no window shows it', () => {
+        const history = run(fresh(), [
+            launched('pen'),
+            { kind: 'signals', store: 'store-7', command: { kind: 'shape', shape: 'saw' } },
+            { kind: 'link', store: 'pen', param: 'y', source: 'store-7' },
+            { kind: 'signals', store: 'store-8', command: { kind: 'shape', shape: 'saw' } },
+            { kind: 'prune' },
+        ]);
+
+        expect(history.present.signals.has('store-7')).toBe(true);
+        expect(history.present.signals.has('store-8')).toBe(false);
     });
 });

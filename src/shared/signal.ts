@@ -234,22 +234,20 @@ export const sameWave = (a: Wave, b: Wave): boolean =>
         return x === null || y === null ? x === y : sameWave(x, y);
     });
 
+export type Linked = { readonly sources: Readonly<Record<string, string | null>> };
+
 export const reachedFrom = (
-    all: ReadonlyMap<string, Signal>,
+    all: ReadonlyMap<string, Linked>,
     roots: Iterable<string>,
 ): ReadonlySet<string> => {
     const step = (found: ReadonlySet<string>): ReadonlySet<string> => {
         const next = new Set([
             ...found,
-            ...[...found].flatMap(id => {
-                const { sources } = all.get(id) ?? defaultSignal;
-
-                return PARAMS.flatMap(param => {
-                    const source = sources[param];
-
-                    return source === null ? [] : [source];
-                });
-            }),
+            ...[...found].flatMap(id =>
+                Object.values(all.get(id)?.sources ?? {}).flatMap(source =>
+                    source === null ? [] : [source],
+                ),
+            ),
         ]);
 
         return next.size === found.size ? found : step(next);
@@ -258,7 +256,7 @@ export const reachedFrom = (
     return step(new Set(roots));
 };
 
-export const closesLoop = (all: ReadonlyMap<string, Signal>, target: string, source: string) =>
+export const closesLoop = (all: ReadonlyMap<string, Linked>, target: string, source: string) =>
     reachedFrom(all, [source]).has(target);
 
 export const samplesOf = (wave: Wave, count: number) =>

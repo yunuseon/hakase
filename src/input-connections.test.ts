@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { inputGroups, storeInputCommand } from './input-connections.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { fits, initialFollows } from './inputs.ts';
-import { defaultSignal, reduceSignal } from './shared/signal.ts';
+import { defaultSignal } from './shared/signal.ts';
 import { mainStore } from './stores.ts';
 import { defaultWorkspace, reduceWorkspace, type Process } from './workspace.ts';
 
@@ -86,12 +86,8 @@ describe('store-owned inputs', () => {
         });
         const disconnect = storeInputCommand(inputs, { kind: 'unfollow', input: 'depth' });
 
-        expect(command).toEqual({ kind: 'source', param: 'depth', source: 'other' });
-        expect(disconnect).toEqual({ kind: 'source', param: 'depth', source: null });
-        if (command === null || disconnect === null) throw new Error('Missing source command');
-        const connected = reduceSignal(defaultSignal, command);
-        expect(connected.depth).toBe(defaultSignal.depth);
-        expect(reduceSignal(connected, disconnect)).toEqual(defaultSignal);
+        expect(command).toEqual({ param: 'depth', source: 'other' });
+        expect(disconnect).toEqual({ param: 'depth', source: null });
         expect(
             storeInputCommand(inputs, {
                 kind: 'follow',

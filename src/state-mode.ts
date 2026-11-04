@@ -9,7 +9,7 @@ import {
     type WiringView,
 } from './components/state-wiring/wiring.ts';
 import { colourOf, HOLDING, withMain } from './stores.ts';
-import type { Signal } from './shared/signal.ts';
+import type { Linked } from './shared/signal.ts';
 import { boxOf, type Workspace } from './workspace.ts';
 
 export type StateMode = { readonly active: boolean };
@@ -131,7 +131,7 @@ const openGroupIn = ({ open, sprung }: ModeSession, window: string) =>
 
 export const wiringOf = (
     workspace: Workspace,
-    signals: ReadonlyMap<string, Signal>,
+    signals: ReadonlyMap<string, Linked>,
     inputsFor: InputsFor,
     session: ModeSession,
 ): WiringView | null => {

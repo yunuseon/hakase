@@ -1,10 +1,5 @@
-import {
-    isSymmetry,
-    isTool,
-    MAX_BRUSH,
-    type Symmetry,
-    type Tool,
-} from './components/paint/paint.ts';
+import { isTool, MAX_BRUSH, type Tool } from './components/paint/paint.ts';
+import { isSymmetry, type Symmetry } from './shared/brush.ts';
 import { isLayout, type Layout } from './components/plot/plot.ts';
 import {
     defaultExport,

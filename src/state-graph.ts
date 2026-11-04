@@ -6,7 +6,8 @@ import type {
 } from './components/state-map/state-map.ts';
 import { followedBy, followedStores, SOURCES, type InputsFor } from './inputs.ts';
 import { GLOBALS, targetId } from './inventory.ts';
-import { defaultSignal, type Signal } from './shared/signal.ts';
+import type { Linked } from './shared/signal.ts';
+import { sourceIn } from './input-connections.ts';
 import { PROGRAM_IDS, type ProgramId } from './program.ts';
 import { colourOf, HOLDING, mainStore, type StoreEntry } from './stores.ts';
 import { listed, type Workspace } from './workspace.ts';
@@ -23,7 +24,7 @@ export const graphOf = (
     inputsFor: InputsFor,
     titles: Titles,
     held: ReadonlySet<string>,
-    signals: ReadonlyMap<string, Signal>,
+    signals: ReadonlyMap<string, Linked>,
 ): StateGraph => {
     const followed = new Set(processes.flatMap(({ follows }) => followedStores(follows)));
     // A main store has no registry entry until a window opens: followed or holding data, it is listed anyway.
@@ -54,9 +55,7 @@ export const graphOf = (
                               title: definition.title,
                               accepts: definition.sources.map(source => source.kind),
                               optional: true,
-                              bound: (signals.get(store.id) ?? defaultSignal).sources[
-                                  definition.param
-                              ],
+                              bound: sourceIn(signals, store.id, definition.param),
                           },
                       ]
                     : [],

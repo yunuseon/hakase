@@ -29,6 +29,14 @@ import { emptyNotes, reduceNotes, type NoteCommand, type Notes } from './compone
 import type { Theme } from './components/sketch/theme.ts';
 import { reducePicture, type PaintCommand } from './components/paint/paint.ts';
 import { defaultPicture, type Picture } from './shared/picture.ts';
+import {
+    defaultPen,
+    isPenParam,
+    reducePen,
+    type Pen,
+    type PenCommand,
+} from './components/pen/pen.ts';
+import { isProgramId } from './program.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
     emptyTodos,
@@ -44,8 +52,10 @@ import { viewOnly, type Settings } from './settings.ts';
 import {
     closesLoop,
     defaultSignal,
+    isParam,
     reachedFrom,
     reduceSignal,
+    type Linked,
     type Signal,
     type SignalCommand,
 } from './shared/signal.ts';
@@ -83,6 +93,7 @@ export type Documents = {
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly paintings: ReadonlyMap<StoreId, Picture>;
+    readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly library: Library;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
@@ -100,6 +111,7 @@ type StoreCommands = {
     readonly bookmarks: BookmarkCommand;
     readonly signals: SignalCommand;
     readonly paintings: PaintCommand;
+    readonly pens: PenCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -116,6 +128,12 @@ export type DocumentAction =
           };
       }[StoreDocument]
     | { readonly kind: 'library'; readonly command: LibraryCommand }
+    | {
+          readonly kind: 'link';
+          readonly store: StoreId;
+          readonly param: string;
+          readonly source: string | null;
+      }
     | {
           readonly kind: 'formula';
           readonly formula: FormulaId;
@@ -162,7 +180,14 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     bookmarks: storeEvent(documents.bookmarks, event),
     signals: storeEvent(documents.signals, event),
     paintings: storeEvent(documents.paintings, event),
+    pens: storeEvent(documents.pens, event),
 });
+
+export const linkedOf = ({ signals, pens }: Pick<Documents, 'signals' | 'pens'>) =>
+    new Map<StoreId, Linked>([...signals, ...pens]);
+
+const ownerOf = ({ stores }: Workspace, store: StoreId) =>
+    stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
 
 // A fork's copy belongs to the step that made the fork, so undoing one undoes both.
 const copiesOf = (before: readonly StoreEntry[], after: readonly StoreEntry[]): StoreEvent[] =>
@@ -197,9 +222,10 @@ export const reduceDocuments =
                       });
             }
             case 'prune': {
+                const linked = linkedOf(documents);
                 const workspace = reduceWorkspace(
                     documents.workspace,
-                    { kind: 'prune-stores', followed: documents.signals },
+                    { kind: 'prune-stores', followed: linked },
                     inputsFor,
                     seq,
                 );
@@ -211,7 +237,7 @@ export const reduceDocuments =
                     {
                         kind: 'keep',
                         stores: new Set([
-                            ...reachedFrom(documents.signals, usedStores(processes)),
+                            ...reachedFrom(linked, usedStores(processes)),
                             ...processes.map(({ id }) => id),
                         ]),
                     },
@@ -340,6 +366,36 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'pens':
+                return {
+                    ...documents,
+                    pens: commanded(
+                        documents.pens,
+                        action.store,
+                        defaultPen,
+                        reducePen,
+                        action.command,
+                        seq,
+                    ),
+                };
+            case 'link': {
+                const { store, param, source } = action;
+                const owner = ownerOf(documents.workspace, store);
+
+                return owner === 'signal' && isParam(param)
+                    ? reduceDocuments(inputsFor)(
+                          documents,
+                          { kind: 'signals', store, command: { kind: 'source', param, source } },
+                          seq,
+                      )
+                    : owner === 'pen' && isPenParam(param)
+                      ? reduceDocuments(inputsFor)(
+                            documents,
+                            { kind: 'pens', store, command: { kind: 'source', param, source } },
+                            seq,
+                        )
+                      : documents;
+            }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
 
@@ -391,6 +447,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     bookmarks: ['rename', 'readdress', 'rename-group'],
     signals: ['nudge', 'drag-wave', 'draw', 'set'],
     paintings: ['shift'],
+    pens: ['weight'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -404,6 +461,8 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'library':
         case 'look':
             return { key: action.kind, joins: false };
+        case 'link':
+            return { key: `link:${action.store}:${action.param}`, joins: false };
         case 'settings':
             return viewOnly(before.settings.get(action.key), action.settings)
                 ? { key: null, breaks: false }
@@ -440,10 +499,11 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     bookmarks: 'bookmarks',
     signals: 'signal',
     paintings: 'painting',
+    pens: 'pen',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>
-    stores.find(store => store.id === id)?.name ?? 'Main';
+    stores.find(store => store.id === id)?.name ?? (isProgramId(id) ? 'Main' : id);
 
 export const labelOfDocument = (action: DocumentAction, before: Documents): string => {
     switch (action.kind) {
@@ -451,6 +511,10 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return workspaceLabel(action.action, before.workspace);
         case 'prune':
             return 'Pruned unused states';
+        case 'link':
+            return `Set ${storeName(before.workspace, action.store)} ${action.param} to follow ${
+                action.source === null ? 'nothing' : storeName(before.workspace, action.source)
+            }`;
         case 'settings':
             return action.settings.kind === 'state-map'
                 ? 'Arranged the state map'

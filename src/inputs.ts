@@ -1,7 +1,6 @@
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { Focus } from './components/focus/focus.ts';
-import type { Param } from './shared/signal.ts';
 import type { Clock } from './shared/playhead.ts';
 import type { ProgramId } from './program.ts';
 import { focusProgress, type ProgressConnection } from './progress.ts';
@@ -11,7 +10,8 @@ export type PlaybackBinding = { readonly kind: 'playback'; readonly store: Store
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
-export type Follow = PlaybackBinding | FocusBinding | SignalBinding | PaintBinding;
+export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
+export type Follow = PlaybackBinding | FocusBinding | SignalBinding | PaintBinding | PenBinding;
 
 export type InputSources = {
     readonly playback$: (store: StoreId) => Observable<Clock>;
@@ -54,7 +54,14 @@ const paintSource = {
     access: 'read',
 } as const;
 
-export const SOURCES = [playbackSource, focusSource, signalSource, paintSource] as const;
+const penSource = {
+    kind: 'pen',
+    program: 'pen',
+    title: 'Pen',
+    access: 'read',
+} as const;
+
+export const SOURCES = [playbackSource, focusSource, signalSource, paintSource, penSource] as const;
 
 type Source = (typeof SOURCES)[number];
 
@@ -71,7 +78,7 @@ export type OwnInput = { readonly title: string; readonly from: 'own'; readonly 
 export type StoreInput = {
     readonly title: string;
     readonly from: 'store';
-    readonly param: Param;
+    readonly param: string;
     readonly sources: readonly (typeof signalSource)[];
     readonly initial: null;
 };
@@ -105,7 +112,7 @@ const signalInput = (title: string, group: string) =>
         initial: null,
     }) as const satisfies FollowedInput;
 
-const storedSignalInput = (param: Param) =>
+const storedSignalInput = (param: string) =>
     ({
         title: param,
         from: 'store',
@@ -142,9 +149,16 @@ export const paintInput = {
     title: 'paint',
     from: 'followed',
     group: null,
-    sources: [paintSource],
+    sources: [paintSource, penSource],
     initial: null,
 } as const satisfies FollowedInput;
+
+export const penInputs = {
+    x: storedSignalInput('x'),
+    y: storedSignalInput('y'),
+    size: storedSignalInput('size'),
+    ink: storedSignalInput('ink'),
+};
 
 export const plotInputs = {
     a: signalInput('a', 'Signals'),
@@ -227,6 +241,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return signalSource.program;
         case 'paint':
             return paintSource.program;
+        case 'pen':
+            return penSource.program;
     }
 };
 
@@ -239,6 +255,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'signal':
             return { kind, store };
         case 'paint':
+            return { kind, store };
+        case 'pen':
             return { kind, store };
         default:
             return null;

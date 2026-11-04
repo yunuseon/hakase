@@ -57,14 +57,7 @@ import { sourceOf, type FormulaId } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
 import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
-import {
-    defaultSignal,
-    isParam,
-    reachedFrom,
-    sameWave,
-    waveOf,
-    type Signal,
-} from './shared/signal.ts';
+import { defaultSignal, reachedFrom, sameWave, waveOf, type Linked } from './shared/signal.ts';
 import { inputGroups } from './input-connections.ts';
 import { graphOf, sameGraph } from './state-graph.ts';
 import { defaultBoard } from './components/board/board.ts';
@@ -114,8 +107,10 @@ import {
 } from './program.ts';
 import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts';
 import { defaultPicture } from './shared/picture.ts';
+import { defaultPen, drawingOf, sameDrawing, traced } from './components/pen/pen.ts';
 import {
     documentsKit,
+    linkedOf,
     reduceHistory,
     seqFloor,
     type DocumentAction,
@@ -159,7 +154,8 @@ type StoreKey =
     | 'followedWave$'
     | 'followedSignal$'
     | 'picture$'
-    | 'followedPicture$';
+    | 'followedPicture$'
+    | 'drawing$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -313,6 +309,7 @@ const bootstrap = () => {
         bookmarks: stored.bookmarks,
         signals: stored.signals,
         paintings: stored.paint,
+        pens: stored.pens,
         library: stored.library,
         formulas: restored(stored.formulas),
         themes: restored(stored.themes),
@@ -520,8 +517,8 @@ const bootstrap = () => {
         const inputs = inputsFor(program);
         const definitions = Object.values(inputs);
         const signals$ = definitions.some(definition => definition.from === 'store')
-            ? defer(() => waves$)
-            : of(new Map<string, Signal>());
+            ? defer(() => linked$)
+            : of(new Map<string, Linked>());
 
         return definitions.every(definition => definition.from === 'own')
             ? of(null)
@@ -726,7 +723,7 @@ const bootstrap = () => {
 
     const wiringView$: Observable<WiringView | null> = combineLatest([
         workspace$,
-        defer(() => waves$),
+        defer(() => linked$),
         session$,
     ]).pipe(
         map(([workspace, signals, session]) => wiringOf(workspace, signals, inputsFor, session)),
@@ -772,7 +769,7 @@ const bootstrap = () => {
             filter(({ input }) => input.kind === 'prune'),
             withLatestFrom(
                 workspace$,
-                defer(() => waves$),
+                defer(() => linked$),
             ),
             map(([, { processes }, all]): StoreEvent => ({
                 kind: 'keep',
@@ -787,11 +784,6 @@ const bootstrap = () => {
     // A program whose store holds settings keys them by store; any other keys them by window.
     const settingsKey = (program: ProgramId, store: StoreId, from: ProcessId): string =>
         HOLDING[program]?.holds === 'settings' ? store : from;
-
-    const sourced = (store: StoreId, param: string, source: string | null): DocumentAction[] =>
-        isParam(param)
-            ? [{ kind: 'signals', store, command: { kind: 'source', param, source } }]
-            : [];
 
     const documentActions$: Observable<DocumentAction> = merge(
         inputs$.pipe(
@@ -823,8 +815,17 @@ const bootstrap = () => {
                         return [{ kind: 'signals', store, command: input.command }];
                     case 'paint':
                         return [{ kind: 'paintings', store, command: input.command }];
+                    case 'pen':
+                        return [{ kind: 'pens', store, command: input.command }];
                     case 'modulate':
-                        return sourced(input.store, input.param, input.source);
+                        return [
+                            {
+                                kind: 'link',
+                                store: input.store,
+                                param: input.param,
+                                source: input.source,
+                            },
+                        ];
                     case 'library':
                         return [{ kind: 'library', command: input.command }];
                     case 'source':
@@ -849,9 +850,16 @@ const bootstrap = () => {
             }),
         ),
         wiringCommands$.pipe(
-            mergeMap(command =>
+            mergeMap((command): DocumentAction[] =>
                 command.kind === 'source'
-                    ? sourced(command.store, command.param, command.source)
+                    ? [
+                          {
+                              kind: 'link',
+                              store: command.store,
+                              param: command.param,
+                              source: command.source,
+                          },
+                      ]
                     : [],
             ),
         ),
@@ -907,6 +915,15 @@ const bootstrap = () => {
     const paintings$ = documents$.pipe(
         map(({ paintings }) => paintings),
         distinctUntilChanged(),
+    );
+    const pens$ = documents$.pipe(
+        map(({ pens }) => pens),
+        distinctUntilChanged(),
+    );
+    const linked$ = documents$.pipe(
+        distinctUntilChanged((a, b) => a.signals === b.signals && a.pens === b.pens),
+        map(linkedOf),
+        shareReplay({ bufferSize: 1, refCount: true }),
     );
 
     const timers$ = createTimers$(
@@ -1002,6 +1019,7 @@ const bootstrap = () => {
         bookmarks$,
         waves$,
         paintings$,
+        pens$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -1027,7 +1045,7 @@ const bootstrap = () => {
         appearance$,
         library$,
         inspect$: (id: string) => inspected$(id),
-        graph$: combineLatest([workspace$, held$, waves$]).pipe(
+        graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
                 graphOf(workspace, inputsFor, programOf, held, signals),
             ),
@@ -1075,6 +1093,11 @@ const bootstrap = () => {
         );
     const timerIn = inStore(timers$, initialFocus);
     const pictureIn = inStore(paintings$, defaultPicture);
+    const drawingIn = (store: StoreId) =>
+        documents$.pipe(
+            map(({ pens, signals }) => drawingOf(pens.get(store) ?? defaultPen, signals)),
+            distinctUntilChanged(sameDrawing),
+        );
 
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
@@ -1089,6 +1112,7 @@ const bootstrap = () => {
         bookmarks: bookmarksIn,
         signal: signalIn,
         paint: pictureIn,
+        pen: drawingIn,
         timeline: playbackIn,
     };
 
@@ -1191,10 +1215,15 @@ const bootstrap = () => {
                     ),
                 ),
             picture$: narrowed(pictureIn),
+            drawing$: narrowed(drawingIn),
             followedPicture$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
-                        binding?.kind === 'paint' ? pictureIn(binding.store) : of(null),
+                        binding?.kind === 'paint'
+                            ? pictureIn(binding.store)
+                            : binding?.kind === 'pen'
+                              ? drawingIn(binding.store).pipe(map(traced))
+                              : of(null),
                     ),
                 ),
             followedSignal$: input =>
@@ -1249,6 +1278,7 @@ const bootstrap = () => {
                 bookmarks: bookmarks$,
                 signals: waves$,
                 paint: paintings$,
+                pens: pens$,
                 library: library$,
                 seq: history$.pipe(
                     map(({ seq }) => seq),

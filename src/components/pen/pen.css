@@ -1,0 +1,184 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    block-size: 100%;
+    min-block-size: 0;
+    font: 12px/1.3 var(--font-ui);
+    color: var(--label);
+}
+
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+}
+
+.modes,
+.symmetries,
+.sides {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--well);
+    border-radius: 9px;
+}
+
+.modes button,
+.symmetries button,
+.sides button {
+    display: grid;
+    place-items: center;
+    min-inline-size: 26px;
+    block-size: 26px;
+    padding: 0 8px;
+    font: 500 11px var(--font-ui);
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.symmetries button,
+.sides button {
+    padding: 0 4px;
+    font-family: var(--font-mono);
+}
+
+.modes button:hover,
+.symmetries button:hover,
+.sides button:hover {
+    color: var(--ink);
+}
+
+.modes button[aria-checked='true'],
+.symmetries button[aria-checked='true'],
+.sides button[aria-checked='true'] {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+
+.symmetries svg {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 7;
+    stroke-linecap: round;
+}
+
+.symmetries .rim {
+    stroke-width: 5;
+    opacity: 0.35;
+}
+
+.symmetries circle:not(.rim) {
+    fill: currentColor;
+    stroke: none;
+}
+
+.dial {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    color: var(--muted);
+}
+
+.dial input {
+    inline-size: 72px;
+    accent-color: var(--accent);
+}
+
+.dial output {
+    min-inline-size: 3ch;
+    font: 500 11px var(--font-mono);
+    color: var(--ink);
+}
+
+.stage {
+    flex: 1;
+    min-block-size: 120px;
+    display: grid;
+    place-items: center;
+    container-type: size;
+}
+
+.sheet {
+    position: relative;
+    inline-size: min(100cqi, 100cqb);
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--well);
+    border-radius: 8px;
+}
+
+.sheet canvas {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+}
+
+.whole {
+    opacity: 0.22;
+}
+
+.guides {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+}
+
+.guides path {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.5;
+}
+
+.tip {
+    position: absolute;
+    inset-inline-start: calc(var(--x, 0.5) * 100%);
+    inset-block-start: calc(var(--y, 0.5) * 100%);
+    inline-size: 10px;
+    block-size: 10px;
+    background: var(--accent);
+    border: 2px solid var(--panel);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.hint {
+    flex: 1;
+    min-inline-size: 180px;
+    margin: 0;
+    color: var(--muted);
+}
+
+.hint b {
+    font: 600 11px var(--font-mono);
+    color: var(--label);
+}
+
+.hint[hidden] {
+    display: none;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}

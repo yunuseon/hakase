@@ -15,6 +15,7 @@ import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
 import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
 import type { Picture } from './shared/picture.ts';
 import type { PaintCommand } from './components/paint/paint.ts';
+import type { Drawing, PenCommand } from './components/pen/pen.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -36,6 +37,7 @@ export const PROGRAM_IDS = [
     'signal',
     'plot',
     'paint',
+    'pen',
     'tasks',
     'todo',
     'board',
@@ -82,6 +84,7 @@ export type AppInput =
     | { readonly kind: 'clock'; readonly command: ClockCommand }
     | { readonly kind: 'signal'; readonly command: SignalCommand }
     | { readonly kind: 'paint'; readonly command: PaintCommand }
+    | { readonly kind: 'pen'; readonly command: PenCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -134,6 +137,7 @@ export type AppState = {
     readonly signal$: Observable<Signal>;
     readonly wave$: Observable<Wave>;
     readonly picture$: Observable<Picture>;
+    readonly drawing$: Observable<Drawing>;
     readonly followedPicture$: (input: string) => Observable<Picture | null>;
     readonly followedWave$: (input: string) => Observable<Wave | null>;
     // One stream, not followedWave$ beside a name: a rebind changes both, and two would fire twice.

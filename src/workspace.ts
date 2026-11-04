@@ -11,7 +11,7 @@ import {
     type Follow,
     type InputsFor,
 } from './inputs.ts';
-import { reachedFrom, type Signal } from './shared/signal.ts';
+import { reachedFrom, type Linked } from './shared/signal.ts';
 import type { programs } from './programs.ts';
 import {
     centredOn,
@@ -142,7 +142,7 @@ export type WorkspaceAction =
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
     // What signals follow, so a store that only feeds another signal survives the prune.
-    | { readonly kind: 'prune-stores'; readonly followed: ReadonlyMap<StoreId, Signal> }
+    | { readonly kind: 'prune-stores'; readonly followed: ReadonlyMap<StoreId, Linked> }
     // Back (negative) or forward through the history by that many steps.
     | { readonly kind: 'travel'; readonly offset: number }
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }

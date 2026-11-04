@@ -7,20 +7,23 @@ import { pointerGesture$ } from '../../shared/drag.ts';
 import { isSide, SIZES, type Frame } from '../../shared/picture.ts';
 import {
     ACTIONS,
-    guidesOf,
     isAction,
     isBrushField,
-    isSymmetry,
     isTool,
     MAX_BRUSH,
-    SYMMETRIES,
     TOOLS,
     type PaintEvent,
     type PaintView,
-    type Point,
-    type Symmetry,
     type Tool,
 } from './paint.ts';
+import {
+    guidesOf,
+    isSymmetry,
+    symmetryGlyph,
+    SYMMETRIES,
+    type Point,
+    type Symmetry,
+} from '../../shared/brush.ts';
 import css from './paint.css?inline';
 
 const sheet = styleSheet(css);
@@ -48,15 +51,6 @@ const SYMMETRY_TITLES: Readonly<Record<Symmetry, string>> = {
     'spin-6': 'six turns',
     kaleido: 'kaleidoscope: six turns, mirrored',
 };
-
-const symmetryGlyph = (symmetry: Symmetry) =>
-    `<svg viewBox="0 0 100 100" aria-hidden="true">${
-        symmetry === 'none'
-            ? '<circle cx="50" cy="50" r="7"/>'
-            : guidesOf(symmetry)
-                  .map(path => `<path d="${path}"/>`)
-                  .join('')
-    }<circle cx="50" cy="50" r="38" class="rim"/></svg>`;
 
 const dial = (field: string, label: string, min: number, max: number, step: number) => `
     <label class="dial" title="${label}">

@@ -1,3 +1,4 @@
+import { parsePen, type Pen } from './components/pen/pen.ts';
 import { parsePicture, type Picture } from './shared/picture.ts';
 import type { Observable } from 'rxjs';
 import { debounceTime, map, tap } from 'rxjs/operators';
@@ -54,6 +55,7 @@ export type Snapshot = {
     readonly bookmarks: ReadonlyMap<StoreId, Bookmarks>;
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly paint: ReadonlyMap<StoreId, Picture>;
+    readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly library: Library;
     readonly seq: number;
 };
@@ -145,6 +147,7 @@ const fresh: Restored = {
     bookmarks: new Map(),
     signals: new Map(),
     paint: new Map(),
+    pens: new Map(),
     library: emptyLibrary,
     seq: 0,
 };
@@ -202,6 +205,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
                 : byStore(field(stored, 'bookmarks'), 'bookmarks', value => parseBookmarks(value)),
         signals: byStore(field(stored, 'signals'), 'signal', parseSignal),
         paint: byStore(field(stored, 'paint'), 'paint', parsePicture),
+        pens: byStore(field(stored, 'pens'), 'pen', parsePen),
         library: parseLibrary(field(stored, 'library')),
         seq: seqFrom(field(stored, 'seq')),
     };
@@ -236,6 +240,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         bookmarks: saved(snapshot.bookmarks),
         signals: saved(snapshot.signals),
         paint: saved(snapshot.paint),
+        pens: saved(snapshot.pens),
         library: snapshot.library,
         seq: snapshot.seq,
     };

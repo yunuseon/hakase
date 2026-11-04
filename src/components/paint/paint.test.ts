@@ -6,7 +6,8 @@ import {
     parsePicture,
     type Picture,
 } from '../../shared/picture.ts';
-import { copiesOf, reducePicture, resampled, type Brush } from './paint.ts';
+import { reducePicture, resampled } from './paint.ts';
+import { copiesOf, type Brush } from '../../shared/brush.ts';
 
 const empty: Picture = { side: 16, frames: [blank(16)], fade: false };
 const brush: Brush = { tool: 'brush', size: 3, hardness: 1, flow: 1 };
