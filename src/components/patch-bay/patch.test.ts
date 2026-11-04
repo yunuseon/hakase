@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutOf, NODE_WIDTH, type PatchView } from './patch.ts';
+import { layoutOf, NODE_WIDTH, relatedTo, type PatchView } from './patch.ts';
 
 const view: PatchView = {
     stores: [
@@ -84,5 +84,33 @@ describe('layoutOf', () => {
         const [first, second] = windows;
 
         expect((second?.y ?? 0) - (first?.y ?? 0)).toBeGreaterThanOrEqual(first?.height ?? 0);
+    });
+});
+
+describe('relatedTo', () => {
+    const layout = layoutOf(view);
+    const sorted = (set: ReadonlySet<string>) => [...set].sort();
+
+    it('brings a window its own state, what it follows and those wires', () => {
+        const related = relatedTo(layout, { kind: 'window', id: 'sketch-2' });
+
+        expect(sorted(related.stores)).toEqual(['signal', 'sketch-2', 'timeline']);
+        expect(sorted(related.windows)).toEqual(['sketch-2']);
+        expect(sorted(related.wires)).toEqual(['sketch-2:k1', 'sketch-2:playback']);
+    });
+
+    it('brings a store every window that keeps it or follows it', () => {
+        const related = relatedTo(layout, { kind: 'store', id: 'signal' });
+
+        expect(sorted(related.stores)).toEqual(['signal']);
+        expect(sorted(related.windows)).toEqual(['signal-5', 'sketch-2']);
+        expect(sorted(related.wires)).toEqual(['signal-5:', 'sketch-2:k1']);
+    });
+
+    it('brings a private store only its one window', () => {
+        const related = relatedTo(layout, { kind: 'store', id: 'sketch-2' });
+
+        expect(sorted(related.windows)).toEqual(['sketch-2']);
+        expect(related.wires.size).toBe(0);
     });
 });

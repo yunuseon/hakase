@@ -59,7 +59,7 @@
     align-items: center;
     gap: 8px;
     padding-inline: 10px 14px;
-    cursor: grab;
+    cursor: pointer;
 }
 
 .dot {
@@ -90,6 +90,7 @@
 
 .jack {
     position: absolute;
+    cursor: grab;
     inline-size: 10px;
     block-size: 10px;
     background: var(--panel);
@@ -113,7 +114,7 @@
     padding-inline: 10px;
     color: var(--ink);
     font-weight: 500;
-    cursor: default;
+    cursor: pointer;
     user-select: none;
 }
 
@@ -122,10 +123,6 @@
     inset-block-start: 10px;
     background: var(--ink);
     border-color: var(--ink);
-}
-
-.head[data-own] {
-    cursor: grab;
 }
 
 .head > .label {
@@ -148,7 +145,6 @@
     color: var(--label);
     border: 1px solid var(--edge);
     border-radius: 999px;
-    cursor: grab;
 }
 
 .tag .dot {
@@ -173,7 +169,7 @@
     gap: 6px;
     block-size: 24px;
     padding-inline: 14px 6px;
-    cursor: grab;
+    cursor: pointer;
 }
 
 .port .jack {
@@ -240,4 +236,39 @@
 
 :host([data-empty]) .empty {
     display: block;
+}
+
+/* Wider than it looks, so a wire can be started without pixel aim. */
+.jack::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+}
+
+.node,
+.wire {
+    transition: opacity 0.15s;
+}
+
+.board[data-focus] .node:not([data-related]),
+.board[data-focus] .wire:not([data-related]) {
+    opacity: 0.18;
+}
+
+.board[data-focus] .tag:not([data-related]) {
+    opacity: 0.4;
+}
+
+.node[data-selected],
+.tag[data-selected] {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink);
+}
+
+.board[data-focus] .wire[data-related] {
+    stroke-width: 3;
+}
+
+.board[data-focus] .wire.own[data-related] {
+    stroke-width: 4.5;
 }

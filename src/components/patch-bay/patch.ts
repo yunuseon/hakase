@@ -70,6 +70,7 @@ export type PlacedWindow = Omit<PatchWindow, 'ports'> &
 export type Wire = {
     readonly kind: 'own' | 'follow';
     readonly window: string;
+    readonly store: string;
     readonly input: string | null;
     readonly colour: string;
     readonly path: string;
@@ -144,6 +145,7 @@ export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
                       {
                           kind: 'own',
                           window: window.id,
+                          store: own.id,
                           input: null,
                           colour: own.colour,
                           path: wirePath(own.anchor, window.anchor),
@@ -162,6 +164,7 @@ export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
                           {
                               kind: 'follow',
                               window: window.id,
+                              store: source.id,
                               input: port.input,
                               colour: source.colour,
                               path: wirePath(source.anchor, port.anchor),
@@ -178,5 +181,35 @@ export const layoutOf = ({ stores, windows }: PatchView): PatchLayout => {
         stores: placedStores,
         windows: placedWindows,
         wires,
+    };
+};
+
+export type Focus = { readonly kind: 'window' | 'store'; readonly id: string };
+
+export const wireKey = ({ window, input }: Pick<Wire, 'window' | 'input'>) =>
+    `${window}:${input ?? ''}`;
+
+export type Related = {
+    readonly stores: ReadonlySet<string>;
+    readonly windows: ReadonlySet<string>;
+    readonly wires: ReadonlySet<string>;
+};
+
+export const relatedTo = ({ windows, wires }: PatchLayout, focus: Focus): Related => {
+    const touching = wires.filter(wire =>
+        focus.kind === 'window' ? wire.window === focus.id : wire.store === focus.id,
+    );
+    const owner = windows.filter(window =>
+        focus.kind === 'window' ? window.id === focus.id : window.own?.store === focus.id,
+    );
+
+    return {
+        stores: new Set([
+            ...(focus.kind === 'store' ? [focus.id] : []),
+            ...touching.map(({ store }) => store),
+            ...owner.flatMap(({ own }) => (own === null ? [] : [own.store])),
+        ]),
+        windows: new Set([...owner.map(({ id }) => id), ...touching.map(({ window }) => window)]),
+        wires: new Set(touching.map(wireKey)),
     };
 };

@@ -1,10 +1,13 @@
-import { merge, type Observable } from 'rxjs';
-import { filter, map, mergeMap, scan, share, tap } from 'rxjs/operators';
+import { combineLatest, merge, type Observable } from 'rxjs';
+import { filter, map, mergeMap, scan, share, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
 import {
+    relatedTo,
+    wireKey,
     wirePath,
+    type Focus,
     type PatchCommand,
     type PatchLayout,
     type PlacedPort,
@@ -126,6 +129,31 @@ const commandOf = (a: End, b: End | null): PatchCommand | null => {
         : null;
 };
 
+// undefined: a press that says nothing about focus, like one on a jack, which starts a wire instead.
+const focusAt = (target: EventTarget | null): Focus | null | undefined => {
+    if (!(target instanceof Element) || target instanceof HTMLButtonElement) {
+        return undefined;
+    }
+
+    if (target.closest('.jack') !== null) {
+        return undefined;
+    }
+
+    const store = target.closest('.tag, .store');
+
+    if (store instanceof HTMLElement && store.dataset['store'] !== undefined) {
+        return { kind: 'store', id: store.dataset['store'] };
+    }
+
+    const window = target.closest('[data-window-node]');
+
+    return window instanceof HTMLElement && window.dataset['windowNode'] !== undefined
+        ? { kind: 'window', id: window.dataset['windowNode'] }
+        : null;
+};
+
+const unfocused: Focus | null = null;
+
 const iconOf = (path: string): SVGSVGElement => {
     const icon = document.createElementNS(SVG, 'svg');
     icon.setAttribute('viewBox', '0 0 24 24');
@@ -234,6 +262,7 @@ export class HksPatchBay extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
+    private readonly focus$: Observable<Focus | null>;
 
     constructor() {
         super();
@@ -265,7 +294,13 @@ export class HksPatchBay extends HTMLElement {
         };
 
         // Shared: the drawn wire and the command it ends in must read one gesture.
-        this.drags$ = pointerGesture$(board, start => endOf(start.target) !== null).pipe(
+        this.drags$ = pointerGesture$(
+            board,
+            ({ target }) =>
+                target instanceof Element &&
+                target.closest('.jack') !== null &&
+                endOf(target) !== null,
+        ).pipe(
             scan(
                 (drag: Drag, { phase, event }): Drag => {
                     const at = local(event.clientX, event.clientY);
@@ -290,6 +325,15 @@ export class HksPatchBay extends HTMLElement {
                 },
             ),
             share(),
+        );
+
+        this.focus$ = fromElementEvent$(board, 'pointerdown').pipe(
+            mergeMap(({ target }): (Focus | null)[] => {
+                const focus = focusAt(target);
+
+                return focus === undefined ? [] : [focus];
+            }),
+            startWith(unfocused),
         );
 
         this.commands$ = merge(
@@ -347,9 +391,10 @@ export class HksPatchBay extends HTMLElement {
                 wires.setAttribute('height', String(height));
                 this.toggleAttribute('data-empty', windows.length === 0);
 
-                const paths = list.map(({ kind, path, colour, removable }) => {
+                const paths = list.map(({ kind, window, input, path, colour, removable }) => {
                     const wire = document.createElementNS(SVG, 'path');
                     wire.classList.add('wire', kind);
+                    wire.dataset['key'] = wireKey({ window, input });
                     wire.toggleAttribute('data-fixed', !removable);
                     wire.setAttribute('d', path);
                     wire.style.setProperty('--store', colour);
@@ -380,7 +425,52 @@ export class HksPatchBay extends HTMLElement {
             }),
         );
 
-        return merge(drawn$, dragged$).pipe(map(() => undefined));
+        // Together, so a redrawn graph keeps the focus and a focus never reads a graph about to be replaced.
+        const focused$ = combineLatest([drawn$, this.focus$]).pipe(
+            tap(([layout, focus]) => {
+                const shown =
+                    focus !== null &&
+                    (focus.kind === 'window'
+                        ? layout.windows.some(({ id }) => id === focus.id)
+                        : layout.stores.some(({ id }) => id === focus.id) ||
+                          layout.windows.some(({ own }) => own?.store === focus.id));
+                const related = shown ? relatedTo(layout, focus) : null;
+                board.toggleAttribute('data-focus', related !== null);
+
+                for (const element of shadow.querySelectorAll('[data-store]')) {
+                    if (element instanceof HTMLElement) {
+                        const id = element.dataset['store'] ?? '';
+                        element.toggleAttribute('data-related', related?.stores.has(id) === true);
+                        element.toggleAttribute(
+                            'data-selected',
+                            focus?.kind === 'store' && focus.id === id,
+                        );
+                    }
+                }
+
+                for (const element of shadow.querySelectorAll('[data-window-node]')) {
+                    if (element instanceof HTMLElement) {
+                        const id = element.dataset['windowNode'] ?? '';
+                        element.toggleAttribute('data-related', related?.windows.has(id) === true);
+                        element.toggleAttribute(
+                            'data-selected',
+                            focus?.kind === 'window' && focus.id === id,
+                        );
+                    }
+                }
+
+                for (const element of wires.querySelectorAll('.wire')) {
+                    if (element instanceof SVGElement) {
+                        element.toggleAttribute(
+                            'data-related',
+                            related?.wires.has(element.dataset['key'] ?? '') === true,
+                        );
+                    }
+                }
+            }),
+        );
+
+        return merge(focused$, dragged$).pipe(map(() => undefined));
     }
 }
 

@@ -1057,7 +1057,19 @@ something follows it, or when two windows share it; otherwise it is a coloured
 tag in its window's header. A tag is still a drag end, so dragging another
 window's header jack onto it shares it, and the tag becomes a node.
 
-Drag between a store and a window's header to bind the window to it (same
+**Wires start only at the jacks** (the docks on a node's edge); a press
+anywhere else on a node **focuses** it instead. A focused window keeps lit its
+own store, what it follows and those wires; a focused store keeps lit every
+window bound to it or following it; everything else fades. `relatedTo` decides
+what is related, purely from the layout. Focus is the bay's own view state, a
+stream of presses, not app state: it is not saved and two bays focus apart. It
+is combined with the drawn layout in one `combineLatest`, so a redraw keeps the
+focus; a focus on something that is gone simply fades nothing. Clicking the
+empty board clears it. It reads presses, not clicks, because a drag captures
+the pointer on the board, and the click that ends it would land on the board
+and clear the focus.
+
+Drag from a jack between a store and a window's header to bind the window to it (same
 program only, and not the store it already has), or between a store and a port
 to follow it; only ends that would make a valid action stay lit, judged by the
 same `commandOf` that turns the drop into a command. Drag a bound optional
@@ -1590,7 +1602,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and seventy of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and seventy-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
