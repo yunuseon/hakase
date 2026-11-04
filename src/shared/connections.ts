@@ -109,18 +109,13 @@ export const commandOf = (a: End, b: End | null): StateCommand | null => {
         : null;
 };
 
+// Level out of an output and into an input, always: the direction of a wire reads from its ends.
 export const wirePath = (from: Point, to: Point) => {
     const dx = to.x - from.x;
+    const pull =
+        dx >= 0
+            ? Math.max(40, dx / 2)
+            : Math.min(160, Math.max(60, Math.max(-dx, Math.abs(to.y - from.y)) / 2));
 
-    if (dx >= 0) {
-        const pull = Math.max(40, dx / 2);
-
-        return `M${from.x} ${from.y} C${from.x + pull} ${from.y} ${to.x - pull} ${to.y} ${to.x} ${to.y}`;
-    }
-
-    // Backwards, a level pull would loop past both jacks; it hangs below them like a cable instead.
-    const out = Math.min(40, -dx / 4 + 16);
-    const low = Math.max(from.y, to.y) + Math.max(48, -dx / 3);
-
-    return `M${from.x} ${from.y} C${from.x + out} ${low} ${to.x - out} ${low} ${to.x} ${to.y}`;
+    return `M${from.x} ${from.y} C${from.x + pull} ${from.y} ${to.x - pull} ${to.y} ${to.x} ${to.y}`;
 };

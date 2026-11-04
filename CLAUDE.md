@@ -1153,10 +1153,11 @@ the selector; both resolve through the pure connection rules in
 `shared/connections.ts`, shared with the State program. Optional inputs offer
 None, and a signal input never offers a source that would close a cycle.
 Output-to-output connections bind a window to the source's state only when
-both programs match. A dotted wire joins windows that share a state. A wire whose
-target lies behind its source (`wirePath`, shared with the state map) hangs
-below both jacks like a cable, since a level pull out of each would loop past
-them.
+both programs match. A dotted wire joins windows that share a state. Every wire
+(`wirePath`, shared with the state map) leaves an output level to the right and
+enters an input level from the left, even when the target lies behind its
+source, so which end is which reads at a glance; a backward wire's pull grows with
+how far apart the jacks are, capped, so both ends stay readable.
 
 `state-mode.ts` derives the world-space sockets and wires. `hks-state-wiring`
 owns their DOM, and compact output selectors offer a manage button for the
