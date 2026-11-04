@@ -1,6 +1,7 @@
 import { asyncScheduler, combineLatest, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
+    filter,
     ignoreElements,
     map,
     mergeMap,
@@ -8,6 +9,7 @@ import {
     shareReplay,
     startWith,
     switchMap,
+    take,
     throttleTime,
     withLatestFrom,
 } from 'rxjs/operators';
@@ -21,7 +23,7 @@ import {
     type GraphStore,
 } from '../components/state-map/state-map.ts';
 import type { AppInput, Program } from '../program.ts';
-import { asStateMap } from '../settings.ts';
+import { asStateMap, defaultStateMap } from '../settings.ts';
 import { centredOn, IDENTITY, panned, zoomedAround } from '../shared/camera.ts';
 
 const READ_MS = 250;
@@ -170,6 +172,21 @@ export const stateProgram = {
                             withLatestFrom(settings$, layout$),
                             map(([size, current, { bounds }]) => ({
                                 ...current,
+                                camera: centredOn(IDENTITY, bounds, size),
+                            })),
+                        ),
+                        // Once, for a window that has never been arranged: a reload keeps the camera it had.
+                        self.settings$.pipe(
+                            take(1),
+                            filter(stored => stored === undefined),
+                            switchMap(() =>
+                                combineLatest([layout$, stateMap.sizes$]).pipe(
+                                    filter(([, { width, height }]) => width > 0 && height > 0),
+                                    take(1),
+                                ),
+                            ),
+                            map(([{ bounds }, size]) => ({
+                                ...defaultStateMap,
                                 camera: centredOn(IDENTITY, bounds, size),
                             })),
                         ),

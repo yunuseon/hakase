@@ -1046,6 +1046,17 @@ playhead, so a sketch on a second clock plays the same wave on its own time.
 `AppState.followedWave$(input)` hands a program the signal its input is bound
 to, or null, with its whole chain already resolved.
 
+**A sketch's scene can follow signals too**: `turn` spins the camera a whole
+turn over the signal's range (yaw added to the viewer's own), `focus` plays the
+lattice focus on the slider's log scale (0.3 to 3), and `colour` slides the
+picture along its theme ramp by up to half of it (`uColourShift`, added to the
+tint before the ramp lookup). They are optional inputs like the knobs
+(`sceneInputs`) and travel in the same `PanelParams.signals`, keyed by `DRIVES`.
+All three are set in `setMoment` every frame, not in `prepare`, because they
+change with the playhead; `setMoment` is shared by the live sketch, the
+thumbnails and an export, so all three see the same frame. A driven focus keeps
+its slider for when it is let go, with the readout saying **signal**.
+
 **A signal's phase, low and high can follow another signal** (`Signal.sources`),
 so an LFO can swell another's range. The followed value stands in for the
 parameter, evaluated at the same moment, so a chain still loops and still
@@ -1112,6 +1123,12 @@ they are looked up by entry, never `spots[key]`. The board is sized to reach
 every node even though the camera moves it: the pointer maths reads its scale
 from its box, and a box of no size has none. Focus listens on the viewport, not
 the board, or a press on empty space beside the board would never clear it.
+
+A state window that has never been arranged (its settings still undefined) fits
+its graph once, on its first layout with a real size; after that its camera is
+what the user left, and a reload keeps it. A drop that the reducer would refuse
+because it closes a loop is not lit while dragging: the map's own `closesLoop`
+reads the chain from its `source` wires, the same reachability as the fold's.
 
 **Every store is a node, private ones too.** Folding a store only one window
 used into a tag in its header was tried and dropped: it made private state a
@@ -1664,7 +1681,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and eighty-three of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and eighty-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

@@ -10,12 +10,14 @@ import {
     startWith,
     switchMap,
     tap,
+    withLatestFrom,
 } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$ } from '../../lib/rx.ts';
+import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import {
+    closesLoop,
     nodeKey,
     relatedTo,
     wireKey,
@@ -431,6 +433,7 @@ export class HksStateMap extends HTMLElement {
     readonly views$: Observable<ViewGesture>;
     readonly fits$: Observable<{ readonly width: number; readonly height: number }>;
     readonly tidies$: Observable<void>;
+    readonly sizes$: Observable<{ readonly width: number; readonly height: number }>;
 
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
@@ -644,6 +647,9 @@ export class HksStateMap extends HTMLElement {
             map(() => ({ width: graph.clientWidth, height: graph.clientHeight })),
         );
         this.tidies$ = tool('tidy').pipe(map(() => undefined));
+        this.sizes$ = observeResize$(graph).pipe(
+            map(() => ({ width: graph.clientWidth, height: graph.clientHeight })),
+        );
 
         this.commands$ = merge(
             this.arming$.pipe(
@@ -806,15 +812,17 @@ export class HksStateMap extends HTMLElement {
         );
 
         const dragged$ = this.drags$.pipe(
-            tap(({ phase, start, from, at, over }) => {
+            withLatestFrom(layout$),
+            tap(([{ phase, start, from, at, over }, layout]) => {
                 const live = phase !== 'release' && start !== null;
                 rubber.setAttribute('d', live ? wirePath(from, at) : '');
                 board.toggleAttribute('data-dragging', live);
 
                 for (const element of shadow.querySelectorAll(ENDS)) {
                     const end = endOf(element);
-                    const ok =
-                        live && start !== null && end !== null && commandOf(start, end) !== null;
+                    const command =
+                        live && start !== null && end !== null ? commandOf(start, end) : null;
+                    const ok = command !== null && !closesLoop(layout, command);
                     element.toggleAttribute('data-ok', ok);
                     element.toggleAttribute(
                         'data-over',

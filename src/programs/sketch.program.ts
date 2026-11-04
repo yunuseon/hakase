@@ -1,4 +1,4 @@
-import { knobInputs, playbackInput } from '../inputs.ts';
+import { knobInputs, playbackInput, sceneInputs } from '../inputs.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -49,7 +49,7 @@ import {
 } from '../components/sketch/animation.ts';
 import {
     centre,
-    KNOBS,
+    DRIVES,
     panelParams,
     samePanel,
     steppedRatio,
@@ -77,7 +77,7 @@ const statusOf = (event: ExportEvent): ExportStatus => {
 
 export const sketchProgram = {
     id: 'sketch',
-    inputs: { playback: playbackInput, ...knobInputs },
+    inputs: { playback: playbackInput, ...knobInputs, ...sceneInputs },
     title: 'sketch',
     category: 'make',
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
@@ -137,6 +137,9 @@ export const sketchProgram = {
                     k2: state.followedWave$('k2'),
                     k3: state.followedWave$('k3'),
                     k4: state.followedWave$('k4'),
+                    turn: state.followedWave$('turn'),
+                    focus: state.followedWave$('focus'),
+                    colour: state.followedWave$('colour'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
                 const params$ = combineLatest([panel$, size$, theme$, signals$]).pipe(
@@ -352,7 +355,7 @@ export const sketchProgram = {
                             shader$.pipe(map(knobsUsed)),
                             state.library$.pipe(map(optionsOf)),
                             signals$.pipe(
-                                map(signals => KNOBS.filter(knob => signals[knob] !== null)),
+                                map(signals => DRIVES.filter(drive => signals[drive] !== null)),
                             ),
                         )
                         .pipe(ignoreElements()),

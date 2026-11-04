@@ -40,9 +40,23 @@ export type Motion = Readonly<Record<Knob, Cycles>>;
 export const knobAt = (value: number, cycles: Cycles, t: number): number =>
     cycles === 0 ? value : value * (0.5 - 0.5 * Math.cos(2 * Math.PI * cycles * t));
 
-export type Signals = Readonly<Record<Knob, Wave | null>>;
+export const DRIVES = [...KNOBS, 'turn', 'focus', 'colour'] as const;
+export type Drive = (typeof DRIVES)[number];
 
-export const unbound: Signals = { k1: null, k2: null, k3: null, k4: null };
+export type Signals = Readonly<Record<Drive, Wave | null>>;
+
+const FOCUS_LOW = 0.3;
+const FOCUS_RANGE = 10;
+
+// A whole turn over the signal's range, so a looping signal brings the camera back where it began.
+export const turnAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
+    signals.turn === null ? 0 : 2 * Math.PI * waveAt(signals.turn, t);
+
+export const focusAt = ({ focus, signals }: Pick<PanelParams, 'focus' | 'signals'>, t: number) =>
+    signals.focus === null ? focus : FOCUS_LOW * FOCUS_RANGE ** waveAt(signals.focus, t);
+
+export const colourShiftAt = ({ signals }: Pick<PanelParams, 'signals'>, t: number) =>
+    signals.colour === null ? 0 : waveAt(signals.colour, t) - 0.5;
 
 export const knobValue = (
     { knobs, motion, signals }: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,

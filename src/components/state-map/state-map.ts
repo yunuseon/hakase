@@ -346,3 +346,22 @@ export const placedAt = ({ stores, windows }: GraphLayout, key: string): Spot | 
     stores.find(({ id }) => nodeKey('store', id) === key) ??
     windows.find(({ id }) => nodeKey('window', id) === key) ??
     null;
+
+export const closesLoop = ({ wires }: GraphLayout, command: StateCommand) => {
+    if (command.kind !== 'source' || command.source === null) {
+        return false;
+    }
+
+    const grow = (found: ReadonlySet<string>): ReadonlySet<string> => {
+        const next = new Set([
+            ...found,
+            ...wires
+                .filter(({ kind, sink }) => kind === 'source' && found.has(sink))
+                .map(({ store }) => store),
+        ]);
+
+        return next.size === found.size ? found : grow(next);
+    };
+
+    return grow(new Set([command.source])).has(command.store);
+};

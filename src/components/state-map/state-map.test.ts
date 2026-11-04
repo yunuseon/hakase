@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    closesLoop,
     focusedStores,
     layoutOf,
     NODE_WIDTH,
@@ -276,5 +277,51 @@ describe('moved nodes', () => {
 
     it('ignores a stored spot named after something every object has', () => {
         expect(() => layoutOf(view, { constructor: { x: 1, y: 1 } })).not.toThrow();
+    });
+});
+
+describe('closesLoop', () => {
+    const fast = { kind: 'source' as const, store: 'slow', param: 'high', source: 'fast' };
+
+    it('finds a source that already follows its target, however deep', () => {
+        const layout = layoutOf({
+            stores: [
+                {
+                    id: 'slow',
+                    target: 'store:signal:slow',
+                    global: false,
+                    program: 'signal',
+                    kind: 'signal',
+                    title: 'Signal',
+                    name: 'slow',
+                    colour: 'red',
+                    ports: [],
+                },
+                {
+                    id: 'fast',
+                    target: 'store:signal:fast',
+                    global: false,
+                    program: 'signal',
+                    kind: 'signal',
+                    title: 'Signal',
+                    name: 'fast',
+                    colour: 'blue',
+                    ports: [
+                        {
+                            input: 'high',
+                            title: 'high',
+                            accepts: ['signal'],
+                            optional: true,
+                            bound: 'slow',
+                        },
+                    ],
+                },
+            ],
+            windows: [],
+        });
+
+        expect(closesLoop(layout, fast)).toBe(true);
+        expect(closesLoop(layout, { ...fast, store: 'fast', source: 'slow' })).toBe(false);
+        expect(closesLoop(layout, { ...fast, store: 'slow', source: 'slow' })).toBe(true);
     });
 });

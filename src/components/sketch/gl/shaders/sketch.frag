@@ -13,6 +13,7 @@ precision highp int;
 const float SMALL_DOT = 6.0;
 
 uniform sampler2D uPalette;
+uniform float uColourShift;
 uniform int uMode;
 uniform int uPass;
 uniform float uFade;
@@ -85,7 +86,7 @@ void main() {
         discard;
     }
 
-    vec3 color = texture(uPalette, vec2(clamp(vTint, 0.0, 1.0), 0.5)).rgb * shading();
+    vec3 color = texture(uPalette, vec2(clamp(vTint + uColourShift, 0.0, 1.0), 0.5)).rgb * shading();
 
     fragColor = vec4(color * alpha, alpha);
 }

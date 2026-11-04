@@ -438,10 +438,17 @@ export class HksSketchControls extends HTMLElement {
         );
 
         const drivers$ = driven$.pipe(
-            map(knobs => knobs.join()),
+            map(drives => drives.join()),
             distinctUntilChanged(),
             tap(joined => {
                 const knobs = joined.split(',');
+                const focus = requireElement(this.shadow, '[data-field="focus"]', HTMLInputElement);
+                focus.disabled = knobs.includes('focus');
+                requireElement(
+                    this.shadow,
+                    '[data-read="focus"]',
+                    HTMLOutputElement,
+                ).toggleAttribute('data-driven', focus.disabled);
 
                 for (const knob of KNOBS) {
                     const driven = knobs.includes(knob);

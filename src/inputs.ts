@@ -76,7 +76,7 @@ export const progressInput = {
     initial: { kind: 'playback', store: 'timeline' },
 } as const satisfies FollowedInput;
 
-const knobInput = (title: string) =>
+const signalInput = (title: string) =>
     ({
         title,
         from: 'followed',
@@ -85,10 +85,16 @@ const knobInput = (title: string) =>
     }) as const satisfies FollowedInput;
 
 export const knobInputs = {
-    k1: knobInput('k1'),
-    k2: knobInput('k2'),
-    k3: knobInput('k3'),
-    k4: knobInput('k4'),
+    k1: signalInput('k1'),
+    k2: signalInput('k2'),
+    k3: signalInput('k3'),
+    k4: signalInput('k4'),
+};
+
+export const sceneInputs = {
+    turn: signalInput('turn'),
+    focus: signalInput('focus'),
+    colour: signalInput('colour'),
 };
 
 export const ownPlaybackInput = {

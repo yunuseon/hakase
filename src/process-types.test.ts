@@ -12,6 +12,9 @@ describe('Process', () => {
             readonly k2?: SignalBinding;
             readonly k3?: SignalBinding;
             readonly k4?: SignalBinding;
+            readonly turn?: SignalBinding;
+            readonly focus?: SignalBinding;
+            readonly colour?: SignalBinding;
         }>();
         expectTypeOf<Of<'playhead'>['follows']>().toEqualTypeOf<{
             readonly progress: PlaybackBinding | FocusBinding;

@@ -1,7 +1,10 @@
 import {
     DRAW_MODES,
     KNOBS,
+    colourShiftAt,
+    focusAt,
     knobValue,
+    turnAt,
     type DrawMode,
     type Knob,
     type PanelParams,
@@ -116,6 +119,7 @@ export type Uniforms = {
     readonly lattice: WebGLUniformLocation | null;
     readonly space: WebGLUniformLocation | null;
     readonly focus: WebGLUniformLocation | null;
+    readonly colourShift: WebGLUniformLocation | null;
     readonly wrap: WebGLUniformLocation | null;
     readonly reference: WebGLUniformLocation | null;
     readonly state: WebGLUniformLocation | null;
@@ -180,6 +184,7 @@ export const createSketch = (gl: WebGL2RenderingContext, formula: string): Sketc
                 lattice: at('uLattice'),
                 space: at('uSpace'),
                 focus: at('uFocus'),
+                colourShift: at('uColourShift'),
                 wrap: at('uWrap'),
                 reference: at('uReference'),
                 state: at('uState'),
@@ -283,7 +288,7 @@ export const PASS_SEED = 4;
 export const setMoment = (
     gl: WebGL2RenderingContext,
     { uniforms }: Sketch,
-    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,
+    params: Pick<PanelParams, 'knobs' | 'motion' | 'signals' | 'focus'>,
     playhead: number,
     { x, y, down }: Pointer,
     orbit: Orbit,
@@ -295,7 +300,12 @@ export const setMoment = (
     });
     gl.uniform2f(uniforms.pointer, x, y);
     gl.uniform1f(uniforms.pointerDown, down ? 1 : 0);
-    gl.uniform3f(uniforms.orbit, ...orbitUniform(orbit));
+    gl.uniform3f(
+        uniforms.orbit,
+        ...orbitUniform({ ...orbit, yaw: orbit.yaw + turnAt(params, playhead) }),
+    );
+    gl.uniform1f(uniforms.focus, focusAt(params, playhead));
+    gl.uniform1f(uniforms.colourShift, colourShiftAt(params, playhead));
 };
 // Must match axisVertex in sketch.vert: 7 lines of 48 pieces of two vertices, then 12 ticks of two.
 const AXIS_VERTICES = 7 * 48 * 2 + 12 * 2;
