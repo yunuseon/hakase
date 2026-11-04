@@ -1087,9 +1087,11 @@ replays exactly. Three choices hold it together:
 
 - **The sources belong to the signal document, not its window.** A knob follows
   a signal _store_, so a window's inputs could never reach it, and closing the
-  window would silently stop the modulation. The sources are edited in the state
-  map (a store's own jacks, `modulate` inputs carrying the target store) and
-  folded like any signal command.
+  window would silently stop the modulation. `signalProgram.inputs` declares
+  phase, offset and depth with `from: 'store'`: the state selector edits the
+  selected signal's sources, and the state map derives its store jacks from the
+  same definitions. These inputs never enter `Process.follows`. Both interfaces
+  feed the signal fold, which rejects cycles before applying a source command.
 - **Rate cannot follow.** It is a whole number of cycles so a loop loops, and a
   moving rate would not be one.
 - **A loop cannot be expressed.** `modulate` reads the signal fold it feeds
@@ -1104,28 +1106,35 @@ what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
 
-## A window's connections, on the canvas
+## State mode, on the canvas
 
-**While a window's state menu is open, the canvas draws what it is connected
-to**: dashed links that flow from every window keeping a state this one reads,
-into it, and from it to every window that reads its state; a dotted tie to
-windows that keep the same state. The canvas knows windows, not stores, so
-`linksOf` in `src/links.ts` resolves the stores between them: a follow, a
-signal's own sources (a chain of signals reads window to window), and a shared
-binding. `hks-links` sits zero-sized at the world origin like the seams and
-takes no pointer events; a link leaves the side of a window that faces the
-other, across or up and down, whichever way they lie apart.
+Clicking a window's state chip enters global **state mode**. Every window exposes
+its output and declared inputs as minimal jacks inside its frame. Hover or
+focus expands a compact state selector inward over that window's content;
+compatible targets expand during a connection drag. The selectors use in-app
+lists, because a native dropdown can swallow W's keyup and leave a held mode on.
+Their lists open upward or downward within their owning window. Drag between compatible jacks to connect, or choose a state in
+the selector; both resolve through the pure connection rules in
+`shared/connections.ts`, shared with the State program. Optional inputs offer
+None, and a signal input never offers a source that would close a cycle.
+Output-to-output connections bind a window to the source's state only when
+both programs match. A dotted wire joins windows that share a state.
 
-Which menu is open is a **peek**, its own process signal beside the workspace
-actions: it is momentary, so it is neither saved nor a step to undo, and a
-close counts only from the window that opened, so opening another first wins.
+`state-mode.ts` derives the world-space sockets and wires. `hks-state-wiring`
+owns their DOM, and compact output selectors offer a manage button for the
+existing name, new-state and fork controls. States without an open window
+remain available in the selectors and in the State program.
 
-The menu itself reads as a function's signature: **Output** (→) is the state the
-window keeps, **Inputs** (←) what it reads. Each input is **one line** showing
-what it follows; clicking it opens that input's list, the current one marked,
-and only one list is open at a time, closed again by a pick or by closing the
-menu. Which line is open is the window's own view state, so a program never
-learns it.
+Hold unmodified **W** outside an editable field to reveal state mode temporarily.
+Releasing W hides it once any drag or open selector has finished. The State
+button pins it; Shift retains its sketch painting gesture. A pure session fold
+tracks held, pinned and named interaction locks. Window blur clears temporary
+mode, and closing a window releases its menu lock.
+
+The mode is transient and independent of workspace history. Escape, the global State toggle and Done beside the window
+that entered the mode all close it. Closing a selector or editing a component
+never exits pinned mode. `sameWiring` compares the applied view field by field so
+editing a signal's numeric values does not rebuild an open selector.
 
 ## The state map
 
@@ -1273,7 +1282,9 @@ timeline `ownPlaybackInput` (its clock is its own store, so it follows nothing),
 and the dial `progressInput`, which accepts a `playback` clock (scrubbable) or a
 `focus` timer (read-only). An input definition is inert data: its title, the
 kinds it accepts, where a new window starts (`initial`, the main clock), and per
-kind how a store of it connects (`connect`). There is no separate table to keep
+kind how a store of it connects (`connect`). `from: 'followed'` bindings belong
+to a process; `from: 'store'` bindings belong to the document it is showing.
+There is no separate table to keep
 in step: adding an input is one field on the program.
 
 **A window can only hold the inputs its own program declares, and the type
@@ -1727,7 +1738,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Three hundred and ninety-five of them survive in `src/` today, every one a single line. Treat that
+    Three hundred and ninety of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

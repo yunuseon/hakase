@@ -26,3 +26,8 @@
     block-size: 0;
     transform-origin: 0 0;
 }
+
+:host([data-state-mode]) {
+    --program-opacity: 0.38;
+    --program-desaturation: 0.75;
+}

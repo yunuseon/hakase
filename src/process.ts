@@ -1,5 +1,13 @@
 import { defer, merge, type Observable } from 'rxjs';
-import { finalize, ignoreElements, map, withLatestFrom } from 'rxjs/operators';
+import {
+    finalize,
+    ignoreElements,
+    map,
+    withLatestFrom,
+    startWith,
+    distinctUntilChanged,
+    shareReplay,
+} from 'rxjs/operators';
 import type {
     FollowGroup,
     StoreOption,
@@ -8,13 +16,14 @@ import type {
 } from './components/window/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
 import type { AppInput, AppState, ProcessId, Program, ProgramId, Self } from './program.ts';
+import { storeInputCommand } from './input-connections.ts';
 import type { PlaybackBinding } from './inputs.ts';
 import type { WorkspaceAction } from './workspace.ts';
 
 export type ProcessSignal =
     | { readonly to: 'workspace'; readonly action: WorkspaceAction }
-    // Apart from the workspace's actions: an open menu is neither saved nor a step to undo.
-    | { readonly to: 'peek'; readonly id: ProcessId; readonly open: boolean }
+    | { readonly to: 'state-mode'; readonly id: ProcessId }
+    | { readonly to: 'state-busy'; readonly id: ProcessId; readonly busy: boolean }
     // Stamped here so a process can tell its own edits from everyone else's.
     | {
           readonly to: 'app';
@@ -35,6 +44,7 @@ export const liveProcess$ = (
     stores$: Observable<readonly StoreOption[] | null>,
     programs$: Observable<readonly SwitchGroup[]>,
     follows$: Observable<readonly FollowGroup[] | null>,
+    manage$: Observable<boolean>,
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
@@ -42,21 +52,41 @@ export const liveProcess$ = (
         element.append(view.element);
         host.append(element);
 
+        const menu$ = merge(manage$, element.stateCloses$).pipe(
+            startWith(false),
+            distinctUntilChanged(),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
         const view$ = self.slot$.pipe(
             map(({ frame, focused }): WindowView => ({ kind: 'floating', frame, focused })),
         );
 
         return merge(
             element.gestures$.pipe(
-                map((gesture): ProcessSignal => ({
-                    to: 'workspace',
-                    action:
-                        gesture.kind === 'resize'
-                            ? { ...gesture, id: self.id, minimum: program.minimum }
-                            : { ...gesture, id: self.id },
-                })),
+                withLatestFrom(self.store$, self.clock$),
+                map(([gesture, store, clock]): ProcessSignal => {
+                    const command = storeInputCommand(program.inputs, gesture);
+
+                    return command === null
+                        ? {
+                              to: 'workspace',
+                              action:
+                                  gesture.kind === 'resize'
+                                      ? { ...gesture, id: self.id, minimum: program.minimum }
+                                      : { ...gesture, id: self.id },
+                          }
+                        : {
+                              to: 'app',
+                              from: self.id,
+                              store,
+                              clock,
+                              program: program.id,
+                              input: { kind: 'signal', command },
+                          };
+                }),
             ),
-            element.peeks$.pipe(map((open): ProcessSignal => ({ to: 'peek', id: self.id, open }))),
+            menu$.pipe(map((busy): ProcessSignal => ({ to: 'state-busy', id: self.id, busy }))),
+            element.stateModes$.pipe(map((): ProcessSignal => ({ to: 'state-mode', id: self.id }))),
             view.run$(state, self).pipe(
                 withLatestFrom(self.store$, self.clock$),
                 map(([input, store, clock]): ProcessSignal => ({
@@ -68,7 +98,7 @@ export const liveProcess$ = (
                     input,
                 })),
             ),
-            element.connect$(view$, stores$, programs$, follows$).pipe(ignoreElements()),
+            element.connect$(view$, stores$, programs$, follows$, menu$).pipe(ignoreElements()),
         ).pipe(
             finalize(() => {
                 element.remove();

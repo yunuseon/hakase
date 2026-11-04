@@ -358,7 +358,8 @@ export class HksWindow extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly open$: Observable<boolean>;
     private readonly expanded$: Observable<string | null>;
-    readonly peeks$: Observable<boolean>;
+    readonly stateModes$: Observable<void>;
+    readonly stateCloses$: Observable<boolean>;
     private readonly switching$: Observable<SwitchAction>;
 
     constructor() {
@@ -383,9 +384,7 @@ export class HksWindow extends HTMLElement {
         const inside = (event: Event): boolean =>
             event.composedPath().includes(popover) || event.composedPath().includes(chip);
 
-        // Shared: the popover's visibility and its closing after a pick read one sequence of toggles.
         this.open$ = merge(
-            fromElementEvent$(chip, 'click').pipe(map(() => 'toggle' as const)),
             fromDocumentEvent$('pointerdown').pipe(
                 filter(event => !inside(event)),
                 map(() => 'close' as const),
@@ -404,13 +403,13 @@ export class HksWindow extends HTMLElement {
                 map(() => 'close' as const),
             ),
         ).pipe(
-            scan((open: boolean, action) => (action === 'toggle' ? !open : false), false),
+            map(() => false),
             startWith(false),
-            distinctUntilChanged(),
             share(),
         );
 
-        this.peeks$ = this.open$;
+        this.stateCloses$ = this.open$;
+        this.stateModes$ = fromElementEvent$(chip, 'click').pipe(map(() => undefined));
 
         this.expanded$ = merge(
             fromElementEvent$(popover, 'click').pipe(
@@ -646,6 +645,7 @@ export class HksWindow extends HTMLElement {
         stores$: Observable<readonly StoreOption[] | null> = of(null),
         programs$: Observable<readonly SwitchGroup[] | null> = of(null),
         follows$: Observable<readonly FollowGroup[] | null> = of(null),
+        manage$: Observable<boolean> = EMPTY,
     ): Observable<void> {
         const shadow = this.shadow;
         const chip = requireChild(shadow, '.store');
@@ -790,7 +790,8 @@ export class HksWindow extends HTMLElement {
                     }
                 }),
             ),
-            this.open$.pipe(
+            manage$.pipe(
+                distinctUntilChanged(),
                 tap(open => {
                     popover.hidden = !open;
                     chip.setAttribute('aria-expanded', String(open));

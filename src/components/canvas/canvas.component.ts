@@ -1,4 +1,4 @@
-import { EMPTY, merge, of, type Observable } from 'rxjs';
+import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
@@ -10,6 +10,7 @@ import {
     isEditable,
     keyEdit,
     keyStep,
+    keyStateHold,
     keyZoom,
     sameVariables,
     type KeyEdit,
@@ -27,6 +28,9 @@ const TEMPLATE = `
 `;
 
 export class HksCanvas extends HTMLElement {
+    readonly stateHolds$: Observable<boolean>;
+    readonly blurs$: Observable<void>;
+    readonly escapes$: Observable<void>;
     readonly gestures$: Observable<ViewGesture>;
     readonly keys$: Observable<KeyZoom>;
     readonly edits$: Observable<KeyEdit>;
@@ -42,6 +46,32 @@ export class HksCanvas extends HTMLElement {
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
+        this.stateHolds$ = merge(
+            fromDocumentEvent$('keydown').pipe(
+                mergeMap(event =>
+                    keyStateHold(
+                        event.code,
+                        event.ctrlKey || event.metaKey || event.altKey || event.shiftKey,
+                        event.repeat,
+                        isEditable(event.composedPath()[0] ?? null),
+                    )
+                        ? of(true)
+                        : EMPTY,
+                ),
+            ),
+            fromDocumentEvent$('keyup').pipe(
+                mergeMap(event => (event.code === 'KeyW' ? of(false) : EMPTY)),
+            ),
+        );
+        this.blurs$ = merge(
+            fromEvent(window, 'blur'),
+            fromDocumentEvent$('visibilitychange').pipe(
+                mergeMap(() => (document.hidden ? of(undefined) : EMPTY)),
+            ),
+        ).pipe(map(() => undefined));
+        this.escapes$ = fromDocumentEvent$('keydown').pipe(
+            mergeMap(event => (event.key === 'Escape' ? of(undefined) : EMPTY)),
+        );
         this.ground = requireChild(shadow, '.ground');
         this.world = requireChild(shadow, '.world');
 
@@ -135,8 +165,15 @@ export class HksCanvas extends HTMLElement {
     connect$(
         camera$: Observable<Camera>,
         variables$: Observable<ReadonlyMap<string, string>>,
+        stateMode$: Observable<boolean>,
     ): Observable<void> {
         return merge(
+            stateMode$.pipe(
+                distinctUntilChanged(),
+                tap(active => {
+                    this.toggleAttribute('data-state-mode', active);
+                }),
+            ),
             // On the host, so every window and the toolbar inherit them across their shadow roots.
             variables$.pipe(
                 distinctUntilChanged(sameVariables),

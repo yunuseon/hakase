@@ -1,3 +1,4 @@
+import { wirePath, type StateCommand } from '../../shared/connections.ts';
 import type { Row } from './rows.ts';
 
 export type GraphStore = {
@@ -33,25 +34,6 @@ export type StateGraph = {
     readonly stores: readonly GraphStore[];
     readonly windows: readonly GraphWindow[];
 };
-
-export type StateCommand =
-    | {
-          readonly kind: 'connect';
-          readonly window: string;
-          readonly input: string;
-          readonly source: string;
-          readonly store: string;
-      }
-    | { readonly kind: 'disconnect'; readonly window: string; readonly input: string }
-    | { readonly kind: 'bind'; readonly window: string; readonly store: string }
-    | { readonly kind: 'locate'; readonly window: string }
-    | { readonly kind: 'prune' }
-    | {
-          readonly kind: 'source';
-          readonly store: string;
-          readonly param: string;
-          readonly source: string | null;
-      };
 
 export type Point = { readonly x: number; readonly y: number };
 
@@ -93,12 +75,6 @@ export type GraphLayout = {
     readonly stores: readonly PlacedStore[];
     readonly windows: readonly PlacedWindow[];
     readonly wires: readonly Wire[];
-};
-
-export const wirePath = (from: Point, to: Point) => {
-    const pull = Math.max(40, Math.abs(to.x - from.x) / 2);
-
-    return `M${from.x} ${from.y} C${from.x + pull} ${from.y} ${to.x - pull} ${to.y} ${to.x} ${to.y}`;
 };
 
 const stacked = <T>(

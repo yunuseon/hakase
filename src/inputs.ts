@@ -1,6 +1,7 @@
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { Focus } from './components/focus/focus.ts';
+import type { Param } from './shared/signal.ts';
 import type { Clock } from './shared/playhead.ts';
 import type { ProgramId } from './program.ts';
 import { focusProgress, type ProgressConnection } from './progress.ts';
@@ -58,7 +59,15 @@ export type FollowedInput = {
 
 export type OwnInput = { readonly title: string; readonly from: 'own'; readonly kind: 'playback' };
 
-export type InputDefinition = FollowedInput | OwnInput;
+export type StoreInput = {
+    readonly title: string;
+    readonly from: 'store';
+    readonly param: Param;
+    readonly sources: readonly (typeof signalSource)[];
+    readonly initial: null;
+};
+
+export type InputDefinition = FollowedInput | OwnInput | StoreInput;
 export type ProgramInputs = { readonly [name: string]: InputDefinition };
 export type InputsFor = (program: ProgramId) => ProgramInputs;
 
@@ -83,6 +92,15 @@ const signalInput = (title: string) =>
         sources: [signalSource],
         initial: null,
     }) as const satisfies FollowedInput;
+
+const storedSignalInput = (param: Param) =>
+    ({ ...signalInput(param), from: 'store', param }) satisfies StoreInput;
+
+export const signalInputs = {
+    phase: storedSignalInput('phase'),
+    offset: storedSignalInput('offset'),
+    depth: storedSignalInput('depth'),
+};
 
 export const knobInputs = {
     k1: signalInput('k1'),

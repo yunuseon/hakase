@@ -190,3 +190,10 @@ svg {
     margin-inline: 4px;
     background: var(--edge);
 }
+
+.state-mode {
+    inline-size: auto;
+    gap: 4px;
+    padding-inline: 7px;
+    font: 500 11px var(--font-ui);
+}

@@ -6,7 +6,7 @@ import type {
 } from './components/state-map/state-map.ts';
 import { followedBy, followedStores, SOURCES, type InputsFor } from './inputs.ts';
 import { GLOBALS, targetId } from './inventory.ts';
-import { defaultSignal, PARAMS, type Signal } from './shared/signal.ts';
+import { defaultSignal, type Signal } from './shared/signal.ts';
 import { PROGRAM_IDS, type ProgramId } from './program.ts';
 import { colourOf, HOLDING, mainStore, type StoreEntry } from './stores.ts';
 import { listed, type Workspace } from './workspace.ts';
@@ -46,16 +46,21 @@ export const graphOf = (
             title: sourceOf(store.program)?.title ?? titles(store.program).title,
             name: store.name,
             colour: colourOf(store.id),
-            ports:
-                store.program === 'signal'
-                    ? PARAMS.map(param => ({
-                          input: param,
-                          title: param,
-                          accepts: ['signal'],
-                          optional: true,
-                          bound: (signals.get(store.id) ?? defaultSignal).sources[param],
-                      }))
+            ports: Object.entries(inputsFor(store.program)).flatMap(([input, definition]) =>
+                definition.from === 'store'
+                    ? [
+                          {
+                              input,
+                              title: definition.title,
+                              accepts: definition.sources.map(source => source.kind),
+                              optional: true,
+                              bound: (signals.get(store.id) ?? defaultSignal).sources[
+                                  definition.param
+                              ],
+                          },
+                      ]
                     : [],
+            ),
         }))
         .sort((a, b) => rank(a) - rank(b));
     const globals = GLOBALS.map((name): GraphStore => ({
@@ -73,7 +78,7 @@ export const graphOf = (
     const windows = listed(processes).flatMap(({ process, ordinal }): GraphWindow[] => {
         const ports = Object.entries(inputsFor(process.program)).flatMap(
             ([input, definition]): GraphPort[] => {
-                if (definition.from === 'own') {
+                if (definition.from !== 'followed') {
                     return [];
                 }
 

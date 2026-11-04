@@ -1,0 +1,73 @@
+import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
+import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
+import { closesLoop, defaultSignal, type Signal, type SignalCommand } from './shared/signal.ts';
+import { colourOf, withMain, type StoreEntry } from './stores.ts';
+import type { Process } from './workspace.ts';
+
+export const inputGroups = (
+    process: Process,
+    inputs: ProgramInputs,
+    processes: readonly Process[],
+    stores: readonly StoreEntry[],
+    signals: ReadonlyMap<string, Signal>,
+): readonly FollowGroup[] =>
+    Object.entries(inputs).flatMap(([name, definition]) => {
+        if (definition.from === 'own') {
+            return [];
+        }
+
+        const bound =
+            definition.from === 'store'
+                ? (signals.get(process.store) ?? defaultSignal).sources[definition.param]
+                : (followedBy(process.follows, name)?.store ?? null);
+        const kind =
+            definition.from === 'store' ? 'signal' : followedBy(process.follows, name)?.kind;
+
+        return definition.sources.map((source, index): FollowGroup => ({
+            input: name,
+            optional: index === 0 && definition.initial === null,
+            source: source.kind,
+            label: definition.title,
+            title: [
+                source.title,
+                ...(definition.sources.length > 1 && source.access === 'read' ? ['read-only'] : []),
+            ].join(' · '),
+            options: withMain(source.program, stores)
+                .filter(
+                    store =>
+                        definition.from !== 'store' ||
+                        !closesLoop(signals, process.store, store.id),
+                )
+                .map(store => ({
+                    id: store.id,
+                    name: store.name,
+                    colour: colourOf(store.id),
+                    users: processes.filter(
+                        other =>
+                            other.store === store.id ||
+                            followedStores(other.follows).includes(store.id),
+                    ).length,
+                    current: kind === source.kind && bound === store.id,
+                })),
+        }));
+    });
+
+export const storeInputCommand = (
+    inputs: ProgramInputs,
+    gesture: WindowGesture,
+): SignalCommand | null => {
+    if (gesture.kind !== 'follow' && gesture.kind !== 'unfollow') {
+        return null;
+    }
+
+    const definition = definitionOf(inputs, gesture.input);
+
+    return definition?.from !== 'store' ||
+        (gesture.kind === 'follow' && gesture.source !== 'signal')
+        ? null
+        : {
+              kind: 'source',
+              param: definition.param,
+              source: gesture.kind === 'follow' ? gesture.store : null,
+          };
+};

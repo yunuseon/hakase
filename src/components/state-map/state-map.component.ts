@@ -1,3 +1,10 @@
+import {
+    commandOf,
+    sameEnd,
+    wirePath,
+    type End,
+    type StateCommand,
+} from '../../shared/connections.ts';
 import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -21,9 +28,7 @@ import {
     nodeKey,
     relatedTo,
     wireKey,
-    wirePath,
     type Focus,
-    type StateCommand,
     type GraphLayout,
     type PlacedPort,
     type PlacedStore,
@@ -155,28 +160,6 @@ const filledSection = (section: HTMLElement, { title, name, colour, rows }: Insp
     }
 };
 
-type End =
-    | {
-          readonly kind: 'store';
-          readonly id: string;
-          readonly program: string;
-          readonly feeds: string | null;
-      }
-    | {
-          readonly kind: 'port';
-          readonly owner: 'window' | 'store';
-          readonly sink: string;
-          readonly input: string;
-          readonly accepts: readonly string[];
-          readonly cuttable: boolean;
-      }
-    | {
-          readonly kind: 'own';
-          readonly window: string;
-          readonly program: string;
-          readonly store: string;
-      };
-
 type Drag = {
     readonly phase: Phase;
     readonly start: End | null;
@@ -214,57 +197,6 @@ const endOf = (target: EventTarget | null): End | null => {
               accepts: accepts.split(' '),
               cuttable: cuttable !== undefined,
           }
-        : null;
-};
-
-const sameEnd = (a: End, b: End): boolean => {
-    switch (a.kind) {
-        case 'store':
-            return b.kind === 'store' && a.id === b.id;
-        case 'port':
-            return b.kind === 'port' && a.sink === b.sink && a.input === b.input;
-        case 'own':
-            return b.kind === 'own' && a.window === b.window;
-    }
-};
-
-const commandOf = (a: End, b: End | null): StateCommand | null => {
-    if (b === null) {
-        return a.kind !== 'port' || !a.cuttable
-            ? null
-            : a.owner === 'store'
-              ? { kind: 'source', store: a.sink, param: a.input, source: null }
-              : { kind: 'disconnect', window: a.sink, input: a.input };
-    }
-
-    const [store, other] = a.kind === 'store' ? [a, b] : b.kind === 'store' ? [b, a] : [null, null];
-
-    if (store === null || other === null) {
-        return null;
-    }
-
-    if (other.kind === 'port') {
-        if (store.feeds === null || !other.accepts.includes(store.feeds)) {
-            return null;
-        }
-
-        if (other.owner === 'store') {
-            return other.sink === store.id
-                ? null
-                : { kind: 'source', store: other.sink, param: other.input, source: store.id };
-        }
-
-        return {
-            kind: 'connect',
-            window: other.sink,
-            input: other.input,
-            source: store.feeds,
-            store: store.id,
-        };
-    }
-
-    return other.kind === 'own' && other.program === store.program && other.store !== store.id
-        ? { kind: 'bind', window: other.window, store: store.id }
         : null;
 };
 

@@ -182,6 +182,8 @@
 }
 
 .body {
+    opacity: var(--program-opacity, 1);
+    filter: grayscale(var(--program-desaturation, 0));
     flex: 1;
     min-block-size: 0;
     display: flex;

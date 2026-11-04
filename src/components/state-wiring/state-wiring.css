@@ -1,0 +1,235 @@
+:host {
+    position: absolute;
+    inset: 0 auto auto 0;
+    inline-size: 1px;
+    block-size: 1px;
+    z-index: 99999;
+    pointer-events: none;
+    font: 500 11px var(--font-ui);
+    color: var(--wiring-ink);
+    --wiring-panel: color-mix(in srgb, var(--ink) 94%, var(--panel));
+    --wiring-ink: var(--panel);
+    --wiring-well: color-mix(in srgb, var(--wiring-panel) 84%, var(--wiring-ink));
+    --wiring-edge: color-mix(in srgb, var(--wiring-ink) 28%, transparent);
+}
+:host([hidden]) {
+    display: none;
+}
+svg {
+    position: absolute;
+    overflow: visible;
+    pointer-events: none;
+}
+path {
+    fill: none;
+    stroke: var(--store, var(--accent));
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.95;
+}
+path.shared {
+    stroke-dasharray: 3 5;
+}
+.rubber path {
+    stroke-width: 2.5;
+    opacity: 1;
+}
+.socket {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-sizing: border-box;
+    inline-size: var(--socket-width);
+    block-size: 28px;
+    padding: 3px 5px 3px 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    pointer-events: none;
+}
+.socket span {
+    position: absolute;
+    inset-inline-start: 24px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    background: var(--wiring-panel);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    font: 600 10px var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--wiring-ink);
+    pointer-events: auto;
+}
+.jack {
+    position: absolute;
+    inset-inline-start: 3px;
+    inset-block-start: 6px;
+    flex: none;
+    inline-size: 14px;
+    block-size: 14px;
+    padding: 0;
+    border: 2px solid var(--store);
+    border-radius: 50%;
+    background: var(--wiring-panel);
+    cursor: crosshair;
+    touch-action: none;
+    pointer-events: auto;
+    box-shadow: 0 0 0 3px var(--wiring-panel);
+}
+.output .jack {
+    inset-inline-start: auto;
+    inset-inline-end: 3px;
+    background: var(--store);
+}
+.output span {
+    inset-inline-start: auto;
+    inset-inline-end: 24px;
+}
+.output {
+    padding-inline: 5px 24px;
+}
+.socket:hover,
+.socket:focus-within,
+.socket[data-compatible],
+.socket[data-open] {
+    background: var(--wiring-panel);
+    border-color: var(--wiring-edge);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--shadow) 8%, transparent);
+    pointer-events: auto;
+}
+.socket:hover span,
+.socket:focus-within span,
+.socket[data-compatible] span,
+.socket[data-open] span {
+    position: static;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.selector {
+    display: none;
+    flex: 1;
+    min-inline-size: 0;
+    border: 0;
+    border-radius: 4px;
+    background: var(--wiring-well);
+    color: var(--wiring-ink);
+    font: inherit;
+    padding: 2px;
+    cursor: pointer;
+}
+.manage {
+    display: none;
+    padding: 0 3px;
+    border: 0;
+    background: transparent;
+    color: var(--wiring-ink);
+    cursor: pointer;
+}
+.socket:hover .selector,
+.socket:focus-within .selector,
+.socket[data-compatible] .selector,
+.socket[data-open] .selector {
+    display: block;
+}
+.socket:hover .manage,
+.socket:focus-within .manage,
+.socket[data-compatible] .manage,
+.socket[data-open] .manage {
+    display: block;
+}
+.exit {
+    position: absolute;
+    block-size: 24px;
+    padding: 0 9px;
+    border: 1px solid var(--wiring-edge);
+    border-radius: 12px;
+    color: var(--wiring-ink);
+    background: var(--wiring-panel);
+    font: inherit;
+    cursor: pointer;
+    pointer-events: auto;
+    white-space: nowrap;
+}
+.exit[hidden] {
+    display: none;
+}
+.jack:focus-visible,
+.selector:focus-visible,
+.manage:focus-visible,
+.exit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+:host([data-dragging]) .jack {
+    opacity: 0.3;
+}
+:host([data-dragging]) .jack[data-compatible] {
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--store) 25%, transparent);
+}
+.jack[data-over] {
+    transform: scale(1.4);
+}
+
+.socket[data-open] {
+    z-index: 2;
+}
+.selector {
+    text-align: start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.choices {
+    display: none;
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 28px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 3px;
+    border: 1px solid var(--wiring-edge);
+    border-radius: 9px;
+    background: var(--wiring-panel);
+    pointer-events: auto;
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--shadow) 14%, transparent);
+}
+.choices[data-above] {
+    inset-block-start: auto;
+    inset-block-end: 28px;
+}
+.socket[data-open] .choices {
+    display: flex;
+    flex-direction: column;
+}
+.choice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    min-block-size: 24px;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--wiring-ink);
+    text-align: start;
+    font: inherit;
+    cursor: pointer;
+}
+.choice::before {
+    content: '';
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: var(--choice-colour);
+}
+.choice:hover,
+.choice:focus-visible,
+.choice[aria-selected='true'] {
+    background: var(--wiring-well);
+    outline: none;
+}

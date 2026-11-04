@@ -82,3 +82,6 @@ export const keyStep = (key: string, modified: boolean, editing: boolean): KeySt
 
     return key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp' ? 'previous' : null;
 };
+
+export const keyStateHold = (code: string, modified: boolean, repeat: boolean, editing: boolean) =>
+    code === 'KeyW' && !modified && !repeat && !editing;

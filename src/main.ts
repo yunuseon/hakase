@@ -31,8 +31,22 @@ import { HksCanvas } from './components/canvas/canvas.component.ts';
 import { HksNavigator } from './components/navigator/navigator.component.ts';
 import { minimapOf } from './components/navigator/navigator.ts';
 import { HksSeams } from './components/seams/seams.component.ts';
-import { HksLinks } from './components/links/links.component.ts';
-import { linksOf } from './links.ts';
+import { HksStateWiring } from './components/state-wiring/state-wiring.component.ts';
+import {
+    defaultSession,
+    reduceSession,
+    modeOf,
+    wiringOf,
+    type ModeAction,
+    type StateMode,
+} from './state-mode.ts';
+import {
+    commandFor,
+    sameWiring,
+    type WiringView,
+    type WiringCommand,
+} from './components/state-wiring/wiring.ts';
+import type { StateCommand } from './shared/connections.ts';
 import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
@@ -56,6 +70,7 @@ import {
     waveOf,
     type Signal,
 } from './shared/signal.ts';
+import { inputGroups } from './input-connections.ts';
 import { graphOf, sameGraph } from './state-graph.ts';
 import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
@@ -80,8 +95,7 @@ import {
     inStore,
     perStore$,
     reduceStores,
-    mainStore,
-    type StoreEntry,
+    withMain,
     type StoreEvent,
     type StoreAction,
     type StoreId,
@@ -214,8 +228,8 @@ const bootstrap = () => {
 
     const seams = new HksSeams();
     canvas.append(seams);
-    const links = new HksLinks();
-    canvas.append(links);
+    const wiring = new HksStateWiring();
+    canvas.append(wiring);
 
     const sections = new HksSections();
     canvas.append(sections);
@@ -316,8 +330,21 @@ const bootstrap = () => {
                 command === 'close' ? { kind: 'quit', id } : { kind: 'reveal', id, viewport },
             ),
         ),
-        defer(() => inputs$).pipe(
-            mergeMap(({ input }) => (input.kind === 'wiring' ? of(input.command) : EMPTY)),
+        merge(
+            defer(() => inputs$).pipe(
+                mergeMap(({ input }) => (input.kind === 'wiring' ? of(input.command) : EMPTY)),
+            ),
+            defer(() => wiringCommands$).pipe(
+                mergeMap(
+                    (command): Exclude<StateCommand, { kind: 'locate' | 'prune' | 'source' }>[] =>
+                        command.kind === 'source' ||
+                        command.kind === 'locate' ||
+                        command.kind === 'prune'
+                            ? []
+                            : [command],
+                ),
+            ),
+        ).pipe(
             map((command): WorkspaceAction => {
                 switch (command.kind) {
                     case 'connect':
@@ -468,49 +495,25 @@ const bootstrap = () => {
             process => process.store === id || followedStores(process.follows).includes(id),
         ).length;
 
-    // null for a program that follows nothing: the popover then has no section for it.
-    // From the program's own inputs: one section per kind of state each accepts, and none for its own store.
     const followOptions$ = ({
         id,
         program,
     }: Process): Observable<readonly FollowGroup[] | null> => {
-        const followedInputs = Object.entries(inputsFor(program)).flatMap(([name, definition]) =>
-            definition.from === 'followed' ? [{ name, definition }] : [],
-        );
+        const inputs = inputsFor(program);
+        const definitions = Object.values(inputs);
+        const signals$ = definitions.some(definition => definition.from === 'store')
+            ? defer(() => waves$)
+            : of(new Map<string, Signal>());
 
-        return followedInputs.length === 0
+        return definitions.every(definition => definition.from === 'own')
             ? of(null)
-            : workspace$.pipe(
-                  map(({ processes, stores }) => {
-                      const follows = processes.find(process => process.id === id)?.follows ?? {};
+            : combineLatest([workspace$, signals$]).pipe(
+                  map(([{ processes, stores }, signals]) => {
+                      const process = processes.find(process => process.id === id);
 
-                      return followedInputs.flatMap(({ name, definition }) => {
-                          const binding = followedBy(follows, name);
-
-                          const choice = definition.sources.length > 1;
-
-                          return definition.sources.map((source, index): FollowGroup => ({
-                              input: name,
-                              optional: index === 0 && definition.initial === null,
-                              source: source.kind,
-                              label: definition.title,
-                              title: [
-                                  source.title,
-                                  ...(choice && source.access === 'read' ? ['read-only'] : []),
-                              ].join(' · '),
-                              options: withMain(source.program, stores).map(
-                                  (store): StoreOption => ({
-                                      id: store.id,
-                                      name: store.name,
-                                      colour: colourOf(store.id),
-                                      users: usersOf(processes, store.id),
-                                      current:
-                                          binding?.kind === source.kind &&
-                                          binding.store === store.id,
-                                  }),
-                              ),
-                          }));
-                      });
+                      return process === undefined
+                          ? []
+                          : inputGroups(process, inputs, processes, stores, signals);
                   }),
                   distinctUntilChanged(
                       (a, b) =>
@@ -542,15 +545,6 @@ const bootstrap = () => {
                   }),
                   distinctUntilChanged(sameOptions),
               );
-
-    // A document's main store is always on offer, registered yet or not: it is where its data lives.
-    const withMain = (program: ProgramId, stores: readonly StoreEntry[]): readonly StoreEntry[] => {
-        const own = stores.filter(store => store.program === program);
-
-        return HOLDING[program]?.holds === 'document' && !own.some(({ id }) => id === program)
-            ? [mainStore(program), ...own]
-            : own;
-    };
 
     const switches$: Observable<readonly SwitchGroup[]> = workspace$.pipe(
         map(({ processes, stores }) =>
@@ -665,22 +659,68 @@ const bootstrap = () => {
                           ),
                       ),
                       followOptions$(process),
+                      defer(() => wiringEvents$).pipe(
+                          mergeMap(event =>
+                              event.kind === 'manage' && event.window === process.id
+                                  ? of(true)
+                                  : EMPTY,
+                          ),
+                      ),
                   ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
         }),
         share(),
     );
 
-    // The window whose state menu is open; a close only counts from that window, so opening another first wins.
-    const peeked$: Observable<ProcessId | null> = signals$.pipe(
-        mergeMap(signal => (signal.to === 'peek' ? of(signal) : EMPTY)),
-        scan(
-            (current: ProcessId | null, { id, open }): ProcessId | null =>
-                open ? id : current === id ? null : current,
-            null,
+    const mode$: Observable<StateMode> = merge(
+        signals$.pipe(
+            mergeMap((signal): ModeAction[] =>
+                signal.to === 'state-mode' ? [{ kind: 'enter', origin: signal.id }] : [],
+            ),
         ),
-        startWith(null),
-        distinctUntilChanged(),
+        signals$.pipe(
+            mergeMap((signal): ModeAction[] =>
+                signal.to === 'state-busy'
+                    ? [{ kind: 'busy', key: `menu:${signal.id}`, busy: signal.busy }]
+                    : [],
+            ),
+        ),
+        ids$.pipe(map((ids): ModeAction => ({ kind: 'windows', ids }))),
+        canvas.stateHolds$.pipe(map((held): ModeAction => ({ kind: 'hold', held }))),
+        canvas.blurs$.pipe(map((): ModeAction => ({ kind: 'blur' }))),
+        navigator.modes$.pipe(map((): ModeAction => ({ kind: 'toggle' }))),
+        canvas.escapes$.pipe(map((): ModeAction => ({ kind: 'close' }))),
+        defer(() => wiringEvents$).pipe(
+            mergeMap((event): ModeAction[] =>
+                event.kind === 'close' ? [{ kind: 'close' }] : event.kind === 'busy' ? [event] : [],
+            ),
+        ),
+    ).pipe(
+        scan(reduceSession, defaultSession),
+        startWith(defaultSession),
+        map(modeOf),
         shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    const wiringView$: Observable<WiringView | null> = combineLatest([
+        workspace$,
+        defer(() => waves$),
+        mode$,
+    ]).pipe(
+        map(([workspace, signals, mode]) => wiringOf(workspace, signals, inputsFor, mode)),
+        distinctUntilChanged(sameWiring),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const wiringEvents$: Observable<WiringCommand> = wiring.changes$.pipe(
+        withLatestFrom(wiringView$),
+        mergeMap(([event, view]) => {
+            const command = commandFor(view, event);
+            return command === null ? EMPTY : of(command);
+        }),
+        share(),
+    );
+    const wiringCommands$: Observable<StateCommand> = wiringEvents$.pipe(
+        mergeMap(event => (event.kind === 'wire' ? of(event.command) : EMPTY)),
+        share(),
     );
 
     const inputs$ = signals$.pipe(
@@ -834,11 +874,25 @@ const bootstrap = () => {
                     input.kind === 'signal' ? of({ store, command: input.command }) : EMPTY,
                 ),
             ),
-            inputs$.pipe(
-                mergeMap(({ input }) => (input.kind === 'modulate' ? of(input) : EMPTY)),
-                withLatestFrom(defer(() => waves$)),
-                mergeMap(([{ store, param, source }, all]) =>
-                    !isParam(param) || (source !== null && closesLoop(all, store, source))
+            merge(
+                inputs$.pipe(
+                    mergeMap(({ input }) => (input.kind === 'modulate' ? of(input) : EMPTY)),
+                ),
+                wiringCommands$.pipe(
+                    mergeMap(command =>
+                        command.kind === 'source'
+                            ? of({
+                                  kind: 'modulate',
+                                  store: command.store,
+                                  param: command.param,
+                                  source: command.source,
+                              })
+                            : EMPTY,
+                    ),
+                ),
+            ).pipe(
+                mergeMap(({ store, param, source }) =>
+                    !isParam(param)
                         ? EMPTY
                         : of({
                               store,
@@ -846,6 +900,15 @@ const bootstrap = () => {
                           }),
                 ),
             ),
+        ).pipe(
+            withLatestFrom(defer(() => waves$)),
+            filter(
+                ([{ store, command }, all]) =>
+                    command.kind !== 'source' ||
+                    command.source === null ||
+                    !closesLoop(all, store, command.source),
+            ),
+            map(([stamped]) => stamped),
         ),
         storeEvents$,
         reduceSignal,
@@ -1232,15 +1295,11 @@ const bootstrap = () => {
                 switchMap(appearance$),
                 map(({ value }) => variables(value)),
             ),
+            mode$.pipe(map(mode => mode.active)),
         ),
         toolbar.connect$(toolbarView$),
         seams.connect$(workspace$.pipe(map(seamsOf))),
-        links.connect$(
-            combineLatest([workspace$, waves$, peeked$]).pipe(
-                map(([workspace, signals, peeked]) => linksOf(workspace, signals, peeked)),
-                distinctUntilChanged((a, b) => a.length === 0 && b.length === 0),
-            ),
-        ),
+        wiring.connect$(wiringView$),
         palette.connect$(
             workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
             paletteOpen$,
@@ -1263,6 +1322,7 @@ const bootstrap = () => {
             history$.pipe(
                 map(({ past, future }) => ({ undo: past.length > 0, redo: future.length > 0 })),
             ),
+            mode$.pipe(map(mode => mode.active)),
         ),
     ).subscribe();
 };

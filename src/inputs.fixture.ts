@@ -1,5 +1,6 @@
 import {
     knobInputs,
+    signalInputs,
     sceneInputs,
     ownPlaybackInput,
     playbackInput,
@@ -12,7 +13,7 @@ export const inputsFor: InputsFor = program =>
     program === 'sketch'
         ? { playback: playbackInput, ...knobInputs, ...sceneInputs }
         : program === 'signal'
-          ? { playback: playbackInput }
+          ? { playback: playbackInput, ...signalInputs }
           : program === 'timeline'
             ? { playback: ownPlaybackInput }
             : program === 'playhead'

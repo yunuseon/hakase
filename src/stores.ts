@@ -148,3 +148,14 @@ export const keptStores = <S>(
     stores: readonly StoreEntry[],
 ): ReadonlyMap<StoreId, S> =>
     new Map([...all].filter(([id]) => isProgramId(id) || stores.some(store => store.id === id)));
+
+export const withMain = (
+    program: ProgramId,
+    stores: readonly StoreEntry[],
+): readonly StoreEntry[] => {
+    const own = stores.filter(store => store.program === program);
+
+    return HOLDING[program]?.holds === 'document' && !own.some(({ id }) => id === program)
+        ? [mainStore(program), ...own]
+        : own;
+};

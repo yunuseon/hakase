@@ -1,12 +1,12 @@
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import { HksSignal } from '../components/signal/signal.component.ts';
-import { playbackInput } from '../inputs.ts';
+import { playbackInput, signalInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 export const signalProgram = {
     id: 'signal',
-    inputs: { playback: playbackInput },
+    inputs: { playback: playbackInput, ...signalInputs },
     title: 'signal',
     category: 'make',
     icon: 'M3 12 C 6 3, 9 3, 12 12 S 18 21, 21 12',
