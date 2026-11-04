@@ -1021,7 +1021,8 @@ export const reduceWorkspace = (
     inputsFor: InputsFor,
     seq?: number,
 ): Workspace => {
-    const camera = 'camera' in action ? action.camera : undefined;
+    // Not set-camera: its camera is where the view goes, not the view its action was measured in.
+    const camera = action.kind !== 'set-camera' && 'camera' in action ? action.camera : undefined;
     const seen = camera === undefined ? workspace : { ...workspace, camera };
     const stepped = step(seen, action, inputsFor, seq);
 

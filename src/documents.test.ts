@@ -264,4 +264,12 @@ describe('links', () => {
         expect(history.present.signals.has('store-7')).toBe(true);
         expect(history.present.signals.has('store-8')).toBe(false);
     });
+
+    it('moves the camera when a flight sets it', () => {
+        const camera = { x: 5, y: 6, zoom: 0.5 };
+
+        expect(
+            run(fresh(), [act({ kind: 'set-camera', camera })]).present.workspace.camera,
+        ).toEqual(camera);
+    });
 });
