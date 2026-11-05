@@ -14,6 +14,7 @@ import { playheadProgram } from './programs/playhead.program.ts';
 import { paintProgram } from './programs/paint.program.ts';
 import { penProgram } from './programs/pen.program.ts';
 import { voiceProgram } from './programs/voice.program.ts';
+import { drumsProgram } from './programs/drums.program.ts';
 import { piecesProgram } from './programs/pieces.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
@@ -35,6 +36,7 @@ export const programs = {
     paint: paintProgram,
     pen: penProgram,
     voice: voiceProgram,
+    drums: drumsProgram,
     pieces: piecesProgram,
     tasks: tasksProgram,
     todo: todoProgram,

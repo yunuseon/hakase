@@ -1325,6 +1325,85 @@ instead of striking it again at 0; and
 with the sounding (`Heard`) into one `combineLatest`, never derived beside it,
 or a change would reach the levels by two paths.
 
+**Instruments strike notes of their own.** A voice's `instrument` is the
+`synth` (the one oscillator above, which follows the pitch) or a preset from
+`INSTRUMENTS` in `components/voice/instruments.ts`, plain data built from a
+closed set of parts: oscillator **partials** with ratios and their own fades
+(additive: the organ's drawbars, the marimba's partial near 4×), an **fm** pair
+(Chowning's: a modulator at ratio × the note bends the carrier by index × its
+own frequency, the index falling away; piano and bell), a **string**, and a
+band-passed **noise** burst (the marimba's knock, the flute's breath), under a
+volume envelope, an optional sweeping lowpass (pad, bass) and vibrato on every
+oscillator's `detune`. A new instrument is one entry. With an instrument
+chosen, the window's own oscillator is shut (`drive`) and its bus carries only
+volume, filter and pan; the synth's own controls are hidden (`data-synth`).
+
+- **Notes are scheduled ahead on the audio clock, never struck per frame.**
+  `scheduled` (in `shared/schedule.ts`, pure, shared with the drum machine)
+  looks `AHEAD` (150 ms) past the playhead each frame and lists the onsets in
+  that window with their exact audio times, remembering how far it has
+  scheduled so none is struck twice; through a wrap it carries on, after a
+  scrub or a pause it starts afresh, and a note carried across the loop is
+  never struck again. **It anchors once per run**: the first frame pairs an
+  audio time with the playhead, and every strike after is placed from that one
+  pair. Pairing each frame's playhead with the audio clock as read in that
+  frame looked equivalent and wobbled by up to a frame, measured live at 0 to
+  14 ms off the grid; anchored, twelve live onsets landed within a microsecond.
+  Both clocks keep real time (measured), and the anchor is set again only on a
+  jump, a new loop length, or a drift past 30 ms. Each strike builds its own nodes
+  (`audio/strike.ts`) that stop and disconnect themselves, so overlapping notes
+  ring on.
+- **The string is a pure buffer, not a worklet.** Karplus–Strong (`string.ts`):
+  a hashed noise burst circulating in a delay one period long, averaged and
+  damped each pass, computed into a `Float32Array` and played as a buffer. A
+  feedback loop of `DelayNode`s cannot be shorter than one render quantum (128
+  samples, so nothing above about 345 Hz), and the buffer is deterministic, so
+  a test measures its pitch by autocorrelation: within 5 cents at 110, 440 and
+  880 Hz. The delay is the period less half a sample, since the average delays
+  by half a sample itself; damping is set per note from `sustain` (seconds to
+  fall 60 dB) with the average's own loss made up, or high notes died in a
+  fraction of a second; and each string is scaled to one loudness after its
+  first overtones have gone, since a short burst holds little of its fundamental.
+- **Loudness is measured, not guessed.** Each preset's `gain` comes from
+  offline renders (`OfflineAudioContext`, through the very `strike` code), so
+  every instrument sits at the same RMS a moment after its strike; they came
+  out within 10% of each other, from a spread of 6× before.
+- **The envelope is one curve in two places.** `envelopeAt` draws what the
+  audio draws (a linear attack, then `setTargetAtTime` approaches whose time
+  constant is a stage's length over `STAGE`), so `heardAt`, what a sketch
+  follows, flares and fades with the instrument actually sounding.
+
+## Drums
+
+`drums` is a drum machine: seven drums (kick, snare, clap, closed and open
+hat, tom, cowbell) by 8 to 32 steps, each cell off, a hit or an accent, the
+pattern played 1, 2 or 4 times per loop, with swing holding back every second
+step by up to half a step. It is a document like a voice's, its `volume` a
+store input a signal can swell, and it plays on its window's clock through the
+same anchored scheduler (`hitsOf` turns the pattern into spans), each hit
+synthesised the TR-808 way in `audio/hit.ts`: a sine falling from 160 Hz with a
+click for the kick, high-passed noise over two triangle tones for the snare,
+three quick bursts of band-passed noise for the clap, six detuned squares
+through a high and a band pass for the hats, a falling sine for the tom, two
+squares at 540 and 800 Hz for the cowbell. The bus has a compressor, so hits
+struck together do not clip, and the gains come from offline renders, to a
+drum machine's balance rather than one loudness: the kick leads, snare, clap
+and tom sit a step under, hats and cowbell light. A sketch can follow a kit
+like a voice (`kitCurve`): each drum's hit decaying by its own time, weighted
+so the kick leads and the hats only shimmer.
+
+**A stroke paints, and is one step.** A press cycles its cell (off, hit,
+accent); dragging gives every cell it crosses that first cell's new value, as
+an intent (`paint` with `like`), never a value the component read back from its
+own cells. Cells a quick drag skipped are filled along the line (`between`),
+and moves are hit-tested with the shadow root's `elementFromPoint` because a
+touch keeps its first target captured. **The tap is sent at the first move or
+the release, not the press**: the window raises on the press, after the grid
+inside it has heard it, and a raise ends the step it follows, so a tap sent on
+the press left the stroke as two undo steps. Making a raise spare a step its
+own press had opened was tried in the log and broke window drags, which look
+the same there.
+
 **A sketch can follow a voice.** Its knob and scene inputs accept a voice as
 well as a signal (`driveInput`), and read its **level**: how loud it is at each
 moment, so a struck note flares and fades exactly as it sounds. The envelope is
@@ -2079,7 +2158,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and fifty-two of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and eighty-two of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

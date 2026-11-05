@@ -18,7 +18,8 @@
 
 .shapes,
 .articulations,
-.scales {
+.scales,
+.instruments {
     display: flex;
     gap: 2px;
     padding: 2px;
@@ -34,7 +35,8 @@ button {
 
 .shapes button,
 .articulations button,
-.scales button {
+.scales button,
+.instruments button {
     display: grid;
     place-items: center;
     min-inline-size: 26px;
@@ -53,13 +55,15 @@ button {
 
 .shapes button:hover,
 .articulations button:hover,
-.scales button:hover {
+.scales button:hover,
+.instruments button:hover {
     color: var(--ink);
 }
 
 .shapes button[aria-checked='true'],
 .articulations button[aria-checked='true'],
-.scales button[aria-checked='true'] {
+.scales button[aria-checked='true'],
+.instruments button[aria-checked='true'] {
     color: var(--ink);
     background: var(--panel);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
@@ -180,8 +184,14 @@ svg {
     color: var(--ink);
 }
 
-:host(:not([data-articulation='pluck'])) [data-only='pluck'] {
+:host(:not([data-articulation='pluck'])) [data-only='pluck'],
+:host(:not([data-instrument='synth'])) [data-synth] {
     display: none;
+}
+
+.instruments {
+    flex-wrap: wrap;
+    align-self: flex-start;
 }
 
 button:focus-visible,

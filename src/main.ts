@@ -119,6 +119,7 @@ import { createClocks$, initialClock, restedClocks } from './shared/playhead.ts'
 import { defaultPicture } from './shared/picture.ts';
 import { defaultPen, drawingOf, sameDrawing, strokeOf } from './components/pen/pen.ts';
 import { defaultVoice, sameSounding, soundingOf, voiceCurve } from './components/voice/voice.ts';
+import { defaultDrums, kitCurve, kitOf, sameKit } from './components/drums/drums.ts';
 import type { Driver } from './shared/curve.ts';
 import {
     documentsKit,
@@ -169,7 +170,8 @@ type StoreKey =
     | 'picture$'
     | 'followedPicture$'
     | 'drawing$'
-    | 'sounding$';
+    | 'sounding$'
+    | 'kit$';
 
 // In toolbar order: a record keeps its keys in the order they were written.
 const programList = Object.values(programs);
@@ -331,6 +333,7 @@ const bootstrap = () => {
         paintings: stored.paint,
         pens: stored.pens,
         voices: stored.voices,
+        drums: stored.drums,
         library: stored.library,
         pieces: stored.pieces,
         formulas: restored(stored.formulas),
@@ -854,6 +857,8 @@ const bootstrap = () => {
                         return [{ kind: 'pens', store, command: input.command }];
                     case 'voice':
                         return [{ kind: 'voices', store, command: input.command }];
+                    case 'drums':
+                        return [{ kind: 'drums', store, command: input.command }];
                     case 'modulate':
                         return [
                             {
@@ -993,9 +998,17 @@ const bootstrap = () => {
         map(({ voices }) => voices),
         distinctUntilChanged(),
     );
+    const drums$ = documents$.pipe(
+        map(({ drums }) => drums),
+        distinctUntilChanged(),
+    );
     const linked$ = documents$.pipe(
         distinctUntilChanged(
-            (a, b) => a.signals === b.signals && a.pens === b.pens && a.voices === b.voices,
+            (a, b) =>
+                a.signals === b.signals &&
+                a.pens === b.pens &&
+                a.voices === b.voices &&
+                a.drums === b.drums,
         ),
         map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
@@ -1113,6 +1126,7 @@ const bootstrap = () => {
         paintings$,
         pens$,
         voices$,
+        drums$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -1199,6 +1213,12 @@ const bootstrap = () => {
             distinctUntilChanged(sameSounding),
         );
 
+    const kitIn = (store: StoreId) =>
+        documents$.pipe(
+            map(({ drums, signals }) => kitOf(drums.get(store) ?? defaultDrums, signals)),
+            distinctUntilChanged(sameKit),
+        );
+
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
     > = {
@@ -1214,6 +1234,7 @@ const bootstrap = () => {
         paint: pictureIn,
         pen: drawingIn,
         voice: soundingIn,
+        drums: kitIn,
         timeline: playbackIn,
     };
 
@@ -1323,12 +1344,17 @@ const bootstrap = () => {
                               ? combineLatest([soundingIn(binding.store), seconds$]).pipe(
                                     map(([sounding, seconds]) => voiceCurve(sounding, seconds)),
                                 )
-                              : of(null),
+                              : binding?.kind === 'drums'
+                                ? combineLatest([kitIn(binding.store), seconds$]).pipe(
+                                      map(([kit, seconds]) => kitCurve(kit, seconds)),
+                                  )
+                                : of(null),
                     ),
                 ),
             picture$: narrowed(pictureIn),
             drawing$: narrowed(drawingIn),
             sounding$: narrowed(soundingIn),
+            kit$: narrowed(kitIn),
             followedPicture$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
@@ -1393,6 +1419,7 @@ const bootstrap = () => {
                 paint: paintings$,
                 pens: pens$,
                 voices: voices$,
+                drums: drums$,
                 library: library$,
                 pieces: pieces$,
                 seq: history$.pipe(

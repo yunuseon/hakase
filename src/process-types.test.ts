@@ -6,6 +6,7 @@ import type {
     PlaybackBinding,
     SignalBinding,
     VoiceBinding,
+    DrumsBinding,
 } from './inputs.ts';
 import type { Process } from './workspace.ts';
 
@@ -15,18 +16,18 @@ describe('Process', () => {
     it('gives each program the follows its own inputs declare, keyed by input', () => {
         expectTypeOf<Of<'sketch'>['follows']>().toEqualTypeOf<{
             readonly playback: PlaybackBinding;
-            readonly k1?: SignalBinding | VoiceBinding;
-            readonly k2?: SignalBinding | VoiceBinding;
-            readonly k3?: SignalBinding | VoiceBinding;
-            readonly k4?: SignalBinding | VoiceBinding;
-            readonly turn?: SignalBinding | VoiceBinding;
-            readonly pitch?: SignalBinding | VoiceBinding;
-            readonly distance?: SignalBinding | VoiceBinding;
-            readonly focus?: SignalBinding | VoiceBinding;
-            readonly colour?: SignalBinding | VoiceBinding;
-            readonly size?: SignalBinding | VoiceBinding;
-            readonly depth?: SignalBinding | VoiceBinding;
-            readonly trails?: SignalBinding | VoiceBinding;
+            readonly k1?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly k2?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly k3?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly k4?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly turn?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly pitch?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly distance?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly focus?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly colour?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly size?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly depth?: SignalBinding | VoiceBinding | DrumsBinding;
+            readonly trails?: SignalBinding | VoiceBinding | DrumsBinding;
             readonly paint?: PaintBinding | PenBinding;
         }>();
         expectTypeOf<Of<'playhead'>['follows']>().toEqualTypeOf<{

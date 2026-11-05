@@ -10,11 +10,27 @@ import {
     switchMap,
     tap,
 } from 'rxjs/operators';
-import { applyLevel, voiceGraph$, type Played } from '../components/voice/audio/graph.ts';
+import {
+    applyLevel,
+    voiceGraph$,
+    type Played,
+    type VoiceGraph,
+} from '../components/voice/audio/graph.ts';
+import { strike } from '../components/voice/audio/strike.ts';
+import { INSTRUMENTS, type Instrument } from '../components/voice/instruments.ts';
+import { scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
 import { HksVoice, type Heard } from '../components/voice/voice.component.ts';
-import { levelAt, notesOf } from '../components/voice/voice.ts';
+import { frequencyOf, levelAt, notesOf, type Note } from '../components/voice/voice.ts';
 import { playbackInput, voiceInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
+
+type Scheduling = {
+    readonly schedule: Schedule;
+    readonly strikes: readonly (Strike<Note> & {
+        readonly instrument: Instrument;
+        readonly frequency: number;
+    })[];
+};
 
 export const voiceProgram = {
     id: 'voice',
@@ -49,18 +65,59 @@ export const voiceProgram = {
                             level: { ...level, gain: playing ? level.gain : 0 },
                             shape: sounding.voice.shape,
                             glide: sounding.voice.glide,
+                            synth: sounding.voice.instrument === 'synth',
                         };
                     }),
                 );
+                const frames$ = combineLatest([heard$, playhead$, duration$, playing$]);
+                // Ahead of the playhead on the audio clock: struck at the frame rate, a note would land up to a frame late.
+                const struck$ = (graph: VoiceGraph) =>
+                    frames$.pipe(
+                        scan(
+                            (
+                                { schedule }: Scheduling,
+                                [heard, t, seconds, playing],
+                            ): Scheduling => {
+                                const { instrument, root } = heard.sounding.voice;
+
+                                if (instrument === 'synth') {
+                                    return { schedule: unscheduled, strikes: [] };
+                                }
+
+                                const next = scheduled(
+                                    schedule,
+                                    { t, now: graph.context.currentTime, seconds, playing },
+                                    heard.notes,
+                                );
+
+                                return {
+                                    schedule: next.schedule,
+                                    strikes: next.strikes.map(planned => ({
+                                        ...planned,
+                                        instrument: INSTRUMENTS[instrument],
+                                        frequency: frequencyOf(root + planned.span.semitones),
+                                    })),
+                                };
+                            },
+                            { schedule: unscheduled, strikes: [] },
+                        ),
+                        mergeMap(({ strikes }) => strikes),
+                        tap(({ instrument, frequency, at, held }) => {
+                            strike(graph.context, graph.filter, instrument, frequency, at, held);
+                        }),
+                    );
                 const sound$ = listening$.pipe(
                     switchMap(on =>
                         on
                             ? voiceGraph$.pipe(
                                   switchMap(graph =>
-                                      played$.pipe(
-                                          tap(played => {
-                                              applyLevel(graph, played);
-                                          }),
+                                      merge(
+                                          played$.pipe(
+                                              tap(played => {
+                                                  applyLevel(graph, played);
+                                              }),
+                                          ),
+                                          struck$(graph),
                                       ),
                                   ),
                               )

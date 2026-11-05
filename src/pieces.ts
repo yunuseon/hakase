@@ -8,6 +8,7 @@ import { parsePen, type Pen } from './components/pen/pen.ts';
 import { formulas as registry } from './components/sketch/formulas/registry.ts';
 import { parseTodos } from './components/todo/todo.ts';
 import { parseVoice, type Voice } from './components/voice/voice.ts';
+import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
@@ -46,7 +47,8 @@ type HeldKind =
     | 'signals'
     | 'paintings'
     | 'pens'
-    | 'voices';
+    | 'voices'
+    | 'drums';
 
 type Entries<M> =
     M extends ReadonlyMap<StoreId, infer V> ? readonly (readonly [StoreId, V])[] : never;
@@ -110,8 +112,8 @@ export const reducePieces = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices }: Documents) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices]);
+const linkedOf = ({ signals, pens, voices, drums }: Documents) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums]);
 
 const picked = <V>(map: ReadonlyMap<StoreId, V>, stores: ReadonlySet<StoreId>) =>
     [...map].filter(([id]) => stores.has(id));
@@ -212,6 +214,7 @@ export const pieceOf = (
             paintings: picked(documents.paintings, stores),
             pens: picked(documents.pens, stores),
             voices: picked(documents.voices, stores),
+            drums: picked(documents.drums, stores),
         },
         formulas,
         links: workspace.links.filter(({ a, b }) => ids.has(a) && ids.has(b)),
@@ -374,6 +377,10 @@ export const placed = (
                 pan: sourceOf(voice.sources.pan),
             },
         })),
+        drums: into(documents.drums, held.drums, (drums): Drums => ({
+            ...drums,
+            sources: { volume: sourceOf(drums.sources.volume) },
+        })),
     };
 };
 
@@ -443,6 +450,7 @@ const pieceFrom = (value: unknown, inputsFor: InputsFor): Piece[] => {
                 paintings: entriesOf(heldOf('paintings'), parsePicture),
                 pens: entriesOf(heldOf('pens'), parsePen),
                 voices: entriesOf(heldOf('voices'), parseVoice),
+                drums: entriesOf(heldOf('drums'), parseDrums),
             },
             formulas: Array.isArray(formulas)
                 ? formulas.flatMap((stored: unknown): PieceFormula[] => {

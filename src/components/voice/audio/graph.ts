@@ -1,25 +1,13 @@
 import { Observable } from 'rxjs';
-import { shareReplay, switchMap } from 'rxjs/operators';
+import { switchMap } from 'rxjs/operators';
+import { context$ } from '../../../shared/audio.ts';
 import type { Level, Shape } from '../voice.ts';
-
-// One context for every voice: a browser allows only a few, and it is closed when the last voice stops listening.
-const context$ = new Observable<AudioContext>(subscriber => {
-    const context = new AudioContext();
-
-    void context.resume();
-    subscriber.next(context);
-
-    // Not at once: the voices' release fades are scheduled on this context, and closing cuts them off with a click.
-    return () => {
-        setTimeout(() => {
-            void context.close();
-        }, 250);
-    };
-}).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
 export type VoiceGraph = {
     readonly context: AudioContext;
     readonly oscillator: OscillatorNode;
+    // Open for the synth, shut for an instrument, whose notes come in at the filter instead.
+    readonly drive: GainNode;
     readonly filter: BiquadFilterNode;
     readonly gain: GainNode;
     readonly panner: StereoPannerNode;
@@ -34,6 +22,7 @@ export const voiceGraph$ = context$.pipe(
         context =>
             new Observable<VoiceGraph>(subscriber => {
                 const oscillator = context.createOscillator();
+                const drive = context.createGain();
                 const filter = context.createBiquadFilter();
                 const gain = context.createGain();
                 const panner = context.createStereoPanner();
@@ -42,12 +31,13 @@ export const voiceGraph$ = context$.pipe(
                 filter.Q.value = 0.7;
                 gain.gain.value = 0;
                 oscillator
+                    .connect(drive)
                     .connect(filter)
                     .connect(gain)
                     .connect(panner)
                     .connect(context.destination);
                 oscillator.start();
-                subscriber.next({ context, oscillator, filter, gain, panner });
+                subscriber.next({ context, oscillator, drive, filter, gain, panner });
 
                 return () => {
                     const now = context.currentTime;
@@ -67,11 +57,12 @@ export type Played = {
     readonly level: Level;
     readonly shape: Shape;
     readonly glide: number;
+    readonly synth: boolean;
 };
 
 export const applyLevel = (
-    { context, oscillator, filter, gain, panner }: VoiceGraph,
-    { level, shape, glide }: Played,
+    { context, oscillator, drive, filter, gain, panner }: VoiceGraph,
+    { level, shape, glide, synth }: Played,
 ): void => {
     const now = context.currentTime;
 
@@ -79,6 +70,7 @@ export const applyLevel = (
         oscillator.type = shape;
     }
 
+    drive.gain.setTargetAtTime(synth ? 1 : 0, now, 0.01);
     oscillator.frequency.setTargetAtTime(level.frequency, now, Math.max(glide / 3, 0.002));
     filter.frequency.setTargetAtTime(level.cutoff, now, 0.01);
     gain.gain.setTargetAtTime(level.gain * HEADROOM, now, 0.006);

@@ -32,6 +32,7 @@ const started = (): Documents => ({
     paintings: new Map(),
     pens: new Map(),
     voices: new Map(),
+    drums: new Map(),
     library: emptyLibrary,
     pieces: emptyPieces,
     formulas: new Map(),
@@ -274,5 +275,29 @@ describe('links', () => {
         expect(
             run(fresh(), [act({ kind: 'set-camera', camera })]).present.workspace.camera,
         ).toEqual(camera);
+    });
+
+    it('keeps a stroke in one step, its raise arriving before the stroke opens', () => {
+        const drums = run(fresh(), [{ kind: 'drums', store: 'drums', command: { kind: 'clear' } }]);
+        const paint = (step: number): DocumentAction => ({
+            kind: 'drums',
+            store: 'drums',
+            command: { kind: 'paint', drum: 'tom', step, like: { drum: 'tom', step: 0 } },
+        });
+        const stroked = run(drums, [
+            act({ kind: 'raise', id: drums.present.workspace.processes[0]?.id ?? '' }),
+            { kind: 'drums', store: 'drums', command: { kind: 'tap', drum: 'tom', step: 0 } },
+            paint(1),
+            paint(2),
+        ]);
+
+        expect(stroked.present.drums.get('drums')?.pattern.tom.slice(0, 3)).toEqual([
+            0.6, 0.6, 0.6,
+        ]);
+        expect(
+            run(stroked, [{ kind: 'undo' }])
+                .present.drums.get('drums')
+                ?.pattern.tom.slice(0, 3),
+        ).toEqual([0, 0, 0]);
     });
 });

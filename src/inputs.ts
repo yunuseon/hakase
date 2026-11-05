@@ -12,8 +12,15 @@ export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId }
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
 export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
+export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type Follow =
-    PlaybackBinding | FocusBinding | SignalBinding | PaintBinding | PenBinding | VoiceBinding;
+    | PlaybackBinding
+    | FocusBinding
+    | SignalBinding
+    | PaintBinding
+    | PenBinding
+    | VoiceBinding
+    | DrumsBinding;
 
 export type InputSources = {
     readonly playback$: (store: StoreId) => Observable<Clock>;
@@ -70,6 +77,13 @@ const voiceSource = {
     access: 'read',
 } as const;
 
+const drumsSource = {
+    kind: 'drums',
+    program: 'drums',
+    title: 'Drums',
+    access: 'read',
+} as const;
+
 export const SOURCES = [
     playbackSource,
     focusSource,
@@ -77,6 +91,7 @@ export const SOURCES = [
     paintSource,
     penSource,
     voiceSource,
+    drumsSource,
 ] as const;
 
 type Source = (typeof SOURCES)[number];
@@ -133,7 +148,7 @@ const driveInput = (title: string, group: string) =>
         title,
         from: 'followed',
         group,
-        sources: [signalSource, voiceSource],
+        sources: [signalSource, voiceSource, drumsSource],
         initial: null,
     }) as const satisfies FollowedInput;
 
@@ -190,6 +205,10 @@ export const voiceInputs = {
     volume: storedSignalInput('volume'),
     filter: storedSignalInput('filter'),
     pan: storedSignalInput('pan'),
+};
+
+export const drumsInputs = {
+    volume: storedSignalInput('volume'),
 };
 
 export const plotInputs = {
@@ -277,6 +296,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return penSource.program;
         case 'voice':
             return voiceSource.program;
+        case 'drums':
+            return drumsSource.program;
     }
 };
 
@@ -293,6 +314,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'pen':
             return { kind, store };
         case 'voice':
+            return { kind, store };
+        case 'drums':
             return { kind, store };
         default:
             return null;

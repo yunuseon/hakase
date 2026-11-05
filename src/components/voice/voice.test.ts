@@ -119,6 +119,18 @@ describe('a voice', () => {
         expect(at(0.3)).toBeLessThan(at(0.25));
     });
 
+    it('offers a sketch the envelope of the instrument, not of the synth', () => {
+        const bell = playing({ instrument: 'bell' });
+        const curve = voiceCurve(bell, 8);
+        const at = (t: number) => curve.samples[Math.round(t * curve.samples.length)] ?? 0;
+
+        expect(at(0.25)).toBeLessThan(0.05);
+        expect(at(0.26)).toBeGreaterThan(at(0.3));
+        expect(at(0.3)).toBeGreaterThan(0.3);
+        expect(parseVoice({ instrument: 'harp' }).instrument).toBe('harp');
+        expect(parseVoice({ instrument: 'kazoo' }).instrument).toBe('synth');
+    });
+
     it('keeps its settings in range, and reads a broken save as the default, field by field', () => {
         expect(reduceVoice(defaultVoice, { kind: 'root', root: 200 }).root).toBe(84);
         expect(reduceVoice(defaultVoice, { kind: 'volume', volume: Number.NaN })).toBe(

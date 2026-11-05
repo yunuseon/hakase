@@ -9,11 +9,13 @@ import {
     isArticulation,
     isScale,
     isShape,
+    isVoiceInstrument,
     noteName,
     ROOTS,
     SCALES,
     semitonesAt,
     SHAPES,
+    VOICE_INSTRUMENTS,
     type Note,
     type Shape,
     type Sounding,
@@ -48,13 +50,13 @@ const TEMPLATE = `
             <svg viewBox="0 0 24 24" aria-hidden="true"><path class="speaker" d="${SPEAKER}"/><path class="on" d="${SOUNDING}"/><path class="off" d="${SILENT}"/></svg>
             <span>Listen</span>
         </button>
-        <div class="shapes" role="radiogroup" aria-label="shape">
+        <div class="shapes" role="radiogroup" aria-label="shape" data-synth>
             ${SHAPES.map(
                 shape =>
                     `<button type="button" role="radio" data-shape="${shape}" aria-label="${shape}" title="${shape}">${glyph(GLYPHS[shape])}</button>`,
             ).join('')}
         </div>
-        <div class="articulations" role="radiogroup" aria-label="articulation">
+        <div class="articulations" role="radiogroup" aria-label="articulation" data-synth>
             ${ARTICULATIONS.map(
                 articulation =>
                     `<button type="button" role="radio" data-articulation="${articulation}" title="${
@@ -64,6 +66,12 @@ const TEMPLATE = `
                     }">${articulation}</button>`,
             ).join('')}
         </div>
+    </div>
+    <div class="instruments" role="radiogroup" aria-label="instrument">
+        ${VOICE_INSTRUMENTS.map(
+            instrument =>
+                `<button type="button" role="radio" data-instrument="${instrument}">${instrument}</button>`,
+        ).join('')}
     </div>
     <div class="roll">
         <canvas width="600" height="240"></canvas>
@@ -84,12 +92,12 @@ const TEMPLATE = `
                     `<button type="button" role="radio" data-scale="${scale}">${scale}</button>`,
             ).join('')}
         </div>
-        <label class="dial" data-only="pluck" title="how long a struck note takes to fade">
+        <label class="dial" data-only="pluck" data-synth title="how long a struck note takes to fade">
             <span>decay</span>
             <input type="range" data-dial="decay" min="${DECAY.low}" max="${DECAY.high}" step="0.01" />
             <output></output>
         </label>
-        <label class="dial" title="how long the pitch takes to slide to a new note">
+        <label class="dial" data-synth title="how long the pitch takes to slide to a new note">
             <span>glide</span>
             <input type="range" data-dial="glide" min="${GLIDE.low}" max="${GLIDE.high}" step="0.01" />
             <output></output>
@@ -170,6 +178,7 @@ export class HksVoice extends HTMLElement {
                 const shape = dataOf(target, 'shape');
                 const scale = dataOf(target, 'scale');
                 const articulation = dataOf(target, 'articulation');
+                const instrument = dataOf(target, 'instrument');
                 const command = (made: VoiceCommand): VoiceEvent[] => [
                     { kind: 'command', command: made },
                 ];
@@ -182,7 +191,9 @@ export class HksVoice extends HTMLElement {
                         ? command({ kind: 'scale', scale })
                         : articulation !== null && isArticulation(articulation)
                           ? command({ kind: 'articulation', articulation })
-                          : [];
+                          : instrument !== null && isVoiceInstrument(instrument)
+                            ? command({ kind: 'instrument', instrument })
+                            : [];
             }),
         );
 
@@ -255,6 +266,8 @@ export class HksVoice extends HTMLElement {
             distinctUntilChanged((a, b) => a.voice === b.voice && a.waves.pitch === b.waves.pitch),
             tap(({ voice, waves }) => {
                 checked('shape', voice.shape);
+                checked('instrument', voice.instrument);
+                this.dataset['instrument'] = voice.instrument;
                 checked('scale', voice.scale);
                 checked('articulation', voice.articulation);
                 if (root.value !== String(voice.root)) {

@@ -1,4 +1,11 @@
 import { curveOf } from '../../shared/curve.ts';
+import {
+    envelopeAt,
+    INSTRUMENT_NAMES,
+    INSTRUMENTS,
+    isInstrumentName,
+    type InstrumentName,
+} from './instruments.ts';
 import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
 
 export const VOICE_PARAMS = ['pitch', 'volume', 'filter', 'pan'] as const;
@@ -20,11 +27,18 @@ export type Articulation = (typeof ARTICULATIONS)[number];
 export const isArticulation = (value: string): value is Articulation =>
     ARTICULATIONS.some(articulation => articulation === value);
 
+// The synth is the one oscillator that follows the pitch; every other instrument strikes a note of its own.
+export const VOICE_INSTRUMENTS = ['synth', ...INSTRUMENT_NAMES] as const;
+export type VoiceInstrument = 'synth' | InstrumentName;
+export const isVoiceInstrument = (value: string): value is VoiceInstrument =>
+    value === 'synth' || isInstrumentName(value);
+
 export const ROOTS = { low: 24, high: 84 } as const;
 export const DECAY = { low: 0.05, high: 2 } as const;
 export const GLIDE = { low: 0, high: 0.5 } as const;
 
 export type Voice = {
+    readonly instrument: VoiceInstrument;
     readonly shape: Shape;
     readonly root: number;
     readonly scale: Scale;
@@ -36,6 +50,7 @@ export type Voice = {
 };
 
 export const defaultVoice: Voice = {
+    instrument: 'synth',
     shape: 'triangle',
     root: 48,
     scale: 'pentatonic',
@@ -47,6 +62,7 @@ export const defaultVoice: Voice = {
 };
 
 export type VoiceCommand =
+    | { readonly kind: 'instrument'; readonly instrument: VoiceInstrument }
     | { readonly kind: 'shape'; readonly shape: Shape }
     | { readonly kind: 'root'; readonly root: number }
     | { readonly kind: 'scale'; readonly scale: Scale }
@@ -64,6 +80,10 @@ const withNumber = (voice: Voice, key: 'root' | 'decay' | 'glide' | 'volume', va
 
 export const reduceVoice = (voice: Voice, command: VoiceCommand): Voice => {
     switch (command.kind) {
+        case 'instrument':
+            return command.instrument === voice.instrument
+                ? voice
+                : { ...voice, instrument: command.instrument };
         case 'shape':
             return command.shape === voice.shape ? voice : { ...voice, shape: command.shape };
         case 'scale':
@@ -241,6 +261,13 @@ export type Level = {
 const OPEN_FILTER = 0.6;
 const FILTER_OCTAVES = 6;
 
+const brightnessAt = ({ waves }: Sounding, t: number, open: number) =>
+    waves.filter === null ? open : Math.min(1, Math.max(0, waveAt(waves.filter, t)));
+
+const swellAt = ({ waves }: Sounding, t: number) =>
+    waves.volume === null ? 1 : Math.min(1, Math.max(0, waveAt(waves.volume, t)));
+
+// What reaches the window's bus: for an instrument only its volume, filter and pan, since each note brings its own envelope.
 export const levelAt = (
     sounding: Sounding,
     notes: readonly Note[],
@@ -249,24 +276,69 @@ export const levelAt = (
 ): Level => {
     const { voice, waves } = sounding;
     const frequency = frequencyOf(voice.root + semitonesAt(sounding, t));
-    const swell = waves.volume === null ? 1 : Math.min(1, Math.max(0, waveAt(waves.volume, t)));
+    const swell = swellAt(sounding, t);
+    const pan = waves.pan === null ? 0 : Math.min(1, Math.max(-1, waveAt(waves.pan, t)));
+
+    if (voice.instrument !== 'synth') {
+        return {
+            frequency,
+            gain: voice.volume * swell,
+            cutoff: Math.min(18000, 40 * 2 ** (brightnessAt(sounding, t, 1) * 9)),
+            pan,
+        };
+    }
+
     const since = (t - onsetAt(notes, t)) * seconds;
     const envelope = voice.articulation === 'pluck' ? Math.exp(-since / voice.decay) : 1;
-    const brightness =
-        waves.filter === null ? OPEN_FILTER : Math.min(1, Math.max(0, waveAt(waves.filter, t)));
 
     return {
         frequency,
         gain: voice.volume * swell * envelope,
-        cutoff: Math.min(18000, Math.max(40, frequency * 2 ** (brightness * FILTER_OCTAVES))),
-        pan: waves.pan === null ? 0 : Math.min(1, Math.max(-1, waveAt(waves.pan, t))),
+        cutoff: Math.min(
+            18000,
+            Math.max(
+                40,
+                frequency * 2 ** (brightnessAt(sounding, t, OPEN_FILTER) * FILTER_OCTAVES),
+            ),
+        ),
+        pan,
     };
+};
+
+const heldAt = (notes: readonly Note[], t: number) => {
+    const at = ((t % 1) + 1) % 1;
+    const current = notes.filter(({ from }) => from <= at).at(-1);
+    const first = notes[0];
+    const last = notes.at(-1);
+
+    return current === undefined || last === undefined
+        ? 1
+        : current.carried
+          ? last.to - last.from + current.to
+          : current === last && first?.carried === true
+            ? last.to - last.from + first.to
+            : current.to - current.from;
+};
+
+// How loud the voice is as heard, envelope and all: an instrument's own, so a sketch flares as each note sounds.
+export const heardAt = (sounding: Sounding, notes: readonly Note[], t: number, seconds: number) => {
+    const { voice } = sounding;
+
+    return voice.instrument === 'synth'
+        ? levelAt(sounding, notes, t, seconds).gain
+        : voice.volume *
+              swellAt(sounding, t) *
+              envelopeAt(
+                  INSTRUMENTS[voice.instrument].amp,
+                  (t - onsetAt(notes, t)) * seconds,
+                  heldAt(notes, t) * seconds,
+              );
 };
 
 export const voiceCurve = (sounding: Sounding, seconds: number) => {
     const notes = notesOf(sounding);
 
-    return curveOf(t => levelAt(sounding, notes, t, seconds).gain);
+    return curveOf(t => heardAt(sounding, notes, t, seconds));
 };
 
 const field = (value: object, key: string): unknown =>
@@ -292,7 +364,13 @@ export const parseVoice = (value: unknown): Voice => {
         return typeof read === 'string' ? read : null;
     };
 
+    const instrument = field(value, 'instrument');
+
     return {
+        instrument:
+            typeof instrument === 'string' && isVoiceInstrument(instrument)
+                ? instrument
+                : defaultVoice.instrument,
         shape: typeof shape === 'string' && isShape(shape) ? shape : defaultVoice.shape,
         root: Math.round(numberIn(field(value, 'root'), ROOTS.low, ROOTS.high, defaultVoice.root)),
         scale: typeof scale === 'string' && isScale(scale) ? scale : defaultVoice.scale,

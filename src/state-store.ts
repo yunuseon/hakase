@@ -1,5 +1,6 @@
 import { parsePen, type Pen } from './components/pen/pen.ts';
 import { parseVoice, type Voice } from './components/voice/voice.ts';
+import { parseDrums, type Drums } from './components/drums/drums.ts';
 import { parsePicture, type Picture } from './shared/picture.ts';
 import type { Observable } from 'rxjs';
 import { debounceTime, map, tap } from 'rxjs/operators';
@@ -59,6 +60,7 @@ export type Snapshot = {
     readonly paint: ReadonlyMap<StoreId, Picture>;
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
+    readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly library: Library;
     readonly pieces: Pieces;
     readonly seq: number;
@@ -153,6 +155,7 @@ const fresh: Restored = {
     paint: new Map(),
     pens: new Map(),
     voices: new Map(),
+    drums: new Map(),
     library: emptyLibrary,
     pieces: emptyPieces,
     seq: 0,
@@ -213,6 +216,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
         paint: byStore(field(stored, 'paint'), 'paint', parsePicture),
         pens: byStore(field(stored, 'pens'), 'pen', parsePen),
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
+        drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
         library: parseLibrary(field(stored, 'library')),
         pieces: parsePieces(field(stored, 'pieces'), inputsFor),
         seq: seqFrom(field(stored, 'seq')),
@@ -250,6 +254,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         paint: saved(snapshot.paint),
         pens: saved(snapshot.pens),
         voices: saved(snapshot.voices),
+        drums: saved(snapshot.drums),
         library: snapshot.library,
         pieces: snapshot.pieces,
         seq: snapshot.seq,

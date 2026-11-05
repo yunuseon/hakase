@@ -20,6 +20,7 @@ import type { Driver } from './shared/curve.ts';
 import type { PaintCommand } from './components/paint/paint.ts';
 import type { Drawing, PenCommand } from './components/pen/pen.ts';
 import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
+import type { DrumsCommand, Kit } from './components/drums/drums.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -43,6 +44,7 @@ export const PROGRAM_IDS = [
     'paint',
     'pen',
     'voice',
+    'drums',
     'pieces',
     'tasks',
     'todo',
@@ -94,6 +96,7 @@ export type AppInput =
     | { readonly kind: 'paint'; readonly command: PaintCommand }
     | { readonly kind: 'pen'; readonly command: PenCommand }
     | { readonly kind: 'voice'; readonly command: VoiceCommand }
+    | { readonly kind: 'drums'; readonly command: DrumsCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -149,6 +152,7 @@ export type AppState = {
     readonly picture$: Observable<Picture>;
     readonly drawing$: Observable<Drawing>;
     readonly sounding$: Observable<Sounding>;
+    readonly kit$: Observable<Kit>;
     readonly followedPicture$: (input: string) => Observable<Sheet | null>;
     readonly followedDriver$: (input: string) => Observable<Driver | null>;
     // One stream, not followedDriver$ beside a name: a rebind changes both, and two would fire twice.

@@ -37,6 +37,12 @@ import {
     type PenCommand,
 } from './components/pen/pen.ts';
 import {
+    defaultDrums,
+    reduceDrums,
+    type Drums,
+    type DrumsCommand,
+} from './components/drums/drums.ts';
+import {
     defaultVoice,
     isVoiceParam,
     reduceVoice,
@@ -104,6 +110,7 @@ export type Documents = {
     readonly paintings: ReadonlyMap<StoreId, Picture>;
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
+    readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly library: Library;
     readonly pieces: Pieces;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
@@ -124,6 +131,7 @@ type StoreCommands = {
     readonly paintings: PaintCommand;
     readonly pens: PenCommand;
     readonly voices: VoiceCommand;
+    readonly drums: DrumsCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -196,14 +204,16 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     paintings: storeEvent(documents.paintings, event),
     pens: storeEvent(documents.pens, event),
     voices: storeEvent(documents.voices, event),
+    drums: storeEvent(documents.drums, event),
 });
 
 export const linkedOf = ({
     signals,
     pens,
     voices,
-}: Pick<Documents, 'signals' | 'pens' | 'voices'>) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices]);
+    drums,
+}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums'>) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums]);
 
 const ownerOf = ({ stores }: Workspace, store: StoreId) =>
     stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
@@ -409,6 +419,18 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'drums':
+                return {
+                    ...documents,
+                    drums: commanded(
+                        documents.drums,
+                        action.store,
+                        defaultDrums,
+                        reduceDrums,
+                        action.command,
+                        seq,
+                    ),
+                };
             case 'link': {
                 const { store, param, source } = action;
                 const owner = ownerOf(documents.workspace, store);
@@ -431,7 +453,17 @@ export const reduceDocuments =
                               { kind: 'voices', store, command: { kind: 'source', param, source } },
                               seq,
                           )
-                        : documents;
+                        : owner === 'drums' && param === 'volume'
+                          ? reduceDocuments(inputsFor)(
+                                documents,
+                                {
+                                    kind: 'drums',
+                                    store,
+                                    command: { kind: 'source', param, source },
+                                },
+                                seq,
+                            )
+                          : documents;
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
@@ -498,6 +530,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     paintings: ['shift'],
     pens: ['weight'],
     voices: ['decay', 'glide', 'volume'],
+    drums: ['swing', 'volume'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -532,6 +565,16 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
             const kind = action.command.kind;
 
             // A stroke joins only the moves of its own gesture: two strokes in a row are two steps.
+            if (
+                action.kind === 'drums' &&
+                (action.command.kind === 'tap' || action.command.kind === 'paint')
+            ) {
+                return {
+                    key: `drums:${action.store}:stroke`,
+                    joins: action.command.kind === 'paint',
+                };
+            }
+
             if (action.kind === 'paintings' && action.command.kind === 'stroke') {
                 return { key: `paintings:${action.store}:stroke`, joins: !action.command.start };
             }
@@ -556,6 +599,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     paintings: 'painting',
     pens: 'pen',
     voices: 'voice',
+    drums: 'drum machine',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>
