@@ -1,7 +1,6 @@
 import type { Program, ProgramId } from './program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
-import { boardProgram } from './programs/board.program.ts';
 import { bookmarksProgram } from './programs/bookmarks.program.ts';
 import { clocksProgram } from './programs/clocks.program.ts';
 import { focusProgram } from './programs/focus.program.ts';
@@ -23,7 +22,7 @@ import { sketchProgram } from './programs/sketch.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
 import { themeProgram } from './programs/theme.program.ts';
 import { timelineProgram } from './programs/timeline.program.ts';
-import { todoProgram } from './programs/todo.program.ts';
+import { ticketsProgram } from './programs/tickets.program.ts';
 
 export const programs = {
     formula: formulaProgram,
@@ -40,8 +39,7 @@ export const programs = {
     drums: drumsProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,
-    todo: todoProgram,
-    board: boardProgram,
+    tickets: ticketsProgram,
     note: noteProgram,
     focus: focusProgram,
     agenda: agendaProgram,

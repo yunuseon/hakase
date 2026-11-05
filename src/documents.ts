@@ -2,12 +2,6 @@ import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
 import {
-    reduceBoard,
-    defaultBoard,
-    type Board,
-    type BoardCommand,
-} from './components/board/board.ts';
-import {
     defaultBookmarks,
     reduceBookmarks,
     type BookmarkCommand,
@@ -56,11 +50,11 @@ import { blueprintIn } from './starters.ts';
 import type { Rect } from './shared/camera.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
-    emptyTodos,
-    reduceTodos,
-    type TodoCommand,
-    type TodoList,
-} from './components/todo/todo.ts';
+    defaultTickets,
+    reduceTickets,
+    type TicketCommand,
+    type Tickets,
+} from './shared/tickets.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
 import type { InputsFor } from './inputs.ts';
 import { reduceLibrary, type FormulaId, type Library, type LibraryCommand } from './library.ts';
@@ -101,8 +95,7 @@ import {
 export type Documents = {
     readonly workspace: Workspace;
     readonly settings: ReadonlyMap<string, Settings>;
-    readonly todos: ReadonlyMap<StoreId, TodoList>;
-    readonly boards: ReadonlyMap<StoreId, Board>;
+    readonly tickets: ReadonlyMap<StoreId, Tickets>;
     readonly notes: ReadonlyMap<StoreId, Notes>;
     readonly agendas: ReadonlyMap<StoreId, Agenda>;
     readonly habits: ReadonlyMap<StoreId, Habits>;
@@ -123,8 +116,7 @@ export type Documents = {
 };
 
 type StoreCommands = {
-    readonly todos: TodoCommand;
-    readonly boards: BoardCommand;
+    readonly tickets: TicketCommand;
     readonly notes: NoteCommand;
     readonly agendas: AgendaCommand;
     readonly habits: HabitCommand;
@@ -196,8 +188,7 @@ const commanded = <S, C>(
 const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     ...documents,
     settings: storeEvent(documents.settings, event),
-    todos: storeEvent(documents.todos, event),
-    boards: storeEvent(documents.boards, event),
+    tickets: storeEvent(documents.tickets, event),
     notes: storeEvent(documents.notes, event),
     agendas: storeEvent(documents.agendas, event),
     habits: storeEvent(documents.habits, event),
@@ -296,26 +287,14 @@ export const reduceDocuments =
                           ...documents,
                           settings: new Map(documents.settings).set(action.key, action.settings),
                       };
-            case 'todos':
+            case 'tickets':
                 return {
                     ...documents,
-                    todos: commanded(
-                        documents.todos,
+                    tickets: commanded(
+                        documents.tickets,
                         action.store,
-                        emptyTodos,
-                        reduceTodos,
-                        action.command,
-                        seq,
-                    ),
-                };
-            case 'boards':
-                return {
-                    ...documents,
-                    boards: commanded(
-                        documents.boards,
-                        action.store,
-                        defaultBoard,
-                        reduceBoard,
+                        defaultTickets,
+                        reduceTickets,
                         action.command,
                         seq,
                     ),
@@ -540,8 +519,7 @@ const idOf = (command: object) =>
           : '';
 
 const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
-    todos: [],
-    boards: ['edit-card', 'rename-column'],
+    tickets: ['rename', 'describe', 'rename-status'],
     notes: ['edit'],
     agendas: ['move', 'resize', 'rename'],
     habits: ['rename'],
@@ -609,8 +587,7 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
 };
 
 const TITLES: Readonly<Record<StoreDocument, string>> = {
-    todos: 'todo list',
-    boards: 'board',
+    tickets: 'tickets',
     notes: 'notes',
     agendas: 'agenda',
     habits: 'habits',
@@ -709,8 +686,7 @@ export const seqFloor = (documents: Documents) =>
         documents.workspace.made,
         documents.library.made,
         ...[
-            documents.todos,
-            documents.boards,
+            documents.tickets,
             documents.notes,
             documents.agendas,
             documents.habits,

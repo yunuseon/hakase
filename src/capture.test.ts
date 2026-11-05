@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { defaultBoard } from './components/board/board.ts';
 import { capturedActions } from './capture.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { defaultWorkspace } from './workspace.ts';
@@ -9,30 +8,42 @@ const workspace = {
     ...base,
     stores: [
         ...base.stores,
-        { id: 'store-1', program: 'todo', name: 'Groceries', kept: true, copy: null, clock: null },
-        { id: 'store-2', program: 'board', name: 'Sprint', kept: true, copy: null, clock: null },
+        {
+            id: 'store-1',
+            program: 'tickets',
+            name: 'Groceries',
+            kept: true,
+            copy: null,
+            clock: null,
+        },
+        { id: 'store-2', program: 'note', name: 'Ideas', kept: true, copy: null, clock: null },
     ],
 } as const;
-const empty = { notes: new Map(), boards: new Map(), workspace };
+const empty = { notes: new Map(), workspace };
 
 describe('capturedActions', () => {
-    it('adds a to-do to the chosen list, Main or another', () => {
-        expect(
-            capturedActions(
-                { kind: 'capture', target: 'todo', store: 'store-1', text: 'Oat milk' },
-                empty,
-            ),
-        ).toEqual([
-            { kind: 'todos', store: 'store-1', command: { kind: 'add', text: 'Oat milk' } },
-        ]);
-        expect(
-            capturedActions({ kind: 'capture', target: 'todo', store: 'todo', text: 'x' }, empty),
-        ).toHaveLength(1);
+    it('adds a ticket through either keyword, into Main or a chosen state', () => {
+        for (const target of ['todo', 'ticket'] as const) {
+            expect(
+                capturedActions(
+                    { kind: 'capture', target, store: 'store-1', text: 'Oat milk' },
+                    empty,
+                ),
+            ).toEqual([
+                {
+                    kind: 'tickets',
+                    store: 'store-1',
+                    command: { kind: 'add', title: 'Oat milk', status: null, parent: null },
+                },
+            ]);
+            expect(
+                capturedActions({ kind: 'capture', target, store: 'tickets', text: 'Ship' }, empty),
+            ).toHaveLength(1);
+        }
     });
 
     it('creates a note after the last one in its state, written in the same step', () => {
         const notes = new Map([['note', { items: [{ id: 'note-4', text: 'old' }], made: 4 }]]);
-
         expect(
             capturedActions(
                 { kind: 'capture', target: 'note', store: 'note', text: 'An idea' },
@@ -47,46 +58,16 @@ describe('capturedActions', () => {
         ]);
     });
 
-    it('puts a card in the first column of its board, a board never opened too', () => {
-        const capture = {
-            kind: 'capture',
-            target: 'card',
-            store: 'store-2',
-            text: 'Ship',
-        } as const;
-        const renamed = {
-            ...defaultBoard,
-            columns: [{ id: 'column-9', title: 'Inbox', cards: [] }, ...defaultBoard.columns],
-        };
-
-        expect(capturedActions(capture, empty)).toEqual([
-            {
-                kind: 'boards',
-                store: 'store-2',
-                command: { kind: 'add-card', column: 'column-1', text: 'Ship' },
-            },
-        ]);
-        expect(
-            capturedActions(capture, { ...empty, boards: new Map([['store-2', renamed]]) })[0],
-        ).toMatchObject({ command: { column: 'column-9' } });
-        expect(
-            capturedActions(capture, {
-                ...empty,
-                boards: new Map([['store-2', { columns: [], made: 0 }]]),
-            }),
-        ).toEqual([]);
-    });
-
     it('takes nothing into a state of another program, or one that is gone', () => {
         expect(
             capturedActions(
-                { kind: 'capture', target: 'todo', store: 'store-2', text: 'x' },
+                { kind: 'capture', target: 'ticket', store: 'store-2', text: 'x' },
                 empty,
             ),
         ).toEqual([]);
         expect(
             capturedActions(
-                { kind: 'capture', target: 'card', store: 'store-7', text: 'x' },
+                { kind: 'capture', target: 'ticket', store: 'store-7', text: 'x' },
                 empty,
             ),
         ).toEqual([]);

@@ -7,7 +7,6 @@ import type { BlueprintCommand, Blueprints } from './blueprints.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
-import type { Board, BoardCommand } from './components/board/board.ts';
 import type { NoteCommand, Notes } from './components/note/note.ts';
 import type { Focus, FocusCommand, Plan } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
@@ -26,7 +25,7 @@ import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
-import type { Todo, TodoCommand } from './components/todo/todo.ts';
+import type { TicketCommand, Tickets } from './shared/tickets.ts';
 import type { Settings } from './settings.ts';
 import type { ProgramInputs } from './inputs.ts';
 import type { PlaybackBinding } from './inputs.ts';
@@ -48,8 +47,7 @@ export const PROGRAM_IDS = [
     'drums',
     'blueprints',
     'tasks',
-    'todo',
-    'board',
+    'tickets',
     'note',
     'focus',
     'agenda',
@@ -87,8 +85,7 @@ export type AppInput =
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'blueprint'; readonly command: BlueprintCommand }
     | { readonly kind: 'place-blueprint'; readonly id: string }
-    | { readonly kind: 'todo'; readonly command: TodoCommand }
-    | { readonly kind: 'board'; readonly command: BoardCommand }
+    | { readonly kind: 'ticket'; readonly command: TicketCommand }
     | { readonly kind: 'note'; readonly command: NoteCommand }
     | { readonly kind: 'focus'; readonly command: FocusCommand }
     | { readonly kind: 'agenda'; readonly command: AgendaCommand }
@@ -145,8 +142,7 @@ export type AppState = {
     readonly library$: Observable<Library>;
     readonly blueprints$: Observable<Blueprints>;
     readonly tasks$: Observable<readonly Task[]>;
-    readonly todos$: Observable<readonly Todo[]>;
-    readonly board$: Observable<Board>;
+    readonly tickets$: Observable<Tickets>;
     readonly notes$: Observable<Notes>;
     readonly focus$: Observable<Focus>;
     readonly agenda$: Observable<Agenda>;

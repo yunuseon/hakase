@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
@@ -69,10 +70,10 @@ const knobRow = (knob: Knob) => `
             <output class="read" data-read="${knob}"></output>
         </label>
         <span class="driven" title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand">follows</span>
-        <select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
+        <hks-select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
                 title="let it swing from 0 to its value and back, a whole number of times per loop">
             ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× per loop`}</option>`).join('')}
-        </select>
+        </hks-select>
     </div>
 `;
 
@@ -96,9 +97,9 @@ const segments = (name: string, label: string, values: readonly string[], hint: 
 const option = (key: string, label: string, values: readonly string[], hint: string) => `
     <label class="row" title="${hint}">
         <span class="key">${label}</span>
-        <select class="pick" data-pick="${key}" aria-label="${label}">
+        <hks-select class="pick" data-pick="${key}" aria-label="${label}">
             ${values.map(value => `<option value="${value}">${value}</option>`).join('')}
-        </select>
+        </hks-select>
     </label>
 `;
 
@@ -112,7 +113,7 @@ const flag = (key: string, label: string, hint: string) => `
 const choice = (key: string, label: string) => `
     <label class="item">
         <span class="key">${label}</span>
-        <select class="pick" data-pick="${key}" aria-label="${label}"></select>
+        <hks-select class="pick" data-pick="${key}" aria-label="${label}"></hks-select>
     </label>
 `;
 
@@ -242,11 +243,9 @@ export class HksSketchControls extends HTMLElement {
                         return of({ field: 'tab', value: target.value });
                     }
 
-                    const pick =
-                        target instanceof HTMLSelectElement ? target.dataset['pick'] : undefined;
+                    const pick = target instanceof HksSelect ? target.dataset['pick'] : undefined;
 
-                    return target instanceof HTMLSelectElement &&
-                        (pick === 'formula' || pick === 'theme')
+                    return target instanceof HksSelect && (pick === 'formula' || pick === 'theme')
                         ? of({ field: pick, value: target.value })
                         : EMPTY;
                 }),
@@ -277,7 +276,7 @@ export class HksSketchControls extends HTMLElement {
             ),
             fromElementEvent$(panes, 'change').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
-                    if (target instanceof HTMLSelectElement) {
+                    if (target instanceof HksSelect) {
                         const knob = target.dataset['cycles'];
 
                         if (knob !== undefined && isKnob(knob)) {
@@ -319,8 +318,8 @@ export class HksSketchControls extends HTMLElement {
         return this;
     }
 
-    private pick(key: string): HTMLSelectElement {
-        return requireElement(this.shadow, `[data-pick="${key}"]`, HTMLSelectElement);
+    private pick(key: string): HksSelect {
+        return requireElement(this.shadow, `[data-pick="${key}"]`, HksSelect);
     }
 
     private checkRadio(name: string, value: string): void {
@@ -398,11 +397,7 @@ export class HksSketchControls extends HTMLElement {
                 map(({ motion }) => String(motion[knob])),
                 distinctUntilChanged(),
                 tap(value => {
-                    requireElement(
-                        this.shadow,
-                        `[data-cycles="${knob}"]`,
-                        HTMLSelectElement,
-                    ).value = value;
+                    requireElement(this.shadow, `[data-cycles="${knob}"]`, HksSelect).value = value;
                 }),
             ),
         );
@@ -476,11 +471,8 @@ export class HksSketchControls extends HTMLElement {
                         `[data-field="${knob}"]`,
                         HTMLInputElement,
                     ).disabled = driven;
-                    requireElement(
-                        this.shadow,
-                        `[data-cycles="${knob}"]`,
-                        HTMLSelectElement,
-                    ).disabled = driven;
+                    requireElement(this.shadow, `[data-cycles="${knob}"]`, HksSelect).disabled =
+                        driven;
                 }
             }),
         );
@@ -545,6 +537,7 @@ export class HksSketchControls extends HTMLElement {
         );
 
         return merge(
+            connectSelects$(this.shadow),
             tab$,
             formula$,
             ...picks$,

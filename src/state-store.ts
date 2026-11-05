@@ -14,7 +14,6 @@ import {
     type Library,
 } from './library.ts';
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
-import { parseBoard, type Board } from './components/board/board.ts';
 import { parseNotes, type Notes } from './components/note/note.ts';
 import {
     parseFocus,
@@ -27,11 +26,11 @@ import { parseHabits, type Habits } from './components/habits/habits.ts';
 import { parseClocks, type Clocks } from './components/clocks/clocks.ts';
 import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks.ts';
 import { parseSignal, type Signal } from './shared/signal.ts';
-import { parseTodos, type TodoList } from './components/todo/todo.ts';
+import { parseTickets, type Tickets } from './shared/tickets.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
 import { readStored, writeStored } from './lib/storage.ts';
-import type { ProcessId, ProgramId } from './program.ts';
-import { keptStores, type StoreId } from './stores.ts';
+import type { ProcessId } from './program.ts';
+import { keptStores, renamedStore, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
@@ -53,8 +52,7 @@ export type Snapshot = {
     readonly themes: ReadonlyMap<ThemeName, Theme>;
     readonly playback: ReadonlyMap<StoreId, Clock>;
     readonly settings: ReadonlyMap<ProcessId, Settings>;
-    readonly todos: ReadonlyMap<StoreId, TodoList>;
-    readonly board: ReadonlyMap<StoreId, Board>;
+    readonly tickets: ReadonlyMap<StoreId, Tickets>;
     readonly notes: ReadonlyMap<StoreId, Notes>;
     readonly focus: ReadonlyMap<StoreId, Focus>;
     readonly agenda: ReadonlyMap<StoreId, Agenda>;
@@ -129,7 +127,7 @@ const settingsFrom = (value: unknown): ReadonlyMap<ProcessId, Settings> =>
 // Saved before stores, a document was one value: it becomes its program's main store.
 const byStore = <T>(
     value: unknown,
-    program: ProgramId,
+    program: StoreId,
     parse: (stored: unknown) => T,
 ): ReadonlyMap<StoreId, T> => {
     const stores = field(value, 'byStore');
@@ -149,8 +147,7 @@ const fresh: Restored = {
     themes: new Map(),
     playback: new Map(),
     settings: new Map(),
-    todos: new Map(),
-    board: new Map(),
+    tickets: new Map(),
     notes: new Map(),
     focus: new Map(),
     agenda: new Map(),
@@ -179,16 +176,70 @@ const legacy = (inputsFor: InputsFor): Restored => {
     };
 };
 
-// Takes what programs read from other programs, so a saved follow is kept only where it still fits.
-export const restoreState = (inputsFor: InputsFor): Restored => {
-    const stored = readStored(KEY);
+// Saved before tickets: to-do lists and boards both become ticket lists, the to-do list's Main the tickets' Main.
+const ticketsFrom = (stored: unknown): ReadonlyMap<StoreId, Tickets> => {
+    const current = field(stored, 'tickets');
 
+    return current !== undefined
+        ? byStore(current, 'tickets', parseTickets)
+        : new Map([
+              ...[...byStore(field(stored, 'todos'), 'tickets', parseTickets)].map(
+                  ([id, tickets]) => [renamedStore(id), tickets] as const,
+              ),
+              ...byStore(field(stored, 'board'), 'board', parseTickets),
+          ]);
+};
+
+const ticketViews = (stored: unknown): ReadonlyMap<ProcessId, Settings> => {
+    const settings = settingsFrom(field(stored, 'settings'));
+    const processes = field(field(stored, 'workspace'), 'processes');
+
+    return new Map([
+        ...(Array.isArray(processes)
+            ? processes.flatMap((process: unknown): [ProcessId, Settings][] => {
+                  const id = field(process, 'id');
+                  return typeof id === 'string' && field(process, 'program') === 'board'
+                      ? [[id, { kind: 'tickets', view: 'board' }]]
+                      : [];
+              })
+            : []),
+        ...settings,
+    ]);
+};
+
+// A board's old Main is no program's main store now: without an entry, the next save would drop it.
+const withBoard = (
+    workspace: Workspace | null,
+    tickets: ReadonlyMap<StoreId, Tickets>,
+): Workspace | null =>
+    workspace === null || !tickets.has('board') || workspace.stores.some(({ id }) => id === 'board')
+        ? workspace
+        : {
+              ...workspace,
+              stores: [
+                  ...workspace.stores,
+                  {
+                      id: 'board',
+                      program: 'tickets',
+                      name: 'Board',
+                      kept: true,
+                      copy: null,
+                      clock: null,
+                  },
+              ],
+          };
+
+// Takes what programs read from other programs, so a saved follow is kept only where it still fits.
+export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored | null => {
     if (field(stored, 'version') !== VERSION) {
-        return legacy(inputsFor);
+        return null;
     }
 
     return {
-        workspace: parseWorkspace(field(stored, 'workspace'), inputsFor),
+        workspace: withBoard(
+            parseWorkspace(field(stored, 'workspace'), inputsFor),
+            ticketsFrom(stored),
+        ),
         look: lookFrom(field(stored, 'look')),
         looks: looksFrom(field(stored, 'looks')),
         formulas: formulasFrom(field(stored, 'formulas')),
@@ -207,9 +258,8 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
                       ],
                   ])
                 : byStore(field(stored, 'playback'), 'timeline', parseClock),
-        settings: settingsFrom(field(stored, 'settings')),
-        todos: byStore(field(stored, 'todos'), 'todo', parseTodos),
-        board: byStore(field(stored, 'board'), 'board', parseBoard),
+        settings: ticketViews(stored),
+        tickets: ticketsFrom(stored),
         notes: byStore(field(stored, 'notes'), 'note', parseNotes),
         focus: byStore(field(stored, 'focus'), 'focus', parseFocus),
         agenda: byStore(field(stored, 'agenda'), 'agenda', parseAgenda),
@@ -234,6 +284,9 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
     };
 };
 
+export const restoreState = (inputsFor: InputsFor): Restored =>
+    parseSnapshot(readStored(KEY), inputsFor) ?? legacy(inputsFor);
+
 const serialised = (snapshot: Snapshot): unknown => {
     const { stores } = snapshot.workspace;
     const live = new Set([
@@ -253,8 +306,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         themes: Object.fromEntries(snapshot.themes),
         playback: saved(snapshot.playback),
         settings: Object.fromEntries([...snapshot.settings].filter(([id]) => live.has(id))),
-        todos: saved(snapshot.todos),
-        board: saved(snapshot.board),
+        tickets: saved(snapshot.tickets),
         notes: saved(snapshot.notes),
         focus: saved(snapshot.focus),
         agenda: saved(snapshot.agenda),

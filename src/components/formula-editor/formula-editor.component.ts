@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, share, switchMap, tap } from 'rxjs/operators';
 import Prism from 'prismjs';
@@ -33,7 +34,7 @@ const TEMPLATE = `
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 L10 17 L19 7"/></svg>
             <span>Compiled</span>
         </div>
-        <select class="preset" aria-label="formula preset"></select>
+        <hks-select class="preset" aria-label="formula preset"></hks-select>
         <details class="more">
             <summary class="toggle" aria-label="formula actions" title="save, share or delete">⋯</summary>
             <div class="menu">
@@ -92,7 +93,7 @@ export class HksFormulaEditor extends HTMLElement {
     readonly deletes$: Observable<void>;
 
     private readonly source: HTMLTextAreaElement;
-    private readonly picker: HTMLSelectElement;
+    private readonly picker: HksSelect;
     private readonly highlighted: HTMLElement;
     private readonly viewport: HTMLElement;
     private readonly error: HTMLElement;
@@ -107,15 +108,18 @@ export class HksFormulaEditor extends HTMLElement {
     private readonly removal: HTMLButtonElement;
     private readonly submitted$: Observable<string>;
 
+    private readonly shadow: ShadowRoot;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
+        this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
         this.source = requireElement(shadow, '.source', HTMLTextAreaElement);
-        this.picker = requireElement(shadow, '.preset', HTMLSelectElement);
+        this.picker = requireElement(shadow, '.preset', HksSelect);
         this.viewport = requireChild(shadow, '.highlight');
         this.highlighted = requireChild(this.viewport, 'code');
         this.error = requireChild(shadow, '.error');
@@ -189,6 +193,7 @@ export class HksFormulaEditor extends HTMLElement {
         const text$ = merge(applied$, this.typed$);
 
         return merge(
+            connectSelects$(this.shadow),
             // Together: options rebuilt after the value was set would drop the selection.
             combineLatest([options$, selected$]).pipe(
                 tap(([options, value]) => {

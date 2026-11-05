@@ -94,8 +94,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
             links: [{ a: 'signal-1', b: 'voice-1' }],
         },
         settings: new Map([['sketch-1', { ...defaultSketch, formula: 'custom-1' }]]),
-        todos: new Map(),
-        boards: new Map(),
+        tickets: new Map(),
         notes: new Map(),
         agendas: new Map(),
         habits: new Map(),
@@ -269,5 +268,83 @@ describe('a blueprint', () => {
             parseBlueprints(JSON.parse(JSON.stringify(history.present.blueprints)), inputsFor),
         ).toEqual(history.present.blueprints);
         expect(emptyLibrary.items).toEqual([]);
+    });
+});
+
+describe('ticket blueprint migration', () => {
+    it('places old todo and board states as separate ticket documents with their own views', () => {
+        const saved = {
+            id: 'blueprint-legacy',
+            name: 'Work',
+            size: { width: 700, height: 400 },
+            windows: [
+                {
+                    id: 'todo-1',
+                    program: 'todo',
+                    store: 'todo',
+                    follows: {},
+                    frame: frame(0, 0),
+                    settings: null,
+                },
+                {
+                    id: 'board-1',
+                    program: 'board',
+                    store: 'board',
+                    follows: {},
+                    frame: frame(320, 0),
+                    settings: null,
+                },
+            ],
+            stores: [
+                { id: 'todo', program: 'todo', name: 'Main' },
+                { id: 'board', program: 'board', name: 'Main' },
+            ],
+            held: {
+                todos: [
+                    ['todo', { items: [{ id: 'todo-1', text: 'Buy milk', done: false }], made: 1 }],
+                ],
+                boards: [
+                    [
+                        'board',
+                        {
+                            columns: [
+                                {
+                                    id: 'column-1',
+                                    title: 'Ideas',
+                                    cards: [{ id: 'card-2', text: 'Ship' }],
+                                },
+                            ],
+                            made: 2,
+                        },
+                    ],
+                ],
+            },
+        };
+        const blueprint = parseBlueprints({ items: [saved] }, inputsFor).items[0];
+        expect(blueprint?.windows.map(({ program, store }) => [program, store])).toEqual([
+            ['tickets', 'tickets'],
+            ['tickets', 'board'],
+        ]);
+        expect(blueprint?.windows[1]?.settings).toEqual({ kind: 'tickets', view: 'board' });
+        if (blueprint === undefined) {
+            throw new Error('Missing migrated blueprint');
+        }
+        const before = scene();
+        const after = placed(
+            before,
+            blueprint,
+            { x: 0, y: 0, width: 1400, height: 900 },
+            50,
+            inputsFor,
+        );
+        const copies = after.workspace.processes.slice(before.workspace.processes.length);
+        expect(copies).toHaveLength(2);
+        expect(copies[0]?.store).not.toBe(copies[1]?.store);
+        expect(after.tickets.get(copies[0]?.store ?? '')?.statuses[0]?.tickets[0]?.title).toBe(
+            'Buy milk',
+        );
+        expect(after.tickets.get(copies[1]?.store ?? '')?.statuses[0]?.tickets[0]?.title).toBe(
+            'Ship',
+        );
     });
 });

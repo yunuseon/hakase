@@ -1,3 +1,4 @@
+import { parseTickets } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import type { Documents } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
@@ -6,13 +7,12 @@ import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
 import { blueprintIn, STARTERS } from './starters.ts';
 import { defaultWorkspace } from './workspace.ts';
 
-const todos = { items: [{ id: 'todo-1', text: 'Mine', done: false }], made: 1 };
+const tickets = parseTickets({ items: [{ id: 'todo-1', text: 'Mine', done: false }], made: 1 });
 
 const scene = (): Documents => ({
     workspace: defaultWorkspace({ width: 1400, height: 900 }, inputsFor),
     settings: new Map(),
-    todos: new Map([['todo', todos]]),
-    boards: new Map(),
+    tickets: new Map([['tickets', tickets]]),
     notes: new Map(),
     agendas: new Map(),
     habits: new Map(),
@@ -75,21 +75,21 @@ describe('starter blueprints', () => {
         expect(added(before, after).map(({ program, store }) => [program, store])).toEqual([
             ['agenda', 'agenda'],
             ['progress', 'progress'],
-            ['todo', 'todo'],
+            ['tickets', 'tickets'],
             ['progress', 'progress'],
         ]);
         expect(added(before, after)[1]?.follows).toEqual({
             source: { kind: 'agenda', store: 'agenda' },
         });
         expect(added(before, after)[3]?.follows).toEqual({
-            source: { kind: 'todo', store: 'todo' },
+            source: { kind: 'tickets', store: 'tickets' },
         });
-        expect(after.todos.get('todo')).toBe(todos);
+        expect(after.tickets.get('tickets')).toBe(tickets);
         expect(after.workspace.stores.map(({ id }) => id)).toEqual([
             ...before.workspace.stores.map(({ id }) => id),
             'agenda',
             'progress',
-            'todo',
+            'tickets',
         ]);
     });
 
@@ -102,7 +102,7 @@ describe('starter blueprints', () => {
         expect(second.notes.get('store-40-1')?.items[0]?.text).toMatch(/^Daily review/);
         expect(second.notes.get('store-41-1')?.items[0]?.text).toMatch(/^Daily review/);
         expect(second.settings.get(notes?.id ?? '')).toEqual({ kind: 'note', note: 'note-1' });
-        expect(second.todos.get('todo')).toBe(todos);
+        expect(second.tickets.get('tickets')).toBe(tickets);
     });
 
     it('starts a focus session on a fresh board and the one focus timer', () => {
@@ -110,13 +110,13 @@ describe('starter blueprints', () => {
         const after = placed(before, starter('starter-focus-session'), view, 40, inputsFor);
 
         expect(added(before, after).map(({ program, store }) => [program, store])).toEqual([
-            ['board', 'store-40-1'],
+            ['tickets', 'store-40-1'],
             ['focus', 'focus'],
             ['progress', 'progress'],
         ]);
-        expect(after.boards.get('store-40-1')?.columns.map(({ title }) => title)).toEqual([
+        expect(after.tickets.get('store-40-1')?.statuses.map(({ title }) => title)).toEqual([
             'To do',
-            'Doing',
+            'In progress',
             'Done',
         ]);
         expect(after.workspace.stores.find(({ id }) => id === 'store-40-1')?.name).toBe(

@@ -33,7 +33,7 @@ describe('steppedSection', () => {
     });
 });
 
-const entry = (id: string, program: 'todo' | 'board', name: string) => ({
+const entry = (id: string, program: 'tickets' | 'note', name: string) => ({
     id,
     program,
     name,
@@ -50,9 +50,9 @@ const lists = (frontmost: string | null): Workspace => {
         ...base,
         stores: [
             ...base.stores,
-            entry('store-1', 'todo', 'Groceries'),
-            entry('store-2', 'todo', 'Errands'),
-            entry('store-3', 'board', 'Sprint'),
+            entry('store-1', 'tickets', 'Groceries'),
+            entry('store-2', 'tickets', 'Errands'),
+            entry('store-3', 'note', 'Sprint'),
         ],
         processes:
             frontmost === null
@@ -61,7 +61,7 @@ const lists = (frontmost: string | null): Workspace => {
                       ...base.processes,
                       {
                           id: 'todo-9',
-                          program: 'todo',
+                          program: 'tickets',
                           store: frontmost,
                           follows: {},
                           frame,
@@ -73,16 +73,16 @@ const lists = (frontmost: string | null): Workspace => {
 
 describe('captures', () => {
     it('offer every state, Main always, then by name', () => {
-        expect(captureStores('todo', lists(null)).map(({ name }) => name)).toEqual([
+        expect(captureStores('tickets', lists(null)).map(({ name }) => name)).toEqual([
             'Main',
             'Errands',
             'Groceries',
         ]);
-        expect(captureStores('note', lists(null)).map(({ id }) => id)).toEqual(['note']);
+        expect(captureStores('note', lists(null)).map(({ id }) => id)).toEqual(['note', 'store-3']);
     });
 
     it('put the frontmost window’s state first', () => {
-        expect(captureStores('todo', lists('store-1')).map(({ name }) => name)).toEqual([
+        expect(captureStores('tickets', lists('store-1')).map(({ name }) => name)).toEqual([
             'Groceries',
             'Main',
             'Errands',
@@ -91,19 +91,25 @@ describe('captures', () => {
 
     it('are commands named after their state, all claiming the same word', () => {
         expect(
-            commandsOf([], lists('store-1')).filter(({ keyword }) => keyword === 'card'),
+            commandsOf([], lists('store-1')).filter(({ keyword }) => keyword === 'ticket'),
         ).toEqual([
             {
-                id: 'capture:card:board',
-                label: 'Add card to Main',
-                hint: 'card …',
-                keyword: 'card',
+                id: 'capture:ticket:store-1',
+                label: 'Add ticket to Groceries',
+                hint: 'ticket …',
+                keyword: 'ticket',
             },
             {
-                id: 'capture:card:store-3',
-                label: 'Add card to Sprint',
-                hint: 'card …',
-                keyword: 'card',
+                id: 'capture:ticket:tickets',
+                label: 'Add ticket to Main',
+                hint: 'ticket …',
+                keyword: 'ticket',
+            },
+            {
+                id: 'capture:ticket:store-2',
+                label: 'Add ticket to Errands',
+                hint: 'ticket …',
+                keyword: 'ticket',
             },
         ]);
     });
@@ -119,6 +125,9 @@ describe('captures', () => {
         expect(pickedOf('capture:todo:store-1', null)).toBeNull();
         expect(pickedOf('capture:todo', 'milk')).toBeNull();
         expect(pickedOf('capture:agenda:agenda', 'standup')).toBeNull();
-        expect(pickedOf('launch:todo', 'ignored')).toEqual({ kind: 'launch', program: 'todo' });
+        expect(pickedOf('launch:tickets', 'ignored')).toEqual({
+            kind: 'launch',
+            program: 'tickets',
+        });
     });
 });

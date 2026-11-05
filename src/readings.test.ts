@@ -1,7 +1,8 @@
+import { parseTickets } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import { initialFocus, reduceFocus } from './components/focus/focus.ts';
 import { focusView } from './components/focus/focus.ts';
-import { agendaReading, focusReading, planOf, plansOf, todoReading } from './readings.ts';
+import { agendaReading, focusReading, planOf, plansOf, ticketsReading } from './readings.ts';
 
 const block = (id: string, day: string, start: number, end: number, title = '') => ({
     id,
@@ -72,14 +73,19 @@ describe('focusReading', () => {
     });
 });
 
-describe('todoReading', () => {
+describe('ticketsReading', () => {
     it('counts what is done, and has nothing to show for an empty list', () => {
         const todo = (id: string, done: boolean) => ({ id, text: id, done });
 
         expect(
-            todoReading({ items: [todo('a', true), todo('b', false), todo('c', true)], made: 3 }),
-        ).toEqual({ kind: 'count', title: 'To-dos', done: 2, total: 3 });
-        expect(todoReading({ items: [], made: 0 }).kind).toBe('none');
+            ticketsReading(
+                parseTickets({
+                    items: [todo('a', true), todo('b', false), todo('c', true)],
+                    made: 3,
+                }),
+            ),
+        ).toEqual({ kind: 'count', title: 'Tickets', done: 2, total: 3 });
+        expect(ticketsReading(parseTickets(null)).kind).toBe('none');
     });
 });
 

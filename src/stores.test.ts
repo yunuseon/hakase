@@ -67,14 +67,14 @@ describe('colourOf', () => {
 describe('keptStores', () => {
     it('keeps every main store, open or not, and drops removed ones', () => {
         const all = new Map([
-            ['board', 1],
+            ['tickets', 1],
             ['store-4', 2],
             ['store-9', 3],
         ]);
         const stores: StoreEntry[] = [
-            { id: 'store-4', program: 'board', name: 'x', kept: true, copy: null, clock: null },
+            { id: 'store-4', program: 'tickets', name: 'x', kept: true, copy: null, clock: null },
         ];
 
-        expect([...keptStores(all, stores).keys()]).toEqual(['board', 'store-4']);
+        expect([...keptStores(all, stores).keys()]).toEqual(['tickets', 'store-4']);
     });
 });

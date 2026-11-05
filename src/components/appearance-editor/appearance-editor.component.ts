@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
@@ -9,7 +10,7 @@ const sheet = styleSheet(css);
 const TEMPLATE = `
     <label class="head">
         <span class="key">look</span>
-        <select class="pick" aria-label="look"></select>
+        <hks-select class="pick" aria-label="look"></hks-select>
     </label>
     <div class="swatches"></div>
     <div class="rows"></div>
@@ -24,18 +25,21 @@ export class HksAppearanceEditor extends HTMLElement {
     readonly selections$: Observable<string>;
     readonly changes$: Observable<ReadonlyMap<string, string>>;
 
-    private readonly picker: HTMLSelectElement;
+    private readonly picker: HksSelect;
     private readonly rows: HTMLElement;
     private readonly swatches: HTMLElement;
+
+    private readonly shadow: ShadowRoot;
 
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
+        this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
-        this.picker = requireElement(shadow, '.pick', HTMLSelectElement);
+        this.picker = requireElement(shadow, '.pick', HksSelect);
         this.rows = requireChild(shadow, '.rows');
         this.swatches = requireChild(shadow, '.swatches');
 
@@ -112,6 +116,7 @@ export class HksAppearanceEditor extends HTMLElement {
         values$: Observable<ReadonlyMap<string, string>>,
     ): Observable<void> {
         return merge(
+            connectSelects$(this.shadow),
             selected$.pipe(
                 tap(name => {
                     this.picker.value = name;

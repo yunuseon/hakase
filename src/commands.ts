@@ -9,9 +9,9 @@ import type { Section, Workspace, WorkspaceAction } from './workspace.ts';
 export type Direction = 'next' | 'previous';
 
 export const CAPTURES = [
-    { target: 'todo', program: 'todo', label: 'Add to-do to' },
+    { target: 'ticket', program: 'tickets', label: 'Add ticket to' },
+    { target: 'todo', program: 'tickets', label: 'Add to-do to' },
     { target: 'note', program: 'note', label: 'Jot a note in' },
-    { target: 'card', program: 'board', label: 'Add card to' },
 ] as const;
 
 export type CaptureTarget = (typeof CAPTURES)[number]['target'];

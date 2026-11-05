@@ -1,12 +1,11 @@
 import { parseAgenda } from './components/agenda/agenda.ts';
-import { parseBoard } from './components/board/board.ts';
 import { parseBookmarks } from './components/bookmarks/bookmarks.ts';
 import { parseClocks } from './components/clocks/clocks.ts';
 import { parseHabits } from './components/habits/habits.ts';
 import { parseNotes } from './components/note/note.ts';
 import { parsePen, type Pen } from './components/pen/pen.ts';
 import { formulas as registry } from './components/sketch/formulas/registry.ts';
-import { parseTodos } from './components/todo/todo.ts';
+import { parseTickets } from './shared/tickets.ts';
 import { parseVoice, type Voice } from './components/voice/voice.ts';
 import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
@@ -21,6 +20,7 @@ import {
     HOLDING,
     MAIN,
     mainStore,
+    renamedStore,
     settingsKey,
     type ClockSeed,
     type StoreEntry,
@@ -39,8 +39,7 @@ import {
 } from './workspace.ts';
 
 type HeldKind =
-    | 'todos'
-    | 'boards'
+    | 'tickets'
     | 'notes'
     | 'agendas'
     | 'habits'
@@ -207,8 +206,7 @@ export const blueprintOf = (
         windows,
         stores: entries,
         held: {
-            todos: picked(documents.todos, stores),
-            boards: picked(documents.boards, stores),
+            tickets: picked(documents.tickets, stores),
             notes: picked(documents.notes, stores),
             agendas: picked(documents.agendas, stores),
             habits: picked(documents.habits, stores),
@@ -353,8 +351,7 @@ export const placed = (
             formulas.items === documents.library.items
                 ? documents.library
                 : { items: formulas.items, made: formulas.made },
-        todos: into(documents.todos, held.todos),
-        boards: into(documents.boards, held.boards),
+        tickets: into(documents.tickets, held.tickets),
         notes: into(documents.notes, held.notes),
         agendas: into(documents.agendas, held.agendas),
         habits: into(documents.habits, held.habits),
@@ -424,7 +421,7 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
     const held = field(value, 'held');
     const formulas = field(value, 'formulas');
     const links = field(value, 'links');
-    const heldOf = (kind: HeldKind) =>
+    const heldOf = (kind: HeldKind | 'todos' | 'boards') =>
         typeof held === 'object' && held !== null ? field(held, kind) : undefined;
 
     if (typeof id !== 'string' || typeof name !== 'string' || width === null || height === null) {
@@ -441,7 +438,10 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                       const draft = processFrom(stored, inputsFor);
                       const settings =
                           typeof stored === 'object' && stored !== null
-                              ? parseSettings(field(stored, 'settings'))
+                              ? (parseSettings(field(stored, 'settings')) ??
+                                (field(stored, 'program') === 'board'
+                                    ? { kind: 'tickets' as const, view: 'board' as const }
+                                    : null))
                               : null;
 
                       return draft === null ? [] : [{ ...draft, settings }];
@@ -449,8 +449,12 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 : [],
             stores: Array.isArray(stores) ? stores.flatMap(storeFrom) : [],
             held: {
-                todos: entriesOf(heldOf('todos'), parseTodos),
-                boards: entriesOf(heldOf('boards'), parseBoard),
+                // Saved before tickets, to-do lists and boards are both read as ticket lists.
+                tickets: [
+                    ...entriesOf(heldOf('tickets'), parseTickets),
+                    ...entriesOf(heldOf('todos'), parseTickets),
+                    ...entriesOf(heldOf('boards'), parseTickets),
+                ].map(([id, tickets]) => [renamedStore(id), tickets] as const),
                 notes: entriesOf(heldOf('notes'), parseNotes),
                 agendas: entriesOf(heldOf('agendas'), parseAgenda),
                 habits: entriesOf(heldOf('habits'), parseHabits),

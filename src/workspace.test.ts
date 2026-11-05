@@ -234,8 +234,8 @@ describe('prune-stores', () => {
 describe('resizing an attached edge', () => {
     const box = (id: string, x: number, y: number, width: number, height: number) => ({
         id,
-        program: 'todo' as const,
-        store: 'todo',
+        program: 'tickets' as const,
+        store: 'tickets',
         follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
@@ -308,8 +308,8 @@ describe('resizing an attached edge', () => {
 describe('snapping while resizing', () => {
     const box = (id: string, x: number, y: number, width: number, height: number) => ({
         id,
-        program: 'todo' as const,
-        store: 'todo',
+        program: 'tickets' as const,
+        store: 'tickets',
         follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
@@ -723,7 +723,7 @@ describe('focus progress bindings', () => {
                 kind: 'follow',
                 id: 'progress-6',
                 input: 'source',
-                source: 'board',
+                source: 'tickets',
                 store: 'store-1',
             },
             {

@@ -1,4 +1,4 @@
-import { defaultBoard } from './components/board/board.ts';
+import { defaultTickets } from './shared/tickets.ts';
 import type { Size } from './components/window/frame.ts';
 import type { Bindings } from './inputs.ts';
 import type { Blueprint, BlueprintWindow, Blueprints } from './blueprints.ts';
@@ -9,8 +9,7 @@ import type { StoreEntry, StoreId } from './stores.ts';
 export type Starter = Blueprint & { readonly summary: string };
 
 const held = {
-    todos: [],
-    boards: [],
+    tickets: [],
     notes: [],
     agendas: [],
     habits: [],
@@ -63,7 +62,7 @@ Tomorrow's top three
 3.
 `;
 
-// A window on a store the blueprint does not list keeps that id when placed, so these work on the main todo, agenda, habits and timer.
+// A window on a store the blueprint does not list keeps that id when placed, so these work on the main tickets, agenda, habits and timer.
 export const STARTERS: readonly Starter[] = [
     {
         id: 'starter-today',
@@ -79,13 +78,20 @@ export const STARTERS: readonly Starter[] = [
                 { x: 360, y: 48, width: 300, height: 130 },
                 { source: { kind: 'agenda', store: 'agenda' } },
             ),
-            opened('todo', 'todo', 'todo', { x: 360, y: 194, width: 300, height: 228 }),
+            opened(
+                'todo',
+                'tickets',
+                'tickets',
+                { x: 360, y: 194, width: 300, height: 228 },
+                {},
+                { kind: 'tickets', view: 'list' },
+            ),
             opened(
                 'done',
                 'progress',
                 'progress',
                 { x: 360, y: 438, width: 300, height: 130 },
-                { source: { kind: 'todo', store: 'todo' } },
+                { source: { kind: 'tickets', store: 'tickets' } },
             ),
         ],
         stores: [],
@@ -96,10 +102,18 @@ export const STARTERS: readonly Starter[] = [
     {
         id: 'starter-focus-session',
         name: 'Focus session',
-        summary: 'A fresh board for the work, the focus timer, and how far the phase has run.',
+        summary:
+            'A fresh ticket board for the work, the focus timer, and how far the phase has run.',
         size: { width: 1044, height: 558 },
         windows: [
-            opened('board', 'board', 'session', { x: 24, y: 48, width: 720, height: 486 }),
+            opened(
+                'board',
+                'tickets',
+                'session',
+                { x: 24, y: 48, width: 720, height: 486 },
+                {},
+                { kind: 'tickets', view: 'board' },
+            ),
             opened('focus', 'focus', 'focus', { x: 760, y: 48, width: 260, height: 340 }),
             opened(
                 'progress',
@@ -109,8 +123,8 @@ export const STARTERS: readonly Starter[] = [
                 { source: { kind: 'focus', store: 'focus' } },
             ),
         ],
-        stores: [own('session', 'board', 'Focus session')],
-        held: { ...held, boards: [['session', defaultBoard]] },
+        stores: [own('session', 'tickets', 'Focus session')],
+        held: { ...held, tickets: [['session', defaultTickets]] },
         formulas: [],
         links: [],
     },
@@ -129,7 +143,14 @@ export const STARTERS: readonly Starter[] = [
                 { kind: 'note', note: 'note-1' },
             ),
             opened('habits', 'habits', 'habits', { x: 380, y: 48, width: 460, height: 220 }),
-            opened('todo', 'todo', 'todo', { x: 380, y: 284, width: 460, height: 204 }),
+            opened(
+                'todo',
+                'tickets',
+                'tickets',
+                { x: 380, y: 284, width: 460, height: 204 },
+                {},
+                { kind: 'tickets', view: 'list' },
+            ),
         ],
         stores: [own('review', 'note', 'Daily review')],
         held: {

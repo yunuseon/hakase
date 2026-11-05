@@ -164,7 +164,7 @@ svg {
     color: var(--muted);
 }
 
-.field select {
+.field hks-select {
     padding: 4px 6px;
     font: 500 11px var(--font-mono);
     color: var(--ink);
@@ -195,7 +195,7 @@ svg {
 }
 
 button:focus-visible,
-select:focus-visible {
+hks-select:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }

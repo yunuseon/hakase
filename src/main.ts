@@ -73,12 +73,11 @@ import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import { defaultSignal, reachedFrom, sameWave, waveOf, type Linked } from './shared/signal.ts';
 import { inputGroups } from './input-connections.ts';
 import { graphOf, sameGraph } from './state-graph.ts';
-import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
 import { emptyHabits } from './components/habits/habits.ts';
 import { emptyNotes } from './components/note/note.ts';
-import { emptyTodos } from './components/todo/todo.ts';
+import { defaultTickets } from './shared/tickets.ts';
 import {
     followedBy,
     type Bindings,
@@ -167,8 +166,7 @@ type StoreKey =
     | 'looping$'
     | 'duration$'
     | 'clock$'
-    | 'todos$'
-    | 'board$'
+    | 'tickets$'
     | 'notes$'
     | 'focus$'
     | 'agenda$'
@@ -334,8 +332,7 @@ const bootstrap = () => {
     const started: Documents = {
         workspace: stored.workspace ?? defaultWorkspace(viewportSize(), inputsFor),
         settings: stored.settings,
-        todos: stored.todos,
-        boards: stored.board,
+        tickets: stored.tickets,
         notes: stored.notes,
         agendas: stored.agenda,
         habits: stored.habits,
@@ -843,10 +840,8 @@ const bootstrap = () => {
                                 settings: input.settings,
                             },
                         ];
-                    case 'todo':
-                        return [{ kind: 'todos', store, command: input.command }];
-                    case 'board':
-                        return [{ kind: 'boards', store, command: input.command }];
+                    case 'ticket':
+                        return [{ kind: 'tickets', store, command: input.command }];
                     case 'note':
                         return [{ kind: 'notes', store, command: input.command }];
                     case 'agenda':
@@ -969,12 +964,8 @@ const bootstrap = () => {
         map(({ settings }) => settings),
         distinctUntilChanged(),
     );
-    const todos$ = documents$.pipe(
-        map(({ todos }) => todos),
-        distinctUntilChanged(),
-    );
-    const boards$ = documents$.pipe(
-        map(({ boards }) => boards),
+    const tickets$ = documents$.pipe(
+        map(({ tickets }) => tickets),
         distinctUntilChanged(),
     );
     const notes$ = documents$.pipe(
@@ -1166,8 +1157,7 @@ const bootstrap = () => {
 
     // Which stores hold any data, read as one sorted key so a ticking timer does not churn the graph.
     const held$: Observable<ReadonlySet<StoreId>> = combineLatest([
-        todos$,
-        boards$,
+        tickets$,
         notes$,
         timers$,
         agendas$,
@@ -1238,8 +1228,7 @@ const bootstrap = () => {
             ),
     };
 
-    const todoIn = inStore(todos$, emptyTodos);
-    const boardIn = inStore(boards$, defaultBoard);
+    const ticketsIn = inStore(tickets$, defaultTickets);
     const notesIn = inStore(notes$, emptyNotes);
     const agendaIn = inStore(agendas$, emptyAgenda);
     const habitsIn = inStore(habits$, emptyHabits);
@@ -1274,8 +1263,7 @@ const bootstrap = () => {
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
     > = {
-        todo: todoIn,
-        board: boardIn,
+        tickets: ticketsIn,
         note: notesIn,
         focus: timerIn,
         agenda: agendaIn,
@@ -1328,7 +1316,7 @@ const bootstrap = () => {
         focus$: timerIn,
         plan$: planIn,
         agenda$: agendaIn,
-        todos$: todoIn,
+        tickets$: ticketsIn,
         now$: wallClock$,
     };
 
@@ -1382,8 +1370,7 @@ const bootstrap = () => {
                 map(({ duration }) => duration),
                 distinctUntilChanged(),
             ),
-            todos$: narrowed(todoIn).pipe(map(({ items }) => items)),
-            board$: narrowed(boardIn),
+            tickets$: narrowed(ticketsIn),
             notes$: narrowed(notesIn),
             focus$: narrowed(timerIn),
             plan$: narrowed(planIn),
@@ -1464,8 +1451,7 @@ const bootstrap = () => {
                 formulas: edits$.pipe(map(valuesOf)),
                 themes: palettes$.pipe(map(valuesOf)),
                 settings: settings$,
-                todos: todos$,
-                board: boards$,
+                tickets: tickets$,
                 notes: notes$,
                 focus: timersRested$,
                 playback: playbacksRested$,

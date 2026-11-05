@@ -7,7 +7,7 @@ import {
 } from './components/agenda/agenda.ts';
 import { focusView, type Focus, type FocusLink, type Plan } from './components/focus/focus.ts';
 import type { Reading } from './components/progress-bar/progress-bar.ts';
-import type { TodoList } from './components/todo/todo.ts';
+import { factsOf, type Tickets } from './shared/tickets.ts';
 
 const MINUTE = 60_000;
 
@@ -83,12 +83,15 @@ export const focusReading = (focus: Focus, plan: Plan | null): Reading => {
     };
 };
 
-export const todoReading = ({ items }: TodoList): Reading =>
-    items.length === 0
+export const ticketsReading = (tickets: Tickets): Reading => {
+    const facts = [...factsOf(tickets).values()];
+
+    return facts.length === 0
         ? { kind: 'none', title: 'Nothing to do' }
         : {
               kind: 'count',
-              title: 'To-dos',
-              done: items.filter(({ done }) => done).length,
-              total: items.length,
+              title: 'Tickets',
+              done: facts.filter(({ done }) => done).length,
+              total: facts.length,
           };
+};

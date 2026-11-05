@@ -3,16 +3,16 @@ import { map } from 'rxjs/operators';
 import type { Agenda } from './components/agenda/agenda.ts';
 import type { Focus, Plan } from './components/focus/focus.ts';
 import type { Reading } from './components/progress-bar/progress-bar.ts';
-import type { TodoList } from './components/todo/todo.ts';
+import type { Tickets } from './shared/tickets.ts';
 import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
-import { agendaReading, focusReading, todoReading } from './readings.ts';
+import { agendaReading, focusReading, ticketsReading } from './readings.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
 export type AgendaBinding = { readonly kind: 'agenda'; readonly store: StoreId };
-export type TodoBinding = { readonly kind: 'todo'; readonly store: StoreId };
+export type TicketsBinding = { readonly kind: 'tickets'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
@@ -22,7 +22,7 @@ export type Follow =
     | PlaybackBinding
     | FocusBinding
     | AgendaBinding
-    | TodoBinding
+    | TicketsBinding
     | SignalBinding
     | PaintBinding
     | PenBinding
@@ -33,7 +33,7 @@ export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
     readonly plan$: (store: StoreId) => Observable<Plan | null>;
     readonly agenda$: (store: StoreId) => Observable<Agenda>;
-    readonly todos$: (store: StoreId) => Observable<TodoList>;
+    readonly tickets$: (store: StoreId) => Observable<Tickets>;
     readonly now$: Observable<number>;
 };
 
@@ -66,13 +66,13 @@ const agendaSource = {
         ),
 } as const;
 
-const todoSource = {
-    kind: 'todo',
-    program: 'todo',
-    title: 'To-do list',
+const ticketsSource = {
+    kind: 'tickets',
+    program: 'tickets',
+    title: 'Tickets',
     access: 'read',
     read: (store: StoreId, sources: InputSources): Observable<Reading> =>
-        sources.todos$(store).pipe(map(todoReading)),
+        sources.tickets$(store).pipe(map(ticketsReading)),
 } as const;
 
 const signalSource = {
@@ -114,7 +114,7 @@ export const SOURCES = [
     playbackSource,
     focusSource,
     agendaSource,
-    todoSource,
+    ticketsSource,
     signalSource,
     paintSource,
     penSource,
@@ -166,7 +166,7 @@ export const sourceInput = {
     title: 'Source',
     from: 'followed',
     group: null,
-    sources: [focusSource, agendaSource, todoSource],
+    sources: [focusSource, agendaSource, ticketsSource],
     initial: { kind: 'focus', store: 'focus' },
 } as const satisfies FollowedInput;
 
@@ -336,8 +336,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return focusSource.program;
         case 'agenda':
             return agendaSource.program;
-        case 'todo':
-            return todoSource.program;
+        case 'tickets':
+            return ticketsSource.program;
         case 'signal':
             return signalSource.program;
         case 'paint':
@@ -359,8 +359,11 @@ export const progressBinding = (kind: string, store: StoreId) => {
             return { kind, store };
         case 'agenda':
             return { kind, store };
-        case 'todo':
+        case 'tickets':
             return { kind, store };
+        // Saved before to-do lists grew into tickets.
+        case 'todo':
+            return { kind: 'tickets' as const, store };
         case 'signal':
             return { kind, store };
         case 'paint':
@@ -404,8 +407,8 @@ export const readingOf = (binding: Follow, sources: InputSources): Observable<Re
             return focusSource.read(binding.store, sources);
         case 'agenda':
             return agendaSource.read(binding.store, sources);
-        case 'todo':
-            return todoSource.read(binding.store, sources);
+        case 'tickets':
+            return ticketsSource.read(binding.store, sources);
         default:
             return null;
     }

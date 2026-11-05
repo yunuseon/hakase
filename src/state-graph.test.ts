@@ -60,10 +60,10 @@ describe('graphOf', () => {
     });
 
     it('lists the app-wide globals last, and a main store that only holds data', () => {
-        const held = graphOf(run([]), inputsFor, titles, new Set(['board']), new Map());
+        const held = graphOf(run([]), inputsFor, titles, new Set(['tickets']), new Map());
 
-        expect(held.stores.map(({ target }) => target).slice(-6)).toEqual([
-            'store:board:board',
+        expect(held.stores.map(({ target }) => target)).toContain('store:tickets:tickets');
+        expect(held.stores.map(({ target }) => target).slice(-5)).toEqual([
             'global:workspace',
             'global:appearance',
             'global:formulas',
