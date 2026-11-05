@@ -10,6 +10,7 @@ import {
     ownPlaybackInput,
     playbackInput,
     progressInput,
+    sourceInput,
     type InputsFor,
 } from './inputs.ts';
 
@@ -31,4 +32,6 @@ export const inputsFor: InputsFor = program =>
                     ? { playback: ownPlaybackInput }
                     : program === 'playhead'
                       ? { progress: progressInput }
-                      : {};
+                      : program === 'progress'
+                        ? { source: sourceInput }
+                        : {};

@@ -132,3 +132,12 @@ button:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
 }
+
+.card[data-builtin] .name {
+    cursor: default;
+    border-color: transparent;
+}
+
+.card[data-builtin] .remove {
+    visibility: hidden;
+}

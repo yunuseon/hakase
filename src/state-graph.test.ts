@@ -75,11 +75,10 @@ describe('graphOf', () => {
     it('always offers what can be followed, a clock first, and a main store once something follows it', () => {
         const following: WorkspaceAction[] = [
             {
-                kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
-                source: 'focus',
-                store: 'focus',
+                kind: 'launch',
+                program: 'progress',
+                size: { width: 300, height: 130 },
+                viewport: { width: 1400, height: 900 },
             },
         ];
 
@@ -91,6 +90,6 @@ describe('graphOf', () => {
             ['timeline', 'playback'],
             ['focus', 'focus'],
         ]);
-        expect(windowOf(following, 'playhead-4')?.ports[0]?.bound).toBe('focus');
+        expect(windowOf(following, 'progress-5')?.ports[0]?.bound).toBe('focus');
     });
 });

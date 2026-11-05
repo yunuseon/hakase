@@ -17,8 +17,10 @@ import { parseSettings, type Settings } from './settings.ts';
 import { parsePicture } from './shared/picture.ts';
 import { parseSignal, reachedFrom, type Linked, type Signal } from './shared/signal.ts';
 import {
+    ensured,
     HOLDING,
     MAIN,
+    mainStore,
     settingsKey,
     type ClockSeed,
     type StoreEntry,
@@ -55,9 +57,9 @@ type Entries<M> =
 
 export type Held = { readonly [K in HeldKind]: Entries<Documents[K]> };
 
-export type PieceWindow = Draft & { readonly settings: Settings | null };
+export type BlueprintWindow = Draft & { readonly settings: Settings | null };
 
-export type PieceFormula = {
+export type BlueprintFormula = {
     readonly id: FormulaId;
     readonly label: string;
     readonly source: string;
@@ -66,49 +68,51 @@ export type PieceFormula = {
 export type Captured = {
     readonly name: string;
     readonly size: Size;
-    readonly windows: readonly PieceWindow[];
+    readonly windows: readonly BlueprintWindow[];
     readonly stores: readonly StoreEntry[];
     readonly held: Held;
-    readonly formulas: readonly PieceFormula[];
+    readonly formulas: readonly BlueprintFormula[];
     readonly links: readonly Link[];
 };
 
-export type Piece = Captured & { readonly id: string };
+export type Blueprint = Captured & { readonly id: string };
 
-export type Pieces = { readonly items: readonly Piece[] };
+export type Blueprints = { readonly items: readonly Blueprint[] };
 
-export const emptyPieces: Pieces = { items: [] };
+export const emptyBlueprints: Blueprints = { items: [] };
 
-export type PieceCommand =
-    | { readonly kind: 'add'; readonly piece: Captured }
+export type BlueprintCommand =
+    | { readonly kind: 'add'; readonly blueprint: Captured }
     | { readonly kind: 'rename'; readonly id: string; readonly name: string }
     | { readonly kind: 'remove'; readonly id: string };
 
 const named = (name: string) => name.trim() || 'Untitled';
 
-export const reducePieces = (
-    pieces: Pieces,
-    command: PieceCommand,
+export const reduceBlueprints = (
+    blueprints: Blueprints,
+    command: BlueprintCommand,
     { seq }: { readonly seq: number },
-): Pieces => {
+): Blueprints => {
     switch (command.kind) {
         case 'add':
-            return { items: [...pieces.items, { ...command.piece, id: `piece-${seq}` }] };
+            return {
+                items: [...blueprints.items, { ...command.blueprint, id: `blueprint-${seq}` }],
+            };
         case 'rename': {
             const name = named(command.name);
 
-            return pieces.items.some(({ id, name: was }) => id === command.id && was !== name)
+            return blueprints.items.some(({ id, name: was }) => id === command.id && was !== name)
                 ? {
-                      items: pieces.items.map(piece =>
-                          piece.id === command.id ? { ...piece, name } : piece,
+                      items: blueprints.items.map(blueprint =>
+                          blueprint.id === command.id ? { ...blueprint, name } : blueprint,
                       ),
                   }
-                : pieces;
+                : blueprints;
         }
         case 'remove':
-            return pieces.items.some(({ id }) => id === command.id)
-                ? { items: pieces.items.filter(({ id }) => id !== command.id) }
-                : pieces;
+            return blueprints.items.some(({ id }) => id === command.id)
+                ? { items: blueprints.items.filter(({ id }) => id !== command.id) }
+                : blueprints;
     }
 };
 
@@ -122,7 +126,7 @@ const formulaOf = (settings: Settings | null) =>
     settings?.kind === 'sketch' || settings?.kind === 'formula' ? [settings.formula] : [];
 
 // A clock is carried only with a timeline window to play it; a window on any other clock is placed on the main one.
-export const pieceOf = (
+export const blueprintOf = (
     documents: Documents,
     playback: ReadonlyMap<StoreId, ClockSeed>,
     sectionId: string,
@@ -145,7 +149,7 @@ export const pieceOf = (
                     : binding,
             ]),
         );
-    const windows = inside.map((process): PieceWindow => ({
+    const windows = inside.map((process): BlueprintWindow => ({
         id: process.id,
         program: process.program,
         store: process.store,
@@ -181,7 +185,7 @@ export const pieceOf = (
             : [{ id, program, name: entry?.name ?? MAIN, kept: true, copy: null, clock }];
     });
     const formulas = [...new Set(windows.flatMap(({ settings }) => formulaOf(settings)))].flatMap(
-        (id): PieceFormula[] => {
+        (id): BlueprintFormula[] => {
             if (isCustomId(id)) {
                 const item = documents.library.items.find(candidate => candidate.id === id);
 
@@ -221,7 +225,7 @@ export const pieceOf = (
     };
 };
 
-const formulaIdsIn = (library: Library, formulas: readonly PieceFormula[]) =>
+const formulaIdsIn = (library: Library, formulas: readonly BlueprintFormula[]) =>
     formulas.reduce(
         ({ ids, items, made }, formula) => {
             const same = items.find(({ source }) => source === formula.source);
@@ -245,23 +249,23 @@ const formulaIdsIn = (library: Library, formulas: readonly PieceFormula[]) =>
 
 export const placed = (
     documents: Documents,
-    piece: Piece,
+    blueprint: Blueprint,
     view: Rect,
     seq: number,
     inputsFor: InputsFor,
 ): Documents => {
     const { workspace } = documents;
     const storeIds = new Map(
-        piece.stores.map(({ id }, index) => [id, `store-${seq}-${index + 1}`]),
+        blueprint.stores.map(({ id }, index) => [id, `store-${seq}-${index + 1}`]),
     );
     const windowIds = new Map(
-        piece.windows.map(({ id, program }, index) => [id, `${program}-${seq}-${index + 1}`]),
+        blueprint.windows.map(({ id, program }, index) => [id, `${program}-${seq}-${index + 1}`]),
     );
     const storeOf = (id: StoreId) => storeIds.get(id) ?? id;
     const sourceOf = (id: StoreId | null) => (id === null ? null : storeOf(id));
-    const x = Math.round(view.x + (view.width - piece.size.width) / 2);
-    const y = Math.round(view.y + (view.height - piece.size.height) / 2);
-    const processes = piece.windows
+    const x = Math.round(view.x + (view.width - blueprint.size.width) / 2);
+    const y = Math.round(view.y + (view.height - blueprint.size.height) / 2);
+    const processes = blueprint.windows
         .map((window): Draft => ({
             id: windowIds.get(window.id) ?? window.id,
             program: window.program,
@@ -276,12 +280,12 @@ export const placed = (
             measured: window.measured,
         }))
         .filter(ownsInputs(inputsFor));
-    const formulas = formulaIdsIn(documents.library, piece.formulas);
+    const formulas = formulaIdsIn(documents.library, blueprint.formulas);
     const settled = (settings: Settings): Settings =>
         settings.kind === 'sketch' || settings.kind === 'formula'
             ? { ...settings, formula: formulas.ids.get(settings.formula) ?? settings.formula }
             : settings;
-    const settings = piece.windows.flatMap(({ id, program, store, settings: saved }) =>
+    const settings = blueprint.windows.flatMap(({ id, program, store, settings: saved }) =>
         saved === null
             ? []
             : [
@@ -302,7 +306,7 @@ export const placed = (
                   ...map,
                   ...entries.map(([id, value]): [StoreId, V] => [storeOf(id), relink(value)]),
               ]);
-    const { held } = piece;
+    const { held } = blueprint;
 
     return {
         ...documents,
@@ -310,19 +314,25 @@ export const placed = (
             ...workspace,
             launched: workspace.launched + processes.length,
             processes: [...workspace.processes, ...processes],
-            stores: [
-                ...workspace.stores,
-                ...piece.stores.map((entry): StoreEntry => ({
-                    ...entry,
-                    id: storeOf(entry.id),
-                    // A copy is not its program's main store, so it should not answer to the name.
-                    name: entry.name === MAIN ? piece.name : entry.name,
-                    kept: HOLDING[entry.program]?.sharing !== 'private',
-                })),
-            ],
+            // A window on its program's main store registers it, as a launch would, or it shows no chip.
+            stores: processes
+                .filter(({ program, store }) => store === program)
+                .reduce<readonly StoreEntry[]>(
+                    (all, { program }) => ensured(all, mainStore(program)),
+                    [
+                        ...workspace.stores,
+                        ...blueprint.stores.map((entry): StoreEntry => ({
+                            ...entry,
+                            id: storeOf(entry.id),
+                            // A copy is not its program's main store, so it should not answer to the name.
+                            name: entry.name === MAIN ? blueprint.name : entry.name,
+                            kept: HOLDING[entry.program]?.sharing !== 'private',
+                        })),
+                    ],
+                ),
             links: [
                 ...workspace.links,
-                ...piece.links.flatMap(({ a, b }) => {
+                ...blueprint.links.flatMap(({ a, b }) => {
                     const from = windowIds.get(a);
                     const to = windowIds.get(b);
 
@@ -333,8 +343,8 @@ export const placed = (
                 ...workspace.sections,
                 {
                     id: `section-${seq}`,
-                    name: piece.name,
-                    rect: { x, y, width: piece.size.width, height: piece.size.height },
+                    name: blueprint.name,
+                    rect: { x, y, width: blueprint.size.width, height: blueprint.size.height },
                 },
             ],
         },
@@ -399,7 +409,7 @@ const entriesOf = <V>(value: unknown, parse: (stored: unknown) => V) =>
 const finite = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
-const pieceFrom = (value: unknown, inputsFor: InputsFor): Piece[] => {
+const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
     if (typeof value !== 'object' || value === null) {
         return [];
     }
@@ -427,7 +437,7 @@ const pieceFrom = (value: unknown, inputsFor: InputsFor): Piece[] => {
             name,
             size: { width, height },
             windows: Array.isArray(windows)
-                ? windows.flatMap((stored: unknown): PieceWindow[] => {
+                ? windows.flatMap((stored: unknown): BlueprintWindow[] => {
                       const draft = processFrom(stored, inputsFor);
                       const settings =
                           typeof stored === 'object' && stored !== null
@@ -453,7 +463,7 @@ const pieceFrom = (value: unknown, inputsFor: InputsFor): Piece[] => {
                 drums: entriesOf(heldOf('drums'), parseDrums),
             },
             formulas: Array.isArray(formulas)
-                ? formulas.flatMap((stored: unknown): PieceFormula[] => {
+                ? formulas.flatMap((stored: unknown): BlueprintFormula[] => {
                       if (typeof stored !== 'object' || stored === null) {
                           return [];
                       }
@@ -475,10 +485,10 @@ const pieceFrom = (value: unknown, inputsFor: InputsFor): Piece[] => {
     ];
 };
 
-export const parsePieces = (value: unknown, inputsFor: InputsFor): Pieces => {
+export const parseBlueprints = (value: unknown, inputsFor: InputsFor): Blueprints => {
     const items = typeof value === 'object' && value !== null ? field(value, 'items') : undefined;
 
     return Array.isArray(items)
-        ? { items: items.flatMap((item: unknown) => pieceFrom(item, inputsFor)) }
-        : emptyPieces;
+        ? { items: items.flatMap((item: unknown) => blueprintFrom(item, inputsFor)) }
+        : emptyBlueprints;
 };

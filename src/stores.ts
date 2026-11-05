@@ -30,13 +30,14 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     pen: document,
     voice: document,
     drums: document,
-    pieces: null,
+    blueprints: null,
     tasks: null,
     todo: document,
     board: document,
     note: document,
     focus: document,
     agenda: document,
+    progress: null,
     habits: document,
     clocks: document,
     bookmarks: document,
@@ -52,7 +53,7 @@ export type StoreEntry = {
     readonly kept: boolean;
     // The store this one was split off from, so its content can be copied in once.
     readonly copy: StoreId | null;
-    // A clock placed from a piece: its loop as it was saved, since the clock it was saved from may be gone.
+    // A clock placed from a blueprint: its loop as it was saved, since the clock it was saved from may be gone.
     readonly clock: ClockSeed | null;
 };
 

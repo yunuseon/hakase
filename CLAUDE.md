@@ -1199,6 +1199,25 @@ what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
 
+## Progress
+
+`progress` shows what a timer or a plan is doing: a bar with a title, the time
+left and the span, following a focus timer (its phase) or an agenda (the block
+now, or the next one, named, with an empty bar). It is a separate program from
+the dial on purpose. The dial once followed focus too, read-only, and it looked
+like a disabled control; and a reading has more to say than a fraction — a
+name, the time left, what comes next — which a scrub control has no room for.
+So a control scrubs (`playhead`) and an indicator reads (`progress`), and they
+share no type. A saved dial that followed focus falls back to its main clock.
+
+A source is read into a `Reading` (`now`, `next` or `none`) by pure functions in
+`src/readings.ts` (`agendaReading`, `focusReading`), and `barView` turns that
+into the text and fill the component applies. The agenda's reading moves with
+the wall clock, which reaches `inputs.ts` as `InputSources.now$` rather than an
+import: the input definitions are plain data the tests load, and `lib/rx.ts`
+touches `window`. A new readable kind is a source with a `read`, a case in
+`readingOf`, and one entry in `sourceInput.sources`.
+
 ## The plot
 
 `plot` draws signals as curves over the loop, like an oscilloscope: four optional inputs, `a` to `d`
@@ -1436,15 +1455,17 @@ to whichever program owns the store (`ownerOf`), and `reachedFrom`,
 `closesLoop`, the prune and the state map read every linked map alike, so a
 signal feeding a pen or a voice is kept by a prune and a pen cannot be wired into a loop.
 
-## Pieces
+## Blueprints
 
-A **piece** is a creation kept to be placed again: everything inside a section,
-saved from the section label's **Save as piece**, listed in the **pieces**
-window and placed from there. It is a document like the formula library
-(`Documents.pieces`, saved in the snapshot), so saving, renaming, deleting and
+A **blueprint** is a creation kept to be placed again: everything inside a
+section, saved from the section label's **Save as blueprint**, listed in the
+**blueprints** window and placed from there. It was called a piece; `RENAMED`
+maps the old `pieces` window, and the snapshot is read from `pieces` when it
+has no `blueprints`. It is a document like the formula library
+(`Documents.blueprints`, saved in the snapshot), so saving, renaming, deleting and
 placing are ordinary steps; one undo takes a whole placement back.
 
-`pieceOf` (in `src/pieces.ts`, pure) captures the section's windows with frames
+`blueprintOf` (in `src/blueprints.ts`, pure) captures the section's windows with frames
 relative to it, their settings, every store they keep or follow **and what
 those follow** (`reachedFrom`, so a signal that only modulates another comes
 along), the documents of those stores, the formulas they show (a saved formula,
@@ -1460,11 +1481,11 @@ hands it to the clocks fold as the store first appears, the way `copy` does
 for a fork.
 
 **Placing makes a fresh copy, never a link.** `placed` names every store,
-window and section from the log's sequence (`store-<seq>-<n>`), so a piece
-placed twice is two pieces, and rewrites every reference to the copies:
+window and section from the log's sequence (`store-<seq>-<n>`), so a blueprint
+placed twice is two copies, and rewrites every reference to the copies:
 bindings, a signal's, pen's or voice's sources, the settings keys, the links.
 A formula is matched against the library by its source and added only if it
-is new. A copy of a program's Main store takes the piece's name, since it is
+is new. A copy of a program's Main store takes the blueprint's name, since it is
 not that program's main store.
 
 **Place picks the spot first.** **Place** starts **placing**, a mode, not a
@@ -1480,10 +1501,28 @@ carries `data-ground`, which the canvas reads as ground, so the wheel still
 pans and zooms while placing. Nothing of it is saved or undone; only the drop
 is a step.
 
-A piece from storage is untrusted like the rest of the snapshot:
-`parsePieces` reads windows with the workspace's own `processFrom`, stores with
+A blueprint from storage is untrusted like the rest of the snapshot:
+`parseBlueprints` reads windows with the workspace's own `processFrom`, stores with
 `storeFrom`, settings and every document with their own parsers, and placing
 keeps only windows that `ownsInputs` accepts.
+
+**Some blueprints come with the app.** `STARTERS` in `src/starters.ts` are
+plain `Blueprint` values with a summary, for organising a day: **Today**
+(agenda, a progress bar on it, todo), **Focus session** (a fresh board, the
+focus timer, a progress bar on it) and **Daily review** (a fresh note opened
+on a review template, habits, todo). They are listed above the saved ones, and
+cannot be renamed or deleted, like built-in formulas; `blueprintIn` is the one
+lookup, so placing, the ghost and the history label all find them. Like the
+formula registry they are never seeded into the document, so a starter changed
+in code reaches every user.
+
+**A starter may work on the main stores instead of copies.** A window on a
+store the blueprint does not list keeps that id when placed, so Today shows
+your todo list rather than an empty one; only what should start fresh (the
+session's board, tonight's note) is listed and copied. A saved blueprint lists
+everything it binds, so it still copies everything. `placed` registers a main
+store a window lands on, as a launch would, or a main store never opened before
+(habits) has no entry and its window no chip.
 
 ## State mode, on the canvas
 
@@ -1699,10 +1738,10 @@ A window binds its own state and may read one **input** beside it, from another
 program's store. **Each program declares its inputs** (`Program.inputs`, built
 from the definitions in `src/inputs.ts`): the sketch takes `playbackInput`, the
 timeline `ownPlaybackInput` (its clock is its own store, so it follows nothing),
-and the dial `progressInput`, which accepts a `playback` clock (scrubbable) or a
-`focus` timer (read-only). An input definition is inert data: its title, the
-kinds it accepts, where a new window starts (`initial`, the main clock), and per
-kind how a store of it connects (`connect`). `from: 'followed'` bindings belong
+the dial `progressInput`, which accepts a `playback` clock only, and the
+progress bar `sourceInput`, which accepts a `focus` timer or an `agenda`. An input
+definition is inert data: its title, the kinds it accepts, where a new window
+starts (`initial`), and per readable kind how a store of it is read (`read`). `from: 'followed'` bindings belong
 to a process; `from: 'store'` bindings belong to the document it is showing.
 There is no separate table to keep
 in step: adding an input is one field on the program.
@@ -1712,7 +1751,7 @@ says so.** The program table is a record keyed by id (`src/programs.ts`,
 `satisfies { [K in ProgramId]: Program<K> }`), and `Process` is derived from it
 with `import type`: one member per program, whose `follows` is a record keyed by
 input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding, k1?:
-SignalBinding, … }`, the dial's `{ progress: PlaybackBinding | FocusBinding }`,
+SignalBinding, … }`, the dial's `{ progress: PlaybackBinding }`,
 a todo's and a timeline's have no keys at all, so a focus binding on a sketch
 does not type-check. An input whose `initial` is `null` is **optional**: a new
 window starts without it, its key is optional in the type, `fits` does not
@@ -1752,12 +1791,9 @@ conditional falls back to the constraint and lets every kind through.
   playback binding to the same store, and a saved array of follows goes to the
   first input that accepts each kind; a forged one falls back to the input's
   `initial`.
-- `scoped` gives each window `progress$`: the connection its input makes for the
-  selected binding (`progressConnection`), with its access and a stream of
-  positions. It changes on a rebind, not on ticks. The dial subscribes to
-  gestures only while the source is scrubbable (`progressScrubs$`), and the
-  circular slider shows read-only progress (role `progressbar`, a hint) without
-  learning which program supplied it. A focus timer is never made seekable.
+- `scoped` gives each window `reading$`: what its `source` input's store is
+  doing, as a `Reading` (`readingOf`), switched on a rebind. The dial needs none
+  of it: it reads `playhead$` like a sketch and always scrubs.
 - `liveProcess$` stamps each input with the window's playback target, or null
   when it has none (`playbackBinding`: a timeline's own store, a scrubbable
   binding otherwise). `routePlayback$` feeds those to the clocks fold; its pure
@@ -1766,8 +1802,8 @@ conditional falls back to the constraint and lets every kind through.
   name the **old** target: stamping it with the new binding would strand the old
   hold.
 - The popover has one section per kind each followed input accepts. The source is named
-  only where there is a choice ("Progress · Focus · read-only"; the sketch's
-  section is just "Playback"). A followed store is in use for pruning, deletion
+  only where there is a choice ("Source · Focus" and "Source · Agenda"; the
+  sketch's section is just "Playback"). A followed store is in use for pruning, deletion
   and counts. Forking copies the canonical document once, clocks and focus
   timers starting paused; a connection is never saved or forked.
 

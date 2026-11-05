@@ -3,7 +3,7 @@ import type { Phase } from './shared/drag.ts';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { FormulaId, Library, LibraryCommand } from './library.ts';
-import type { PieceCommand, Pieces } from './pieces.ts';
+import type { BlueprintCommand, Blueprints } from './blueprints.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
@@ -30,7 +30,7 @@ import type { Todo, TodoCommand } from './components/todo/todo.ts';
 import type { Settings } from './settings.ts';
 import type { ProgramInputs } from './inputs.ts';
 import type { PlaybackBinding } from './inputs.ts';
-import type { ProgressConnection } from './progress.ts';
+import type { Reading } from './components/progress-bar/progress-bar.ts';
 import type { TransportCommand } from './shared/playhead.ts';
 
 export const PROGRAM_IDS = [
@@ -46,13 +46,14 @@ export const PROGRAM_IDS = [
     'pen',
     'voice',
     'drums',
-    'pieces',
+    'blueprints',
     'tasks',
     'todo',
     'board',
     'note',
     'focus',
     'agenda',
+    'progress',
     'habits',
     'clocks',
     'bookmarks',
@@ -84,8 +85,8 @@ export type AppInput =
     | { readonly kind: 'take-back'; readonly id: number }
     | { readonly kind: 'settings'; readonly settings: Settings }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
-    | { readonly kind: 'piece'; readonly command: PieceCommand }
-    | { readonly kind: 'place-piece'; readonly id: string }
+    | { readonly kind: 'blueprint'; readonly command: BlueprintCommand }
+    | { readonly kind: 'place-blueprint'; readonly id: string }
     | { readonly kind: 'todo'; readonly command: TodoCommand }
     | { readonly kind: 'board'; readonly command: BoardCommand }
     | { readonly kind: 'note'; readonly command: NoteCommand }
@@ -127,7 +128,7 @@ export type Task = {
 };
 
 export type AppState = {
-    readonly progress$: Observable<ProgressConnection>;
+    readonly reading$: Observable<Reading>;
     readonly playhead$: Observable<number>;
     readonly playing$: Observable<boolean>;
     readonly looping$: Observable<boolean>;
@@ -141,7 +142,7 @@ export type AppState = {
     readonly error$: (formula: FormulaId) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
     readonly library$: Observable<Library>;
-    readonly pieces$: Observable<Pieces>;
+    readonly blueprints$: Observable<Blueprints>;
     readonly tasks$: Observable<readonly Task[]>;
     readonly todos$: Observable<readonly Todo[]>;
     readonly board$: Observable<Board>;

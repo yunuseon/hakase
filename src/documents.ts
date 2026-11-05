@@ -50,7 +50,8 @@ import {
     type VoiceCommand,
 } from './components/voice/voice.ts';
 import { isProgramId } from './program.ts';
-import { placed, reducePieces, type PieceCommand, type Pieces } from './pieces.ts';
+import { placed, reduceBlueprints, type BlueprintCommand, type Blueprints } from './blueprints.ts';
+import { blueprintIn } from './starters.ts';
 import type { Rect } from './shared/camera.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
@@ -112,7 +113,7 @@ export type Documents = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly library: Library;
-    readonly pieces: Pieces;
+    readonly blueprints: Blueprints;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
     readonly looks: ReadonlyMap<AppearanceName, Written<Appearance>>;
@@ -148,8 +149,8 @@ export type DocumentAction =
           };
       }[StoreDocument]
     | { readonly kind: 'library'; readonly command: LibraryCommand }
-    | { readonly kind: 'pieces'; readonly command: PieceCommand }
-    | { readonly kind: 'place'; readonly piece: string; readonly view: Rect }
+    | { readonly kind: 'blueprints'; readonly command: BlueprintCommand }
+    | { readonly kind: 'place'; readonly blueprint: string; readonly view: Rect }
     | {
           readonly kind: 'link';
           readonly store: StoreId;
@@ -470,17 +471,19 @@ export const reduceDocuments =
 
                 return library === documents.library ? documents : { ...documents, library };
             }
-            case 'pieces': {
-                const pieces = reducePieces(documents.pieces, action.command, { seq });
+            case 'blueprints': {
+                const blueprints = reduceBlueprints(documents.blueprints, action.command, { seq });
 
-                return pieces === documents.pieces ? documents : { ...documents, pieces };
+                return blueprints === documents.blueprints
+                    ? documents
+                    : { ...documents, blueprints };
             }
             case 'place': {
-                const piece = documents.pieces.items.find(({ id }) => id === action.piece);
+                const blueprint = blueprintIn(documents.blueprints, action.blueprint);
 
-                return piece === undefined
+                return blueprint === undefined
                     ? documents
-                    : placed(documents, piece, action.view, seq, inputsFor);
+                    : placed(documents, blueprint, action.view, seq, inputsFor);
             }
             case 'formula':
                 return documents.formulas.get(action.formula)?.value === action.text
@@ -545,9 +548,9 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'look':
         case 'place':
             return { key: action.kind, joins: false };
-        case 'pieces':
+        case 'blueprints':
             return action.command.kind === 'rename'
-                ? { key: `piece:${action.command.id}`, joins: true }
+                ? { key: `blueprint:${action.command.id}`, joins: true }
                 : { key: action.kind, joins: false };
         case 'link':
             return { key: `link:${action.store}:${action.param}`, joins: false };
@@ -623,20 +626,20 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return action.command.kind === 'remove'
                 ? 'Deleted a formula'
                 : `Saved formula ${action.command.label}`;
-        case 'pieces': {
+        case 'blueprints': {
             const { command } = action;
-            const was = before.pieces.items.find(
+            const was = before.blueprints.items.find(
                 ({ id }) => command.kind !== 'add' && id === command.id,
             );
 
             return command.kind === 'add'
-                ? `Saved piece ${command.piece.name}`
+                ? `Saved blueprint ${command.blueprint.name}`
                 : command.kind === 'rename'
-                  ? `Renamed piece ${was?.name ?? ''} to ${command.name}`
-                  : `Deleted piece ${was?.name ?? ''}`;
+                  ? `Renamed blueprint ${was?.name ?? ''} to ${command.name}`
+                  : `Deleted blueprint ${was?.name ?? ''}`;
         }
         case 'place':
-            return `Placed piece ${before.pieces.items.find(({ id }) => id === action.piece)?.name ?? ''}`;
+            return `Placed blueprint ${blueprintIn(before.blueprints, action.blueprint)?.name ?? ''}`;
         case 'formula':
             return `Edited formula ${before.library.items.find(({ id }) => id === action.formula)?.label ?? action.formula}`;
         case 'theme':

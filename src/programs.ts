@@ -15,7 +15,8 @@ import { paintProgram } from './programs/paint.program.ts';
 import { penProgram } from './programs/pen.program.ts';
 import { voiceProgram } from './programs/voice.program.ts';
 import { drumsProgram } from './programs/drums.program.ts';
-import { piecesProgram } from './programs/pieces.program.ts';
+import { blueprintsProgram } from './programs/blueprints.program.ts';
+import { progressProgram } from './programs/progress.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
@@ -37,13 +38,14 @@ export const programs = {
     pen: penProgram,
     voice: voiceProgram,
     drums: drumsProgram,
-    pieces: piecesProgram,
+    blueprints: blueprintsProgram,
     tasks: tasksProgram,
     todo: todoProgram,
     board: boardProgram,
     note: noteProgram,
     focus: focusProgram,
     agenda: agendaProgram,
+    progress: progressProgram,
     habits: habitsProgram,
     clocks: clocksProgram,
     bookmarks: bookmarksProgram,

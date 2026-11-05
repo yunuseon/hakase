@@ -31,7 +31,7 @@ import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
 import { parseWorkspace, type Workspace } from './workspace.ts';
-import { emptyPieces, parsePieces, type Pieces } from './pieces.ts';
+import { emptyBlueprints, parseBlueprints, type Blueprints } from './blueprints.ts';
 
 const KEY = 'hakase.state';
 const VERSION = 1;
@@ -62,7 +62,7 @@ export type Snapshot = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly library: Library;
-    readonly pieces: Pieces;
+    readonly blueprints: Blueprints;
     readonly seq: number;
 };
 
@@ -157,7 +157,7 @@ const fresh: Restored = {
     voices: new Map(),
     drums: new Map(),
     library: emptyLibrary,
-    pieces: emptyPieces,
+    blueprints: emptyBlueprints,
     seq: 0,
 };
 
@@ -218,7 +218,10 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
         library: parseLibrary(field(stored, 'library')),
-        pieces: parsePieces(field(stored, 'pieces'), inputsFor),
+        blueprints: parseBlueprints(
+            field(stored, 'blueprints') ?? field(stored, 'pieces'),
+            inputsFor,
+        ),
         seq: seqFrom(field(stored, 'seq')),
     };
 };
@@ -256,7 +259,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         voices: saved(snapshot.voices),
         drums: saved(snapshot.drums),
         library: snapshot.library,
-        pieces: snapshot.pieces,
+        blueprints: snapshot.blueprints,
         seq: snapshot.seq,
     };
 };

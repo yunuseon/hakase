@@ -1,9 +1,10 @@
 import type { Size } from '../window/frame.ts';
 
-export type PieceCard = {
+export type BlueprintCard = {
     readonly id: string;
     readonly name: string;
     readonly size: Size;
+    readonly summary: string | null;
     readonly windows: readonly {
         readonly x: number;
         readonly y: number;
@@ -12,7 +13,7 @@ export type PieceCard = {
     }[];
 };
 
-export type PieceEvent =
+export type BlueprintEvent =
     | { readonly kind: 'place'; readonly id: string }
     | { readonly kind: 'rename'; readonly id: string; readonly name: string }
     | { readonly kind: 'remove'; readonly id: string };

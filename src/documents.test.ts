@@ -10,7 +10,7 @@ import {
 } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
-import { emptyPieces } from './pieces.ts';
+import { emptyBlueprints } from './blueprints.ts';
 import { defaultSketch } from './settings.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { entriesOf, startTimeline } from './timeline.ts';
@@ -34,7 +34,7 @@ const started = (): Documents => ({
     voices: new Map(),
     drums: new Map(),
     library: emptyLibrary,
-    pieces: emptyPieces,
+    blueprints: emptyBlueprints,
     formulas: new Map(),
     themes: new Map(),
     looks: new Map(),

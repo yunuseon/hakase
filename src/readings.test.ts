@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { initialFocus, reduceFocus } from './components/focus/focus.ts';
+import { agendaReading, focusReading } from './readings.ts';
+
+const block = (id: string, day: string, start: number, end: number, title = '') => ({
+    id,
+    day,
+    start,
+    end,
+    title,
+});
+
+const agenda = {
+    made: 4,
+    blocks: [
+        block('block-1', '2026-11-05', 600, 660, 'Standup'),
+        block('block-2', '2026-11-05', 630, 645),
+        block('block-3', '2026-11-05', 720, 780, 'Lunch'),
+        block('block-4', '2026-11-06', 600, 660),
+    ],
+};
+
+describe('agendaReading', () => {
+    it('reads how far through the current block now is', () => {
+        expect(agendaReading(agenda, '2026-11-05', 620)).toEqual({
+            kind: 'now',
+            title: 'Standup',
+            at: 1 / 3,
+            remaining: 40 * 60_000,
+            running: true,
+            span: { start: '10:00', end: '11:00' },
+        });
+    });
+
+    it('follows the block that began last where blocks overlap', () => {
+        expect(agendaReading(agenda, '2026-11-05', 640)).toMatchObject({
+            title: 'Untitled',
+            at: 2 / 3,
+        });
+    });
+
+    it('names the next block between blocks', () => {
+        expect(agendaReading(agenda, '2026-11-05', 690)).toEqual({
+            kind: 'next',
+            title: 'Lunch',
+            remaining: 30 * 60_000,
+            span: { start: '12:00', end: '13:00' },
+        });
+    });
+
+    it('has nothing after the last block or on an empty day', () => {
+        expect(agendaReading(agenda, '2026-11-05', 780).kind).toBe('none');
+        expect(agendaReading(agenda, '2026-11-07', 620).kind).toBe('none');
+    });
+});
+
+describe('focusReading', () => {
+    it('reads the phase, its progress and whether it runs', () => {
+        const running = reduceFocus(initialFocus, { kind: 'command', command: { kind: 'toggle' } });
+        const halfway = reduceFocus(running, { kind: 'tick', ms: running.remaining / 2 });
+
+        expect(focusReading(halfway)).toEqual({
+            kind: 'now',
+            title: 'Focus',
+            at: 0.5,
+            remaining: halfway.remaining,
+            running: true,
+            span: null,
+        });
+        expect(focusReading(initialFocus)).toMatchObject({ at: 0, running: false });
+    });
+});

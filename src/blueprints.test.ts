@@ -3,7 +3,13 @@ import { defaultVoice } from './components/voice/voice.ts';
 import { documentsKit, reduceHistory, seqFloor, type Documents } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
-import { emptyPieces, parsePieces, pieceOf, placed, type Piece } from './pieces.ts';
+import {
+    emptyBlueprints,
+    parseBlueprints,
+    blueprintOf,
+    placed,
+    type Blueprint,
+} from './blueprints.ts';
 import { defaultSketch } from './settings.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { startTimeline } from './timeline.ts';
@@ -115,7 +121,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         ]),
         drums: new Map(),
         library: { items: [{ id: 'custom-1', label: 'Chladni', source: 'vec4 formula' }], made: 1 },
-        pieces: emptyPieces,
+        blueprints: emptyBlueprints,
         formulas: new Map(),
         themes: new Map(),
         looks: new Map(),
@@ -125,34 +131,34 @@ const scene = (extra: readonly Process[] = []): Documents => {
 
 const playback = new Map([['timeline', { duration: 6, looping: true }]]);
 
-const saved = (documents: Documents): Piece => {
-    const captured = pieceOf(documents, playback, 'section-1');
+const saved = (documents: Documents): Blueprint => {
+    const captured = blueprintOf(documents, playback, 'section-1');
 
     if (captured === null) {
         throw new Error('nothing captured');
     }
 
-    return { ...captured, id: 'piece-1' };
+    return { ...captured, id: 'blueprint-1' };
 };
 
-describe('a piece', () => {
+describe('a blueprint', () => {
     it('keeps a section: its windows, the states they keep and follow, chains and all', () => {
-        const piece = saved(scene());
+        const blueprint = saved(scene());
 
-        expect(piece.name).toBe('Twinkle');
-        expect(piece.windows.map(({ id }) => id)).toEqual(['signal-1', 'voice-1', 'sketch-1']);
-        expect(piece.windows[0]?.frame).toMatchObject({ x: 20, y: 20 });
-        expect(piece.stores.map(({ id }) => id).sort()).toEqual([
+        expect(blueprint.name).toBe('Twinkle');
+        expect(blueprint.windows.map(({ id }) => id)).toEqual(['signal-1', 'voice-1', 'sketch-1']);
+        expect(blueprint.windows[0]?.frame).toMatchObject({ x: 20, y: 20 });
+        expect(blueprint.stores.map(({ id }) => id).sort()).toEqual([
             'sketch-1',
             'store-a',
             'store-b',
             'voice',
         ]);
-        expect(piece.held.signals.map(([id]) => id).sort()).toEqual(['store-a', 'store-b']);
-        expect(piece.formulas).toEqual([
+        expect(blueprint.held.signals.map(([id]) => id).sort()).toEqual(['store-a', 'store-b']);
+        expect(blueprint.formulas).toEqual([
             { id: 'custom-1', label: 'Chladni', source: 'vec4 formula' },
         ]);
-        expect(piece.links).toEqual([{ a: 'signal-1', b: 'voice-1' }]);
+        expect(blueprint.links).toEqual([{ a: 'signal-1', b: 'voice-1' }]);
     });
 
     it('places a fresh copy in view, every wire pointing at the copies', () => {
@@ -194,17 +200,17 @@ describe('a piece', () => {
             frame: frame(420, 420),
             measured,
         };
-        const piece = saved(scene([timeline]));
+        const blueprint = saved(scene([timeline]));
         const after = placed(
             scene([timeline]),
-            piece,
+            blueprint,
             { x: 0, y: 0, width: 900, height: 900 },
             7,
             inputsFor,
         );
         const seeded = after.workspace.stores.find(({ clock }) => clock !== null);
 
-        expect(piece.stores.find(({ id }) => id === 'timeline')?.clock).toEqual({
+        expect(blueprint.stores.find(({ id }) => id === 'timeline')?.clock).toEqual({
             duration: 6,
             looping: true,
         });
@@ -216,11 +222,17 @@ describe('a piece', () => {
 
     it('reuses a saved formula the library already holds, and adds one it does not', () => {
         const before = scene();
-        const piece = {
+        const blueprint = {
             ...saved(before),
             formulas: [{ id: 'custom-1' as const, label: 'X', source: 'other' }],
         };
-        const after = placed(before, piece, { x: 0, y: 0, width: 900, height: 900 }, 9, inputsFor);
+        const after = placed(
+            before,
+            blueprint,
+            { x: 0, y: 0, width: 900, height: 900 },
+            9,
+            inputsFor,
+        );
 
         expect(after.library.items.map(({ id }) => id)).toEqual(['custom-1', 'custom-2']);
         expect(after.settings.get('store-9-1')).toBeUndefined();
@@ -236,12 +248,15 @@ describe('a piece', () => {
         const reduce = reduceHistory(kit);
         const documents = scene();
         const history = [
-            { kind: 'pieces' as const, command: { kind: 'add' as const, piece: saved(documents) } },
+            {
+                kind: 'blueprints' as const,
+                command: { kind: 'add' as const, blueprint: saved(documents) },
+            },
         ].reduce(reduce, startTimeline(documents, seqFloor(documents)));
-        const [piece] = history.present.pieces.items;
+        const [blueprint] = history.present.blueprints.items;
         const placedOnce = reduce(history, {
             kind: 'place',
-            piece: piece?.id ?? '',
+            blueprint: blueprint?.id ?? '',
             view: { x: 0, y: 0, width: 900, height: 900 },
         });
 
@@ -249,9 +264,9 @@ describe('a piece', () => {
         expect(reduce(placedOnce, { kind: 'undo' }).present.workspace.processes).toHaveLength(
             windows.length,
         );
-        expect(parsePieces(JSON.parse(JSON.stringify(history.present.pieces)), inputsFor)).toEqual(
-            history.present.pieces,
-        );
+        expect(
+            parseBlueprints(JSON.parse(JSON.stringify(history.present.blueprints)), inputsFor),
+        ).toEqual(history.present.blueprints);
         expect(emptyLibrary.items).toEqual([]);
     });
 });

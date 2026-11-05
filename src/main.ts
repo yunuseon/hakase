@@ -24,6 +24,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import './styles.css';
+import type { Reading } from './components/progress-bar/progress-bar.ts';
 import { variables, type Appearance } from './appearance.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
 import { centredOn, centreOf, fitted, flight, IDENTITY, zoomLabel } from './shared/camera.ts';
@@ -69,14 +70,12 @@ import { emptyHabits } from './components/habits/habits.ts';
 import { emptyNotes } from './components/note/note.ts';
 import { emptyTodos } from './components/todo/todo.ts';
 import {
-    definitionOf,
     followedBy,
     type Bindings,
     followedStores,
     playbackBinding,
-    progressConnection,
+    readingOf,
     type InputsFor,
-    type ProgramInputs,
     type PlaybackBinding,
 } from './inputs.ts';
 import {
@@ -89,11 +88,10 @@ import {
     type StoreId,
 } from './stores.ts';
 import { routePlayback$ } from './playback-routing.ts';
-import type { ProgressConnection } from './progress.ts';
 import { chime$ } from './chime.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
-import { viewport$ } from './lib/rx.ts';
+import { viewport$, wallClock$ } from './lib/rx.ts';
 import type {
     FollowGroup,
     StoreOption,
@@ -145,13 +143,15 @@ import {
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
-import { pieceOf } from './pieces.ts';
+import { blueprintOf } from './blueprints.ts';
+import { blueprintIn } from './starters.ts';
 
 type Jump = { readonly kind: 'section' | 'window'; readonly id: string };
 
 type StoreKey =
     | 'progress$'
     | 'playhead$'
+    | 'reading$'
     | 'playing$'
     | 'looping$'
     | 'duration$'
@@ -336,7 +336,7 @@ const bootstrap = () => {
         voices: stored.voices,
         drums: stored.drums,
         library: stored.library,
-        pieces: stored.pieces,
+        blueprints: stored.blueprints,
         formulas: restored(stored.formulas),
         themes: restored(stored.themes),
         looks: restored(stored.looks),
@@ -680,12 +680,7 @@ const bootstrap = () => {
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(
-                          inputsFor(process.program),
-                          binding$(process.id),
-                          clockOf$(process.id),
-                          followsOf$(process.id),
-                      ),
+                      scoped(binding$(process.id), clockOf$(process.id), followsOf$(process.id)),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(
@@ -809,11 +804,11 @@ const bootstrap = () => {
 
     const placing$ = merge(
         inputs$.pipe(
-            mergeMap(({ input }) => (input.kind === 'place-piece' ? [input.id] : [])),
+            mergeMap(({ input }) => (input.kind === 'place-blueprint' ? [input.id] : [])),
             withLatestFrom(viewport$),
-            map(([piece, viewport]): PlacingAction => ({
+            map(([blueprint, viewport]): PlacingAction => ({
                 kind: 'start',
-                piece,
+                blueprint,
                 at: centreOf(viewport),
             })),
         ),
@@ -871,8 +866,8 @@ const bootstrap = () => {
                         ];
                     case 'library':
                         return [{ kind: 'library', command: input.command }];
-                    case 'piece':
-                        return [{ kind: 'pieces', command: input.command }];
+                    case 'blueprint':
+                        return [{ kind: 'blueprints', command: input.command }];
                     case 'source':
                         return [
                             { kind: 'formula', formula: input.formula, text: input.text, from: id },
@@ -911,15 +906,15 @@ const bootstrap = () => {
         placing$.pipe(
             mergeMap(placing => (placing.mode === 'dropped' ? [placing] : [])),
             withLatestFrom(documents$),
-            mergeMap(([{ piece, at }, { pieces, workspace }]): DocumentAction[] => {
-                const chosen = pieces.items.find(({ id }) => id === piece);
+            mergeMap(([{ blueprint, at }, { blueprints, workspace }]): DocumentAction[] => {
+                const chosen = blueprintIn(blueprints, blueprint);
 
                 return chosen === undefined
                     ? []
                     : [
                           {
                               kind: 'place',
-                              piece,
+                              blueprint,
                               view: footprintAt(chosen.size, at, workspace.camera),
                           },
                       ];
@@ -933,9 +928,11 @@ const bootstrap = () => {
                 defer(() => playbacks$),
             ),
             mergeMap(([section, documents, clocks]): DocumentAction[] => {
-                const piece = pieceOf(documents, clocks, section);
+                const blueprint = blueprintOf(documents, clocks, section);
 
-                return piece === null ? [] : [{ kind: 'pieces', command: { kind: 'add', piece } }];
+                return blueprint === null
+                    ? []
+                    : [{ kind: 'blueprints', command: { kind: 'add', blueprint } }];
             }),
         ),
         sharedFormulas$.pipe(
@@ -1032,8 +1029,8 @@ const bootstrap = () => {
         map(({ library }) => library),
         distinctUntilChanged(),
     );
-    const pieces$ = documents$.pipe(
-        map(({ pieces }) => pieces),
+    const blueprints$ = documents$.pipe(
+        map(({ blueprints }) => blueprints),
         distinctUntilChanged(),
     );
 
@@ -1152,7 +1149,7 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
-        pieces$,
+        blueprints$,
         inspect$: (id: string) => inspected$(id),
         graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
@@ -1273,10 +1270,9 @@ const bootstrap = () => {
     };
 
     // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
-    const sources = { playback$: playbackIn, focus$: timerIn };
+    const sources = { focus$: timerIn, agenda$: agendaIn, now$: wallClock$ };
 
     const scoped = (
-        inputs: ProgramInputs,
         store$: Observable<StoreId>,
         clock$: Observable<PlaybackBinding | null>,
         follows$: Observable<Bindings>,
@@ -1293,7 +1289,6 @@ const bootstrap = () => {
             shareReplay({ bufferSize: 1, refCount: true }),
         );
 
-        const progress = definitionOf(inputs, 'progress');
         // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
         const seconds$ = clock.pipe(
             map(({ duration }) => duration),
@@ -1302,11 +1297,11 @@ const bootstrap = () => {
 
         return {
             ...state,
-            progress$: followed$('progress').pipe(
-                mergeMap((source): ProgressConnection[] =>
-                    source === null || progress?.from !== 'followed'
-                        ? []
-                        : [progressConnection(source, sources)],
+            reading$: followed$('source').pipe(
+                switchMap(
+                    (binding): Observable<Reading> =>
+                        (binding === null ? null : readingOf(binding, sources)) ??
+                        of({ kind: 'none', title: 'Nothing followed' }),
                 ),
                 shareReplay({ bufferSize: 1, refCount: true }),
             ),
@@ -1423,7 +1418,7 @@ const bootstrap = () => {
                 voices: voices$,
                 drums: drums$,
                 library: library$,
-                pieces: pieces$,
+                blueprints: blueprints$,
                 seq: history$.pipe(
                     map(({ seq }) => seq),
                     distinctUntilChanged(),
@@ -1442,16 +1437,16 @@ const bootstrap = () => {
         seams.connect$(workspace$.pipe(map(seamsOf))),
         wiring.connect$(wiringView$),
         placement.connect$(
-            combineLatest([placing$, camera$, pieces$]).pipe(
-                map(([placing, camera, { items }]) => {
-                    const piece =
+            combineLatest([placing$, camera$, blueprints$]).pipe(
+                map(([placing, camera, blueprints]) => {
+                    const blueprint =
                         placing.mode === 'placing'
-                            ? items.find(({ id }) => id === placing.piece)
+                            ? blueprintIn(blueprints, placing.blueprint)
                             : undefined;
 
-                    return placing.mode !== 'placing' || piece === undefined
+                    return placing.mode !== 'placing' || blueprint === undefined
                         ? null
-                        : ghostOf(piece, placing.at, camera);
+                        : ghostOf(blueprint, placing.at, camera);
                 }),
             ),
         ),

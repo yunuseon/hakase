@@ -160,7 +160,19 @@ describe('state mode', () => {
     });
 
     it('uses the same commands for compact selection and dragging, including hidden sources', () => {
-        const view = wiringOf(run(), new Map(), inputsFor, on);
+        const view = wiringOf(
+            run([
+                {
+                    kind: 'launch',
+                    program: 'progress',
+                    size: { width: 300, height: 130 },
+                    viewport,
+                },
+            ]),
+            new Map(),
+            inputsFor,
+            on,
+        );
         const playback = view?.sockets.find(socket => socket.key === 'sketch-2:input:playback');
         const output = view?.sockets.find(socket => socket.key === 'timeline-3:output');
         if (playback === undefined || output === undefined)
@@ -173,14 +185,14 @@ describe('state mode', () => {
         expect(
             commandFor(null, { kind: 'select', key: playback.key, value: 'timeline' }),
         ).toBeNull();
-        const focus = view?.sockets.find(socket => socket.key === 'playhead-4:input:progress');
-        if (focus === undefined) throw new Error('Missing progress socket');
-        expect(selectionOf(focus, 'focus')).toEqual({
+        const source = view?.sockets.find(socket => socket.key === 'progress-5:input:source');
+        if (source === undefined) throw new Error('Missing source socket');
+        expect(selectionOf(source, 'agenda')).toEqual({
             kind: 'connect',
-            window: 'playhead-4',
-            input: 'progress',
-            source: 'focus',
-            store: 'focus',
+            window: 'progress-5',
+            input: 'source',
+            source: 'agenda',
+            store: 'agenda',
         });
     });
 

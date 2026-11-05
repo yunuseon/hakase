@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import type {
+    AgendaBinding,
     FocusBinding,
     PaintBinding,
     PenBinding,
@@ -31,7 +32,10 @@ describe('Process', () => {
             readonly paint?: PaintBinding | PenBinding;
         }>();
         expectTypeOf<Of<'playhead'>['follows']>().toEqualTypeOf<{
-            readonly progress: PlaybackBinding | FocusBinding;
+            readonly progress: PlaybackBinding;
+        }>();
+        expectTypeOf<Of<'progress'>['follows']>().toEqualTypeOf<{
+            readonly source: FocusBinding | AgendaBinding;
         }>();
     });
 
@@ -39,7 +43,7 @@ describe('Process', () => {
         expectTypeOf<keyof Of<'timeline'>['follows']>().toEqualTypeOf<never>();
         expectTypeOf<keyof Of<'todo'>['follows']>().toEqualTypeOf<never>();
         expectTypeOf<
-            keyof Exclude<Process, { program: 'sketch' | 'playhead' }>['follows']
+            keyof Exclude<Process, { program: 'sketch' | 'playhead' | 'progress' }>['follows']
         >().toEqualTypeOf<never>();
     });
 
