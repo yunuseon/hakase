@@ -19,7 +19,7 @@ const choose = (note: string): AppInput => ({ kind: 'settings', settings: { kind
 const created = (notes: Notes): readonly AppInput[] => {
     const id = nextNoteId(notes);
 
-    return [{ kind: 'note', command: { kind: 'create', id } }, choose(id)];
+    return [{ kind: 'note', command: { kind: 'create', id, text: '' } }, choose(id)];
 };
 
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;

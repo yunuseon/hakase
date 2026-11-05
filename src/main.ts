@@ -52,6 +52,7 @@ import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
 import { HksPlacement } from './components/placement/placement.component.ts';
 import { footprintAt, ghostOf, idle, reducePlacing, type PlacingAction } from './placing.ts';
+import { capturedActions } from './capture.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
@@ -248,8 +249,8 @@ const bootstrap = () => {
     canvas.append(placement);
 
     const picked$ = palette.picks$.pipe(
-        mergeMap(id => {
-            const picked = pickedOf(id);
+        mergeMap(({ id, text }) => {
+            const picked = pickedOf(id, text);
 
             return picked === null ? EMPTY : of(picked);
         }),
@@ -945,6 +946,11 @@ const bootstrap = () => {
             mergeMap((picked): DocumentAction[] =>
                 picked.kind === 'look' ? [{ kind: 'look', name: picked.name }] : [],
             ),
+        ),
+        picked$.pipe(
+            mergeMap(picked => (picked.kind === 'capture' ? [picked] : [])),
+            withLatestFrom(documents$),
+            mergeMap(([capture, documents]) => capturedActions(capture, documents)),
         ),
     );
 

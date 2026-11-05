@@ -7,12 +7,24 @@ import type { Section, WorkspaceAction } from './workspace.ts';
 
 export type Direction = 'next' | 'previous';
 
+export const CAPTURES = [
+    { target: 'todo', label: 'Add to-do' },
+    { target: 'note', label: 'Jot a note' },
+    { target: 'card', label: 'Add card to the board' },
+] as const;
+
+export type CaptureTarget = (typeof CAPTURES)[number]['target'];
+
+const isCaptureTarget = (value: string): value is CaptureTarget =>
+    CAPTURES.some(({ target }) => target === value);
+
 export type Picked =
     | { readonly kind: 'launch'; readonly program: ProgramId }
     | { readonly kind: 'section'; readonly id: string }
     | { readonly kind: 'step'; readonly direction: Direction }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'toolbar'; readonly placement: Placement }
+    | { readonly kind: 'capture'; readonly target: CaptureTarget; readonly text: string }
     | {
           readonly kind: 'workspace';
           readonly action: 'undo' | 'redo' | 'add-section' | 'fit' | 'reset' | 'minimap';
@@ -27,41 +39,60 @@ export const commandsOf = (
     programs: readonly { readonly id: ProgramId; readonly title: string }[],
     sections: readonly Section[],
 ): readonly Command[] => [
+    ...CAPTURES.map(({ target, label }) => ({
+        id: `capture:${target}`,
+        label,
+        hint: `${target} …`,
+        keyword: target,
+    })),
     ...programs.map(({ id, title }) => ({
         id: `launch:${id}`,
         label: `New ${title}`,
         hint: 'open',
+        keyword: null,
     })),
     ...sections.map(({ id, name }) => ({
         id: `section:${id}`,
         label: `Go to ${name}`,
         hint: 'section',
+        keyword: null,
     })),
-    { id: 'step:next', label: 'Next section', hint: '→' },
-    { id: 'step:previous', label: 'Previous section', hint: '←' },
-    { id: 'workspace:add-section', label: 'New section around the view', hint: 'section' },
-    { id: 'workspace:undo', label: 'Undo', hint: '⌘Z' },
-    { id: 'workspace:redo', label: 'Redo', hint: '⇧⌘Z' },
-    { id: 'workspace:fit', label: 'Fit everything in view', hint: 'zoom' },
-    { id: 'workspace:reset', label: 'Zoom to 100%', hint: 'zoom' },
-    { id: 'workspace:minimap', label: 'Show or hide the map', hint: 'view' },
+    { id: 'step:next', label: 'Next section', hint: '→', keyword: null },
+    { id: 'step:previous', label: 'Previous section', hint: '←', keyword: null },
+    {
+        id: 'workspace:add-section',
+        label: 'New section around the view',
+        hint: 'section',
+        keyword: null,
+    },
+    { id: 'workspace:undo', label: 'Undo', hint: '⌘Z', keyword: null },
+    { id: 'workspace:redo', label: 'Redo', hint: '⇧⌘Z', keyword: null },
+    { id: 'workspace:fit', label: 'Fit everything in view', hint: 'zoom', keyword: null },
+    { id: 'workspace:reset', label: 'Zoom to 100%', hint: 'zoom', keyword: null },
+    { id: 'workspace:minimap', label: 'Show or hide the map', hint: 'view', keyword: null },
     ...Object.keys(appearances).map(name => ({
         id: `look:${name}`,
         label: `Look: ${name}`,
         hint: 'appearance',
+        keyword: null,
     })),
     ...(['top', 'bottom', 'left', 'right', 'float'] as const).map(placement => ({
         id: `toolbar:${placement}`,
         label: `Toolbar: ${placement === 'float' ? 'own window' : placement}`,
         hint: 'toolbar',
+        keyword: null,
     })),
 ];
 
 // Untrusted in the sense that a click target carries it: parsed, never assumed.
-export const pickedOf = (id: string): Picked | null => {
+export const pickedOf = (id: string, text: string | null): Picked | null => {
     const [kind, value = ''] = id.split(/:(.*)/s);
 
     switch (kind) {
+        case 'capture':
+            return isCaptureTarget(value) && text !== null && text.trim() !== ''
+                ? { kind, target: value, text: text.trim() }
+                : null;
         case 'launch':
             return isProgramId(value) ? { kind, program: value } : null;
         case 'section':

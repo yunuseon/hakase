@@ -1,8 +1,8 @@
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import { matches, sameCommands, type Command } from './palette.ts';
+import { matched, sameCommands, type Command, type Match } from './palette.ts';
 import css from './palette.css?inline';
 
 const sheet = styleSheet(css);
@@ -17,16 +17,29 @@ const TEMPLATE = `
     </div>
 `;
 
-const rowOf = ({ id, label, hint }: Command, index: number): HTMLElement => {
+export type Pick = { readonly id: string; readonly text: string | null };
+
+const rowOf = (
+    { command: { id, label, hint, keyword }, text }: Match,
+    index: number,
+): HTMLElement => {
     const row = document.createElement('li');
     row.className = 'row';
     row.id = `command-${index}`;
     row.dataset['command'] = id;
     row.setAttribute('role', 'option');
 
+    if (keyword !== null) {
+        row.dataset['keyword'] = keyword;
+    }
+
+    if (text !== null) {
+        row.dataset['text'] = text;
+    }
+
     const name = document.createElement('span');
     name.className = 'label';
-    name.textContent = label;
+    name.textContent = text === null ? label : `${label}: ${text}`;
 
     const kind = document.createElement('span');
     kind.className = 'hint';
@@ -40,9 +53,10 @@ const rowOf = ({ id, label, hint }: Command, index: number): HTMLElement => {
 export class HksPalette extends HTMLElement {
     readonly opens$: Observable<void>;
     readonly closes$: Observable<void>;
-    readonly picks$: Observable<string>;
+    readonly picks$: Observable<Pick>;
 
     private readonly query: HTMLInputElement;
+    private readonly chosen$: Observable<HTMLElement>;
     private readonly results: HTMLElement;
 
     constructor() {
@@ -69,23 +83,34 @@ export class HksPalette extends HTMLElement {
             fromElementEvent$(this.query, 'keydown').pipe(filter(({ key }) => key === 'Escape')),
         ).pipe(map(() => undefined));
 
-        this.picks$ = merge(
+        // One shared listener: the pick and the fill-in read the same row, never two reads of the DOM.
+        this.chosen$ = merge(
             fromElementEvent$(this.results, 'click').pipe(
                 mergeMap(({ target }) => {
                     const row = target instanceof Element ? target.closest('[data-command]') : null;
-                    const id = row instanceof HTMLElement ? row.dataset['command'] : undefined;
 
-                    return id === undefined ? EMPTY : of(id);
+                    return row instanceof HTMLElement ? of(row) : EMPTY;
                 }),
             ),
             fromElementEvent$(this.query, 'keydown').pipe(
                 filter(({ key }) => key === 'Enter'),
                 mergeMap(() => {
-                    const id = this.active()?.dataset['command'];
+                    const row = this.active();
 
-                    return id === undefined ? EMPTY : of(id);
+                    return row === undefined ? EMPTY : of(row);
                 }),
             ),
+        ).pipe(share());
+
+        this.picks$ = this.chosen$.pipe(
+            mergeMap(({ dataset }): Pick[] => {
+                const id = dataset['command'];
+                const text = dataset['text'] ?? null;
+
+                return id === undefined || (dataset['keyword'] !== undefined && text === null)
+                    ? []
+                    : [{ id, text }];
+            }),
         );
     }
 
@@ -131,8 +156,20 @@ export class HksPalette extends HTMLElement {
             }),
         );
 
-        // Read from the field on every keystroke and on opening, after shown$ has emptied it.
-        const query$ = merge(fromElementEvent$(this.query, 'input'), open$).pipe(
+        const filled$ = this.chosen$.pipe(
+            mergeMap(({ dataset }) =>
+                dataset['keyword'] !== undefined && dataset['text'] === undefined
+                    ? [`${dataset['keyword']} `]
+                    : [],
+            ),
+            tap(text => {
+                this.query.value = text;
+                this.query.focus();
+            }),
+        );
+
+        // Read from the field on every keystroke, on opening after shown$ has emptied it, and after a fill-in.
+        const query$ = merge(fromElementEvent$(this.query, 'input'), open$, filled$).pipe(
             map(() => this.query.value),
         );
 
@@ -140,7 +177,7 @@ export class HksPalette extends HTMLElement {
             commands$.pipe(distinctUntilChanged(sameCommands)),
             query$,
         ]).pipe(
-            map(([commands, query]) => matches(commands, query)),
+            map(([commands, query]) => matched(commands, query)),
             tap(shown => {
                 this.results.replaceChildren(...shown.map(rowOf));
                 this.activate(this.rows()[0]);

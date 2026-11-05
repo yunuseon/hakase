@@ -1822,6 +1822,20 @@ command is one entry in `commandsOf` plus one case where it is routed. Filtering
 is every typed word appearing in the label or hint, as a `combineLatest` of the
 commands and the query, not a remembered list.
 
+**Quick capture: a command can take the rest of the query.** A `Command` may
+name a `keyword`, and `matched` hands everything after it to that command, so
+`todo call Ada` is the one row "Add to-do: call Ada" and the pick carries its
+text. Picking a keyword command with nothing after it fills in the keyword
+instead of running, and both read the row from one shared `chosen$`, for the
+todo submit's reason. The palette still knows nothing of what a capture does:
+`CAPTURES` in `commands.ts` lists them (`todo`, `note`, `card`), `pickedOf`
+parses the text, and `capturedActions` in `src/capture.ts` turns one into
+document actions on the **main** store, the one a new window opens on: a
+to-do, a note, a card in the main board's first column. They are read against
+the documents fold, like placing a blueprint. A capture is one undo step, which
+is why a note's `create` carries its text rather than being followed by an
+`edit`: different keys, so two steps.
+
 ## Animation and export
 
 A sketch's controls have three tabs, **Parameters**, **Scene** and **Animation**,

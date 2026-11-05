@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { steppedSection } from './commands.ts';
+import { commandsOf, pickedOf, steppedSection } from './commands.ts';
 import type { Section } from './workspace.ts';
 
 const section = (id: string, x: number, y: number): Section => ({
@@ -29,5 +29,27 @@ describe('steppedSection', () => {
 
     it('has nowhere to go without sections', () => {
         expect(steppedSection([], at(0, 0), viewport, 'next')).toBeNull();
+    });
+});
+
+describe('captures', () => {
+    it('are offered with the word that starts them', () => {
+        expect(commandsOf([], []).filter(({ keyword }) => keyword !== null)).toEqual([
+            { id: 'capture:todo', label: 'Add to-do', hint: 'todo …', keyword: 'todo' },
+            { id: 'capture:note', label: 'Jot a note', hint: 'note …', keyword: 'note' },
+            { id: 'capture:card', label: 'Add card to the board', hint: 'card …', keyword: 'card' },
+        ]);
+    });
+
+    it('carry their text, trimmed, and nothing without it', () => {
+        expect(pickedOf('capture:todo', '  buy milk ')).toEqual({
+            kind: 'capture',
+            target: 'todo',
+            text: 'buy milk',
+        });
+        expect(pickedOf('capture:todo', '  ')).toBeNull();
+        expect(pickedOf('capture:todo', null)).toBeNull();
+        expect(pickedOf('capture:agenda', 'standup')).toBeNull();
+        expect(pickedOf('launch:todo', 'ignored')).toEqual({ kind: 'launch', program: 'todo' });
     });
 });
