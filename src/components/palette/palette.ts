@@ -27,10 +27,10 @@ export const matched = (commands: readonly Command[], query: string): readonly M
     const typed = query.trim();
     const [first = ''] = typed.split(/\s/, 1);
     const text = typed.slice(first.length).trim();
-    const taking = commands.find(({ keyword }) => keyword === first.toLowerCase());
+    const taking = commands.filter(({ keyword }) => keyword === first.toLowerCase());
 
-    return taking !== undefined && text !== ''
-        ? [{ command: taking, text }]
+    return taking.length > 0 && text !== ''
+        ? taking.map(command => ({ command, text }))
         : matches(commands, query).map(command => ({ command, text: null }));
 };
 

@@ -1830,9 +1830,19 @@ instead of running, and both read the row from one shared `chosen$`, for the
 todo submit's reason. The palette still knows nothing of what a capture does:
 `CAPTURES` in `commands.ts` lists them (`todo`, `note`, `card`), `pickedOf`
 parses the text, and `capturedActions` in `src/capture.ts` turns one into
-document actions on the **main** store, the one a new window opens on: a
-to-do, a note, a card in the main board's first column. They are read against
-the documents fold, like placing a blueprint. A capture is one undo step, which
+document actions: a to-do, a note, a card in a board's first column. They are
+read against the documents fold, like placing a blueprint.
+
+**A capture is offered once per state, not into Main alone.** `commandsOf`
+makes one command per state of the program (`withMain`, so Main is there before
+any window opened it), all claiming the same keyword, and `matched` hands the
+text to every one of them: `todo oat milk` lists "Add to-do to Groceries",
+"Add to-do to Main" and so on, and ↑/↓ chooses. `captureStores` orders them:
+the frontmost window's state of that program first, since that is the list in
+front of you, then Main, then by name. Rows were chosen over a syntax such as
+`todo @groceries`, which needs names remembered and a misspelling handled. The
+state travels in the command id, which a clicked row carries, so
+`capturedActions` refuses a state of another program or one since deleted. A capture is one undo step, which
 is why a note's `create` carries its text rather than being followed by an
 `edit`: different keys, so two steps.
 

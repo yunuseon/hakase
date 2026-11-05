@@ -1457,7 +1457,7 @@ const bootstrap = () => {
             ),
         ),
         palette.connect$(
-            workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
+            workspace$.pipe(map(workspace => commandsOf(programList, workspace))),
             paletteOpen$,
         ),
         sections.connect$(

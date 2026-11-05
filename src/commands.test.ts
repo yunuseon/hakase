@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { commandsOf, pickedOf, steppedSection } from './commands.ts';
-import type { Section } from './workspace.ts';
+import { captureStores, commandsOf, pickedOf, steppedSection } from './commands.ts';
+import { inputsFor } from './inputs.fixture.ts';
+import { defaultWorkspace, type Section, type Workspace } from './workspace.ts';
 
 const section = (id: string, x: number, y: number): Section => ({
     id,
@@ -32,24 +33,92 @@ describe('steppedSection', () => {
     });
 });
 
+const entry = (id: string, program: 'todo' | 'board', name: string) => ({
+    id,
+    program,
+    name,
+    kept: true,
+    copy: null,
+    clock: null,
+});
+
+const lists = (frontmost: string | null): Workspace => {
+    const base = defaultWorkspace({ width: 1400, height: 900 }, inputsFor);
+    const frame = { x: 0, y: 0, z: 0, width: 280, height: 320 };
+
+    return {
+        ...base,
+        stores: [
+            ...base.stores,
+            entry('store-1', 'todo', 'Groceries'),
+            entry('store-2', 'todo', 'Errands'),
+            entry('store-3', 'board', 'Sprint'),
+        ],
+        processes:
+            frontmost === null
+                ? base.processes
+                : [
+                      ...base.processes,
+                      {
+                          id: 'todo-9',
+                          program: 'todo',
+                          store: frontmost,
+                          follows: {},
+                          frame,
+                          measured: { width: 280, height: 320 },
+                      },
+                  ],
+    };
+};
+
 describe('captures', () => {
-    it('are offered with the word that starts them', () => {
-        expect(commandsOf([], []).filter(({ keyword }) => keyword !== null)).toEqual([
-            { id: 'capture:todo', label: 'Add to-do', hint: 'todo …', keyword: 'todo' },
-            { id: 'capture:note', label: 'Jot a note', hint: 'note …', keyword: 'note' },
-            { id: 'capture:card', label: 'Add card to the board', hint: 'card …', keyword: 'card' },
+    it('offer every state, Main always, then by name', () => {
+        expect(captureStores('todo', lists(null)).map(({ name }) => name)).toEqual([
+            'Main',
+            'Errands',
+            'Groceries',
+        ]);
+        expect(captureStores('note', lists(null)).map(({ id }) => id)).toEqual(['note']);
+    });
+
+    it('put the frontmost window’s state first', () => {
+        expect(captureStores('todo', lists('store-1')).map(({ name }) => name)).toEqual([
+            'Groceries',
+            'Main',
+            'Errands',
         ]);
     });
 
-    it('carry their text, trimmed, and nothing without it', () => {
-        expect(pickedOf('capture:todo', '  buy milk ')).toEqual({
+    it('are commands named after their state, all claiming the same word', () => {
+        expect(
+            commandsOf([], lists('store-1')).filter(({ keyword }) => keyword === 'card'),
+        ).toEqual([
+            {
+                id: 'capture:card:board',
+                label: 'Add card to Main',
+                hint: 'card …',
+                keyword: 'card',
+            },
+            {
+                id: 'capture:card:store-3',
+                label: 'Add card to Sprint',
+                hint: 'card …',
+                keyword: 'card',
+            },
+        ]);
+    });
+
+    it('carry their state and text, trimmed, and nothing without either', () => {
+        expect(pickedOf('capture:todo:store-1', '  buy milk ')).toEqual({
             kind: 'capture',
             target: 'todo',
+            store: 'store-1',
             text: 'buy milk',
         });
-        expect(pickedOf('capture:todo', '  ')).toBeNull();
-        expect(pickedOf('capture:todo', null)).toBeNull();
-        expect(pickedOf('capture:agenda', 'standup')).toBeNull();
+        expect(pickedOf('capture:todo:store-1', '  ')).toBeNull();
+        expect(pickedOf('capture:todo:store-1', null)).toBeNull();
+        expect(pickedOf('capture:todo', 'milk')).toBeNull();
+        expect(pickedOf('capture:agenda:agenda', 'standup')).toBeNull();
         expect(pickedOf('launch:todo', 'ignored')).toEqual({ kind: 'launch', program: 'todo' });
     });
 });

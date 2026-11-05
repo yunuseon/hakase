@@ -3,14 +3,15 @@ import type { Command } from './components/palette/palette.ts';
 import { isPlacement, type Placement } from './components/toolbar/toolbar.ts';
 import { centreOf, worldAt, type Camera, type Extent } from './shared/camera.ts';
 import { isProgramId, type ProgramId } from './program.ts';
-import type { Section, WorkspaceAction } from './workspace.ts';
+import { withMain, type StoreEntry, type StoreId } from './stores.ts';
+import type { Section, Workspace, WorkspaceAction } from './workspace.ts';
 
 export type Direction = 'next' | 'previous';
 
 export const CAPTURES = [
-    { target: 'todo', label: 'Add to-do' },
-    { target: 'note', label: 'Jot a note' },
-    { target: 'card', label: 'Add card to the board' },
+    { target: 'todo', program: 'todo', label: 'Add to-do to' },
+    { target: 'note', program: 'note', label: 'Jot a note in' },
+    { target: 'card', program: 'board', label: 'Add card to' },
 ] as const;
 
 export type CaptureTarget = (typeof CAPTURES)[number]['target'];
@@ -24,7 +25,12 @@ export type Picked =
     | { readonly kind: 'step'; readonly direction: Direction }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'toolbar'; readonly placement: Placement }
-    | { readonly kind: 'capture'; readonly target: CaptureTarget; readonly text: string }
+    | {
+          readonly kind: 'capture';
+          readonly target: CaptureTarget;
+          readonly store: StoreId;
+          readonly text: string;
+      }
     | {
           readonly kind: 'workspace';
           readonly action: 'undo' | 'redo' | 'add-section' | 'fit' | 'reset' | 'minimap';
@@ -35,23 +41,37 @@ const WORKSPACE = ['undo', 'redo', 'add-section', 'fit', 'reset', 'minimap'] as 
 const isWorkspaceCommand = (value: string): value is (typeof WORKSPACE)[number] =>
     WORKSPACE.some(command => command === value);
 
+// The frontmost window's state first, since that is the list in front of you, then Main, then by name.
+export const captureStores = (program: ProgramId, workspace: Workspace): readonly StoreEntry[] => {
+    const front = [...workspace.processes]
+        .reverse()
+        .find(process => process.program === program)?.store;
+    const rank = ({ id }: StoreEntry) => (id === front ? 0 : id === program ? 1 : 2);
+
+    return [...withMain(program, workspace.stores)].sort(
+        (a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name),
+    );
+};
+
 export const commandsOf = (
     programs: readonly { readonly id: ProgramId; readonly title: string }[],
-    sections: readonly Section[],
+    workspace: Workspace,
 ): readonly Command[] => [
-    ...CAPTURES.map(({ target, label }) => ({
-        id: `capture:${target}`,
-        label,
-        hint: `${target} …`,
-        keyword: target,
-    })),
+    ...CAPTURES.flatMap(({ target, program, label }) =>
+        captureStores(program, workspace).map(({ id, name }) => ({
+            id: `capture:${target}:${id}`,
+            label: `${label} ${name}`,
+            hint: `${target} …`,
+            keyword: target,
+        })),
+    ),
     ...programs.map(({ id, title }) => ({
         id: `launch:${id}`,
         label: `New ${title}`,
         hint: 'open',
         keyword: null,
     })),
-    ...sections.map(({ id, name }) => ({
+    ...workspace.sections.map(({ id, name }) => ({
         id: `section:${id}`,
         label: `Go to ${name}`,
         hint: 'section',
@@ -89,10 +109,13 @@ export const pickedOf = (id: string, text: string | null): Picked | null => {
     const [kind, value = ''] = id.split(/:(.*)/s);
 
     switch (kind) {
-        case 'capture':
-            return isCaptureTarget(value) && text !== null && text.trim() !== ''
-                ? { kind, target: value, text: text.trim() }
+        case 'capture': {
+            const [target = '', store = ''] = value.split(/:(.*)/s);
+
+            return isCaptureTarget(target) && store !== '' && text !== null && text.trim() !== ''
+                ? { kind, target, store, text: text.trim() }
                 : null;
+        }
         case 'launch':
             return isProgramId(value) ? { kind, program: value } : null;
         case 'section':
