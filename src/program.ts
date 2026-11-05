@@ -9,7 +9,7 @@ import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
 import type { Board, BoardCommand } from './components/board/board.ts';
 import type { NoteCommand, Notes } from './components/note/note.ts';
-import type { Focus, FocusCommand } from './components/focus/focus.ts';
+import type { Focus, FocusCommand, Plan } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
@@ -129,6 +129,7 @@ export type Task = {
 
 export type AppState = {
     readonly reading$: Observable<Reading>;
+    readonly plan$: Observable<Plan | null>;
     readonly playhead$: Observable<number>;
     readonly playing$: Observable<boolean>;
     readonly looping$: Observable<boolean>;

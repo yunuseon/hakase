@@ -1,6 +1,7 @@
 import type { Observable } from 'rxjs';
-import { filter, map, pairwise, tap } from 'rxjs/operators';
-import { finished, type Timers } from './components/focus/focus.ts';
+import { merge } from 'rxjs';
+import { filter, map, pairwise, startWith, tap } from 'rxjs/operators';
+import { endedPlans, finished, type Plan, type Timers } from './components/focus/focus.ts';
 
 const NOTES = [660, 880, 990];
 
@@ -26,10 +27,21 @@ const play = (): void => {
     });
 };
 
-export const chime$ = (timers$: Observable<Timers>): Observable<void> =>
-    timers$.pipe(
-        pairwise(),
-        filter(([before, after]) => finished(before, after) > 0),
+export const chime$ = (
+    timers$: Observable<Timers>,
+    plans$: Observable<ReadonlyMap<string, Plan>>,
+): Observable<void> =>
+    merge(
+        timers$.pipe(
+            pairwise(),
+            filter(([before, after]) => finished(before, after) > 0),
+        ),
+        plans$.pipe(
+            startWith(new Map<string, Plan>()),
+            pairwise(),
+            filter(([before, after]) => endedPlans(before, after) > 0),
+        ),
+    ).pipe(
         tap(play),
         map(() => undefined),
     );

@@ -23,6 +23,7 @@ const scene = (): Documents => ({
     pens: new Map(),
     voices: new Map(),
     drums: new Map(),
+    focusLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     formulas: new Map(),
@@ -75,9 +76,13 @@ describe('starter blueprints', () => {
             ['agenda', 'agenda'],
             ['progress', 'progress'],
             ['todo', 'todo'],
+            ['progress', 'progress'],
         ]);
         expect(added(before, after)[1]?.follows).toEqual({
             source: { kind: 'agenda', store: 'agenda' },
+        });
+        expect(added(before, after)[3]?.follows).toEqual({
+            source: { kind: 'todo', store: 'todo' },
         });
         expect(after.todos.get('todo')).toBe(todos);
         expect(after.workspace.stores.map(({ id }) => id)).toEqual([

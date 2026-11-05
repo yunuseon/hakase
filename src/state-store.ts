@@ -16,7 +16,12 @@ import {
 import { parseTheme, type Theme } from './components/sketch/theme.ts';
 import { parseBoard, type Board } from './components/board/board.ts';
 import { parseNotes, type Notes } from './components/note/note.ts';
-import { parseFocus, type Focus } from './components/focus/focus.ts';
+import {
+    parseFocus,
+    parseFocusLink,
+    type Focus,
+    type FocusLink,
+} from './components/focus/focus.ts';
 import { parseAgenda, type Agenda } from './components/agenda/agenda.ts';
 import { parseHabits, type Habits } from './components/habits/habits.ts';
 import { parseClocks, type Clocks } from './components/clocks/clocks.ts';
@@ -61,6 +66,7 @@ export type Snapshot = {
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
+    readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly library: Library;
     readonly blueprints: Blueprints;
     readonly seq: number;
@@ -156,6 +162,7 @@ const fresh: Restored = {
     pens: new Map(),
     voices: new Map(),
     drums: new Map(),
+    focusLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     seq: 0,
@@ -217,6 +224,7 @@ export const restoreState = (inputsFor: InputsFor): Restored => {
         pens: byStore(field(stored, 'pens'), 'pen', parsePen),
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
+        focusLinks: byStore(field(stored, 'focusLinks'), 'focus', parseFocusLink),
         library: parseLibrary(field(stored, 'library')),
         blueprints: parseBlueprints(
             field(stored, 'blueprints') ?? field(stored, 'pieces'),
@@ -258,6 +266,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         pens: saved(snapshot.pens),
         voices: saved(snapshot.voices),
         drums: saved(snapshot.drums),
+        focusLinks: saved(snapshot.focusLinks),
         library: snapshot.library,
         blueprints: snapshot.blueprints,
         seq: snapshot.seq,

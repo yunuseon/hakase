@@ -35,6 +35,7 @@ export type Focus = {
 
 export type FocusCommand =
     | { readonly kind: 'toggle' }
+    | { readonly kind: 'pause' }
     | { readonly kind: 'reset' }
     | { readonly kind: 'skip' }
     | { readonly kind: 'length'; readonly phase: FocusPhase; readonly minutes: number };
@@ -85,6 +86,8 @@ export const reduceFocus = (focus: Focus, action: FocusAction): Focus => {
     switch (command.kind) {
         case 'toggle':
             return { ...focus, running: !focus.running };
+        case 'pause':
+            return focus.running ? { ...focus, running: false } : focus;
         case 'reset':
             return {
                 ...initialFocus,
@@ -208,8 +211,53 @@ export const restedTimers = (kept: Timers, now: Timers): Timers => {
         : next;
 };
 
+// A block of the agenda the timer follows, which stands in for the timer while it runs.
+export type Plan = {
+    readonly id: string;
+    readonly title: string;
+    readonly elapsed: number;
+    readonly length: number;
+};
+
+export const samePlan = (a: Plan | null, b: Plan | null): boolean =>
+    a === b ||
+    (a !== null &&
+        b !== null &&
+        a.id === b.id &&
+        a.title === b.title &&
+        a.elapsed === b.elapsed &&
+        a.length === b.length);
+
+// Blocks that were running and are not any more, in any timer: each rings like a phase that ran out.
+export const endedPlans = (
+    before: ReadonlyMap<string, Plan>,
+    after: ReadonlyMap<string, Plan>,
+): number => [...before].filter(([store, plan]) => after.get(store)?.id !== plan.id).length;
+
+export const startedPlans = (
+    before: ReadonlyMap<string, Plan>,
+    after: ReadonlyMap<string, Plan>,
+): readonly string[] =>
+    [...after].flatMap(([store, plan]) => (before.get(store)?.id === plan.id ? [] : [store]));
+
+export type FocusLink = { readonly sources: { readonly agenda: string | null } };
+
+export const unlinked: FocusLink = { sources: { agenda: null } };
+
+export const parseFocusLink = (value: unknown): FocusLink => {
+    const sources =
+        typeof value === 'object' && value !== null && 'sources' in value ? value.sources : null;
+    const agenda =
+        typeof sources === 'object' && sources !== null && 'agenda' in sources
+            ? sources.agenda
+            : null;
+
+    return typeof agenda === 'string' ? { sources: { agenda } } : unlinked;
+};
+
 export type FocusView = {
     readonly phase: FocusPhase;
+    readonly planned: boolean;
     readonly label: string;
     readonly clock: string;
     readonly progress: number;
@@ -231,15 +279,28 @@ export const clockOf = (ms: number): string => {
     return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 };
 
-export const focusView = (focus: Focus): FocusView => ({
-    phase: focus.phase,
-    label: LABELS[focus.phase],
-    clock: clockOf(focus.remaining),
-    progress: 1 - focus.remaining / lengthOf(focus.lengths, focus.phase),
-    round: focus.round,
-    running: focus.running,
-    lengths: focus.lengths,
-});
+export const focusView = (focus: Focus, plan: Plan | null): FocusView =>
+    plan === null
+        ? {
+              phase: focus.phase,
+              planned: false,
+              label: LABELS[focus.phase],
+              clock: clockOf(focus.remaining),
+              progress: 1 - focus.remaining / lengthOf(focus.lengths, focus.phase),
+              round: focus.round,
+              running: focus.running,
+              lengths: focus.lengths,
+          }
+        : {
+              phase: 'work',
+              planned: true,
+              label: plan.title,
+              clock: clockOf(plan.length - plan.elapsed),
+              progress: plan.elapsed / plan.length,
+              round: focus.round,
+              running: true,
+              lengths: focus.lengths,
+          };
 
 const minutesFrom = (value: unknown, fallback: number): number =>
     typeof value === 'number' && Number.isFinite(value) ? clampMinutes(value) : fallback;

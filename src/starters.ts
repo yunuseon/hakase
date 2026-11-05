@@ -68,7 +68,7 @@ export const STARTERS: readonly Starter[] = [
     {
         id: 'starter-today',
         name: 'Today',
-        summary: 'Your agenda, where you are in it, and your to-dos.',
+        summary: 'Your agenda, where you are in it, and how far through your to-dos you are.',
         size: { width: 684, height: 592 },
         windows: [
             opened('agenda', 'agenda', 'agenda', { x: 24, y: 48, width: 320, height: 520 }),
@@ -79,7 +79,14 @@ export const STARTERS: readonly Starter[] = [
                 { x: 360, y: 48, width: 300, height: 130 },
                 { source: { kind: 'agenda', store: 'agenda' } },
             ),
-            opened('todo', 'todo', 'todo', { x: 360, y: 194, width: 300, height: 374 }),
+            opened('todo', 'todo', 'todo', { x: 360, y: 194, width: 300, height: 228 }),
+            opened(
+                'done',
+                'progress',
+                'progress',
+                { x: 360, y: 438, width: 300, height: 130 },
+                { source: { kind: 'todo', store: 'todo' } },
+            ),
         ],
         stores: [],
         held,

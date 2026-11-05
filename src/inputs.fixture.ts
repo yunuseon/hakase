@@ -4,6 +4,7 @@ import {
     penInputs,
     voiceInputs,
     drumsInputs,
+    focusInputs,
     plotInputs,
     signalInputs,
     sceneInputs,
@@ -34,4 +35,6 @@ export const inputsFor: InputsFor = program =>
                       ? { progress: progressInput }
                       : program === 'progress'
                         ? { source: sourceInput }
-                        : {};
+                        : program === 'focus'
+                          ? { ...focusInputs }
+                          : {};

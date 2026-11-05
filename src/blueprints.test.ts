@@ -120,6 +120,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
             ],
         ]),
         drums: new Map(),
+        focusLinks: new Map(),
         library: { items: [{ id: 'custom-1', label: 'Chladni', source: 'vec4 formula' }], made: 1 },
         blueprints: emptyBlueprints,
         formulas: new Map(),

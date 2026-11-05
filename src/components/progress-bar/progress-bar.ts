@@ -15,6 +15,12 @@ export type Reading =
           readonly remaining: number;
           readonly span: Span;
       }
+    | {
+          readonly kind: 'count';
+          readonly title: string;
+          readonly done: number;
+          readonly total: number;
+      }
     | { readonly kind: 'none'; readonly title: string };
 
 export type BarView = {
@@ -59,6 +65,18 @@ export const barView = (reading: Reading): BarView => {
                 fill: 0,
                 start: reading.span.start,
                 end: reading.span.end,
+            };
+        case 'count':
+            return {
+                state: 'now',
+                title: reading.title,
+                detail:
+                    reading.done === reading.total
+                        ? `all ${reading.total} done`
+                        : `${reading.done} of ${reading.total} done`,
+                fill: reading.total === 0 ? 0 : reading.done / reading.total,
+                start: '',
+                end: '',
             };
         case 'none':
             return { state: 'none', title: reading.title, detail: '', fill: 0, start: '', end: '' };

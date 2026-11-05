@@ -667,6 +667,29 @@ hidden tab and would freeze the timer exactly when it is not being watched.
 for those and not for a skip. It is saved where it last stood still, like the
 playhead, and never restored running.
 
+**A focus timer can follow an agenda**, through a store input like a voice's
+pitch: `focusProgram.inputs` declares `agenda` with `from: 'store'`, so the
+state menu, state mode, the state map and the prune all handle it with no code
+of their own. While a block of that agenda runs, the block **is** the timer:
+`planOf` turns it into a `Plan` (title, elapsed, length) and `focusView` shows
+the block's name, countdown and progress, with the controls disabled because
+the plan drives them. Outside blocks the timer is the ordinary pomodoro again.
+Three choices hold it together:
+
+- **The link is a document; the timer is not.** Timers keep their own fold, so
+  what a timer follows lives in `Documents.focusLinks` (`{ sources: { agenda } }`,
+  a `Linked` like a signal's), set by the documents reducer's `link` case,
+  saved, pruned, forked and undone with the other documents. Putting it on
+  `Focus` would have meant teaching the link, the prune and the state map about
+  a fold that is not a document.
+- **The plan is derived, never stored.** `plansOf` maps every linked timer to
+  the block running now, from the agendas and the wall clock, which runs only
+  while some timer follows an agenda. Nothing ticks for a plan.
+- **Its edges are the only effects.** A block that starts pauses that timer
+  (`pause`, idempotent, from `startedPlans`), so a pomodoro does not run on
+  under it and chime mid-block; a block that ends rings the chime
+  (`endedPlans`), as a phase that ran out does.
+
 **The agenda is a day planner over one shared `Agenda`** of time blocks, each
 on a `Day` (`lib/day.ts`: local `YYYY-MM-DD`, stepped through a date at noon so a
 daylight-saving change can never skip or repeat a day). Each window's day is its
@@ -1202,16 +1225,17 @@ deleted out from under it.
 ## Progress
 
 `progress` shows what a timer or a plan is doing: a bar with a title, the time
-left and the span, following a focus timer (its phase) or an agenda (the block
-now, or the next one, named, with an empty bar). It is a separate program from
+left and the span, following a focus timer (its phase, or the block it follows),
+an agenda (the block now, or the next one, named, with an empty bar) or a to-do
+list (a `count`: how many are done of how many). It is a separate program from
 the dial on purpose. The dial once followed focus too, read-only, and it looked
 like a disabled control; and a reading has more to say than a fraction — a
 name, the time left, what comes next — which a scrub control has no room for.
 So a control scrubs (`playhead`) and an indicator reads (`progress`), and they
 share no type. A saved dial that followed focus falls back to its main clock.
 
-A source is read into a `Reading` (`now`, `next` or `none`) by pure functions in
-`src/readings.ts` (`agendaReading`, `focusReading`), and `barView` turns that
+A source is read into a `Reading` (`now`, `next`, `count` or `none`) by pure
+functions in `src/readings.ts` (`agendaReading`, `focusReading`, `todoReading`), and `barView` turns that
 into the text and fill the component applies. The agenda's reading moves with
 the wall clock, which reaches `inputs.ts` as `InputSources.now$` rather than an
 import: the input definitions are plain data the tests load, and `lib/rx.ts`

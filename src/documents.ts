@@ -42,6 +42,7 @@ import {
     type Drums,
     type DrumsCommand,
 } from './components/drums/drums.ts';
+import type { FocusLink } from './components/focus/focus.ts';
 import {
     defaultVoice,
     isVoiceParam,
@@ -112,6 +113,7 @@ export type Documents = {
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
+    readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly library: Library;
     readonly blueprints: Blueprints;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
@@ -206,6 +208,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     pens: storeEvent(documents.pens, event),
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
+    focusLinks: storeEvent(documents.focusLinks, event),
 });
 
 export const linkedOf = ({
@@ -213,8 +216,21 @@ export const linkedOf = ({
     pens,
     voices,
     drums,
-}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums'>) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums]);
+    focusLinks,
+}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums' | 'focusLinks'>) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...focusLinks]);
+
+// A timer is not a document, so only what it follows is kept here, beside the documents that link.
+const linkedFocus = (documents: Documents, store: StoreId, agenda: StoreId | null): Documents =>
+    (documents.focusLinks.get(store)?.sources.agenda ?? null) === agenda
+        ? documents
+        : {
+              ...documents,
+              focusLinks:
+                  agenda === null
+                      ? new Map([...documents.focusLinks].filter(([id]) => id !== store))
+                      : new Map(documents.focusLinks).set(store, { sources: { agenda } }),
+          };
 
 const ownerOf = ({ stores }: Workspace, store: StoreId) =>
     stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
@@ -464,7 +480,9 @@ export const reduceDocuments =
                                 },
                                 seq,
                             )
-                          : documents;
+                          : owner === 'focus' && param === 'agenda'
+                            ? linkedFocus(documents, store, source)
+                            : documents;
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);

@@ -59,7 +59,16 @@ import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.c
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { sourceOf, type FormulaId } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
-import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
+import {
+    createTimers$,
+    initialFocus,
+    restedTimers,
+    samePlan,
+    startedPlans,
+    type Plan,
+} from './components/focus/focus.ts';
+import { dayOf, minuteOfDay } from './lib/day.ts';
+import { plansOf } from './readings.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import { defaultSignal, reachedFrom, sameWave, waveOf, type Linked } from './shared/signal.ts';
 import { inputGroups } from './input-connections.ts';
@@ -153,6 +162,7 @@ type StoreKey =
     | 'progress$'
     | 'playhead$'
     | 'reading$'
+    | 'plan$'
     | 'playing$'
     | 'looping$'
     | 'duration$'
@@ -336,6 +346,7 @@ const bootstrap = () => {
         pens: stored.pens,
         voices: stored.voices,
         drums: stored.drums,
+        focusLinks: stored.focusLinks,
         library: stored.library,
         blueprints: stored.blueprints,
         formulas: restored(stored.formulas),
@@ -1012,16 +1023,53 @@ const bootstrap = () => {
                 a.signals === b.signals &&
                 a.pens === b.pens &&
                 a.voices === b.voices &&
-                a.drums === b.drums,
+                a.drums === b.drums &&
+                a.focusLinks === b.focusLinks,
         ),
         map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
+    const focusLinks$ = documents$.pipe(
+        map(({ focusLinks }) => focusLinks),
+        distinctUntilChanged(),
+    );
+    // The wall clock runs only while some timer follows an agenda.
+    const plans$ = focusLinks$.pipe(
+        switchMap(links =>
+            [...links.values()].some(({ sources }) => sources.agenda !== null)
+                ? combineLatest([agendas$, wallClock$]).pipe(
+                      map(([agendas, now]) =>
+                          plansOf(links, agendas, dayOf(now), minuteOfDay(now)),
+                      ),
+                  )
+                : of(new Map<StoreId, Plan>()),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const planIn = (store: StoreId): Observable<Plan | null> =>
+        plans$.pipe(
+            map(plans => plans.get(store) ?? null),
+            distinctUntilChanged(samePlan),
+        );
+
     const timers$ = createTimers$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
+        merge(
+            inputs$.pipe(
+                mergeMap(({ store, input }) =>
+                    input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
+                ),
+            ),
+            // A block that starts sets the timer aside, so nothing ticks under it.
+            plans$.pipe(
+                startWith(new Map<StoreId, Plan>()),
+                pairwise(),
+                mergeMap(([before, after]) =>
+                    startedPlans(before, after).map(store => ({
+                        store,
+                        command: { kind: 'pause' } as const,
+                    })),
+                ),
             ),
         ),
         storeEvents$,
@@ -1276,7 +1324,13 @@ const bootstrap = () => {
     };
 
     // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
-    const sources = { focus$: timerIn, agenda$: agendaIn, now$: wallClock$ };
+    const sources = {
+        focus$: timerIn,
+        plan$: planIn,
+        agenda$: agendaIn,
+        todos$: todoIn,
+        now$: wallClock$,
+    };
 
     const scoped = (
         store$: Observable<StoreId>,
@@ -1332,6 +1386,7 @@ const bootstrap = () => {
             board$: narrowed(boardIn),
             notes$: narrowed(notesIn),
             focus$: narrowed(timerIn),
+            plan$: narrowed(planIn),
             agenda$: narrowed(agendaIn),
             habits$: narrowed(habitsIn),
             clocks$: narrowed(clocksIn),
@@ -1400,7 +1455,7 @@ const bootstrap = () => {
     );
 
     return merge(
-        chime$(timers$),
+        chime$(timers$, plans$),
         persistState$(
             combineLatest({
                 workspace: workspace$,
@@ -1423,6 +1478,7 @@ const bootstrap = () => {
                 pens: pens$,
                 voices: voices$,
                 drums: drums$,
+                focusLinks: focusLinks$,
                 library: library$,
                 blueprints: blueprints$,
                 seq: history$.pipe(

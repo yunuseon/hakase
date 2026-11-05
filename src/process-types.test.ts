@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import type {
     AgendaBinding,
+    TodoBinding,
     FocusBinding,
     PaintBinding,
     PenBinding,
@@ -35,7 +36,7 @@ describe('Process', () => {
             readonly progress: PlaybackBinding;
         }>();
         expectTypeOf<Of<'progress'>['follows']>().toEqualTypeOf<{
-            readonly source: FocusBinding | AgendaBinding;
+            readonly source: FocusBinding | AgendaBinding | TodoBinding;
         }>();
     });
 

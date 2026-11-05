@@ -1,16 +1,18 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { Agenda } from './components/agenda/agenda.ts';
-import type { Focus } from './components/focus/focus.ts';
+import type { Focus, Plan } from './components/focus/focus.ts';
 import type { Reading } from './components/progress-bar/progress-bar.ts';
+import type { TodoList } from './components/todo/todo.ts';
 import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
-import { agendaReading, focusReading } from './readings.ts';
+import { agendaReading, focusReading, todoReading } from './readings.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
 export type AgendaBinding = { readonly kind: 'agenda'; readonly store: StoreId };
+export type TodoBinding = { readonly kind: 'todo'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
@@ -20,6 +22,7 @@ export type Follow =
     | PlaybackBinding
     | FocusBinding
     | AgendaBinding
+    | TodoBinding
     | SignalBinding
     | PaintBinding
     | PenBinding
@@ -28,7 +31,9 @@ export type Follow =
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
+    readonly plan$: (store: StoreId) => Observable<Plan | null>;
     readonly agenda$: (store: StoreId) => Observable<Agenda>;
+    readonly todos$: (store: StoreId) => Observable<TodoList>;
     readonly now$: Observable<number>;
 };
 
@@ -45,7 +50,9 @@ const focusSource = {
     title: 'Focus',
     access: 'read',
     read: (store: StoreId, sources: InputSources): Observable<Reading> =>
-        sources.focus$(store).pipe(map(focusReading)),
+        combineLatest([sources.focus$(store), sources.plan$(store)]).pipe(
+            map(([focus, plan]) => focusReading(focus, plan)),
+        ),
 } as const;
 
 const agendaSource = {
@@ -57,6 +64,15 @@ const agendaSource = {
         combineLatest([sources.agenda$(store), sources.now$]).pipe(
             map(([agenda, now]) => agendaReading(agenda, dayOf(now), minuteOfDay(now))),
         ),
+} as const;
+
+const todoSource = {
+    kind: 'todo',
+    program: 'todo',
+    title: 'To-do list',
+    access: 'read',
+    read: (store: StoreId, sources: InputSources): Observable<Reading> =>
+        sources.todos$(store).pipe(map(todoReading)),
 } as const;
 
 const signalSource = {
@@ -98,6 +114,7 @@ export const SOURCES = [
     playbackSource,
     focusSource,
     agendaSource,
+    todoSource,
     signalSource,
     paintSource,
     penSource,
@@ -121,7 +138,7 @@ export type StoreInput = {
     readonly title: string;
     readonly from: 'store';
     readonly param: string;
-    readonly sources: readonly (typeof signalSource)[];
+    readonly sources: readonly (typeof signalSource | typeof agendaSource)[];
     readonly initial: null;
 };
 
@@ -149,7 +166,7 @@ export const sourceInput = {
     title: 'Source',
     from: 'followed',
     group: null,
-    sources: [focusSource, agendaSource],
+    sources: [focusSource, agendaSource, todoSource],
     initial: { kind: 'focus', store: 'focus' },
 } as const satisfies FollowedInput;
 
@@ -224,6 +241,16 @@ export const voiceInputs = {
     volume: storedSignalInput('volume'),
     filter: storedSignalInput('filter'),
     pan: storedSignalInput('pan'),
+};
+
+export const focusInputs = {
+    agenda: {
+        title: 'agenda',
+        from: 'store',
+        param: 'agenda',
+        sources: [agendaSource],
+        initial: null,
+    } satisfies StoreInput,
 };
 
 export const drumsInputs = {
@@ -309,6 +336,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return focusSource.program;
         case 'agenda':
             return agendaSource.program;
+        case 'todo':
+            return todoSource.program;
         case 'signal':
             return signalSource.program;
         case 'paint':
@@ -329,6 +358,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'focus':
             return { kind, store };
         case 'agenda':
+            return { kind, store };
+        case 'todo':
             return { kind, store };
         case 'signal':
             return { kind, store };
@@ -373,6 +404,8 @@ export const readingOf = (binding: Follow, sources: InputSources): Observable<Re
             return focusSource.read(binding.store, sources);
         case 'agenda':
             return agendaSource.read(binding.store, sources);
+        case 'todo':
+            return todoSource.read(binding.store, sources);
         default:
             return null;
     }

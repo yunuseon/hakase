@@ -33,6 +33,7 @@ const started = (): Documents => ({
     pens: new Map(),
     voices: new Map(),
     drums: new Map(),
+    focusLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     formulas: new Map(),
@@ -238,7 +239,7 @@ describe('one log for every document', () => {
 });
 
 describe('links', () => {
-    const launched = (program: 'pen' | 'signal') =>
+    const launched = (program: 'pen' | 'signal' | 'focus') =>
         act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 
     it('set a store input on whichever document owns the store, a signal or a pen', () => {
@@ -254,6 +255,37 @@ describe('links', () => {
         expect(history.present.signals.get('signal')?.sources.depth).toBe('other');
         expect(history.steps).toHaveLength(4);
         expect(labels(history).at(-1)).toBe('Set Main depth to follow other');
+    });
+
+    it('let a focus timer follow an agenda, and undo it as one step', () => {
+        const history = run(fresh(), [
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-3' },
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-3' },
+            { kind: 'link', store: 'focus', param: 'lengths', source: 'store-3' },
+        ]);
+
+        expect(history.present.focusLinks.get('focus')).toEqual({ sources: { agenda: 'store-3' } });
+        expect(history.steps).toHaveLength(1);
+        expect(run(history, [{ kind: 'undo' }]).present.focusLinks.has('focus')).toBe(false);
+        expect(
+            run(history, [{ kind: 'link', store: 'focus', param: 'agenda', source: null }]).present
+                .focusLinks.size,
+        ).toBe(0);
+    });
+
+    it('keep an agenda a timer follows through a prune, though no window shows it', () => {
+        const history = run(fresh(), [
+            launched('focus'),
+            {
+                kind: 'agendas',
+                store: 'store-7',
+                command: { kind: 'add', id: 'block-1', day: '2026-11-05', start: 60, end: 120 },
+            },
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-7' },
+            { kind: 'prune' },
+        ]);
+
+        expect(history.present.agendas.has('store-7')).toBe(true);
     });
 
     it('keep a signal a pen follows through a prune, though no window shows it', () => {

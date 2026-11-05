@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialFocus, reduceFocus } from './components/focus/focus.ts';
-import { agendaReading, focusReading } from './readings.ts';
+import { focusView } from './components/focus/focus.ts';
+import { agendaReading, focusReading, planOf, plansOf, todoReading } from './readings.ts';
 
 const block = (id: string, day: string, start: number, end: number, title = '') => ({
     id,
@@ -59,7 +60,7 @@ describe('focusReading', () => {
         const running = reduceFocus(initialFocus, { kind: 'command', command: { kind: 'toggle' } });
         const halfway = reduceFocus(running, { kind: 'tick', ms: running.remaining / 2 });
 
-        expect(focusReading(halfway)).toEqual({
+        expect(focusReading(halfway, null)).toEqual({
             kind: 'now',
             title: 'Focus',
             at: 0.5,
@@ -67,6 +68,59 @@ describe('focusReading', () => {
             running: true,
             span: null,
         });
-        expect(focusReading(initialFocus)).toMatchObject({ at: 0, running: false });
+        expect(focusReading(initialFocus, null)).toMatchObject({ at: 0, running: false });
+    });
+});
+
+describe('todoReading', () => {
+    it('counts what is done, and has nothing to show for an empty list', () => {
+        const todo = (id: string, done: boolean) => ({ id, text: id, done });
+
+        expect(
+            todoReading({ items: [todo('a', true), todo('b', false), todo('c', true)], made: 3 }),
+        ).toEqual({ kind: 'count', title: 'To-dos', done: 2, total: 3 });
+        expect(todoReading({ items: [], made: 0 }).kind).toBe('none');
+    });
+});
+
+describe('plans', () => {
+    it('are the block running now, measured in milliseconds', () => {
+        expect(planOf(agenda, '2026-11-05', 620)).toEqual({
+            id: 'block-1',
+            title: 'Standup',
+            elapsed: 20 * 60_000,
+            length: 60 * 60_000,
+        });
+        expect(planOf(agenda, '2026-11-05', 690)).toBeNull();
+    });
+
+    it('are kept per timer, only for timers that follow an agenda with a block running', () => {
+        const links = new Map([
+            ['focus', { sources: { agenda: 'agenda' } }],
+            ['store-2', { sources: { agenda: null } }],
+            ['store-3', { sources: { agenda: 'store-9' } }],
+        ]);
+        const plans = plansOf(links, new Map([['agenda', agenda]]), '2026-11-05', 620);
+
+        expect([...plans.keys()]).toEqual(['focus']);
+    });
+
+    it('drive the timer while they run: their title, countdown and progress', () => {
+        const plan = planOf(agenda, '2026-11-05', 615);
+
+        expect(focusView(initialFocus, plan)).toMatchObject({
+            planned: true,
+            label: 'Standup',
+            clock: '45:00',
+            progress: 0.25,
+            running: true,
+        });
+        expect(focusReading(initialFocus, plan)).toMatchObject({
+            title: 'Standup',
+            at: 0.25,
+            remaining: 45 * 60_000,
+            running: true,
+        });
+        expect(focusView(initialFocus, null).planned).toBe(false);
     });
 });

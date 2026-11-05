@@ -56,4 +56,15 @@ describe('barView', () => {
             }),
         ).toMatchObject({ state: 'next', title: 'Next: Reading', detail: 'in 15 min', fill: 0 });
     });
+
+    it('shows a count as a share done', () => {
+        expect(barView({ kind: 'count', title: 'To-dos', done: 3, total: 8 })).toMatchObject({
+            state: 'now',
+            detail: '3 of 8 done',
+            fill: 3 / 8,
+        });
+        expect(barView({ kind: 'count', title: 'To-dos', done: 8, total: 8 }).detail).toBe(
+            'all 8 done',
+        );
+    });
 });
