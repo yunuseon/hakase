@@ -109,7 +109,7 @@ const filled = (element: HTMLElement, block: Placed, active: Element | null): vo
     element.style.setProperty('--lanes', String(block.lanes));
     element.dataset['start'] = String(block.start);
     element.dataset['end'] = String(block.end);
-    element.toggleAttribute('data-short', block.end - block.start <= 30);
+    element.toggleAttribute('data-short', block.end - block.start < 60);
 
     const time = element.querySelector('.time');
     const title = element.querySelector('.title');
