@@ -115,12 +115,11 @@ export class HksFrameStrip extends HTMLElement {
 
         this.pinches$ = fromElementEvent$(this.scroller, 'wheel').pipe(
             filter(event => event.ctrlKey || event.metaKey),
-            map(event => {
-                // Claimed here, so the canvas, which skips a handled wheel, does not zoom the whole workspace too.
+            // Claimed here, so the canvas, which skips a handled wheel, does not zoom the whole workspace too.
+            tap(event => {
                 event.preventDefault();
-
-                return { factor: Math.exp(-event.deltaY / 100), x: trackX(event.clientX) };
             }),
+            map(event => ({ factor: Math.exp(-event.deltaY / 100), x: trackX(event.clientX) })),
         );
 
         const { scroller } = this;

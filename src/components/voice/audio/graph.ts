@@ -1,7 +1,7 @@
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { context$ } from '../../../shared/audio.ts';
-import type { Level, Shape } from '../voice.ts';
+import type { Played } from '../voice.ts';
 
 export type VoiceGraph = {
     readonly context: AudioContext;
@@ -52,13 +52,6 @@ export const voiceGraph$ = context$.pipe(
             }),
     ),
 );
-
-export type Played = {
-    readonly level: Level;
-    readonly shape: Shape;
-    readonly glide: number;
-    readonly synth: boolean;
-};
 
 export const applyLevel = (
     { context, oscillator, drive, filter, gain, panner }: VoiceGraph,

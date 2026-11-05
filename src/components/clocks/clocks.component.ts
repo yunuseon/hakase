@@ -105,12 +105,11 @@ export class HksClocks extends HTMLElement {
 
         // One listener, shared: the draft is read once, before anyone clears it.
         this.submitted$ = fromElementEvent$(form, 'submit').pipe(
-            map(event => {
-                // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            tap(event => {
                 event.preventDefault();
-
-                return draft.value;
             }),
+            map(() => draft.value),
             share(),
         );
 

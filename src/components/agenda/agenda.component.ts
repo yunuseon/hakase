@@ -164,8 +164,10 @@ export class HksAgenda extends HTMLElement {
                     !(start.target instanceof HTMLInputElement) &&
                     !(start.target instanceof HTMLButtonElement),
             ),
-            switchMap(start => {
+            tap(start => {
                 start.preventDefault();
+            }),
+            switchMap(start => {
                 const same = (event: PointerEvent): boolean => event.pointerId === start.pointerId;
                 const origin = minuteAt(start.clientY);
                 const handle = dataOf(start.target, 'handle');

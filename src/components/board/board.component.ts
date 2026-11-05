@@ -317,9 +317,11 @@ export class HksBoard extends HTMLElement {
 
         // One listener, shared: the draft is read once, before anyone clears it.
         this.submitted$ = fromElementEvent$(this.scroller, 'submit').pipe(
-            mergeMap(event => {
-                // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            tap(event => {
                 event.preventDefault();
+            }),
+            mergeMap(event => {
                 const form = event.target instanceof HTMLFormElement ? event.target : null;
                 const column = form?.dataset['add'];
                 const draft = form?.querySelector('.draft');
@@ -370,9 +372,11 @@ export class HksBoard extends HTMLElement {
                       ? of({ start, kind: 'column' as const, id: column })
                       : EMPTY;
             }),
-            switchMap(({ start, kind, id }) => {
-                // Otherwise the press starts a text selection across everything it passes.
+            // Otherwise the press starts a text selection across everything it passes.
+            tap(({ start }) => {
                 start.preventDefault();
+            }),
+            switchMap(({ start, kind, id }) => {
                 const same = (event: PointerEvent): boolean => event.pointerId === start.pointerId;
                 const at = (event: PointerEvent, phase: DragPhase): Drag =>
                     kind === 'card'
@@ -420,38 +424,41 @@ export class HksBoard extends HTMLElement {
                 }),
             ),
             fromElementEvent$(this.scroller, 'keydown').pipe(
-                mergeMap((event): Observable<BoardCommand> => {
+                mergeMap(event => {
                     const step = ARROWS[event.key];
                     const card = dataOf(event.target, 'grip');
                     const column = dataOf(event.target, 'columnGrip');
 
-                    if (step === undefined) {
-                        return EMPTY;
-                    }
-
-                    if (card !== undefined) {
-                        // Handled here: the canvas would otherwise read the same arrow as a section step.
-                        event.preventDefault();
-
-                        return of({ kind: 'step-card', id: card, step });
-                    }
-
-                    if (column === undefined || (step !== 'left' && step !== 'right')) {
-                        return EMPTY;
-                    }
-
+                    return step === undefined
+                        ? []
+                        : card !== undefined
+                          ? [{ event, step, card, column: undefined }]
+                          : column !== undefined && (step === 'left' || step === 'right')
+                            ? [{ event, step, card: undefined, column }]
+                            : [];
+                }),
+                // Handled here: the canvas would otherwise read the same arrow as a section step.
+                tap(({ event }) => {
                     event.preventDefault();
+                }),
+                mergeMap(({ step, card, column }): BoardCommand[] => {
+                    if (card !== undefined) {
+                        return [{ kind: 'step-card', id: card, step }];
+                    }
+
                     const index = elementsIn(this.columns).findIndex(
                         section => section.dataset['column'] === column,
                     );
 
-                    return index < 0
-                        ? EMPTY
-                        : of({
-                              kind: 'move-column',
-                              id: column,
-                              to: index + (step === 'left' ? -1 : 1),
-                          });
+                    return column === undefined || index < 0
+                        ? []
+                        : [
+                              {
+                                  kind: 'move-column',
+                                  id: column,
+                                  to: index + (step === 'left' ? -1 : 1),
+                              },
+                          ];
                 }),
             ),
             this.drags$.pipe(

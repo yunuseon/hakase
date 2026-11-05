@@ -241,21 +241,25 @@ export class HksSignal extends HTMLElement {
                 }),
             ),
             fromElementEvent$(params, 'keydown').pipe(
-                mergeMap((event): SignalCommand[] => {
+                mergeMap(event => {
                     const param = paramOf(event.target);
                     const step = event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0;
+                    const command: SignalCommand | null =
+                        param === null || step === 0
+                            ? null
+                            : {
+                                  kind: 'nudge',
+                                  param,
+                                  by: step * dragStep(param, event.shiftKey) * 10,
+                              };
 
-                    if (param === null || step === 0) {
-                        return [];
-                    }
-
-                    // Taken, or the canvas reads the arrow as a step between sections.
-                    event.preventDefault();
-
-                    return [
-                        { kind: 'nudge', param, by: step * dragStep(param, event.shiftKey) * 10 },
-                    ];
+                    return command === null ? [] : [{ event, claimed: command }];
                 }),
+                // Taken, or the canvas reads the arrow as a step between sections.
+                tap(({ event }) => {
+                    event.preventDefault();
+                }),
+                map(({ claimed }) => claimed),
             ),
             pointerGesture$(scope).pipe(
                 map(({ phase, event }) => {

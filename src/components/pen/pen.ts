@@ -92,54 +92,77 @@ const HARDNESS = 0.6;
 
 type Mark = { readonly at: Point; readonly t: number };
 
+type Sample = Mark & { readonly radius: number; readonly flow: number };
+
+const laidTo = (last: Mark | null, { at, t, radius, flow }: Sample) => {
+    if (radius <= 0 || flow <= 0) {
+        return { last: null, laid: [] };
+    }
+
+    if (last === null) {
+        return { last: { at, t }, laid: [{ at, t }] };
+    }
+
+    // Stamped by distance, not per sample: a slow pen would otherwise lay hundreds of dabs on one spot.
+    const spacing = Math.max(radius / 3, 0.5 / INK_SIDE);
+    const count = Math.floor(Math.hypot(at.x - last.at.x, at.y - last.at.y) / spacing);
+    const laid = Array.from({ length: count }, (_, step): Mark => {
+        const along = (step + 1) / count;
+
+        return {
+            at: {
+                x: last.at.x + (at.x - last.at.x) * along,
+                y: last.at.y + (at.y - last.at.y) * along,
+            },
+            t: last.t + (t - last.t) * along,
+        };
+    });
+
+    return { last: count > 0 ? { at, t } : last, laid };
+};
+
 export const strokeOf = (drawing: Drawing): Stroke => {
     const { weight, mode, symmetry } = drawing.pen;
     const { size, ink } = drawing.waves;
-    const dabs: number[] = [];
-    const lay = (at: Point, radius: number, flow: number, t: number) => {
-        for (const copy of copiesOf(at, symmetry)) {
-            dabs.push(copy.x, copy.y, radius, flow, t);
-        }
-    };
-    let last: Mark | null = null;
-
-    for (let index = 0; index <= SAMPLES; index += 1) {
+    const samples = Array.from({ length: SAMPLES + 1 }, (_, index): Sample => {
         const t = index / SAMPLES;
-        const at = penAt(drawing, t);
-        const radius =
-            ((size === null ? weight : weight * Math.max(0, waveAt(size, t))) * WEIGHT_UNIT) / 2;
-        const flow = ink === null ? 1 : Math.min(1, Math.max(0, waveAt(ink, t)));
-        // Stamped by distance, not per sample: a slow pen would otherwise lay hundreds of dabs on one spot.
-        const spacing = Math.max(radius / 3, 0.5 / INK_SIDE);
 
-        if (radius <= 0 || flow <= 0) {
-            last = null;
-        } else if (last === null) {
-            lay(at, radius, flow, t);
-            last = { at, t };
-        } else {
-            const from: Mark = last;
-            const count = Math.floor(Math.hypot(at.x - from.at.x, at.y - from.at.y) / spacing);
+        return {
+            at: penAt(drawing, t),
+            t,
+            radius:
+                ((size === null ? weight : weight * Math.max(0, waveAt(size, t))) * WEIGHT_UNIT) /
+                2,
+            flow: ink === null ? 1 : Math.min(1, Math.max(0, waveAt(ink, t))),
+        };
+    });
+    const { chunks } = samples.reduce<{
+        readonly last: Mark | null;
+        readonly chunks: readonly (readonly number[])[];
+    }>(
+        ({ last, chunks: made }, sample) => {
+            const { last: next, laid } = laidTo(last, sample);
 
-            for (let step = 1; step <= count; step += 1) {
-                const along = step / count;
+            return {
+                last: next,
+                chunks: [
+                    ...made,
+                    laid.flatMap(({ at, t }) =>
+                        copiesOf(at, symmetry).flatMap(copy => [
+                            copy.x,
+                            copy.y,
+                            sample.radius,
+                            sample.flow,
+                            t,
+                        ]),
+                    ),
+                ],
+            };
+        },
+        { last: null, chunks: [] },
+    );
 
-                lay(
-                    {
-                        x: from.at.x + (at.x - from.at.x) * along,
-                        y: from.at.y + (at.y - from.at.y) * along,
-                    },
-                    radius,
-                    flow,
-                    from.t + (t - from.t) * along,
-                );
-            }
-
-            last = count > 0 ? { at, t } : from;
-        }
-    }
-
-    return { dabs: Float32Array.from(dabs), whole: mode === 'whole', hardness: HARDNESS };
+    return { dabs: Float32Array.from(chunks.flat()), whole: mode === 'whole', hardness: HARDNESS };
 };
 
 const field = (value: object, key: string): unknown =>

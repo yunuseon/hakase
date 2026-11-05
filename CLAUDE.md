@@ -2130,13 +2130,25 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 - **Never let a stream reach a `combineLatest` by two paths.** If A feeds B and
   the pipe combines A and B, every A emission fires twice — once with the stale
   B — and the work downstream doubles silently. Fold the sources into one chain,
-  or one `scan` over a union of actions, instead. Three of these have been found
+  or one `scan` over a union of actions, instead. Four of these have been found
   and removed: `params$` -> `geometry$`, `controls.sketch$` -> `size$`, and
   `formula` sitting in `SketchParams` while also selecting the shader — which put
   `controls.sketch$` on both inputs of the sketch's `combineLatest`. The last one
   is why `SketchParams` carries no `formula`: the program is already compiled by
   the time those values are applied, so naming it there was both dead and a
   double-draw. `controls.formula$` is a separate output for the same reason.
+  The fourth was the voice and drums reading `playhead$` and `playing$` side by
+  side: Stop moves both in one fold step, the combine saw "at 0, still playing"
+  first, and the scheduler struck the loop's first notes on Stop. A window now
+  gets its whole clock as `clock$`, and a program that needs more than one of
+  its fields reads that.
+- **Side effects on an event go in a `tap`, after the operator that decides.**
+  A control that claims an event (`preventDefault`, a blur) decides in a
+  `map`/`mergeMap` that returns the event beside its value, claims it in a
+  `tap`, and maps the value out; deciding and claiming in one callback hid an
+  effect in what reads as a pure step. A scheduler's fold likewise gets the
+  audio time stamped onto its input by a `map` before the `scan`, never read
+  inside the reducer.
 - Prefer a bug that _cannot be expressed_ over a bug that is patched. When a
   stale-value bug shows up, the fix is usually to make the stale thing an input
   to a `combineLatest`, not to cache it and invalidate by hand.
@@ -2158,7 +2170,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and eighty-two of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and eighty-five of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

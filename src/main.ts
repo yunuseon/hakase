@@ -155,6 +155,7 @@ type StoreKey =
     | 'playing$'
     | 'looping$'
     | 'duration$'
+    | 'clock$'
     | 'todos$'
     | 'board$'
     | 'notes$'
@@ -1321,6 +1322,7 @@ const bootstrap = () => {
                 map(({ looping }) => looping),
                 distinctUntilChanged(),
             ),
+            clock$: clock,
             duration$: clock.pipe(
                 map(({ duration }) => duration),
                 distinctUntilChanged(),

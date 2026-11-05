@@ -393,9 +393,11 @@ export class HksBookmarks extends HTMLElement {
 
         // One listener, shared: the drafts are read once, before anyone clears them.
         this.submitted$ = fromElementEvent$(scroll, 'submit').pipe(
-            mergeMap(event => {
-                // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            tap(event => {
                 event.preventDefault();
+            }),
+            mergeMap(event => {
                 const form = event.target instanceof HTMLFormElement ? event.target : null;
                 const group = form?.dataset['add'];
                 const name = form?.querySelector('.new-name');
@@ -474,9 +476,11 @@ export class HksBookmarks extends HTMLElement {
                       ? of({ start, kind: 'group' as const, id: group })
                       : EMPTY;
             }),
-            switchMap(({ start, kind, id }) => {
-                // Otherwise the press starts a text selection across everything it passes.
+            // Otherwise the press starts a text selection across everything it passes.
+            tap(({ start }) => {
                 start.preventDefault();
+            }),
+            switchMap(({ start, kind, id }) => {
                 const same = (event: PointerEvent): boolean => event.pointerId === start.pointerId;
                 const at = (event: PointerEvent, phase: DragPhase): Drag =>
                     kind === 'bookmark'
@@ -525,21 +529,23 @@ export class HksBookmarks extends HTMLElement {
                 }),
             ),
             fromElementEvent$(scroll, 'keydown').pipe(
-                mergeMap((event): Observable<BookmarkCommand> => {
-                    const step =
+                mergeMap(event => {
+                    const step: 'up' | 'down' | null =
                         event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : null;
                     const bookmark = dataOf(event.target, 'grip');
                     const group = dataOf(event.target, 'groupGrip');
 
-                    if (step === null || (bookmark === undefined && group === undefined)) {
-                        return EMPTY;
-                    }
-
-                    // Handled here: the canvas would otherwise read the same arrow as a section step.
+                    return step === null || (bookmark === undefined && group === undefined)
+                        ? []
+                        : [{ event, step, bookmark, group }];
+                }),
+                // Handled here: the canvas would otherwise read the same arrow as a section step.
+                tap(({ event }) => {
                     event.preventDefault();
-
+                }),
+                mergeMap(({ step, bookmark, group }): BookmarkCommand[] => {
                     if (bookmark !== undefined) {
-                        return of({ kind: 'step', id: bookmark, step });
+                        return [{ kind: 'step', id: bookmark, step }];
                     }
 
                     const index = elementsIn(groups).findIndex(
@@ -547,12 +553,8 @@ export class HksBookmarks extends HTMLElement {
                     );
 
                     return group === undefined || index < 0
-                        ? EMPTY
-                        : of({
-                              kind: 'move-group',
-                              id: group,
-                              to: index + (step === 'up' ? -1 : 1),
-                          });
+                        ? []
+                        : [{ kind: 'move-group', id: group, to: index + (step === 'up' ? -1 : 1) }];
                 }),
             ),
             fromElementEvent$(scroll, 'change').pipe(
@@ -661,17 +663,18 @@ export class HksBookmarks extends HTMLElement {
                 }),
             ),
             fromElementEvent$(scroll, 'keydown').pipe(
-                tap(event => {
+                mergeMap(event => {
                     const { target } = event;
 
-                    if (
-                        event.key === 'Enter' &&
+                    return event.key === 'Enter' &&
                         target instanceof HTMLInputElement &&
                         target.closest('.add') === null
-                    ) {
-                        event.preventDefault();
-                        target.blur();
-                    }
+                        ? [{ event, target }]
+                        : [];
+                }),
+                tap(({ event, target }) => {
+                    event.preventDefault();
+                    target.blur();
                 }),
             ),
             this.drags$.pipe(

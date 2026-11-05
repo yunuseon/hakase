@@ -13,6 +13,7 @@ import type { Focus, FocusCommand } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
 import type { HabitCommand, Habits } from './components/habits/habits.ts';
 import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
+import type { Clock } from './shared/playhead.ts';
 import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
 import type { Picture } from './shared/picture.ts';
 import type { Sheet } from './shared/stroke.ts';
@@ -131,6 +132,8 @@ export type AppState = {
     readonly playing$: Observable<boolean>;
     readonly looping$: Observable<boolean>;
     readonly duration$: Observable<number>;
+    // The window's clock whole: its position and its play state change together, and two projections would fire twice.
+    readonly clock$: Observable<Clock>;
     readonly zoom$: Observable<number>;
     // Selectors, not streams: a formula is a document several processes may show.
     readonly source$: (formula: FormulaId) => Observable<Source>;

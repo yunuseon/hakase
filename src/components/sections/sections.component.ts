@@ -95,8 +95,10 @@ export class HksSections extends HTMLElement {
                         ? EMPTY
                         : of({ start, id });
                 }),
-                switchMap(({ start, id }) => {
+                tap(({ start }) => {
                     start.preventDefault();
+                }),
+                switchMap(({ start, id }) => {
                     const same = (event: PointerEvent): boolean =>
                         event.pointerId === start.pointerId;
 

@@ -139,11 +139,10 @@ export class HksFormulaEditor extends HTMLElement {
 
         // One listener, shared: the name is read once, before connect$ clears the field.
         this.submitted$ = fromElementEvent$(this.saveForm, 'submit').pipe(
-            map(event => {
+            tap(event => {
                 event.preventDefault();
-
-                return name.value;
             }),
+            map(() => name.value),
             share(),
         );
         this.saves$ = this.submitted$;

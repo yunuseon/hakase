@@ -99,15 +99,13 @@ export class HksCanvas extends HTMLElement {
                         at: { x: event.clientX, y: event.clientY },
                     });
 
-                    if (gesture === null) {
-                        return EMPTY;
-                    }
-
-                    // Otherwise ctrl+wheel zooms the whole browser page as well.
-                    event.preventDefault();
-
-                    return of(gesture);
+                    return gesture === null ? [] : [{ event, claimed: gesture }];
                 }),
+                // Otherwise ctrl+wheel zooms the whole browser page as well.
+                tap(({ event }) => {
+                    event.preventDefault();
+                }),
+                map(({ claimed }) => claimed),
             ),
         );
 
@@ -121,14 +119,12 @@ export class HksCanvas extends HTMLElement {
                     isEditable(event.composedPath()[0] ?? null),
                 );
 
-                if (edit === null) {
-                    return EMPTY;
-                }
-
-                event.preventDefault();
-
-                return of(edit);
+                return edit === null ? [] : [{ event, claimed: edit }];
             }),
+            tap(({ event }) => {
+                event.preventDefault();
+            }),
+            map(({ claimed }) => claimed),
         );
 
         this.steps$ = fromDocumentEvent$('keydown').pipe(
@@ -140,28 +136,24 @@ export class HksCanvas extends HTMLElement {
                     event.defaultPrevented || isEditable(event.composedPath()[0] ?? null),
                 );
 
-                if (step === null) {
-                    return EMPTY;
-                }
-
-                event.preventDefault();
-
-                return of(step);
+                return step === null ? [] : [{ event, claimed: step }];
             }),
+            tap(({ event }) => {
+                event.preventDefault();
+            }),
+            map(({ claimed }) => claimed),
         );
 
         this.keys$ = fromDocumentEvent$('keydown').pipe(
             mergeMap(event => {
                 const zoom = keyZoom(event.key, event.ctrlKey || event.metaKey);
 
-                if (zoom === null) {
-                    return EMPTY;
-                }
-
-                event.preventDefault();
-
-                return of(zoom);
+                return zoom === null ? [] : [{ event, claimed: zoom }];
             }),
+            tap(({ event }) => {
+                event.preventDefault();
+            }),
+            map(({ claimed }) => claimed),
         );
     }
 

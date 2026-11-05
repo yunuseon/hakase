@@ -63,6 +63,92 @@ const sweep = (
     oscillator.frequency.setTargetAtTime(to, start, time);
 };
 
+const toneOf = (context: BaseAudioContext, type: OscillatorType, frequency: number) => {
+    const oscillator = context.createOscillator();
+
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+
+    return oscillator;
+};
+
+const wired = <N extends AudioNode>(node: N, into: AudioNode) => {
+    node.connect(into);
+
+    return node;
+};
+
+const sourcesOf = (
+    context: BaseAudioContext,
+    drum: Drum,
+    start: number,
+    out: AudioNode,
+): readonly AudioScheduledSourceNode[] => {
+    const decay = DECAYS[drum];
+
+    switch (drum) {
+        case 'kick': {
+            const body = context.createOscillator();
+            const click = wired(
+                filterOf(context, 'highpass', 1200),
+                wired(decaying(context, 0.4, start, 0.01), out),
+            );
+
+            sweep(body, 160, 45, start, 0.03);
+
+            return [wired(body, out), wired(noiseOf(context, 0.02), click)];
+        }
+        case 'snare': {
+            const tone = wired(decaying(context, 0.5, start, 0.08), out);
+
+            return [
+                wired(
+                    noiseOf(context, decay * 2 + 0.05),
+                    wired(filterOf(context, 'highpass', 1000), out),
+                ),
+                ...[185, 330].map(frequency => wired(toneOf(context, 'triangle', frequency), tone)),
+            ];
+        }
+        case 'clap': {
+            const bursts = wired(context.createGain(), out);
+
+            [0, 0.011, 0.023].forEach(offset => {
+                bursts.gain.setValueAtTime(1, start + offset);
+                bursts.gain.setTargetAtTime(0.15, start + offset, 0.003);
+            });
+            bursts.gain.setValueAtTime(1, start + 0.034);
+
+            return [
+                wired(
+                    noiseOf(context, decay * 2 + 0.05),
+                    wired(filterOf(context, 'bandpass', 1200, 1.2), bursts),
+                ),
+            ];
+        }
+        case 'hat':
+        case 'open': {
+            const high = wired(
+                filterOf(context, 'highpass', 7000),
+                wired(filterOf(context, 'bandpass', 10000, 0.8), out),
+            );
+
+            return METAL.map(frequency => wired(toneOf(context, 'square', frequency), high));
+        }
+        case 'tom': {
+            const body = context.createOscillator();
+
+            sweep(body, 130, 88, start, 0.08);
+
+            return [wired(body, out)];
+        }
+        case 'bell': {
+            const band = wired(filterOf(context, 'bandpass', 800, 1.5), out);
+
+            return [540, 800].map(frequency => wired(toneOf(context, 'square', frequency), band));
+        }
+    }
+};
+
 export const hit = (
     context: BaseAudioContext,
     bus: AudioNode,
@@ -71,107 +157,10 @@ export const hit = (
     velocity: number,
 ): void => {
     const start = Math.max(at, context.currentTime);
-    const level = velocity * GAINS[drum];
     const decay = DECAYS[drum];
     const end = start + decay * 2 + 0.05;
-    const out = decaying(context, level, start, decay);
-    const started: AudioScheduledSourceNode[] = [];
-    const play = (source: AudioScheduledSourceNode, into: AudioNode) => {
-        source.connect(into);
-        started.push(source);
-    };
-
-    const into = <N extends AudioNode>(node: N, next: AudioNode = out) => {
-        node.connect(next);
-
-        return node;
-    };
-
-    out.connect(bus);
-
-    switch (drum) {
-        case 'kick': {
-            const body = context.createOscillator();
-            const click = noiseOf(context, 0.02);
-
-            sweep(body, 160, 45, start, 0.03);
-            play(body, out);
-            play(
-                click,
-                into(
-                    filterOf(context, 'highpass', 1200),
-                    into(decaying(context, 0.4, start, 0.01)),
-                ),
-            );
-            break;
-        }
-        case 'snare': {
-            const noise = noiseOf(context, decay * 2 + 0.05);
-            const body = [185, 330].map(frequency => {
-                const oscillator = context.createOscillator();
-
-                oscillator.type = 'triangle';
-                oscillator.frequency.value = frequency;
-
-                return oscillator;
-            });
-            const tone = decaying(context, 0.5, start, 0.08);
-
-            play(noise, into(filterOf(context, 'highpass', 1000)));
-            body.forEach(oscillator => {
-                play(oscillator, tone);
-            });
-            tone.connect(out);
-            break;
-        }
-        case 'clap': {
-            const noise = noiseOf(context, decay * 2 + 0.05);
-            const bursts = context.createGain();
-
-            [0, 0.011, 0.023].forEach(offset => {
-                bursts.gain.setValueAtTime(1, start + offset);
-                bursts.gain.setTargetAtTime(0.15, start + offset, 0.003);
-            });
-            bursts.gain.setValueAtTime(1, start + 0.034);
-            play(noise, into(filterOf(context, 'bandpass', 1200, 1.2), into(bursts)));
-            break;
-        }
-        case 'hat':
-        case 'open': {
-            const high = filterOf(context, 'highpass', 7000);
-            const band = filterOf(context, 'bandpass', 10000, 0.8);
-
-            METAL.forEach(frequency => {
-                const oscillator = context.createOscillator();
-
-                oscillator.type = 'square';
-                oscillator.frequency.value = frequency;
-                play(oscillator, high);
-            });
-            high.connect(band).connect(out);
-            break;
-        }
-        case 'tom': {
-            const body = context.createOscillator();
-
-            sweep(body, 130, 88, start, 0.08);
-            play(body, out);
-            break;
-        }
-        case 'bell': {
-            const band = filterOf(context, 'bandpass', 800, 1.5);
-
-            [540, 800].forEach(frequency => {
-                const oscillator = context.createOscillator();
-
-                oscillator.type = 'square';
-                oscillator.frequency.value = frequency;
-                play(oscillator, band);
-            });
-            band.connect(out);
-            break;
-        }
-    }
+    const out = wired(decaying(context, velocity * GAINS[drum], start, decay), bus);
+    const started = sourcesOf(context, drum, start, out);
 
     started.forEach(source => {
         source.start(start);

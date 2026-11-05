@@ -560,15 +560,13 @@ export class HksStateMap extends HTMLElement {
                         at: viewport(event.clientX, event.clientY),
                     });
 
-                    if (gesture === null) {
-                        return [];
-                    }
-
-                    // Claimed, so the canvas behind leaves this wheel to the map, as the frame strip's.
-                    event.preventDefault();
-
-                    return [gesture];
+                    return gesture === null ? [] : [{ event, claimed: gesture }];
                 }),
+                // Claimed, so the canvas behind leaves this wheel to the map, as the frame strip's.
+                tap(({ event }) => {
+                    event.preventDefault();
+                }),
+                map(({ claimed }) => claimed),
             ),
         );
 

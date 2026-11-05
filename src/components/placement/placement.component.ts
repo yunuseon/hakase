@@ -49,11 +49,10 @@ export class HksPlacement extends HTMLElement {
                 ),
             ),
             fromElementEvent$(this, 'contextmenu').pipe(
-                map((event): PlacementEvent => {
+                tap(event => {
                     event.preventDefault();
-
-                    return { kind: 'cancel' };
                 }),
+                map((): PlacementEvent => ({ kind: 'cancel' })),
             ),
             fromDocumentEvent$('keydown').pipe(
                 mergeMap((event): PlacementEvent[] =>

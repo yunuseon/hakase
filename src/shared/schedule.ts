@@ -41,6 +41,15 @@ const heldOf = (notes: readonly Span[], note: Span) => {
         : note.to - note.from;
 };
 
+export const frameOf = (
+    {
+        at,
+        duration,
+        playing,
+    }: { readonly at: number; readonly duration: number; readonly playing: boolean },
+    now: number,
+): Frame => ({ t: at, now, seconds: duration, playing });
+
 export const scheduled = <S extends Span>(
     { last, until, loops, anchor }: Schedule,
     { t, now, seconds, playing }: Frame,

@@ -193,7 +193,7 @@ export class HksPaint extends HTMLElement {
         );
 
         const keys$ = fromElementEvent$(stage, 'keydown').pipe(
-            mergeMap((event): PaintEvent[] => {
+            mergeMap(event => {
                 const shifts: Readonly<Record<string, readonly [number, number]>> = {
                     ArrowLeft: [-1, 0],
                     ArrowRight: [1, 0],
@@ -219,13 +219,13 @@ export class HksPaint extends HTMLElement {
                                     ? { kind: 'tool', tool }
                                     : null;
 
-                // Taken, or the canvas reads the arrows as steps between sections.
-                if (found !== null) {
-                    event.preventDefault();
-                }
-
-                return found === null ? [] : [found];
+                return found === null ? [] : [{ event, claimed: found }];
             }),
+            // Taken, or the canvas reads the arrows as steps between sections.
+            tap(({ event }) => {
+                event.preventDefault();
+            }),
+            map(({ claimed }) => claimed),
         );
 
         const picked$ = clicks$.pipe(

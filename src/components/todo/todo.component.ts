@@ -101,12 +101,11 @@ export class HksTodo extends HTMLElement {
 
         // One listener, shared: the draft is read once, before anyone clears it.
         this.submitted$ = fromElementEvent$(this.form, 'submit').pipe(
-            map(event => {
-                // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            // Not a page navigation: the form exists for Enter, not to be sent anywhere.
+            tap(event => {
                 event.preventDefault();
-
-                return draft.value;
             }),
+            map(() => draft.value),
             share(),
         );
 
@@ -130,9 +129,11 @@ export class HksTodo extends HTMLElement {
                     ? EMPTY
                     : of({ start, id });
             }),
-            switchMap(({ start, id }) => {
-                // Otherwise the press starts a text selection across the rows it passes.
+            // Otherwise the press starts a text selection across the rows it passes.
+            tap(({ start }) => {
                 start.preventDefault();
+            }),
+            switchMap(({ start, id }) => {
                 const same = (event: PointerEvent): boolean => event.pointerId === start.pointerId;
                 const at = (event: PointerEvent, phase: Drag['phase']): Drag => ({
                     id,
@@ -160,21 +161,22 @@ export class HksTodo extends HTMLElement {
         this.commands$ = merge(
             this.submitted$.pipe(map((text): TodoCommand => ({ kind: 'add', text }))),
             fromElementEvent$(this.items, 'keydown').pipe(
-                mergeMap((event): Observable<TodoCommand> => {
+                mergeMap(event => {
                     const id = dataOf(event.target, 'grip');
                     const step = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
 
-                    if (id === undefined || step === 0) {
-                        return EMPTY;
-                    }
-
-                    // Handled here: the canvas would otherwise read the same arrow as a section step.
+                    return id === undefined || step === 0 ? [] : [{ event, id, step }];
+                }),
+                // Handled here: the canvas would otherwise read the same arrow as a section step.
+                tap(({ event }) => {
                     event.preventDefault();
+                }),
+                mergeMap(({ id, step }): TodoCommand[] => {
                     const index = [...this.items.children].findIndex(
                         row => row instanceof HTMLElement && row.dataset['id'] === id,
                     );
 
-                    return index < 0 ? EMPTY : of({ kind: 'move', id, to: index + step });
+                    return index < 0 ? [] : [{ kind: 'move', id, to: index + step }];
                 }),
             ),
             this.drags$.pipe(

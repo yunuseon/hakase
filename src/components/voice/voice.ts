@@ -1,10 +1,18 @@
 import { curveOf } from '../../shared/curve.ts';
 import {
+    scheduled,
+    unscheduled,
+    type Frame,
+    type Schedule,
+    type Strike,
+} from '../../shared/schedule.ts';
+import {
     envelopeAt,
     INSTRUMENT_NAMES,
     INSTRUMENTS,
     isInstrumentName,
     type InstrumentName,
+    type Instrument,
 } from './instruments.ts';
 import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
 
@@ -339,6 +347,63 @@ export const voiceCurve = (sounding: Sounding, seconds: number) => {
     const notes = notesOf(sounding);
 
     return curveOf(t => heardAt(sounding, notes, t, seconds));
+};
+
+export type Heard = { readonly sounding: Sounding; readonly notes: readonly Note[] };
+
+export type Played = {
+    readonly level: Level;
+    readonly shape: Shape;
+    readonly glide: number;
+    readonly synth: boolean;
+};
+
+export const playedAt = (
+    { sounding, notes }: Heard,
+    t: number,
+    seconds: number,
+    playing: boolean,
+): Played => {
+    const level = levelAt(sounding, notes, t, seconds);
+
+    return {
+        level: { ...level, gain: playing ? level.gain : 0 },
+        shape: sounding.voice.shape,
+        glide: sounding.voice.glide,
+        synth: sounding.voice.instrument === 'synth',
+    };
+};
+
+export type Planned = Strike<Note> & {
+    readonly instrument: Instrument;
+    readonly frequency: number;
+};
+
+export type Planning = { readonly schedule: Schedule; readonly strikes: readonly Planned[] };
+
+export const unplanned: Planning = { schedule: unscheduled, strikes: [] };
+
+export const plannedNotes = (
+    { schedule }: Planning,
+    { sounding, notes }: Heard,
+    frame: Frame,
+): Planning => {
+    const { instrument, root } = sounding.voice;
+
+    if (instrument === 'synth') {
+        return unplanned;
+    }
+
+    const next = scheduled(schedule, frame, notes);
+
+    return {
+        schedule: next.schedule,
+        strikes: next.strikes.map(planned => ({
+            ...planned,
+            instrument: INSTRUMENTS[instrument],
+            frequency: frequencyOf(root + planned.span.semitones),
+        })),
+    };
 };
 
 const field = (value: object, key: string): unknown =>

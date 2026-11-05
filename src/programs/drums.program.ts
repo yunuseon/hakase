@@ -17,7 +17,7 @@ import { HksDrums } from '../components/drums/drums.component.ts';
 import { hitsOf, swellOf, type Hit } from '../components/drums/drums.ts';
 import { drumsInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
-import { scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
+import { frameOf, scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
 
 type Scheduling = { readonly schedule: Schedule; readonly strikes: readonly Strike<Hit>[] };
 
@@ -34,7 +34,7 @@ export const drumsProgram = {
 
         return {
             element: drums,
-            run$: ({ kit$, playhead$, playing$, duration$ }) => {
+            run$: ({ kit$, playhead$, clock$ }) => {
                 // Together: hits derived beside the kit would reach the combineLatest below by two paths.
                 const heard$ = kit$.pipe(
                     map(kit => ({ kit, hits: hitsOf(kit.drums) })),
@@ -46,11 +46,11 @@ export const drumsProgram = {
                     startWith(false),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
-                const frames$ = combineLatest([heard$, playhead$, duration$, playing$]);
+                const frames$ = combineLatest([heard$, clock$]);
                 const played$ = (bus: DrumBus) =>
                     merge(
                         frames$.pipe(
-                            map(([{ kit }, t, , playing]) => (playing ? swellOf(kit, t) : 0)),
+                            map(([{ kit }, { at, playing }]) => (playing ? swellOf(kit, at) : 0)),
                             distinctUntilChanged(),
                             tap(volume => {
                                 applyVolume(bus, volume);
@@ -58,13 +58,14 @@ export const drumsProgram = {
                         ),
                         // Ahead of the playhead on the audio clock: struck at the frame rate, a hit would land up to a frame late.
                         frames$.pipe(
+                            // Stamped before the fold, so the fold reads nothing but its arguments.
+                            map(([{ hits }, clock]) => ({
+                                hits,
+                                frame: frameOf(clock, bus.context.currentTime),
+                            })),
                             scan(
-                                ({ schedule }: Scheduling, [{ hits }, t, seconds, playing]) =>
-                                    scheduled(
-                                        schedule,
-                                        { t, now: bus.context.currentTime, seconds, playing },
-                                        hits,
-                                    ),
+                                ({ schedule }: Scheduling, { hits, frame }) =>
+                                    scheduled(schedule, frame, hits),
                                 { schedule: unscheduled, strikes: [] },
                             ),
                             mergeMap(({ strikes }) => strikes),

@@ -16,9 +16,9 @@ import {
     semitonesAt,
     SHAPES,
     VOICE_INSTRUMENTS,
+    type Heard,
     type Note,
     type Shape,
-    type Sounding,
     type VoiceCommand,
 } from './voice.ts';
 import css from './voice.css?inline';
@@ -117,8 +117,6 @@ const dataOf = (target: EventTarget | null, name: string) =>
 
 export type VoiceEvent =
     { readonly kind: 'command'; readonly command: VoiceCommand } | { readonly kind: 'listen' };
-
-export type Heard = { readonly sounding: Sounding; readonly notes: readonly Note[] };
 
 const rollRange = (notes: readonly Note[]) => {
     const heights = notes.map(({ semitones }) => semitones);
