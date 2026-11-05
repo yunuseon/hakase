@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
     clockOf,
+    endedPlans,
     initialFocus,
+    parseFocusLink,
+    startedPlans,
     parseFocus,
     reduceFocus,
     ROUNDS,
@@ -92,5 +95,44 @@ describe('parseFocus', () => {
         expect(focus).toMatchObject({ phase: 'short', round: ROUNDS, running: false });
         expect(focus.lengths).toEqual({ work: 30, short: 5, long: 180 });
         expect(focus.remaining).toBe(5 * 60_000);
+    });
+});
+
+describe('a timer that follows an agenda', () => {
+    const plan = (id: string) => ({ id, title: id, elapsed: 0, length: 60_000 });
+
+    it('pauses when told, and stays as it is when already paused', () => {
+        const running = reduceFocus(initialFocus, { kind: 'command', command: { kind: 'toggle' } });
+
+        expect(reduceFocus(running, { kind: 'command', command: { kind: 'pause' } }).running).toBe(
+            false,
+        );
+        expect(reduceFocus(initialFocus, { kind: 'command', command: { kind: 'pause' } })).toBe(
+            initialFocus,
+        );
+    });
+
+    it('sees a block start and end, and a block replaced by the next as both', () => {
+        const before = new Map([
+            ['a', plan('block-1')],
+            ['b', plan('block-2')],
+        ]);
+        const after = new Map([
+            ['b', plan('block-3')],
+            ['c', plan('block-4')],
+        ]);
+
+        expect(startedPlans(before, after)).toEqual(['b', 'c']);
+        expect(endedPlans(before, after)).toBe(2);
+        expect(startedPlans(before, before)).toEqual([]);
+        expect(endedPlans(before, before)).toBe(0);
+    });
+
+    it('reads its link from storage, following nothing when it is malformed', () => {
+        expect(parseFocusLink({ sources: { agenda: 'store-3' } })).toEqual({
+            sources: { agenda: 'store-3' },
+        });
+        expect(parseFocusLink({ sources: { agenda: 4 } })).toEqual({ sources: { agenda: null } });
+        expect(parseFocusLink(null)).toEqual({ sources: { agenda: null } });
     });
 });

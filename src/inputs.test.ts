@@ -9,6 +9,7 @@ import {
     playbackInput,
     progressBinding,
     progressInput,
+    sourceInput,
     type FocusBinding,
     type PlaybackBinding,
 } from './inputs.ts';
@@ -26,7 +27,10 @@ describe('program inputs', () => {
     });
 
     it('accept only the kinds they declare', () => {
-        expect(accepts({ progress: progressInput }, 'progress', 'focus')).toBe(true);
+        expect(accepts({ progress: progressInput }, 'progress', 'focus')).toBe(false);
+        expect(accepts({ source: sourceInput }, 'source', 'focus')).toBe(true);
+        expect(accepts({ source: sourceInput }, 'source', 'agenda')).toBe(true);
+        expect(accepts({ source: sourceInput }, 'source', 'playback')).toBe(false);
         expect(accepts({ progress: progressInput }, 'playback', 'playback')).toBe(false);
         expect(accepts({ playback: playbackInput }, 'playback', 'focus')).toBe(false);
         expect(accepts({ playback: ownPlaybackInput }, 'playback', 'playback')).toBe(false);

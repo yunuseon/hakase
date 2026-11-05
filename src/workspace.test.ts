@@ -51,6 +51,9 @@ describe('parseWorkspace', () => {
         expect(parseWorkspace(saved('links'), inputsFor)?.processes[0]?.program).toBe('bookmarks');
         expect(parseWorkspace(saved('patch'), inputsFor)?.processes[0]?.program).toBe('state');
         expect(parseWorkspace(saved('inspector'), inputsFor)?.processes[0]?.program).toBe('state');
+        expect(parseWorkspace(saved('pieces'), inputsFor)?.processes[0]?.program).toBe(
+            'blueprints',
+        );
     });
 });
 
@@ -231,8 +234,8 @@ describe('prune-stores', () => {
 describe('resizing an attached edge', () => {
     const box = (id: string, x: number, y: number, width: number, height: number) => ({
         id,
-        program: 'todo' as const,
-        store: 'todo',
+        program: 'tickets' as const,
+        store: 'tickets',
         follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
@@ -305,8 +308,8 @@ describe('resizing an attached edge', () => {
 describe('snapping while resizing', () => {
     const box = (id: string, x: number, y: number, width: number, height: number) => ({
         id,
-        program: 'todo' as const,
-        store: 'todo',
+        program: 'tickets' as const,
+        store: 'tickets',
         follows: {},
         frame: { x, y, width, height, z: 0 },
         measured: { width, height },
@@ -636,6 +639,38 @@ describe('focus progress bindings', () => {
         run(fresh(), [
             { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
             { kind: 'add-store', id: 'focus-5', copy: true },
+            { kind: 'launch', program: 'progress', size: { width: 300, height: 130 }, viewport },
+            {
+                kind: 'follow',
+                id: 'progress-6',
+                input: 'source',
+                source: 'focus',
+                store: 'store-1',
+            },
+        ]);
+    const followsOf = (history: History, id: string) =>
+        history.present.processes.find(process => process.id === id)?.follows;
+
+    it('starts a progress bar on the main focus timer and switches it to an agenda', () => {
+        expect(followsOf(focus(), 'progress-6')).toEqual({
+            source: { kind: 'focus', store: 'store-1' },
+        });
+        const agenda = run(focus(), [
+            {
+                kind: 'follow',
+                id: 'progress-6',
+                input: 'source',
+                source: 'agenda',
+                store: 'agenda',
+            },
+        ]);
+        expect(followsOf(agenda, 'progress-6')).toEqual({
+            source: { kind: 'agenda', store: 'agenda' },
+        });
+    });
+
+    it('lets a dial follow playback only', () => {
+        const history = run(focus(), [
             {
                 kind: 'follow',
                 id: 'playhead-4',
@@ -644,22 +679,7 @@ describe('focus progress bindings', () => {
                 store: 'store-1',
             },
         ]);
-
-    it('replaces playback with focus as the dial’s single progress source', () => {
-        const history = focus();
-        expect(history.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
-            progress: { kind: 'focus', store: 'store-1' },
-        });
-        const back = run(history, [
-            {
-                kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
-                source: 'playback',
-                store: 'timeline',
-            },
-        ]);
-        expect(back.present.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
+        expect(followsOf(history, 'playhead-4')).toEqual({
             progress: { kind: 'playback', store: 'timeline' },
         });
     });
@@ -668,16 +688,17 @@ describe('focus progress bindings', () => {
         const history = run(focus(), [
             { kind: 'quit', id: 'focus-5' },
             { kind: 'prune-stores', followed: new Map() },
-            { kind: 'remove-store', id: 'playhead-4', store: 'store-1' },
+            { kind: 'remove-store', id: 'progress-6', store: 'store-1' },
         ]);
         expect(usedStores(history.present.processes).has('store-1')).toBe(true);
         expect(history.present.stores.some(({ id }) => id === 'store-1')).toBe(true);
     });
 
-    it('does not make a focus dial use the default playback store', () => {
+    it('does not make a progress bar use the default playback store', () => {
         const history = run(focus(), [
             { kind: 'quit', id: 'sketch-2' },
             { kind: 'quit', id: 'timeline-3' },
+            { kind: 'quit', id: 'playhead-4' },
         ]);
         expect(usedStores(history.present.processes).has('timeline')).toBe(false);
     });
@@ -693,22 +714,22 @@ describe('focus progress bindings', () => {
             },
             {
                 kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
-                source: 'focus',
+                id: 'progress-6',
+                input: 'source',
+                source: 'agenda',
                 store: 'timeline',
             },
             {
                 kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
-                source: 'board',
+                id: 'progress-6',
+                input: 'source',
+                source: 'tickets',
                 store: 'store-1',
             },
             {
                 kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
+                id: 'progress-6',
+                input: 'source',
                 source: 'focus',
                 store: 'missing',
             },
@@ -724,16 +745,16 @@ describe('focus progress bindings', () => {
         const broken = {
             ...workspace,
             processes: workspace.processes.map(process =>
-                process.id === 'playhead-4'
+                process.id === 'progress-6'
                     ? { ...process, follows: [{ kind: 'focus', store: 'timeline' }] }
                     : process,
             ),
         };
         const parsed = parseWorkspace(broken, inputsFor);
         expect(parsed?.processes).toHaveLength(workspace.processes.length);
-        // A forged binding falls back to where a new dial starts, not to following nothing.
-        expect(parsed?.processes.find(({ id }) => id === 'playhead-4')?.follows).toEqual({
-            progress: { kind: 'playback', store: 'timeline' },
+        // A forged binding falls back to where a new progress bar starts, not to following nothing.
+        expect(parsed?.processes.find(({ id }) => id === 'progress-6')?.follows).toEqual({
+            source: { kind: 'focus', store: 'focus' },
         });
     });
 });

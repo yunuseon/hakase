@@ -24,6 +24,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import './styles.css';
+import type { Reading } from './components/progress-bar/progress-bar.ts';
 import { variables, type Appearance } from './appearance.ts';
 import { appearances, type AppearanceName } from './appearances.ts';
 import { centredOn, centreOf, fitted, flight, IDENTITY, zoomLabel } from './shared/camera.ts';
@@ -51,32 +52,39 @@ import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
 import { HksPlacement } from './components/placement/placement.component.ts';
 import { footprintAt, ghostOf, idle, reducePlacing, type PlacingAction } from './placing.ts';
+import { capturedActions } from './capture.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
 import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
 import type { ToolbarView } from './components/toolbar/toolbar.ts';
 import { sourceOf, type FormulaId } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
-import { createTimers$, initialFocus, restedTimers } from './components/focus/focus.ts';
+import {
+    createTimers$,
+    initialFocus,
+    restedTimers,
+    samePlan,
+    startedPlans,
+    type Plan,
+} from './components/focus/focus.ts';
+import { dayOf, minuteOfDay } from './lib/day.ts';
+import { plansOf } from './readings.ts';
 import { defaultBookmarks } from './components/bookmarks/bookmarks.ts';
 import { defaultSignal, reachedFrom, sameWave, waveOf, type Linked } from './shared/signal.ts';
 import { inputGroups } from './input-connections.ts';
 import { graphOf, sameGraph } from './state-graph.ts';
-import { defaultBoard } from './components/board/board.ts';
 import { defaultClocks } from './components/clocks/clocks.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
 import { emptyHabits } from './components/habits/habits.ts';
 import { emptyNotes } from './components/note/note.ts';
-import { emptyTodos } from './components/todo/todo.ts';
+import { defaultTickets } from './shared/tickets.ts';
 import {
-    definitionOf,
     followedBy,
     type Bindings,
     followedStores,
     playbackBinding,
-    progressConnection,
+    readingOf,
     type InputsFor,
-    type ProgramInputs,
     type PlaybackBinding,
 } from './inputs.ts';
 import {
@@ -89,11 +97,10 @@ import {
     type StoreId,
 } from './stores.ts';
 import { routePlayback$ } from './playback-routing.ts';
-import type { ProgressConnection } from './progress.ts';
 import { chime$ } from './chime.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
-import { viewport$ } from './lib/rx.ts';
+import { viewport$, wallClock$ } from './lib/rx.ts';
 import type {
     FollowGroup,
     StoreOption,
@@ -145,19 +152,21 @@ import {
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
-import { pieceOf } from './pieces.ts';
+import { blueprintOf } from './blueprints.ts';
+import { blueprintIn } from './starters.ts';
 
 type Jump = { readonly kind: 'section' | 'window'; readonly id: string };
 
 type StoreKey =
     | 'progress$'
     | 'playhead$'
+    | 'reading$'
+    | 'plan$'
     | 'playing$'
     | 'looping$'
     | 'duration$'
     | 'clock$'
-    | 'todos$'
-    | 'board$'
+    | 'tickets$'
     | 'notes$'
     | 'focus$'
     | 'agenda$'
@@ -248,8 +257,8 @@ const bootstrap = () => {
     canvas.append(placement);
 
     const picked$ = palette.picks$.pipe(
-        mergeMap(id => {
-            const picked = pickedOf(id);
+        mergeMap(({ id, text }) => {
+            const picked = pickedOf(id, text);
 
             return picked === null ? EMPTY : of(picked);
         }),
@@ -323,8 +332,7 @@ const bootstrap = () => {
     const started: Documents = {
         workspace: stored.workspace ?? defaultWorkspace(viewportSize(), inputsFor),
         settings: stored.settings,
-        todos: stored.todos,
-        boards: stored.board,
+        tickets: stored.tickets,
         notes: stored.notes,
         agendas: stored.agenda,
         habits: stored.habits,
@@ -335,8 +343,9 @@ const bootstrap = () => {
         pens: stored.pens,
         voices: stored.voices,
         drums: stored.drums,
+        focusLinks: stored.focusLinks,
         library: stored.library,
-        pieces: stored.pieces,
+        blueprints: stored.blueprints,
         formulas: restored(stored.formulas),
         themes: restored(stored.themes),
         looks: restored(stored.looks),
@@ -680,12 +689,7 @@ const bootstrap = () => {
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(
-                          inputsFor(process.program),
-                          binding$(process.id),
-                          clockOf$(process.id),
-                          followsOf$(process.id),
-                      ),
+                      scoped(binding$(process.id), clockOf$(process.id), followsOf$(process.id)),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(
@@ -809,11 +813,11 @@ const bootstrap = () => {
 
     const placing$ = merge(
         inputs$.pipe(
-            mergeMap(({ input }) => (input.kind === 'place-piece' ? [input.id] : [])),
+            mergeMap(({ input }) => (input.kind === 'place-blueprint' ? [input.id] : [])),
             withLatestFrom(viewport$),
-            map(([piece, viewport]): PlacingAction => ({
+            map(([blueprint, viewport]): PlacingAction => ({
                 kind: 'start',
-                piece,
+                blueprint,
                 at: centreOf(viewport),
             })),
         ),
@@ -836,10 +840,8 @@ const bootstrap = () => {
                                 settings: input.settings,
                             },
                         ];
-                    case 'todo':
-                        return [{ kind: 'todos', store, command: input.command }];
-                    case 'board':
-                        return [{ kind: 'boards', store, command: input.command }];
+                    case 'ticket':
+                        return [{ kind: 'tickets', store, command: input.command }];
                     case 'note':
                         return [{ kind: 'notes', store, command: input.command }];
                     case 'agenda':
@@ -871,8 +873,8 @@ const bootstrap = () => {
                         ];
                     case 'library':
                         return [{ kind: 'library', command: input.command }];
-                    case 'piece':
-                        return [{ kind: 'pieces', command: input.command }];
+                    case 'blueprint':
+                        return [{ kind: 'blueprints', command: input.command }];
                     case 'source':
                         return [
                             { kind: 'formula', formula: input.formula, text: input.text, from: id },
@@ -911,15 +913,15 @@ const bootstrap = () => {
         placing$.pipe(
             mergeMap(placing => (placing.mode === 'dropped' ? [placing] : [])),
             withLatestFrom(documents$),
-            mergeMap(([{ piece, at }, { pieces, workspace }]): DocumentAction[] => {
-                const chosen = pieces.items.find(({ id }) => id === piece);
+            mergeMap(([{ blueprint, at }, { blueprints, workspace }]): DocumentAction[] => {
+                const chosen = blueprintIn(blueprints, blueprint);
 
                 return chosen === undefined
                     ? []
                     : [
                           {
                               kind: 'place',
-                              piece,
+                              blueprint,
                               view: footprintAt(chosen.size, at, workspace.camera),
                           },
                       ];
@@ -933,9 +935,11 @@ const bootstrap = () => {
                 defer(() => playbacks$),
             ),
             mergeMap(([section, documents, clocks]): DocumentAction[] => {
-                const piece = pieceOf(documents, clocks, section);
+                const blueprint = blueprintOf(documents, clocks, section);
 
-                return piece === null ? [] : [{ kind: 'pieces', command: { kind: 'add', piece } }];
+                return blueprint === null
+                    ? []
+                    : [{ kind: 'blueprints', command: { kind: 'add', blueprint } }];
             }),
         ),
         sharedFormulas$.pipe(
@@ -949,18 +953,19 @@ const bootstrap = () => {
                 picked.kind === 'look' ? [{ kind: 'look', name: picked.name }] : [],
             ),
         ),
+        picked$.pipe(
+            mergeMap(picked => (picked.kind === 'capture' ? [picked] : [])),
+            withLatestFrom(documents$),
+            mergeMap(([capture, documents]) => capturedActions(capture, documents)),
+        ),
     );
 
     const settings$ = documents$.pipe(
         map(({ settings }) => settings),
         distinctUntilChanged(),
     );
-    const todos$ = documents$.pipe(
-        map(({ todos }) => todos),
-        distinctUntilChanged(),
-    );
-    const boards$ = documents$.pipe(
-        map(({ boards }) => boards),
+    const tickets$ = documents$.pipe(
+        map(({ tickets }) => tickets),
         distinctUntilChanged(),
     );
     const notes$ = documents$.pipe(
@@ -1009,16 +1014,53 @@ const bootstrap = () => {
                 a.signals === b.signals &&
                 a.pens === b.pens &&
                 a.voices === b.voices &&
-                a.drums === b.drums,
+                a.drums === b.drums &&
+                a.focusLinks === b.focusLinks,
         ),
         map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
+    const focusLinks$ = documents$.pipe(
+        map(({ focusLinks }) => focusLinks),
+        distinctUntilChanged(),
+    );
+    // The wall clock runs only while some timer follows an agenda.
+    const plans$ = focusLinks$.pipe(
+        switchMap(links =>
+            [...links.values()].some(({ sources }) => sources.agenda !== null)
+                ? combineLatest([agendas$, wallClock$]).pipe(
+                      map(([agendas, now]) =>
+                          plansOf(links, agendas, dayOf(now), minuteOfDay(now)),
+                      ),
+                  )
+                : of(new Map<StoreId, Plan>()),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const planIn = (store: StoreId): Observable<Plan | null> =>
+        plans$.pipe(
+            map(plans => plans.get(store) ?? null),
+            distinctUntilChanged(samePlan),
+        );
+
     const timers$ = createTimers$(
-        inputs$.pipe(
-            mergeMap(({ store, input }) =>
-                input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
+        merge(
+            inputs$.pipe(
+                mergeMap(({ store, input }) =>
+                    input.kind === 'focus' ? of({ store, command: input.command }) : EMPTY,
+                ),
+            ),
+            // A block that starts sets the timer aside, so nothing ticks under it.
+            plans$.pipe(
+                startWith(new Map<StoreId, Plan>()),
+                pairwise(),
+                mergeMap(([before, after]) =>
+                    startedPlans(before, after).map(store => ({
+                        store,
+                        command: { kind: 'pause' } as const,
+                    })),
+                ),
             ),
         ),
         storeEvents$,
@@ -1032,8 +1074,8 @@ const bootstrap = () => {
         map(({ library }) => library),
         distinctUntilChanged(),
     );
-    const pieces$ = documents$.pipe(
-        map(({ pieces }) => pieces),
+    const blueprints$ = documents$.pipe(
+        map(({ blueprints }) => blueprints),
         distinctUntilChanged(),
     );
 
@@ -1115,8 +1157,7 @@ const bootstrap = () => {
 
     // Which stores hold any data, read as one sorted key so a ticking timer does not churn the graph.
     const held$: Observable<ReadonlySet<StoreId>> = combineLatest([
-        todos$,
-        boards$,
+        tickets$,
         notes$,
         timers$,
         agendas$,
@@ -1152,7 +1193,7 @@ const bootstrap = () => {
         look$,
         appearance$,
         library$,
-        pieces$,
+        blueprints$,
         inspect$: (id: string) => inspected$(id),
         graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
@@ -1187,8 +1228,7 @@ const bootstrap = () => {
             ),
     };
 
-    const todoIn = inStore(todos$, emptyTodos);
-    const boardIn = inStore(boards$, defaultBoard);
+    const ticketsIn = inStore(tickets$, defaultTickets);
     const notesIn = inStore(notes$, emptyNotes);
     const agendaIn = inStore(agendas$, emptyAgenda);
     const habitsIn = inStore(habits$, emptyHabits);
@@ -1223,8 +1263,7 @@ const bootstrap = () => {
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
     > = {
-        todo: todoIn,
-        board: boardIn,
+        tickets: ticketsIn,
         note: notesIn,
         focus: timerIn,
         agenda: agendaIn,
@@ -1273,10 +1312,15 @@ const bootstrap = () => {
     };
 
     // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
-    const sources = { playback$: playbackIn, focus$: timerIn };
+    const sources = {
+        focus$: timerIn,
+        plan$: planIn,
+        agenda$: agendaIn,
+        tickets$: ticketsIn,
+        now$: wallClock$,
+    };
 
     const scoped = (
-        inputs: ProgramInputs,
         store$: Observable<StoreId>,
         clock$: Observable<PlaybackBinding | null>,
         follows$: Observable<Bindings>,
@@ -1293,7 +1337,6 @@ const bootstrap = () => {
             shareReplay({ bufferSize: 1, refCount: true }),
         );
 
-        const progress = definitionOf(inputs, 'progress');
         // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
         const seconds$ = clock.pipe(
             map(({ duration }) => duration),
@@ -1302,11 +1345,11 @@ const bootstrap = () => {
 
         return {
             ...state,
-            progress$: followed$('progress').pipe(
-                mergeMap((source): ProgressConnection[] =>
-                    source === null || progress?.from !== 'followed'
-                        ? []
-                        : [progressConnection(source, sources)],
+            reading$: followed$('source').pipe(
+                switchMap(
+                    (binding): Observable<Reading> =>
+                        (binding === null ? null : readingOf(binding, sources)) ??
+                        of({ kind: 'none', title: 'Nothing followed' }),
                 ),
                 shareReplay({ bufferSize: 1, refCount: true }),
             ),
@@ -1327,10 +1370,10 @@ const bootstrap = () => {
                 map(({ duration }) => duration),
                 distinctUntilChanged(),
             ),
-            todos$: narrowed(todoIn).pipe(map(({ items }) => items)),
-            board$: narrowed(boardIn),
+            tickets$: narrowed(ticketsIn),
             notes$: narrowed(notesIn),
             focus$: narrowed(timerIn),
+            plan$: narrowed(planIn),
             agenda$: narrowed(agendaIn),
             habits$: narrowed(habitsIn),
             clocks$: narrowed(clocksIn),
@@ -1399,7 +1442,7 @@ const bootstrap = () => {
     );
 
     return merge(
-        chime$(timers$),
+        chime$(timers$, plans$),
         persistState$(
             combineLatest({
                 workspace: workspace$,
@@ -1408,8 +1451,7 @@ const bootstrap = () => {
                 formulas: edits$.pipe(map(valuesOf)),
                 themes: palettes$.pipe(map(valuesOf)),
                 settings: settings$,
-                todos: todos$,
-                board: boards$,
+                tickets: tickets$,
                 notes: notes$,
                 focus: timersRested$,
                 playback: playbacksRested$,
@@ -1422,8 +1464,9 @@ const bootstrap = () => {
                 pens: pens$,
                 voices: voices$,
                 drums: drums$,
+                focusLinks: focusLinks$,
                 library: library$,
-                pieces: pieces$,
+                blueprints: blueprints$,
                 seq: history$.pipe(
                     map(({ seq }) => seq),
                     distinctUntilChanged(),
@@ -1442,21 +1485,21 @@ const bootstrap = () => {
         seams.connect$(workspace$.pipe(map(seamsOf))),
         wiring.connect$(wiringView$),
         placement.connect$(
-            combineLatest([placing$, camera$, pieces$]).pipe(
-                map(([placing, camera, { items }]) => {
-                    const piece =
+            combineLatest([placing$, camera$, blueprints$]).pipe(
+                map(([placing, camera, blueprints]) => {
+                    const blueprint =
                         placing.mode === 'placing'
-                            ? items.find(({ id }) => id === placing.piece)
+                            ? blueprintIn(blueprints, placing.blueprint)
                             : undefined;
 
-                    return placing.mode !== 'placing' || piece === undefined
+                    return placing.mode !== 'placing' || blueprint === undefined
                         ? null
-                        : ghostOf(piece, placing.at, camera);
+                        : ghostOf(blueprint, placing.at, camera);
                 }),
             ),
         ),
         palette.connect$(
-            workspace$.pipe(map(({ sections: all }) => commandsOf(programList, all))),
+            workspace$.pipe(map(workspace => commandsOf(programList, workspace))),
             paletteOpen$,
         ),
         sections.connect$(

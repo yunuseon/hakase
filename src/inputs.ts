@@ -1,13 +1,18 @@
-import type { Observable } from 'rxjs';
+import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import type { Focus } from './components/focus/focus.ts';
-import type { Clock } from './shared/playhead.ts';
+import type { Agenda } from './components/agenda/agenda.ts';
+import type { Focus, Plan } from './components/focus/focus.ts';
+import type { Reading } from './components/progress-bar/progress-bar.ts';
+import type { Tickets } from './shared/tickets.ts';
+import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
-import { focusProgress, type ProgressConnection } from './progress.ts';
+import { agendaReading, focusReading, ticketsReading } from './readings.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
 export type FocusBinding = { readonly kind: 'focus'; readonly store: StoreId };
+export type AgendaBinding = { readonly kind: 'agenda'; readonly store: StoreId };
+export type TicketsBinding = { readonly kind: 'tickets'; readonly store: StoreId };
 export type SignalBinding = { readonly kind: 'signal'; readonly store: StoreId };
 export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
@@ -16,6 +21,8 @@ export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
+    | AgendaBinding
+    | TicketsBinding
     | SignalBinding
     | PaintBinding
     | PenBinding
@@ -23,8 +30,11 @@ export type Follow =
     | DrumsBinding;
 
 export type InputSources = {
-    readonly playback$: (store: StoreId) => Observable<Clock>;
     readonly focus$: (store: StoreId) => Observable<Focus>;
+    readonly plan$: (store: StoreId) => Observable<Plan | null>;
+    readonly agenda$: (store: StoreId) => Observable<Agenda>;
+    readonly tickets$: (store: StoreId) => Observable<Tickets>;
+    readonly now$: Observable<number>;
 };
 
 const playbackSource = {
@@ -32,10 +42,6 @@ const playbackSource = {
     program: 'timeline',
     title: 'Playback',
     access: 'scrub',
-    connect: (store: StoreId, sources: InputSources): ProgressConnection => ({
-        access: 'scrub',
-        position$: sources.playback$(store).pipe(map(({ at }) => at)),
-    }),
 } as const;
 
 const focusSource = {
@@ -43,10 +49,30 @@ const focusSource = {
     program: 'focus',
     title: 'Focus',
     access: 'read',
-    connect: (store: StoreId, sources: InputSources): ProgressConnection => ({
-        access: 'read',
-        position$: sources.focus$(store).pipe(map(value => focusProgress(value).at)),
-    }),
+    read: (store: StoreId, sources: InputSources): Observable<Reading> =>
+        combineLatest([sources.focus$(store), sources.plan$(store)]).pipe(
+            map(([focus, plan]) => focusReading(focus, plan)),
+        ),
+} as const;
+
+const agendaSource = {
+    kind: 'agenda',
+    program: 'agenda',
+    title: 'Agenda',
+    access: 'read',
+    read: (store: StoreId, sources: InputSources): Observable<Reading> =>
+        combineLatest([sources.agenda$(store), sources.now$]).pipe(
+            map(([agenda, now]) => agendaReading(agenda, dayOf(now), minuteOfDay(now))),
+        ),
+} as const;
+
+const ticketsSource = {
+    kind: 'tickets',
+    program: 'tickets',
+    title: 'Tickets',
+    access: 'read',
+    read: (store: StoreId, sources: InputSources): Observable<Reading> =>
+        sources.tickets$(store).pipe(map(ticketsReading)),
 } as const;
 
 const signalSource = {
@@ -87,6 +113,8 @@ const drumsSource = {
 export const SOURCES = [
     playbackSource,
     focusSource,
+    agendaSource,
+    ticketsSource,
     signalSource,
     paintSource,
     penSource,
@@ -110,7 +138,7 @@ export type StoreInput = {
     readonly title: string;
     readonly from: 'store';
     readonly param: string;
-    readonly sources: readonly (typeof signalSource)[];
+    readonly sources: readonly (typeof signalSource | typeof agendaSource)[];
     readonly initial: null;
 };
 
@@ -130,8 +158,16 @@ export const progressInput = {
     title: 'Progress',
     from: 'followed',
     group: null,
-    sources: [playbackSource, focusSource],
+    sources: [playbackSource],
     initial: { kind: 'playback', store: 'timeline' },
+} as const satisfies FollowedInput;
+
+export const sourceInput = {
+    title: 'Source',
+    from: 'followed',
+    group: null,
+    sources: [focusSource, agendaSource, ticketsSource],
+    initial: { kind: 'focus', store: 'focus' },
 } as const satisfies FollowedInput;
 
 const signalInput = (title: string, group: string) =>
@@ -205,6 +241,16 @@ export const voiceInputs = {
     volume: storedSignalInput('volume'),
     filter: storedSignalInput('filter'),
     pan: storedSignalInput('pan'),
+};
+
+export const focusInputs = {
+    agenda: {
+        title: 'agenda',
+        from: 'store',
+        param: 'agenda',
+        sources: [agendaSource],
+        initial: null,
+    } satisfies StoreInput,
 };
 
 export const drumsInputs = {
@@ -288,6 +334,10 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return playbackSource.program;
         case 'focus':
             return focusSource.program;
+        case 'agenda':
+            return agendaSource.program;
+        case 'tickets':
+            return ticketsSource.program;
         case 'signal':
             return signalSource.program;
         case 'paint':
@@ -307,6 +357,13 @@ export const progressBinding = (kind: string, store: StoreId) => {
             return { kind, store };
         case 'focus':
             return { kind, store };
+        case 'agenda':
+            return { kind, store };
+        case 'tickets':
+            return { kind, store };
+        // Saved before to-do lists grew into tickets.
+        case 'todo':
+            return { kind: 'tickets' as const, store };
         case 'signal':
             return { kind, store };
         case 'paint':
@@ -344,5 +401,15 @@ export const playbackBinding = (inputs: ProgramInputs, store: StoreId, follows: 
     return scrubbed?.kind === 'playback' ? scrubbed : null;
 };
 
-export const progressConnection = (binding: Follow, sources: InputSources) =>
-    (binding.kind === 'focus' ? focusSource : playbackSource).connect(binding.store, sources);
+export const readingOf = (binding: Follow, sources: InputSources): Observable<Reading> | null => {
+    switch (binding.kind) {
+        case 'focus':
+            return focusSource.read(binding.store, sources);
+        case 'agenda':
+            return agendaSource.read(binding.store, sources);
+        case 'tickets':
+            return ticketsSource.read(binding.store, sources);
+        default:
+            return null;
+    }
+};

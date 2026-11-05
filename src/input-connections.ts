@@ -2,6 +2,7 @@ import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
 import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
 import { closesLoop, type Linked } from './shared/signal.ts';
 import { colourOf, withMain, type StoreEntry } from './stores.ts';
+import { isProgramId } from './program.ts';
 import type { Process } from './workspace.ts';
 
 // Read by entry, not sources[param]: the documents come from storage.
@@ -24,8 +25,13 @@ export const inputGroups = (
             definition.from === 'store'
                 ? sourceIn(linked, process.store, definition.param)
                 : (followedBy(process.follows, name)?.store ?? null);
+        const owner =
+            stores.find(({ id }) => id === bound)?.program ??
+            (bound !== null && isProgramId(bound) ? bound : null);
         const kind =
-            definition.from === 'store' ? 'signal' : followedBy(process.follows, name)?.kind;
+            definition.from === 'store'
+                ? definition.sources.find(source => source.program === owner)?.kind
+                : followedBy(process.follows, name)?.kind;
 
         return definition.sources.map((source, index): FollowGroup => ({
             input: name,
@@ -66,7 +72,8 @@ export const storeInputCommand = (inputs: ProgramInputs, gesture: WindowGesture)
     const definition = definitionOf(inputs, gesture.input);
 
     return definition?.from !== 'store' ||
-        (gesture.kind === 'follow' && gesture.source !== 'signal')
+        (gesture.kind === 'follow' &&
+            !definition.sources.some(source => source.kind === gesture.source))
         ? null
         : { param: definition.param, source: gesture.kind === 'follow' ? gesture.store : null };
 };

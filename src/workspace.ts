@@ -48,8 +48,10 @@ import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
 import {
     ensured,
     HOLDING,
+    MAIN,
     mainStore,
     pruned,
+    renamedStore,
     type StoreEntry,
     type StoreId,
     type ClockSeed,
@@ -1086,6 +1088,9 @@ const RENAMED: Readonly<Record<string, ProgramId>> = {
     links: 'bookmarks',
     patch: 'state',
     inspector: 'state',
+    pieces: 'blueprints',
+    todo: 'tickets',
+    board: 'tickets',
 };
 
 const renamed = (program: string): string =>
@@ -1114,7 +1119,8 @@ export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null 
         return null;
     }
 
-    const store = 'store' in value && typeof value.store === 'string' ? value.store : null;
+    const store =
+        'store' in value && typeof value.store === 'string' ? renamedStore(value.store) : null;
 
     const inputs = inputsFor(program);
     const saved = 'follows' in value ? value.follows : null;
@@ -1139,7 +1145,13 @@ export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null 
         follows: { ...initialFollows(inputs), ...Object.fromEntries(entries) },
         frame,
         // Saved before stores: a private window keeps its own id, which is what its settings are keyed by.
-        store: store ?? (HOLDING[program]?.sharing === 'private' ? value.id : program),
+        store:
+            store ??
+            (value.program === 'board'
+                ? 'board'
+                : HOLDING[program]?.sharing === 'private'
+                  ? value.id
+                  : program),
         measured: { width: measured.width, height: measured.height },
     };
 };
@@ -1158,7 +1170,9 @@ const followFrom = (value: unknown): Follow[] => {
               ? 'playback'
               : null;
     const binding =
-        typeof kind === 'string' && typeof store === 'string' ? progressBinding(kind, store) : null;
+        typeof kind === 'string' && typeof store === 'string'
+            ? progressBinding(kind, renamedStore(store))
+            : null;
 
     return binding === null ? [] : [binding];
 };
@@ -1182,15 +1196,33 @@ export const storeFrom = (value: unknown): StoreEntry[] => {
         return [];
     }
 
-    const { id, program, name } = value;
+    const { id: stored, program: was, name: called } = value;
     const copy = 'copy' in value && typeof value.copy === 'string' ? value.copy : null;
     const clock = 'clock' in value ? clockSeedFrom(value.clock) : null;
 
-    return typeof id === 'string' &&
-        typeof program === 'string' &&
-        isProgramId(program) &&
-        typeof name === 'string'
-        ? [{ id, program, name, kept: !('kept' in value) || value.kept !== false, copy, clock }]
+    if (typeof stored !== 'string' || typeof was !== 'string' || typeof called !== 'string') {
+        return [];
+    }
+
+    const id = renamedStore(stored);
+    const program = renamed(was);
+    // A program's Main that is not the Main of the program it became keeps a name of its own.
+    const name =
+        called === MAIN && program !== was && id !== program
+            ? `${was.charAt(0).toUpperCase()}${was.slice(1)}`
+            : called;
+
+    return isProgramId(program)
+        ? [
+              {
+                  id,
+                  program,
+                  name,
+                  kept: !('kept' in value) || value.kept !== false,
+                  copy: copy === null ? null : renamedStore(copy),
+                  clock,
+              },
+          ]
         : [];
 };
 

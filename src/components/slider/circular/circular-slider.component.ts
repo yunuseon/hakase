@@ -2,7 +2,7 @@ import { combineLatest, merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../../lib/dom.ts';
 import { observeResize$ } from '../../../lib/rx.ts';
-import { angularValue, ringOffset, type Point, type Ring, type Progress } from '../slider.ts';
+import { angularValue, ringOffset, type Point, type Ring } from '../slider.ts';
 import { pointerGesture$ } from '../../../shared/drag.ts';
 import type { Slider } from '../slider.ts';
 import type { Scrub } from '../../../shared/playhead.ts';
@@ -11,8 +11,9 @@ import css from './circular-slider.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = `
-    <div class="track"><div class="indicator"></div></div>
-    <span class="hint" hidden>Read only</span>
+    <div class="track" role="slider" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100">
+        <div class="indicator"></div>
+    </div>
 `;
 
 const indicatorTransform = ({ x, y }: Point): string =>
@@ -55,32 +56,17 @@ export class HksCircularSlider extends HTMLElement implements Slider {
         );
     }
 
-    connect$(progress$: Observable<Progress>): Observable<void> {
+    connect$(at$: Observable<number>): Observable<void> {
         return merge(
-            progress$.pipe(
-                map(({ access }) => access === 'read'),
-                distinctUntilChanged(),
-                tap(readonly => {
-                    this.toggleAttribute('data-readonly', readonly);
-                    this.track.setAttribute('role', readonly ? 'progressbar' : 'slider');
-                    this.track.setAttribute(
-                        'aria-label',
-                        readonly ? 'Phase progress, read only' : 'Playback position',
-                    );
-                    requireChild(this.shadowRoot ?? this, '.hint').hidden = !readonly;
-                }),
-            ),
-            progress$.pipe(
-                map(({ at }) => String(Math.round(at * 100))),
+            at$.pipe(
+                map(at => String(Math.round(at * 100))),
                 distinctUntilChanged(),
                 tap(value => {
                     this.track.setAttribute('aria-valuenow', value);
-                    this.track.setAttribute('aria-valuemin', '0');
-                    this.track.setAttribute('aria-valuemax', '100');
                 }),
             ),
-            combineLatest([this.ring$, progress$]).pipe(
-                map(([ring, { at }]) => indicatorTransform(ringOffset(ring, at))),
+            combineLatest([this.ring$, at$]).pipe(
+                map(([ring, at]) => indicatorTransform(ringOffset(ring, at))),
                 distinctUntilChanged(),
                 tap(transform => {
                     this.indicator.style.transform = transform;

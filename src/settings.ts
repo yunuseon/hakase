@@ -1,3 +1,4 @@
+import { isView, type View } from './shared/tickets.ts';
 import { isTool, MAX_BRUSH, type Tool } from './components/paint/paint.ts';
 import { isSymmetry, type Symmetry } from './shared/brush.ts';
 import { isLayout, type Layout } from './components/plot/plot.ts';
@@ -106,6 +107,16 @@ export const defaultPaint: PaintSettings = {
 export const asPaint = (settings: Settings | undefined): PaintSettings =>
     settings?.kind === 'paint' ? settings : defaultPaint;
 
+export type TicketsSettings = {
+    readonly kind: 'tickets';
+    readonly view: View;
+};
+
+export const defaultTicketsView: TicketsSettings = { kind: 'tickets', view: 'list' };
+
+export const asTickets = (settings: Settings | undefined): TicketsSettings =>
+    settings?.kind === 'tickets' ? settings : defaultTicketsView;
+
 export type PlotSettings = {
     readonly kind: 'plot';
     readonly layout: Layout;
@@ -136,7 +147,8 @@ export type Settings =
     | AgendaSettings
     | StateMapSettings
     | PlotSettings
-    | PaintSettings;
+    | PaintSettings
+    | TicketsSettings;
 
 export const asStateMap = (settings: Settings | undefined): StateMapSettings =>
     settings?.kind === 'state-map' ? settings : defaultStateMap;
@@ -422,6 +434,14 @@ export const parseSettings = (value: unknown): Settings | null => {
                         : defaultPaint.symmetry,
                 frame: Math.round(number('frame', 0, 64, 0)),
                 onion: field(value, 'onion') !== false,
+            };
+        }
+        case 'tickets': {
+            const view = field(value, 'view');
+
+            return {
+                kind: 'tickets',
+                view: typeof view === 'string' && isView(view) ? view : defaultTicketsView.view,
             };
         }
         case 'plot': {

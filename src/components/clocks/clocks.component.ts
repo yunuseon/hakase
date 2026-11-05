@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { map, mergeMap, share, take, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
@@ -11,8 +12,7 @@ const TEMPLATE = `
     <ul class="rows"></ul>
     <p class="empty">No clocks yet.</p>
     <form class="add">
-        <input class="draft" type="text" list="zones" placeholder="Add a city or time zone" aria-label="time zone" autocomplete="off" />
-        <datalist id="zones"></datalist>
+        <hks-select editable class="draft" placeholder="Add a city or time zone" aria-label="time zone"></hks-select>
         <button class="submit" type="submit">Add</button>
     </form>
 `;
@@ -101,7 +101,7 @@ export class HksClocks extends HTMLElement {
         shadow.innerHTML = TEMPLATE;
 
         const form = requireElement(shadow, '.add', HTMLFormElement);
-        const draft = requireElement(shadow, '.draft', HTMLInputElement);
+        const draft = requireElement(shadow, '.draft', HksSelect);
 
         // One listener, shared: the draft is read once, before anyone clears it.
         this.submitted$ = fromElementEvent$(form, 'submit').pipe(
@@ -131,10 +131,11 @@ export class HksClocks extends HTMLElement {
     connect$(rows$: Observable<readonly ClockRow[]>, choices: readonly string[]): Observable<void> {
         const shadow = this.shadow;
         const list = requireChild(shadow, '.rows');
-        const options = requireChild(shadow, '#zones');
+        const options = requireChild(shadow, '.draft');
         const form = requireElement(shadow, '.add', HTMLFormElement);
 
         return merge(
+            connectSelects$(shadow),
             rows$.pipe(
                 take(1),
                 tap(() => {
@@ -170,6 +171,7 @@ export class HksClocks extends HTMLElement {
             this.submitted$.pipe(
                 tap(() => {
                     form.reset();
+                    requireElement(shadow, '.draft', HksSelect).value = '';
                 }),
             ),
         ).pipe(map(() => undefined));

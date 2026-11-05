@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, saveFile, styleSheet } from '../../../lib/dom.ts';
@@ -16,9 +17,9 @@ const sheet = styleSheet(css);
 const select = (field: string, label: string, options: readonly (readonly [string, string])[]) => `
     <label class="item"${field === 'quality' ? ' data-video' : ''}>
         <span class="key">${label}</span>
-        <select class="pick" data-field="${field}" aria-label="${label}">
+        <hks-select class="pick" data-field="${field}" aria-label="${label}">
             ${options.map(([value, text]) => `<option value="${value}">${text}</option>`).join('')}
-        </select>
+        </hks-select>
     </label>
 `;
 
@@ -101,10 +102,9 @@ export class HksExportPanel extends HTMLElement {
         // On the row inside the shadow root: change is not composed, so it never reaches the host.
         this.changes$ = fromElementEvent$(requireChild(shadow, '.row'), 'change').pipe(
             mergeMap(({ target }): ExportChange[] => {
-                const field =
-                    target instanceof HTMLSelectElement ? target.dataset['field'] : undefined;
+                const field = target instanceof HksSelect ? target.dataset['field'] : undefined;
 
-                if (!(target instanceof HTMLSelectElement) || field === undefined) {
+                if (!(target instanceof HksSelect) || field === undefined) {
                     return [];
                 }
 
@@ -120,8 +120,8 @@ export class HksExportPanel extends HTMLElement {
         );
     }
 
-    private pick(field: string): HTMLSelectElement {
-        return requireElement(this.shadow, `[data-field="${field}"]`, HTMLSelectElement);
+    private pick(field: string): HksSelect {
+        return requireElement(this.shadow, `[data-field="${field}"]`, HksSelect);
     }
 
     connect$(
@@ -177,7 +177,14 @@ export class HksExportPanel extends HTMLElement {
             }),
         );
 
-        return merge(...fields$, video$, summarised$, shown$, saved$).pipe(map(() => undefined));
+        return merge(
+            connectSelects$(this.shadow),
+            ...fields$,
+            video$,
+            summarised$,
+            shown$,
+            saved$,
+        ).pipe(map(() => undefined));
     }
 }
 

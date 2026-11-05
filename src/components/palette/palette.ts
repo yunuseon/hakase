@@ -3,7 +3,10 @@ export type Command = {
     readonly label: string;
     // A short word on the right: what kind of thing it does, or its key.
     readonly hint: string;
+    readonly keyword: string | null;
 };
+
+export type Match = { readonly command: Command; readonly text: string | null };
 
 const normalised = (text: string): string => text.toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -20,6 +23,17 @@ export const matches = (commands: readonly Command[], query: string): readonly C
     });
 };
 
+export const matched = (commands: readonly Command[], query: string): readonly Match[] => {
+    const typed = query.trim();
+    const [first = ''] = typed.split(/\s/, 1);
+    const text = typed.slice(first.length).trim();
+    const taking = commands.filter(({ keyword }) => keyword === first.toLowerCase());
+
+    return taking.length > 0 && text !== ''
+        ? taking.map(command => ({ command, text }))
+        : matches(commands, query).map(command => ({ command, text: null }));
+};
+
 export const sameCommands = (a: readonly Command[], b: readonly Command[]): boolean =>
     a.length === b.length &&
     a.every((command, index) => {
@@ -29,6 +43,7 @@ export const sameCommands = (a: readonly Command[], b: readonly Command[]): bool
             other !== undefined &&
             command.id === other.id &&
             command.label === other.label &&
-            command.hint === other.hint
+            command.hint === other.hint &&
+            command.keyword === other.keyword
         );
     });

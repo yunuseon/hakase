@@ -1,3 +1,4 @@
+import { defaultTickets, ticketsIn } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import {
     documentsKit,
@@ -10,7 +11,7 @@ import {
 } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
-import { emptyPieces } from './pieces.ts';
+import { emptyBlueprints } from './blueprints.ts';
 import { defaultSketch } from './settings.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { entriesOf, startTimeline } from './timeline.ts';
@@ -21,8 +22,7 @@ const viewport = { width: 1400, height: 900 };
 const started = (): Documents => ({
     workspace: defaultWorkspace(viewport, inputsFor),
     settings: new Map(),
-    todos: new Map(),
-    boards: new Map(),
+    tickets: new Map(),
     notes: new Map(),
     agendas: new Map(),
     habits: new Map(),
@@ -33,8 +33,9 @@ const started = (): Documents => ({
     pens: new Map(),
     voices: new Map(),
     drums: new Map(),
+    focusLinks: new Map(),
     library: emptyLibrary,
-    pieces: emptyPieces,
+    blueprints: emptyBlueprints,
     formulas: new Map(),
     themes: new Map(),
     looks: new Map(),
@@ -53,7 +54,7 @@ const drag = (id: string, steps: number): DocumentAction[] => [
     act({ kind: 'raise', id }),
     ...Array.from({ length: steps }, () => act({ kind: 'move', id, dx: 10, dy: 0 })),
 ];
-const launch = (program: 'bookmarks' | 'sketch' | 'todo') =>
+const launch = (program: 'bookmarks' | 'sketch' | 'tickets') =>
     act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 const labels = (history: History) => entriesOf(history).map(({ label }) => label);
 
@@ -82,7 +83,11 @@ describe('one log for every document', () => {
 
     it('undoes across documents in the order they changed', () => {
         const history = run(fresh(), [
-            { kind: 'todos', store: 'todo', command: { kind: 'add', text: 'milk' } },
+            {
+                kind: 'tickets',
+                store: 'tickets',
+                command: { kind: 'add', title: 'milk', status: null, parent: null },
+            },
             ...drag('sketch-2', 2),
             { kind: 'signals', store: 'signal', command: { kind: 'shape', shape: 'saw' } },
         ]);
@@ -90,14 +95,16 @@ describe('one log for every document', () => {
         const twice = run(once, [{ kind: 'undo' }]);
 
         expect(once.present.signals.get('signal')?.shape ?? 'sine').toBe('sine');
-        expect(once.present.todos.get('todo')?.items).toHaveLength(1);
+        expect(ticketsIn(once.present.tickets.get('tickets') ?? defaultTickets)).toHaveLength(1);
         expect(frameOf(twice, 'sketch-2')).toEqual(frameOf(fresh(), 'sketch-2'));
-        expect(run(twice, [{ kind: 'undo' }]).present.todos.get('todo')?.items ?? []).toHaveLength(
-            0,
-        );
+        expect(
+            ticketsIn(
+                run(twice, [{ kind: 'undo' }]).present.tickets.get('tickets') ?? defaultTickets,
+            ),
+        ).toHaveLength(0);
         expect(labels(history)).toEqual([
             'Opened the app',
-            'Edited todo list Main',
+            'Edited tickets Main',
             'Moved sketch',
             'Edited signal Main',
         ]);
@@ -113,7 +120,7 @@ describe('one log for every document', () => {
         expect(run(back, [{ kind: 'redo' }, { kind: 'redo' }]).present.workspace.processes).toEqual(
             history.present.workspace.processes,
         );
-        expect(run(back, [launch('todo')]).steps).toHaveLength(1);
+        expect(run(back, [launch('tickets')]).steps).toHaveLength(1);
     });
 
     it('names what a step makes by its place in the log', () => {
@@ -126,7 +133,7 @@ describe('one log for every document', () => {
     });
 
     it('takes back an old launch and keeps every later window, ids, moves and all', () => {
-        const history = run(fresh(), [launch('bookmarks'), launch('todo')]);
+        const history = run(fresh(), [launch('bookmarks'), launch('tickets')]);
         const todo = history.present.workspace.processes.at(-1)?.id ?? '';
         const moved = run(history, drag(todo, 3));
         const first = moved.steps[0]?.id ?? -1;
@@ -144,25 +151,37 @@ describe('one log for every document', () => {
 
     it('makes a fork and its copy one step, so one undo takes both back', () => {
         const filled = run(fresh(), [
-            launch('todo'),
-            { kind: 'todos', store: 'todo', command: { kind: 'add', text: 'milk' } },
+            launch('tickets'),
+            {
+                kind: 'tickets',
+                store: 'tickets',
+                command: { kind: 'add', title: 'milk', status: null, parent: null },
+            },
         ]);
         const window = filled.present.workspace.processes.at(-1)?.id ?? '';
         const forked = run(filled, [act({ kind: 'add-store', id: window, copy: true })]);
         const store = forked.present.workspace.processes.at(-1)?.store ?? '';
 
-        expect(forked.present.todos.get(store)?.items.map(({ text }) => text)).toEqual(['milk']);
-        expect(run(forked, [{ kind: 'undo' }]).present.todos.has(store)).toBe(false);
+        expect(
+            ticketsIn(forked.present.tickets.get(store) ?? defaultTickets).map(
+                ({ title }) => title,
+            ),
+        ).toEqual(['milk']);
+        expect(run(forked, [{ kind: 'undo' }]).present.tickets.has(store)).toBe(false);
     });
 
     it('lets a prune be undone, data and all', () => {
         const history = run(fresh(), [
-            { kind: 'todos', store: 'store-9', command: { kind: 'add', text: 'orphan' } },
+            {
+                kind: 'tickets',
+                store: 'store-9',
+                command: { kind: 'add', title: 'orphan', status: null, parent: null },
+            },
             { kind: 'prune' },
         ]);
 
-        expect(history.present.todos.has('store-9')).toBe(false);
-        expect(run(history, [{ kind: 'undo' }]).present.todos.has('store-9')).toBe(true);
+        expect(history.present.tickets.has('store-9')).toBe(false);
+        expect(run(history, [{ kind: 'undo' }]).present.tickets.has('store-9')).toBe(true);
     });
 
     it('refuses a signal source that would loop, against the state it would change', () => {
@@ -230,7 +249,7 @@ describe('one log for every document', () => {
     it('starts a save from before the log above every counter it holds', () => {
         const documents = {
             ...started(),
-            todos: new Map([['todo', { items: [], made: 40 }]]),
+            tickets: new Map([['tickets', { ...defaultTickets, made: 40 }]]),
         };
 
         expect(seqFloor(documents)).toBe(40);
@@ -238,7 +257,7 @@ describe('one log for every document', () => {
 });
 
 describe('links', () => {
-    const launched = (program: 'pen' | 'signal') =>
+    const launched = (program: 'pen' | 'signal' | 'focus') =>
         act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 
     it('set a store input on whichever document owns the store, a signal or a pen', () => {
@@ -254,6 +273,37 @@ describe('links', () => {
         expect(history.present.signals.get('signal')?.sources.depth).toBe('other');
         expect(history.steps).toHaveLength(4);
         expect(labels(history).at(-1)).toBe('Set Main depth to follow other');
+    });
+
+    it('let a focus timer follow an agenda, and undo it as one step', () => {
+        const history = run(fresh(), [
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-3' },
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-3' },
+            { kind: 'link', store: 'focus', param: 'lengths', source: 'store-3' },
+        ]);
+
+        expect(history.present.focusLinks.get('focus')).toEqual({ sources: { agenda: 'store-3' } });
+        expect(history.steps).toHaveLength(1);
+        expect(run(history, [{ kind: 'undo' }]).present.focusLinks.has('focus')).toBe(false);
+        expect(
+            run(history, [{ kind: 'link', store: 'focus', param: 'agenda', source: null }]).present
+                .focusLinks.size,
+        ).toBe(0);
+    });
+
+    it('keep an agenda a timer follows through a prune, though no window shows it', () => {
+        const history = run(fresh(), [
+            launched('focus'),
+            {
+                kind: 'agendas',
+                store: 'store-7',
+                command: { kind: 'add', id: 'block-1', day: '2026-11-05', start: 60, end: 120 },
+            },
+            { kind: 'link', store: 'focus', param: 'agenda', source: 'store-7' },
+            { kind: 'prune' },
+        ]);
+
+        expect(history.present.agendas.has('store-7')).toBe(true);
     });
 
     it('keep a signal a pen follows through a prune, though no window shows it', () => {
@@ -299,5 +349,78 @@ describe('links', () => {
                 .present.drums.get('drums')
                 ?.pattern.tom.slice(0, 3),
         ).toEqual([0, 0, 0]);
+    });
+});
+
+describe('ticket tags in the document log', () => {
+    it('undoes tag edits and keeps forked categories independent', () => {
+        const added = run(fresh(), [
+            launch('tickets'),
+            {
+                kind: 'tickets',
+                store: 'tickets',
+                command: { kind: 'add', title: 'Work', parent: null, status: null },
+            },
+        ]);
+        const id = ticketsIn(added.present.tickets.get('tickets') ?? defaultTickets)[0]?.id ?? '';
+        const tagged = run(added, [
+            {
+                kind: 'tickets',
+                store: 'tickets',
+                command: { kind: 'tag', id, tags: ['work', 'ui'] },
+            },
+        ]);
+        expect(
+            ticketsIn(
+                run(tagged, [{ kind: 'undo' }]).present.tickets.get('tickets') ?? defaultTickets,
+            )[0]?.tags,
+        ).toEqual([]);
+        const window = tagged.present.workspace.processes.at(-1)?.id ?? '';
+        const forked = run(tagged, [act({ kind: 'add-store', id: window, copy: true })]);
+        const store = forked.present.workspace.processes.at(-1)?.store ?? '';
+        const edited = run(forked, [
+            { kind: 'tickets', store, command: { kind: 'untag', id, tag: 'ui' } },
+        ]);
+        expect(ticketsIn(edited.present.tickets.get(store) ?? defaultTickets)[0]?.tags).toEqual([
+            'work',
+        ]);
+        expect(ticketsIn(edited.present.tickets.get('tickets') ?? defaultTickets)[0]?.tags).toEqual(
+            ['ui', 'work'],
+        );
+    });
+});
+
+describe('complete ticket creation', () => {
+    it('records all creation fields as one undoable step', () => {
+        const created = run(fresh(), [
+            {
+                kind: 'tickets',
+                store: 'tickets',
+                command: {
+                    kind: 'add',
+                    title: 'Ship',
+                    description: 'Ready to review',
+                    priority: 'high',
+                    tags: ['work'],
+                    status: 'status-2',
+                    parent: null,
+                    blockedBy: [],
+                },
+            },
+        ]);
+        expect(created.steps).toHaveLength(1);
+        expect(
+            ticketsIn(created.present.tickets.get('tickets') ?? defaultTickets)[0],
+        ).toMatchObject({
+            title: 'Ship',
+            description: 'Ready to review',
+            priority: 'high',
+            tags: ['work'],
+        });
+        expect(
+            ticketsIn(
+                run(created, [{ kind: 'undo' }]).present.tickets.get('tickets') ?? defaultTickets,
+            ),
+        ).toEqual([]);
     });
 });

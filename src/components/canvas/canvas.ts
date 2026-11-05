@@ -66,6 +66,7 @@ export const isEditable = (target: EventTarget | null): boolean =>
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.localName === 'hks-select') ||
     (target instanceof HTMLElement && target.isContentEditable);
 
 export type KeyStep = 'next' | 'previous';

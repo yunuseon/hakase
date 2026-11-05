@@ -60,10 +60,10 @@ describe('graphOf', () => {
     });
 
     it('lists the app-wide globals last, and a main store that only holds data', () => {
-        const held = graphOf(run([]), inputsFor, titles, new Set(['board']), new Map());
+        const held = graphOf(run([]), inputsFor, titles, new Set(['tickets']), new Map());
 
-        expect(held.stores.map(({ target }) => target).slice(-6)).toEqual([
-            'store:board:board',
+        expect(held.stores.map(({ target }) => target)).toContain('store:tickets:tickets');
+        expect(held.stores.map(({ target }) => target).slice(-5)).toEqual([
             'global:workspace',
             'global:appearance',
             'global:formulas',
@@ -75,11 +75,10 @@ describe('graphOf', () => {
     it('always offers what can be followed, a clock first, and a main store once something follows it', () => {
         const following: WorkspaceAction[] = [
             {
-                kind: 'follow',
-                id: 'playhead-4',
-                input: 'progress',
-                source: 'focus',
-                store: 'focus',
+                kind: 'launch',
+                program: 'progress',
+                size: { width: 300, height: 130 },
+                viewport: { width: 1400, height: 900 },
             },
         ];
 
@@ -91,6 +90,6 @@ describe('graphOf', () => {
             ['timeline', 'playback'],
             ['focus', 'focus'],
         ]);
-        expect(windowOf(following, 'playhead-4')?.ports[0]?.bound).toBe('focus');
+        expect(windowOf(following, 'progress-5')?.ports[0]?.bound).toBe('focus');
     });
 });

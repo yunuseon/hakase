@@ -33,14 +33,3 @@
     box-shadow: 0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
     pointer-events: none;
 }
-
-:host([data-readonly]) {
-    cursor: default;
-    touch-action: auto;
-}
-
-.hint {
-    position: absolute;
-    color: var(--muted);
-    font: 11px var(--font-ui);
-}

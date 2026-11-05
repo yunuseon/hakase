@@ -176,7 +176,8 @@
     position: absolute;
     inset-inline: 0;
     inset-block-end: 0;
-    block-size: 10px;
+    /* A share of the block, not a fixed strip: over a short block's title it took every click. */
+    block-size: clamp(4px, 30%, 10px);
     cursor: ns-resize;
 }
 

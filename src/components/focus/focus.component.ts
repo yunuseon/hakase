@@ -83,6 +83,11 @@ export class HksFocus extends HTMLElement {
         const clock = requireChild(shadow, '.clock');
         const rounds = requireChild(shadow, '.rounds');
         const toggle = requireElement(shadow, '.toggle', HTMLButtonElement);
+        const buttons = [
+            toggle,
+            requireElement(shadow, '.reset', HTMLButtonElement),
+            requireElement(shadow, '.skip', HTMLButtonElement),
+        ];
 
         return merge(
             view$.pipe(
@@ -101,16 +106,27 @@ export class HksFocus extends HTMLElement {
             ),
             view$.pipe(
                 distinctUntilChanged(
-                    (a, b) => a.phase === b.phase && a.round === b.round && a.running === b.running,
+                    (a, b) =>
+                        a.phase === b.phase &&
+                        a.label === b.label &&
+                        a.round === b.round &&
+                        a.running === b.running &&
+                        a.planned === b.planned,
                 ),
-                tap(({ phase, label: text, round, running }) => {
+                tap(({ phase, label: text, round, running, planned }) => {
                     this.dataset['phase'] = phase;
+                    this.toggleAttribute('data-planned', planned);
                     label.textContent = text;
-                    rounds.textContent = Array.from({ length: ROUNDS }, (_, index) =>
-                        index < round ? '●' : '○',
-                    ).join(' ');
-                    toggle.textContent = running ? 'Pause' : 'Start';
+                    rounds.textContent = planned
+                        ? 'from the agenda'
+                        : Array.from({ length: ROUNDS }, (_, index) =>
+                              index < round ? '●' : '○',
+                          ).join(' ');
+                    toggle.textContent = planned ? 'Planned' : running ? 'Pause' : 'Start';
                     toggle.toggleAttribute('data-running', running);
+                    buttons.forEach(button => {
+                        button.disabled = planned;
+                    });
                 }),
             ),
             ...PHASES.map(phase =>

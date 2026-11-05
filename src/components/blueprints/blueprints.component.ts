@@ -6,18 +6,18 @@ import {
     describedCount,
     reduceArmed,
     type Arming,
-    type PieceCard,
-    type PieceEvent,
-} from './pieces.ts';
-import css from './pieces.css?inline';
+    type BlueprintCard,
+    type BlueprintEvent,
+} from './blueprints.ts';
+import css from './blueprints.css?inline';
 
 const sheet = styleSheet(css);
 const SVG = 'http://www.w3.org/2000/svg';
 const DISARM_MS = 3000;
 
 const TEMPLATE = `
-    <p class="empty">No pieces yet. Hover a section's label and choose <b>Save as piece</b>: its windows, their states and their wiring are kept here, ready to place again.</p>
-    <ul class="cards" aria-label="pieces"></ul>
+    <ul class="cards" aria-label="blueprints"></ul>
+    <p class="empty">Your own blueprints join these: hover a section's label and choose <b>Save as blueprint</b>, and its windows, their states and their wiring are kept here, ready to place again.</p>
 `;
 
 const dataOf = (target: EventTarget | null, name: string) =>
@@ -39,7 +39,7 @@ const cardOf = (id: string): HTMLElement => {
     name.className = 'name';
     name.spellcheck = false;
     name.dataset['rename'] = id;
-    name.setAttribute('aria-label', 'piece name');
+    name.setAttribute('aria-label', 'blueprint name');
 
     const meta = document.createElement('span');
     meta.className = 'meta';
@@ -50,14 +50,14 @@ const cardOf = (id: string): HTMLElement => {
     place.dataset['place'] = id;
     place.textContent = 'Place';
     place.title =
-        'Place a fresh copy in view: its states are new, so the saved piece stays as it is';
+        'Place a fresh copy in view: its states are new, so the saved blueprint stays as it is';
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'remove';
     remove.dataset['remove'] = id;
     remove.textContent = '×';
-    remove.setAttribute('aria-label', 'delete piece');
+    remove.setAttribute('aria-label', 'delete blueprint');
 
     const text = document.createElement('div');
     text.className = 'text';
@@ -67,7 +67,7 @@ const cardOf = (id: string): HTMLElement => {
     return card;
 };
 
-const drawPreview = (preview: Element, { size, windows }: PieceCard) => {
+const drawPreview = (preview: Element, { size, windows }: BlueprintCard) => {
     preview.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
     preview.replaceChildren(
         ...windows.map(({ x, y, width, height }) => {
@@ -83,8 +83,8 @@ const drawPreview = (preview: Element, { size, windows }: PieceCard) => {
     );
 };
 
-export class HksPieces extends HTMLElement {
-    readonly changes$: Observable<PieceEvent>;
+export class HksBlueprints extends HTMLElement {
+    readonly changes$: Observable<BlueprintEvent>;
 
     private readonly shadow: ShadowRoot;
     private readonly armed$: Observable<string | null>;
@@ -125,7 +125,7 @@ export class HksPieces extends HTMLElement {
         );
 
         const placed$ = clicks$.pipe(
-            mergeMap((target): PieceEvent[] => {
+            mergeMap((target): BlueprintEvent[] => {
                 const id = dataOf(target, 'place');
 
                 return id === undefined ? [] : [{ kind: 'place', id }];
@@ -133,14 +133,14 @@ export class HksPieces extends HTMLElement {
         );
 
         const removed$ = arming$.pipe(
-            mergeMap(({ fired }): PieceEvent[] =>
+            mergeMap(({ fired }): BlueprintEvent[] =>
                 fired === null ? [] : [{ kind: 'remove', id: fired }],
             ),
         );
 
         // On the list, not the host: change is not composed, so it never leaves the shadow root.
         const renamed$ = fromElementEvent$(requireChild(shadow, '.cards'), 'change').pipe(
-            mergeMap(({ target }): PieceEvent[] => {
+            mergeMap(({ target }): BlueprintEvent[] => {
                 const id =
                     target instanceof HTMLInputElement ? target.dataset['rename'] : undefined;
 
@@ -153,7 +153,7 @@ export class HksPieces extends HTMLElement {
         this.changes$ = merge(placed$, removed$, renamed$);
     }
 
-    connect$(cards$: Observable<readonly PieceCard[]>): Observable<void> {
+    connect$(cards$: Observable<readonly BlueprintCard[]>): Observable<void> {
         const shadow = this.shadow;
         const list = requireChild(shadow, '.cards');
         const empty = requireChild(shadow, '.empty');
@@ -182,8 +182,12 @@ export class HksPieces extends HTMLElement {
                     }
 
                     node.querySelector('.meta')?.replaceChildren(
-                        describedCount(card.windows.length),
+                        card.summary ?? describedCount(card.windows.length),
                     );
+                    node.toggleAttribute('data-builtin', card.summary !== null);
+                    if (name instanceof HTMLInputElement) {
+                        name.readOnly = card.summary !== null;
+                    }
                     if (preview !== null) {
                         drawPreview(preview, card);
                     }
@@ -201,7 +205,7 @@ export class HksPieces extends HTMLElement {
                         list.insertBefore(node, list.children[index] ?? null);
                     }
                 });
-                empty.hidden = cards.length > 0;
+                empty.hidden = cards.some(({ summary }) => summary === null);
             }),
         );
 
@@ -219,4 +223,4 @@ export class HksPieces extends HTMLElement {
     }
 }
 
-customElements.define('hks-pieces', HksPieces);
+customElements.define('hks-blueprints', HksBlueprints);

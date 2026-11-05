@@ -2,12 +2,6 @@ import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
 import {
-    reduceBoard,
-    defaultBoard,
-    type Board,
-    type BoardCommand,
-} from './components/board/board.ts';
-import {
     defaultBookmarks,
     reduceBookmarks,
     type BookmarkCommand,
@@ -42,6 +36,7 @@ import {
     type Drums,
     type DrumsCommand,
 } from './components/drums/drums.ts';
+import type { FocusLink } from './components/focus/focus.ts';
 import {
     defaultVoice,
     isVoiceParam,
@@ -50,15 +45,16 @@ import {
     type VoiceCommand,
 } from './components/voice/voice.ts';
 import { isProgramId } from './program.ts';
-import { placed, reducePieces, type PieceCommand, type Pieces } from './pieces.ts';
+import { placed, reduceBlueprints, type BlueprintCommand, type Blueprints } from './blueprints.ts';
+import { blueprintIn } from './starters.ts';
 import type { Rect } from './shared/camera.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import {
-    emptyTodos,
-    reduceTodos,
-    type TodoCommand,
-    type TodoList,
-} from './components/todo/todo.ts';
+    defaultTickets,
+    reduceTickets,
+    type TicketCommand,
+    type Tickets,
+} from './shared/tickets.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
 import type { InputsFor } from './inputs.ts';
 import { reduceLibrary, type FormulaId, type Library, type LibraryCommand } from './library.ts';
@@ -99,8 +95,7 @@ import {
 export type Documents = {
     readonly workspace: Workspace;
     readonly settings: ReadonlyMap<string, Settings>;
-    readonly todos: ReadonlyMap<StoreId, TodoList>;
-    readonly boards: ReadonlyMap<StoreId, Board>;
+    readonly tickets: ReadonlyMap<StoreId, Tickets>;
     readonly notes: ReadonlyMap<StoreId, Notes>;
     readonly agendas: ReadonlyMap<StoreId, Agenda>;
     readonly habits: ReadonlyMap<StoreId, Habits>;
@@ -111,8 +106,9 @@ export type Documents = {
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
+    readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly library: Library;
-    readonly pieces: Pieces;
+    readonly blueprints: Blueprints;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
     readonly looks: ReadonlyMap<AppearanceName, Written<Appearance>>;
@@ -120,8 +116,7 @@ export type Documents = {
 };
 
 type StoreCommands = {
-    readonly todos: TodoCommand;
-    readonly boards: BoardCommand;
+    readonly tickets: TicketCommand;
     readonly notes: NoteCommand;
     readonly agendas: AgendaCommand;
     readonly habits: HabitCommand;
@@ -148,8 +143,8 @@ export type DocumentAction =
           };
       }[StoreDocument]
     | { readonly kind: 'library'; readonly command: LibraryCommand }
-    | { readonly kind: 'pieces'; readonly command: PieceCommand }
-    | { readonly kind: 'place'; readonly piece: string; readonly view: Rect }
+    | { readonly kind: 'blueprints'; readonly command: BlueprintCommand }
+    | { readonly kind: 'place'; readonly blueprint: string; readonly view: Rect }
     | {
           readonly kind: 'link';
           readonly store: StoreId;
@@ -193,8 +188,7 @@ const commanded = <S, C>(
 const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     ...documents,
     settings: storeEvent(documents.settings, event),
-    todos: storeEvent(documents.todos, event),
-    boards: storeEvent(documents.boards, event),
+    tickets: storeEvent(documents.tickets, event),
     notes: storeEvent(documents.notes, event),
     agendas: storeEvent(documents.agendas, event),
     habits: storeEvent(documents.habits, event),
@@ -205,6 +199,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     pens: storeEvent(documents.pens, event),
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
+    focusLinks: storeEvent(documents.focusLinks, event),
 });
 
 export const linkedOf = ({
@@ -212,8 +207,21 @@ export const linkedOf = ({
     pens,
     voices,
     drums,
-}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums'>) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums]);
+    focusLinks,
+}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums' | 'focusLinks'>) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...focusLinks]);
+
+// A timer is not a document, so only what it follows is kept here, beside the documents that link.
+const linkedFocus = (documents: Documents, store: StoreId, agenda: StoreId | null): Documents =>
+    (documents.focusLinks.get(store)?.sources.agenda ?? null) === agenda
+        ? documents
+        : {
+              ...documents,
+              focusLinks:
+                  agenda === null
+                      ? new Map([...documents.focusLinks].filter(([id]) => id !== store))
+                      : new Map(documents.focusLinks).set(store, { sources: { agenda } }),
+          };
 
 const ownerOf = ({ stores }: Workspace, store: StoreId) =>
     stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
@@ -279,26 +287,14 @@ export const reduceDocuments =
                           ...documents,
                           settings: new Map(documents.settings).set(action.key, action.settings),
                       };
-            case 'todos':
+            case 'tickets':
                 return {
                     ...documents,
-                    todos: commanded(
-                        documents.todos,
+                    tickets: commanded(
+                        documents.tickets,
                         action.store,
-                        emptyTodos,
-                        reduceTodos,
-                        action.command,
-                        seq,
-                    ),
-                };
-            case 'boards':
-                return {
-                    ...documents,
-                    boards: commanded(
-                        documents.boards,
-                        action.store,
-                        defaultBoard,
-                        reduceBoard,
+                        defaultTickets,
+                        reduceTickets,
                         action.command,
                         seq,
                     ),
@@ -463,24 +459,28 @@ export const reduceDocuments =
                                 },
                                 seq,
                             )
-                          : documents;
+                          : owner === 'focus' && param === 'agenda'
+                            ? linkedFocus(documents, store, source)
+                            : documents;
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
 
                 return library === documents.library ? documents : { ...documents, library };
             }
-            case 'pieces': {
-                const pieces = reducePieces(documents.pieces, action.command, { seq });
+            case 'blueprints': {
+                const blueprints = reduceBlueprints(documents.blueprints, action.command, { seq });
 
-                return pieces === documents.pieces ? documents : { ...documents, pieces };
+                return blueprints === documents.blueprints
+                    ? documents
+                    : { ...documents, blueprints };
             }
             case 'place': {
-                const piece = documents.pieces.items.find(({ id }) => id === action.piece);
+                const blueprint = blueprintIn(documents.blueprints, action.blueprint);
 
-                return piece === undefined
+                return blueprint === undefined
                     ? documents
-                    : placed(documents, piece, action.view, seq, inputsFor);
+                    : placed(documents, blueprint, action.view, seq, inputsFor);
             }
             case 'formula':
                 return documents.formulas.get(action.formula)?.value === action.text
@@ -519,8 +519,7 @@ const idOf = (command: object) =>
           : '';
 
 const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
-    todos: [],
-    boards: ['edit-card', 'rename-column'],
+    tickets: ['rename', 'describe', 'rename-status'],
     notes: ['edit'],
     agendas: ['move', 'resize', 'rename'],
     habits: ['rename'],
@@ -545,9 +544,9 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'look':
         case 'place':
             return { key: action.kind, joins: false };
-        case 'pieces':
+        case 'blueprints':
             return action.command.kind === 'rename'
-                ? { key: `piece:${action.command.id}`, joins: true }
+                ? { key: `blueprint:${action.command.id}`, joins: true }
                 : { key: action.kind, joins: false };
         case 'link':
             return { key: `link:${action.store}:${action.param}`, joins: false };
@@ -588,8 +587,7 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
 };
 
 const TITLES: Readonly<Record<StoreDocument, string>> = {
-    todos: 'todo list',
-    boards: 'board',
+    tickets: 'tickets',
     notes: 'notes',
     agendas: 'agenda',
     habits: 'habits',
@@ -623,20 +621,20 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return action.command.kind === 'remove'
                 ? 'Deleted a formula'
                 : `Saved formula ${action.command.label}`;
-        case 'pieces': {
+        case 'blueprints': {
             const { command } = action;
-            const was = before.pieces.items.find(
+            const was = before.blueprints.items.find(
                 ({ id }) => command.kind !== 'add' && id === command.id,
             );
 
             return command.kind === 'add'
-                ? `Saved piece ${command.piece.name}`
+                ? `Saved blueprint ${command.blueprint.name}`
                 : command.kind === 'rename'
-                  ? `Renamed piece ${was?.name ?? ''} to ${command.name}`
-                  : `Deleted piece ${was?.name ?? ''}`;
+                  ? `Renamed blueprint ${was?.name ?? ''} to ${command.name}`
+                  : `Deleted blueprint ${was?.name ?? ''}`;
         }
         case 'place':
-            return `Placed piece ${before.pieces.items.find(({ id }) => id === action.piece)?.name ?? ''}`;
+            return `Placed blueprint ${blueprintIn(before.blueprints, action.blueprint)?.name ?? ''}`;
         case 'formula':
             return `Edited formula ${before.library.items.find(({ id }) => id === action.formula)?.label ?? action.formula}`;
         case 'theme':
@@ -688,8 +686,7 @@ export const seqFloor = (documents: Documents) =>
         documents.workspace.made,
         documents.library.made,
         ...[
-            documents.todos,
-            documents.boards,
+            documents.tickets,
             documents.notes,
             documents.agendas,
             documents.habits,

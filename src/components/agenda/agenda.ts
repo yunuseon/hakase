@@ -159,3 +159,19 @@ export const parseAgenda = (value: unknown): Agenda => {
 
     return { blocks: kept, made: Math.max(made, 0, ...kept.map(({ id }) => numberOf(id))) };
 };
+
+export const currentBlock = (agenda: Agenda, day: string, minute: number): Block | null =>
+    agenda.blocks
+        .filter(block => block.day === day && block.start <= minute && minute < block.end)
+        .reduce<Block | null>(
+            (latest, block) => (latest === null || block.start > latest.start ? block : latest),
+            null,
+        );
+
+export const nextBlock = (agenda: Agenda, day: string, minute: number): Block | null =>
+    agenda.blocks
+        .filter(block => block.day === day && block.start > minute)
+        .reduce<Block | null>(
+            (soonest, block) => (soonest === null || block.start < soonest.start ? block : soonest),
+            null,
+        );

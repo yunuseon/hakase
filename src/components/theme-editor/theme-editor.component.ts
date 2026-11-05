@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
@@ -10,16 +11,16 @@ const sheet = styleSheet(css);
 const TEMPLATE = `
     <div class="head">
         <span class="key">theme</span>
-        <select class="pick" aria-label="theme"></select>
+        <hks-select class="pick" aria-label="theme"></hks-select>
     </div>
     <div class="bar"></div>
     <div class="body">
         <label class="row">
             <span class="key">blend</span>
-            <select class="blend" aria-label="blend">
+            <hks-select class="blend" aria-label="blend">
                 <option value="smooth">smooth</option>
                 <option value="steps">steps</option>
-            </select>
+            </hks-select>
         </label>
         <div class="stops"></div>
         <button class="add" type="button" data-command="add">add stop</button>
@@ -55,7 +56,7 @@ export class HksThemeEditor extends HTMLElement {
         this.stops = requireChild(this.shadow, '.stops');
         this.bar = requireChild(this.shadow, '.bar');
 
-        const picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
+        const picker = requireElement(this.shadow, '.pick', HksSelect);
         const body = requireChild(this.shadow, '.body');
 
         this.selections$ = fromElementEvent$(picker, 'change').pipe(map(() => picker.value));
@@ -84,7 +85,7 @@ export class HksThemeEditor extends HTMLElement {
     }
 
     presets(options: readonly PresetOption[]): this {
-        const picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
+        const picker = requireElement(this.shadow, '.pick', HksSelect);
 
         picker.replaceChildren(
             ...options.map(({ value, label }) => {
@@ -104,9 +105,10 @@ export class HksThemeEditor extends HTMLElement {
         rows$: Observable<Theme>,
         gradient$: Observable<Theme>,
     ): Observable<void> {
-        const picker = requireElement(this.shadow, '.pick', HTMLSelectElement);
+        const picker = requireElement(this.shadow, '.pick', HksSelect);
 
         return merge(
+            connectSelects$(this.shadow),
             selected$.pipe(
                 distinctUntilChanged(),
                 tap(value => {
@@ -124,7 +126,7 @@ export class HksThemeEditor extends HTMLElement {
     }
 
     private read(): Theme {
-        const blend = requireElement(this.shadow, '.blend', HTMLSelectElement).value;
+        const blend = requireElement(this.shadow, '.blend', HksSelect).value;
 
         const stops = [...this.stops.children].map((row): Stop => ({
             at: Number(requireElement(row, '.at', HTMLInputElement).value),
@@ -135,7 +137,7 @@ export class HksThemeEditor extends HTMLElement {
     }
 
     private render({ stops, blend }: Theme): void {
-        requireElement(this.shadow, '.blend', HTMLSelectElement).value = blend;
+        requireElement(this.shadow, '.blend', HksSelect).value = blend;
 
         this.stops.replaceChildren(
             ...stops.map((stop, index) => {

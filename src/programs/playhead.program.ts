@@ -1,9 +1,7 @@
 import { progressInput } from '../inputs.ts';
 import { merge } from 'rxjs';
-import { ignoreElements, map, switchMap } from 'rxjs/operators';
+import { ignoreElements, map } from 'rxjs/operators';
 import { HksCircularSlider } from '../components/slider/circular/circular-slider.component.ts';
-import { progressScrubs$ } from '../progress.ts';
-import type { Progress } from '../components/slider/slider.ts';
 import type { AppInput, Program } from '../program.ts';
 
 export const playheadProgram = {
@@ -19,20 +17,10 @@ export const playheadProgram = {
 
         return {
             element: dial,
-            run$: ({ progress$ }) =>
+            run$: ({ playhead$ }) =>
                 merge(
-                    dial
-                        .connect$(
-                            progress$.pipe(
-                                switchMap(({ access, position$ }) =>
-                                    position$.pipe(map((at): Progress => ({ access, at }))),
-                                ),
-                            ),
-                        )
-                        .pipe(ignoreElements()),
-                    progressScrubs$(progress$, dial.changes$).pipe(
-                        map((scrub): AppInput => ({ kind: 'scrub', ...scrub })),
-                    ),
+                    dial.connect$(playhead$).pipe(ignoreElements()),
+                    dial.changes$.pipe(map((scrub): AppInput => ({ kind: 'scrub', ...scrub }))),
                 ),
         };
     },

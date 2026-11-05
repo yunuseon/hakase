@@ -10,7 +10,7 @@ export type Notes = {
 
 export type NoteCommand =
     // The id is chosen by the program, so the window can select a note that did not exist a moment ago.
-    | { readonly kind: 'create'; readonly id: string }
+    | { readonly kind: 'create'; readonly id: string; readonly text: string }
     | { readonly kind: 'edit'; readonly id: string; readonly text: string }
     | { readonly kind: 'remove'; readonly id: string };
 
@@ -27,7 +27,7 @@ export const reduceNotes = (notes: Notes, command: NoteCommand): Notes => {
                 ? notes
                 : {
                       made: Math.max(notes.made, numberOf(command.id)),
-                      items: [...notes.items, { id: command.id, text: '' }],
+                      items: [...notes.items, { id: command.id, text: command.text }],
                   };
         case 'edit':
             return {

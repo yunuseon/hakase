@@ -545,7 +545,7 @@ column and each content component sets `block-size: 100%` on its host, so a
 window resized taller or narrower reflows its content instead of leaving it
 parked at the top. Two patterns carry the rest:
 
-- A footer (the task manager's, the todo's) takes `margin-block-start: auto`, so
+- A footer (the task manager's, the tickets' ) takes `margin-block-start: auto`, so
   it sits on the window's bottom edge however tall the list above it is.
 - Something that must stay square (the playhead dial) makes its host a size
   container and sizes itself `min(100cqi, 100cqb)`, so it fits whichever side of
@@ -594,54 +594,82 @@ it emits `close-others` with no id, and the fold keeps the process `from` stampe
 on, so the manager never has to name itself. Its count comes from the program,
 which knows `self.id`, rather than from the row count, which would include it.
 
-**The todo list is a document every todo window shares**, like a formula's text:
-`hks-todo` emits `TodoCommand`s (`add`, `toggle`, `remove`, `clear-done`), `main.ts`
-folds them with the pure `reduceTodos` into one `TodoList`, and every todo window
-reads `AppState.todos$` back. Item ids come from the log's sequence, like every
-id a reducer makes (see "Undo"), so a deleted item's id is never reused.
-The list is saved in the snapshot. The draft in the input box is the one piece
-of state the component keeps to itself — it is not app state, and it is cleared
-after a submit. **Read it and clear it from one shared listener** (`submitted$`,
-`share()`d): with two `submit` listeners, one reading and one clearing, the
-order is subscription order, and deferring the clear does not save it — on a
-real key press the browser runs microtasks between listeners, so an `asap` clear
-lands before the read. A scripted `requestSubmit()` does not, which is why only
-real typing showed the bug: test input with real events.
+**Tickets unify the todo list and board as views of one document.** Each state
+holds one `Tickets` value, folded by `reduceTickets` in the documents log;
+windows choose List or Board through their own view-only settings. Ticket numbers
+are monotone within a state; ids come from the log's sequence. Statuses have a
+name and an `open`, `active` or `done` stage. Progress counts stages, never status
+names, and quick capture (`ticket` or `todo`) adds to the first open status.
 
-**Rows reorder by dragging their grip.** `drags$` is one shared gesture stream —
-`moving`, then `dropped` or `cancelled` — read twice: `connect$` paints the
-indicator from it (the dragged row fades, a line marks the drop) and `commands$`
-turns a drop into `{ kind: 'move', id, to }`. Nothing in the list moves until the
-drop, so the rows' midpoints stay put for the whole drag and `dropIndex` simply
-counts how many of the _other_ rows sit above the pointer. That is why `to`
-counts positions in the list without the moved item, and why `reduceTodos`
-removes it before inserting. The gesture ends on the document, filtered by
-`pointerId`, for the same reason the window's do; a cancel moves nothing.
-The grip is a `<button>`, so it is focusable, and ↑/↓ on it move the row one
-place. The list is rebuilt on every change, so `connect$` reads which grip had
-focus before `replaceChildren` and focuses its replacement after. The keydown is
-`preventDefault`ed because the canvas reads unmodified arrows as section steps
-and skips any key already handled — that `defaultPrevented` check is the whole
-contract between them.
+Tickets carry a title, description, priority, optional parent and blocker links.
+Parent and blocker cycles are refused by the reducer and cut when parsing stored
+data. Deleting a parent promotes children to its parent; deleting blockers removes
+their links. A done blocker remains linked but no longer counts as blocking.
+Deleting a status requires it to be empty, and the last status cannot be deleted.
 
-**The board is a kanban document every board window shares**, folded like the
-todo list: `hks-board` emits `BoardCommand`s, `reduceBoard` folds them into one
-`Board` of columns of cards, saved in the snapshot, and ids for both come from
-the log's sequence. Cards and columns move by their grips, a card across
-columns too: `dropTarget` picks the lane nearest the pointer and counts the
-_other_ cards above it, so `to` again counts places without the moved card. The
-arrow keys on a card's grip emit `step-card`, an intent rather than a position,
-because only the fold knows the board; `stepped` turns it into a move, keeping
-the card's height when it changes column. A column can be deleted only while
-empty, so a stray click never takes cards with it.
+**Tags categorise tickets independently of their workflow.** Each ticket owns a
+sorted set of lowercase names, trimmed and deduplicated by `normaliseTags`;
+old tickets parse with no tags. Add/remove commands edit that set, so undo,
+sharing, snapshots and forks treat tags like every other ticket field. Detail
+fields offer existing names from that state; row and card chips select a filter.
+The filter belongs to the window's live program stream and is transient. Its
+listing is derived from the full document, which details and blocker counts
+still read. Filtered moves resolve against visible neighbours before reaching
+the full reducer, and a new ticket inherits the selected tag. Clear done is
+hidden while filtering so it cannot silently delete unseen completed tickets.
 
-Unlike the todo list, the board is **updated in place by id, never rebuilt**: a
-card being edited, a name being typed and a click that lands mid-update all
-belong to a node, and replacing the node on every change (another window's
-included) lost them. `ordered` reorders only when the order differs, and a field
-with focus is never overwritten. The add-card drafts read their text in the one
-shared `submit` listener, for the todo list's reason; reading the form later lost
-every first card.
+Rows and statuses drag by their grips, with arrow keys as the keyboard equivalent.
+Both views use the same drop rule: the nearest status in both dimensions, then the
+position among its other tickets. One shared gesture stream drives indicators and
+commands; document-level pointer ends release it. Rows update in place by id,
+without rewriting focused fields. The tag form reads its draft in one shared submit listener before clearing it. The detail panel's selected ticket is transient
+view state, folded from open/close events, never saved in the document.
+
+Ticket actions use unboxed, muted line icons with a soft circular hover state,
+like the window chrome. Creation is a floating + in the toolbar, each column, and the sub-ticket heading;
+cleanup and deletion use small icons, and the creator uses arrows and a final
+check. Every icon keeps a tooltip, an accessible name and a visible keyboard
+focus ring. Avoid adding filled action pills or duplicate text buttons here.
+
+**New ticket opens a three-step creator**: Basics, Tags & links, then Review.
+Its draft is one pure `reduceCreation` fold owned by the program, discarded on
+cancel or a store switch, and never saved. The creator is a separate component;
+the program slots searchable tag, parent and blocker pickers into it. Submission
+emits one `add` carrying all fields, so a complete ticket is one undo step and
+never appears half-filled. Every ticket + opens the creator with its status or parent preselected;
+command-palette capture keeps its short path. The ticket model lives in `shared/tickets.ts` because both the list
+and creator use it.
+
+**Ticket-link and tag multiselection** uses `hks-search-picker`, taking plain
+choices and selected values. It owns no ticket knowledge. The program supplies
+keys, titles, status and tags as searchable labels and hints; parent and blocker
+choices in existing details use the same cycle checks as before. Arrow keys
+move between results, Enter selects, and Escape closes the picker before the
+creation dialog. Ticket-list search intersects the tag filter and searches key,
+title, description and tags. Filtered moves use the visible listing under either
+kind of filter, while details still read the complete document.
+
+**Dropdowns and free-text autocompletes** use `hks-select` from
+`shared/select/select.component.ts`; do not add native selects or datalists.
+The host takes inert option children, exposes `value` and `disabled`, and emits
+one bubbling `change` when a choice is committed. An `editable` attribute turns
+it into a free-text autocomplete; typing updates its draft value and Enter can
+submit its containing form. Owners clear that value explicitly on form reset.
+Merge `connectSelects$(shadow)` into the owning component's `connect$`; it connects
+dynamic controls and tears them down on removal without lifecycle subscriptions.
+The pure reducer owns popup/search/keyboard state, and the shared stylesheet
+uses appearance tokens. Popovers render in the top layer with viewport clamping
+and upward placement near the bottom. Arrow keys skip disabled choices,
+Home/End navigate, Enter chooses, Escape closes before an enclosing dialog,
+and Tab advances focus. Longer lists automatically expose search. Canvas
+shortcuts treat the host as editable. Ticket multiselects remain program-fed
+pickers because they also support hints, multiple choices and creating tags.
+
+Old todo and board documents migrate independently: Todo Main becomes Tickets
+Main, while Board Main keeps the `board` store id and the name Board. Old windows,
+progress bindings, store copies and saved blueprints migrate with them. Board
+windows retain Board view. Keep this mapping when retiring a program: otherwise
+the next snapshot can discard documents whose old store is no longer registered.
 
 **Notes are documents a window chooses between**, like formulas: one `Notes`
 collection folded in `main.ts` and saved, and each note window's choice in its
@@ -666,6 +694,29 @@ hidden tab and would freeze the timer exactly when it is not being watched.
 `src/chime.ts`, beside `persistState$`, with the one `tap` that plays it) rings
 for those and not for a skip. It is saved where it last stood still, like the
 playhead, and never restored running.
+
+**A focus timer can follow an agenda**, through a store input like a voice's
+pitch: `focusProgram.inputs` declares `agenda` with `from: 'store'`, so the
+state menu, state mode, the state map and the prune all handle it with no code
+of their own. While a block of that agenda runs, the block **is** the timer:
+`planOf` turns it into a `Plan` (title, elapsed, length) and `focusView` shows
+the block's name, countdown and progress, with the controls disabled because
+the plan drives them. Outside blocks the timer is the ordinary pomodoro again.
+Three choices hold it together:
+
+- **The link is a document; the timer is not.** Timers keep their own fold, so
+  what a timer follows lives in `Documents.focusLinks` (`{ sources: { agenda } }`,
+  a `Linked` like a signal's), set by the documents reducer's `link` case,
+  saved, pruned, forked and undone with the other documents. Putting it on
+  `Focus` would have meant teaching the link, the prune and the state map about
+  a fold that is not a document.
+- **The plan is derived, never stored.** `plansOf` maps every linked timer to
+  the block running now, from the agendas and the wall clock, which runs only
+  while some timer follows an agenda. Nothing ticks for a plan.
+- **Its edges are the only effects.** A block that starts pauses that timer
+  (`pause`, idempotent, from `startedPlans`), so a pomodoro does not run on
+  under it and chime mid-block; a block that ends rings the chime
+  (`endedPlans`), as a phase that ran out does.
 
 **The agenda is a day planner over one shared `Agenda`** of time blocks, each
 on a `Day` (`lib/day.ts`: local `YYYY-MM-DD`, stepped through a date at noon so a
@@ -904,7 +955,7 @@ but never shrink it. The minimum (320 x 420) leaves room for the controls.
 **The whole app is one snapshot.** `state-store.ts` writes a single versioned
 `hakase.state`: the workspace (processes, links, camera, toolbar), the look and
 its edits, formula and theme edits, duration, loop, where the playhead last
-rested, every window's settings, and the todo list. `persistState$` takes one `combineLatest` of
+rested, every window's settings, and every ticket state. `persistState$` takes one `combineLatest` of
 the folds, each reaching it by exactly one path, debounced: a drag emits on every
 pointer move and storage only needs where it stopped. That is hygiene, not
 speed — a write measures about 2us for a 168-byte payload, so do not go looking
@@ -945,10 +996,10 @@ for this reason.
 ## Undo: one log for every document
 
 **Every document is one fold, and the state is its log, folded.** The
-workspace, settings, todo lists, boards, notes, agendas, habits, world clocks,
+workspace, settings, tickets, notes, agendas, habits, world clocks,
 bookmarks, signals, the formula library, formula text, themes, appearances and
 the look are one `Documents` record (`src/documents.ts`), folded by one `scan`
-over a union of `DocumentAction`s; `todos$`, `waves$` and the rest are
+over a union of `DocumentAction`s; `tickets$`, `waves$` and the rest are
 projections of it, so their readers never changed. Clocks are not documents —
 playback, focus timers and diagnostics keep their own folds — and neither is
 anything only looked at. The reducers are what they were; `reduceDocuments`
@@ -1033,7 +1084,7 @@ are the same one with a different default binding at launch.
 
 - **`HOLDING` in `stores.ts` is the one table** that says, per program, what its
   store holds and what a new window binds to. A program with a **document**
-  (todo, board, notes, focus, agenda, habits, clocks, bookmarks) binds the
+  (tickets, notes, focus, agenda, habits, clocks, bookmarks) binds the
   document and shares the main store, whose id is the program id; its window
   settings (which note, which day) stay per window, or two windows on one notes
   store could never show different notes. A program with only **settings**
@@ -1198,6 +1249,25 @@ reference, so an edit elsewhere does not re-prepare a sketch. **A prune keeps
 what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
+
+## Progress
+
+`progress` shows what a timer or a plan is doing: a bar with a title, the time
+left and the span, following a focus timer (its phase, or the block it follows),
+an agenda (the block now, or the next one, named, with an empty bar) or tickets (a `count`: how many are done of how many). It is a separate program from
+the dial on purpose. The dial once followed focus too, read-only, and it looked
+like a disabled control; and a reading has more to say than a fraction — a
+name, the time left, what comes next — which a scrub control has no room for.
+So a control scrubs (`playhead`) and an indicator reads (`progress`), and they
+share no type. A saved dial that followed focus falls back to its main clock.
+
+A source is read into a `Reading` (`now`, `next`, `count` or `none`) by pure
+functions in `src/readings.ts` (`agendaReading`, `focusReading`, `ticketsReading`), and `barView` turns that
+into the text and fill the component applies. The agenda's reading moves with
+the wall clock, which reaches `inputs.ts` as `InputSources.now$` rather than an
+import: the input definitions are plain data the tests load, and `lib/rx.ts`
+touches `window`. A new readable kind is a source with a `read`, a case in
+`readingOf`, and one entry in `sourceInput.sources`.
 
 ## The plot
 
@@ -1436,15 +1506,17 @@ to whichever program owns the store (`ownerOf`), and `reachedFrom`,
 `closesLoop`, the prune and the state map read every linked map alike, so a
 signal feeding a pen or a voice is kept by a prune and a pen cannot be wired into a loop.
 
-## Pieces
+## Blueprints
 
-A **piece** is a creation kept to be placed again: everything inside a section,
-saved from the section label's **Save as piece**, listed in the **pieces**
-window and placed from there. It is a document like the formula library
-(`Documents.pieces`, saved in the snapshot), so saving, renaming, deleting and
+A **blueprint** is a creation kept to be placed again: everything inside a
+section, saved from the section label's **Save as blueprint**, listed in the
+**blueprints** window and placed from there. It was called a piece; `RENAMED`
+maps the old `pieces` window, and the snapshot is read from `pieces` when it
+has no `blueprints`. It is a document like the formula library
+(`Documents.blueprints`, saved in the snapshot), so saving, renaming, deleting and
 placing are ordinary steps; one undo takes a whole placement back.
 
-`pieceOf` (in `src/pieces.ts`, pure) captures the section's windows with frames
+`blueprintOf` (in `src/blueprints.ts`, pure) captures the section's windows with frames
 relative to it, their settings, every store they keep or follow **and what
 those follow** (`reachedFrom`, so a signal that only modulates another comes
 along), the documents of those stores, the formulas they show (a saved formula,
@@ -1460,11 +1532,11 @@ hands it to the clocks fold as the store first appears, the way `copy` does
 for a fork.
 
 **Placing makes a fresh copy, never a link.** `placed` names every store,
-window and section from the log's sequence (`store-<seq>-<n>`), so a piece
-placed twice is two pieces, and rewrites every reference to the copies:
+window and section from the log's sequence (`store-<seq>-<n>`), so a blueprint
+placed twice is two copies, and rewrites every reference to the copies:
 bindings, a signal's, pen's or voice's sources, the settings keys, the links.
 A formula is matched against the library by its source and added only if it
-is new. A copy of a program's Main store takes the piece's name, since it is
+is new. A copy of a program's Main store takes the blueprint's name, since it is
 not that program's main store.
 
 **Place picks the spot first.** **Place** starts **placing**, a mode, not a
@@ -1480,10 +1552,28 @@ carries `data-ground`, which the canvas reads as ground, so the wheel still
 pans and zooms while placing. Nothing of it is saved or undone; only the drop
 is a step.
 
-A piece from storage is untrusted like the rest of the snapshot:
-`parsePieces` reads windows with the workspace's own `processFrom`, stores with
+A blueprint from storage is untrusted like the rest of the snapshot:
+`parseBlueprints` reads windows with the workspace's own `processFrom`, stores with
 `storeFrom`, settings and every document with their own parsers, and placing
 keeps only windows that `ownsInputs` accepts.
+
+**Some blueprints come with the app.** `STARTERS` in `src/starters.ts` are
+plain `Blueprint` values with a summary, for organising a day: **Today**
+(agenda, a progress bar on it, todo), **Focus session** (a fresh board, the
+focus timer, a progress bar on it) and **Daily review** (a fresh note opened
+on a review template, habits, todo). They are listed above the saved ones, and
+cannot be renamed or deleted, like built-in formulas; `blueprintIn` is the one
+lookup, so placing, the ghost and the history label all find them. Like the
+formula registry they are never seeded into the document, so a starter changed
+in code reaches every user.
+
+**A starter may work on the main stores instead of copies.** A window on a
+store the blueprint does not list keeps that id when placed, so Today shows
+your todo list rather than an empty one; only what should start fresh (the
+session's board, tonight's note) is listed and copied. A saved blueprint lists
+everything it binds, so it still copies everything. `placed` registers a main
+store a window lands on, as a launch would, or a main store never opened before
+(habits) has no entry and its window no chip.
 
 ## State mode, on the canvas
 
@@ -1699,10 +1789,10 @@ A window binds its own state and may read one **input** beside it, from another
 program's store. **Each program declares its inputs** (`Program.inputs`, built
 from the definitions in `src/inputs.ts`): the sketch takes `playbackInput`, the
 timeline `ownPlaybackInput` (its clock is its own store, so it follows nothing),
-and the dial `progressInput`, which accepts a `playback` clock (scrubbable) or a
-`focus` timer (read-only). An input definition is inert data: its title, the
-kinds it accepts, where a new window starts (`initial`, the main clock), and per
-kind how a store of it connects (`connect`). `from: 'followed'` bindings belong
+the dial `progressInput`, which accepts a `playback` clock only, and the
+progress bar `sourceInput`, which accepts a `focus` timer or an `agenda`. An input
+definition is inert data: its title, the kinds it accepts, where a new window
+starts (`initial`), and per readable kind how a store of it is read (`read`). `from: 'followed'` bindings belong
 to a process; `from: 'store'` bindings belong to the document it is showing.
 There is no separate table to keep
 in step: adding an input is one field on the program.
@@ -1712,7 +1802,7 @@ says so.** The program table is a record keyed by id (`src/programs.ts`,
 `satisfies { [K in ProgramId]: Program<K> }`), and `Process` is derived from it
 with `import type`: one member per program, whose `follows` is a record keyed by
 input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding, k1?:
-SignalBinding, … }`, the dial's `{ progress: PlaybackBinding | FocusBinding }`,
+SignalBinding, … }`, the dial's `{ progress: PlaybackBinding }`,
 a todo's and a timeline's have no keys at all, so a focus binding on a sketch
 does not type-check. An input whose `initial` is `null` is **optional**: a new
 window starts without it, its key is optional in the type, `fits` does not
@@ -1752,12 +1842,9 @@ conditional falls back to the constraint and lets every kind through.
   playback binding to the same store, and a saved array of follows goes to the
   first input that accepts each kind; a forged one falls back to the input's
   `initial`.
-- `scoped` gives each window `progress$`: the connection its input makes for the
-  selected binding (`progressConnection`), with its access and a stream of
-  positions. It changes on a rebind, not on ticks. The dial subscribes to
-  gestures only while the source is scrubbable (`progressScrubs$`), and the
-  circular slider shows read-only progress (role `progressbar`, a hint) without
-  learning which program supplied it. A focus timer is never made seekable.
+- `scoped` gives each window `reading$`: what its `source` input's store is
+  doing, as a `Reading` (`readingOf`), switched on a rebind. The dial needs none
+  of it: it reads `playhead$` like a sketch and always scrubs.
 - `liveProcess$` stamps each input with the window's playback target, or null
   when it has none (`playbackBinding`: a timeline's own store, a scrubbable
   binding otherwise). `routePlayback$` feeds those to the clocks fold; its pure
@@ -1766,8 +1853,8 @@ conditional falls back to the constraint and lets every kind through.
   name the **old** target: stamping it with the new binding would strand the old
   hold.
 - The popover has one section per kind each followed input accepts. The source is named
-  only where there is a choice ("Progress · Focus · read-only"; the sketch's
-  section is just "Playback"). A followed store is in use for pruning, deletion
+  only where there is a choice ("Source · Focus" and "Source · Agenda"; the
+  sketch's section is just "Playback"). A followed store is in use for pruning, deletion
   and counts. Forking copies the canonical document once, clocks and focus
   timers starting paused; a connection is never saved or forked.
 
@@ -1785,6 +1872,30 @@ own — every command is something another control could already do — and a ne
 command is one entry in `commandsOf` plus one case where it is routed. Filtering
 is every typed word appearing in the label or hint, as a `combineLatest` of the
 commands and the query, not a remembered list.
+
+**Quick capture: a command can take the rest of the query.** A `Command` may
+name a `keyword`, and `matched` hands everything after it to that command, so
+`todo call Ada` is the one row "Add to-do: call Ada" and the pick carries its
+text. Picking a keyword command with nothing after it fills in the keyword
+instead of running, and both read the row from one shared `chosen$`, for the
+todo submit's reason. The palette still knows nothing of what a capture does:
+`CAPTURES` in `commands.ts` lists them (`ticket`, `todo`, `note`), `pickedOf`
+parses the text, and `capturedActions` in `src/capture.ts` turns one into
+document actions: a ticket or a note. They are
+read against the documents fold, like placing a blueprint.
+
+**A capture is offered once per state, not into Main alone.** `commandsOf`
+makes one command per state of the program (`withMain`, so Main is there before
+any window opened it), all claiming the same keyword, and `matched` hands the
+text to every one of them: `todo oat milk` lists "Add to-do to Groceries",
+"Add to-do to Main" and so on, and ↑/↓ chooses. `captureStores` orders them:
+the frontmost window's state of that program first, since that is the list in
+front of you, then Main, then by name. Rows were chosen over a syntax such as
+`todo @groceries`, which needs names remembered and a misspelling handled. The
+state travels in the command id, which a clicked row carries, so
+`capturedActions` refuses a state of another program or one since deleted. A capture is one undo step, which
+is why a note's `create` carries its text rather than being followed by an
+`edit`: different keys, so two steps.
 
 ## Animation and export
 
@@ -2383,7 +2494,7 @@ to prevent.
   ecosystem has a standard way to do something, use it.
 - Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`,
   `npm test`.
-- **Tests are Vitest, beside the module they cover** (`todo.ts` → `todo.test.ts`),
+- **Tests are Vitest, beside the module they cover** (`shared/tickets.ts` → `shared/tickets.test.ts`),
   and only for pure code: folds, geometry, the muxers. That is the payoff of the
   layering — anything worth testing is a function of its arguments, so a test
   is a call and an assertion, with no DOM, no GL and no mocks. A test that wants

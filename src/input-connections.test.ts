@@ -97,6 +97,22 @@ describe('store-owned inputs', () => {
             }),
         ).toBeNull();
         expect(storeInputCommand(inputs, { kind: 'unfollow', input: 'playback' })).toBeNull();
+        expect(
+            storeInputCommand(inputsFor('focus'), {
+                kind: 'follow',
+                input: 'agenda',
+                source: 'agenda',
+                store: 'store-3',
+            }),
+        ).toEqual({ param: 'agenda', source: 'store-3' });
+        expect(
+            storeInputCommand(inputsFor('focus'), {
+                kind: 'follow',
+                input: 'agenda',
+                source: 'signal',
+                store: 'signal',
+            }),
+        ).toBeNull();
         expect(storeInputCommand(inputs, { kind: 'unfollow', input: 'constructor' })).toBeNull();
     });
 });

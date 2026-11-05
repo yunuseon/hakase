@@ -34,7 +34,3 @@ export const ringOffset = (ring: Ring, value: number): Point => {
 export interface Slider {
     readonly changes$: Observable<Scrub>;
 }
-
-export type Progress =
-    | { readonly access: 'read'; readonly at: number }
-    | { readonly access: 'scrub'; readonly at: number };

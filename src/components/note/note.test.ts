@@ -16,22 +16,28 @@ const run = (...commands: NoteCommand[]): Notes => commands.reduce(reduceNotes, 
 
 describe('reduceNotes', () => {
     it('creates under the id it was given and advances the counter', () => {
-        const notes = run({ kind: 'create', id: 'note-1' }, { kind: 'create', id: 'note-1' });
+        const notes = run(
+            { kind: 'create', id: 'note-1', text: '' },
+            { kind: 'create', id: 'note-1', text: '' },
+        );
 
         expect(notes.items).toEqual([{ id: 'note-1', text: '' }]);
         expect(nextNoteId(notes)).toBe('note-2');
     });
 
     it('never hands out a removed id again', () => {
-        const notes = run({ kind: 'create', id: 'note-1' }, { kind: 'remove', id: 'note-1' });
+        const notes = run(
+            { kind: 'create', id: 'note-1', text: '' },
+            { kind: 'remove', id: 'note-1' },
+        );
 
         expect(nextNoteId(notes)).toBe('note-2');
     });
 
     it('edits one note', () => {
         const notes = run(
-            { kind: 'create', id: 'note-1' },
-            { kind: 'create', id: 'note-2' },
+            { kind: 'create', id: 'note-1', text: '' },
+            { kind: 'create', id: 'note-2', text: '' },
             { kind: 'edit', id: 'note-2', text: 'hi' },
         );
 
@@ -48,7 +54,10 @@ describe('titleOf', () => {
 });
 
 describe('shownNote', () => {
-    const notes = run({ kind: 'create', id: 'note-1' }, { kind: 'create', id: 'note-2' });
+    const notes = run(
+        { kind: 'create', id: 'note-1', text: '' },
+        { kind: 'create', id: 'note-2', text: '' },
+    );
 
     it('shows the chosen note, or the first one when it is gone', () => {
         expect(shownNote(notes, 'note-2')?.id).toBe('note-2');

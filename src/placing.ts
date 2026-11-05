@@ -1,16 +1,16 @@
 import type { GhostView } from './components/placement/placement.ts';
 import type { Size } from './components/window/frame.ts';
-import type { Piece } from './pieces.ts';
+import type { Blueprint } from './blueprints.ts';
 import { worldAt, type Camera, type Point, type Rect } from './shared/camera.ts';
 
-// Dropped is a state, not a separate event: the drop reads its piece from the very fold that ends the mode.
+// Dropped is a state, not a separate event: the drop reads its blueprint from the very fold that ends the mode.
 export type Placing =
     | { readonly mode: 'idle' }
-    | { readonly mode: 'placing'; readonly piece: string; readonly at: Point }
-    | { readonly mode: 'dropped'; readonly piece: string; readonly at: Point };
+    | { readonly mode: 'placing'; readonly blueprint: string; readonly at: Point }
+    | { readonly mode: 'dropped'; readonly blueprint: string; readonly at: Point };
 
 export type PlacingAction =
-    | { readonly kind: 'start'; readonly piece: string; readonly at: Point }
+    | { readonly kind: 'start'; readonly blueprint: string; readonly at: Point }
     | { readonly kind: 'move'; readonly at: Point }
     | { readonly kind: 'drop'; readonly at: Point }
     | { readonly kind: 'cancel' };
@@ -20,12 +20,12 @@ export const idle: Placing = { mode: 'idle' };
 export const reducePlacing = (placing: Placing, action: PlacingAction): Placing => {
     switch (action.kind) {
         case 'start':
-            return { mode: 'placing', piece: action.piece, at: action.at };
+            return { mode: 'placing', blueprint: action.blueprint, at: action.at };
         case 'move':
             return placing.mode === 'placing' ? { ...placing, at: action.at } : placing;
         case 'drop':
             return placing.mode === 'placing'
-                ? { mode: 'dropped', piece: placing.piece, at: action.at }
+                ? { mode: 'dropped', blueprint: placing.blueprint, at: action.at }
                 : placing;
         case 'cancel':
             return placing.mode === 'idle' ? placing : idle;
@@ -52,7 +52,7 @@ const onScreen = (camera: Camera, { x, y, width, height }: Rect): Rect => ({
 });
 
 export const ghostOf = (
-    { name, size, windows }: Pick<Piece, 'name' | 'size' | 'windows'>,
+    { name, size, windows }: Pick<Blueprint, 'name' | 'size' | 'windows'>,
     at: Point,
     camera: Camera,
 ): GhostView => {

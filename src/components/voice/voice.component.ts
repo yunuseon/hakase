@@ -1,5 +1,6 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import {
@@ -82,9 +83,9 @@ const TEMPLATE = `
     <div class="settings">
         <label class="field">
             <span>root</span>
-            <select data-root>
+            <hks-select data-root>
                 ${ROOT_NOTES.map(note => `<option value="${note}">${noteName(note)}</option>`).join('')}
-            </select>
+            </hks-select>
         </label>
         <div class="scales" role="radiogroup" aria-label="scale">
             ${SCALES.map(
@@ -195,9 +196,14 @@ export class HksVoice extends HTMLElement {
             }),
         );
 
-        const set$ = fromElementEvent$(requireChild(shadow, '.settings'), 'input').pipe(
+        const set$ = merge(
+            fromElementEvent$(requireChild(shadow, '.settings'), 'input'),
+            fromElementEvent$(requireChild(shadow, '.settings'), 'change').pipe(
+                filter(({ target }) => target instanceof HksSelect),
+            ),
+        ).pipe(
             mergeMap(({ target }): VoiceEvent[] => {
-                if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
+                if (!(target instanceof HTMLInputElement || target instanceof HksSelect)) {
                     return [];
                 }
 
@@ -232,7 +238,7 @@ export class HksVoice extends HTMLElement {
         const now = requireChild(shadow, '.now');
         const hint = requireChild(shadow, '.hint');
         const listen = requireChild(shadow, '.listen');
-        const root = requireElement(shadow, '[data-root]', HTMLSelectElement);
+        const root = requireElement(shadow, '[data-root]', HksSelect);
         const token = (name: string) =>
             getComputedStyle(this).getPropertyValue(name).trim() || '#000000';
 
@@ -307,7 +313,9 @@ export class HksVoice extends HTMLElement {
             }),
         );
 
-        return merge(controls$, roll$, moment$, listened$).pipe(map(() => undefined));
+        return merge(connectSelects$(this.shadow), controls$, roll$, moment$, listened$).pipe(
+            map(() => undefined),
+        );
     }
 }
 

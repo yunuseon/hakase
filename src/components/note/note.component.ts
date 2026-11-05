@@ -1,3 +1,4 @@
+import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, scan, share, switchMap, tap } from 'rxjs/operators';
 import { requireElement, requireChild, styleSheet } from '../../lib/dom.ts';
@@ -8,7 +9,7 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = `
     <header class="bar">
-        <select class="pick" aria-label="note"></select>
+        <hks-select class="pick" aria-label="note"></hks-select>
         <button class="new" type="button" title="new note" aria-label="new note">+</button>
         <button class="delete" type="button">Delete</button>
     </header>
@@ -45,20 +46,23 @@ export class HksNote extends HTMLElement {
     readonly edits$: Observable<string>;
     readonly removes$: Observable<void>;
 
-    private readonly picker: HTMLSelectElement;
+    private readonly picker: HksSelect;
     private readonly body: HTMLTextAreaElement;
     private readonly deleter: HTMLButtonElement;
     private readonly count: HTMLElement;
     private readonly arming$: Observable<Arming>;
 
+    private readonly shadow: ShadowRoot;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
+        this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
         shadow.innerHTML = TEMPLATE;
 
-        this.picker = requireElement(shadow, '.pick', HTMLSelectElement);
+        this.picker = requireElement(shadow, '.pick', HksSelect);
         this.body = requireElement(shadow, '.body', HTMLTextAreaElement);
         this.deleter = requireElement(shadow, '.delete', HTMLButtonElement);
         this.count = requireChild(shadow, '.count');
@@ -91,6 +95,7 @@ export class HksNote extends HTMLElement {
 
     connect$({ options$, selected$, text$, count$ }: NoteView): Observable<void> {
         return merge(
+            connectSelects$(this.shadow),
             combineLatest([options$, selected$]).pipe(
                 tap(([options, selected]) => {
                     this.picker.replaceChildren(

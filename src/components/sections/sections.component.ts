@@ -51,8 +51,8 @@ const sectionOf = (id: string): HTMLElement => {
     save.type = 'button';
     save.className = 'save';
     save.dataset['save'] = id;
-    save.textContent = 'Save as piece';
-    save.title = 'Keep everything in this section as a piece you can place again';
+    save.textContent = 'Save as blueprint';
+    save.title = 'Keep everything in this section as a blueprint you can place again';
 
     // Out of the flow together: the legend's width, and so the border's gap, is the name alone.
     const actions = document.createElement('span');
