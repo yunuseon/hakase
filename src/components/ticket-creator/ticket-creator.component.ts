@@ -1,3 +1,8 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
@@ -13,23 +18,165 @@ export class HksTicketCreator extends HTMLElement {
     readonly changes$: Observable<CreationChange>;
     private readonly root: HTMLDialogElement;
 
+    private readonly rendering: RenderView<CreatorView | null>;
+
     constructor() {
         super();
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = `<dialog aria-labelledby="heading"><form novalidate>
-            <header><div><p class="eyebrow">New ticket</p><h2 id="heading" tabindex="-1">Basics</h2></div><button type="button" data-action="cancel" aria-label="cancel ticket creation" title="Cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
-            <ol class="steps" aria-label="creation steps"><li>1 Basics</li><li>2 Tags & links</li><li>3 Review</li></ol>
-            <div class="body">
-                <section data-step="0"><label>Title <input class="title" aria-label="ticket title" placeholder="What needs to happen?" autocomplete="off" autofocus required /></label>
-                <label>Description <textarea class="description" aria-label="ticket description" rows="4" placeholder="Context, requirements, or acceptance criteria…"></textarea></label>
-                <div class="pair"><label>Status <hks-select class="status" aria-label="ticket status"></hks-select></label><label>Priority <hks-select class="priority" aria-label="ticket priority">${PRIORITIES.map(priority => `<option value="${priority}">${priority === 'none' ? 'No priority' : priority}</option>`).join('')}</hks-select></label></div></section>
-                <section data-step="1" hidden><p class="hint">Categorise this ticket and connect related work. All fields here are optional.</p><slot name="tags"></slot><slot name="parent"></slot><slot name="blockers"></slot></section>
-                <section data-step="2" hidden><p class="hint">Check the details before creating your ticket.</p><dl class="review"></dl></section>
-                <p class="error" role="alert" hidden></p>
-            </div>
-            <footer><button type="button" class="back" data-action="back" aria-label="back" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button><span></span><button class="advance" type="submit" aria-label="next" title="Next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></footer>
-        </form></dialog>`;
+        this.rendering = renderView<CreatorView | null>(
+            shadow,
+            null,
+            view =>
+                html`<dialog aria-labelledby="heading">
+                    <form novalidate>
+                        <header>
+                            <div>
+                                <p class="eyebrow">New ticket</p>
+                                <h2 id="heading" tabindex="-1">
+                                    ${
+                                        view?.state.step === 2
+                                            ? 'Review'
+                                            : view?.state.step === 1
+                                              ? 'Tags & links'
+                                              : 'Basics'
+                                    }
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                data-action="cancel"
+                                aria-label="cancel ticket creation"
+                                title="Cancel"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="m6 6 12 12M18 6 6 18"></path>
+                                </svg>
+                            </button>
+                        </header>
+                        <ol class="steps" aria-label="creation steps">
+                            ${['1 Basics', '2 Tags & links', '3 Review'].map(
+                                (label, index) =>
+                                    html`<li
+                                        aria-current=${ifDefined(view?.state.step === index ? 'step' : 'false')}
+                                    >
+                                        ${label}
+                                    </li>`,
+                            )}
+                        </ol>
+                        <div class="body">
+                            <section data-step="0" ?hidden=${view?.state.step !== 0}>
+                                <label
+                                    >Title${' '}<input
+                                        class="title"
+                                        .value=${view?.state.draft.title ?? ''}
+                                        aria-invalid=${ifDefined(view?.state.error !== '')}
+                                        aria-label="ticket title"
+                                        placeholder="What needs to happen?"
+                                        autocomplete="off"
+                                        autofocus
+                                        required /></label
+                                ><label
+                                    >Description${' '}<textarea
+                                        class="description"
+                                        .value=${view?.state.draft.description ?? ''}
+                                        aria-label="ticket description"
+                                        rows="4"
+                                        placeholder="Context, requirements, or acceptance criteria…"
+                                    ></textarea>
+                                </label>
+                                <div class="pair">
+                                    <label
+                                        >Status${' '}<hks-select
+                                            class="status"
+                                            aria-label="ticket status"
+                                            .value=${view?.status ?? ''}
+                                            >${repeat(
+                                                view?.statuses ?? [],
+                                                (_item, index) => index,
+                                                status =>
+                                                    html`<option .value=${status.id}>
+                                                        ${status.title}
+                                                    </option>`,
+                                            )}</hks-select
+                                        ></label
+                                    ><label
+                                        >Priority${' '}<hks-select
+                                            class="priority"
+                                            aria-label="ticket priority"
+                                            .value=${view?.state.draft.priority ?? 'none'}
+                                            >${PRIORITIES.map(
+                                                priority =>
+                                                    html`<option .value=${priority}>
+                                                        ${
+                                                            priority === 'none'
+                                                                ? 'No priority'
+                                                                : priority
+                                                        }
+                                                    </option>`,
+                                            )}</hks-select
+                                        ></label
+                                    >
+                                </div>
+                            </section>
+                            <section data-step="1" ?hidden=${view?.state.step !== 1}>
+                                <p class="hint">
+                                    Categorise this ticket and connect related work. All fields here
+                                    are optional.
+                                </p>
+                                <slot name="tags"></slot><slot name="parent"></slot
+                                ><slot name="blockers"></slot>
+                            </section>
+                            <section data-step="2" ?hidden=${view?.state.step !== 2}>
+                                <p class="hint">Check the details before creating your ticket.</p>
+                                <dl class="review">
+                                    ${repeat(
+                                        view?.summary ?? [],
+                                        (_item, index) => index,
+                                        row =>
+                                            html`<dt>${row.label}</dt>
+                                                <dd>${row.value}</dd>`,
+                                    )}
+                                </dl>
+                            </section>
+                            <p class="error" role="alert" ?hidden=${!view?.state.error}>
+                                ${view?.state.error}
+                            </p>
+                        </div>
+                        <footer>
+                            <button
+                                type="button"
+                                class="back"
+                                ?hidden=${view?.state.step === 0}
+                                data-action="back"
+                                aria-label="back"
+                                title="Back"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M19 12H5m6-6-6 6 6 6"></path>
+                                </svg></button
+                            ><span></span
+                            ><button
+                                class="advance"
+                                type="submit"
+                                data-final=${ifDefined(view?.state.step === 2 ? '' : undefined)}
+                                aria-label=${ifDefined(view?.state.step === 2 ? 'create ticket' : 'next')}
+                                title=${ifDefined(view?.state.step === 2 ? 'Create ticket' : 'Next')}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        d=${ifDefined(
+                                            view?.state.step === 2
+                                                ? 'm5 12 4 4 10-10'
+                                                : 'M5 12h14m-6-6 6 6-6 6',
+                                        )}
+                                    ></path>
+                                </svg>
+                            </button>
+                        </footer>
+                    </form>
+                </dialog>`,
+        );
         this.root = requireElement(shadow, 'dialog', HTMLDialogElement);
         const form = requireElement(shadow, 'form', HTMLFormElement);
         this.changes$ = merge(
@@ -79,76 +226,34 @@ export class HksTicketCreator extends HTMLElement {
     connect$(view$: Observable<CreatorView>): Observable<void> {
         const root = this.root;
         return merge(
-            connectSelects$(root),
-            view$.pipe(
-                tap(({ state, status: selectedStatus, statuses, summary }) => {
-                    if (state.phase !== 'editing') {
-                        if (root.open) {
-                            root.close();
+            this.rendering.lifetime$,
+            merge(
+                connectSelects$(root),
+                view$.pipe(
+                    tap(view => {
+                        this.rendering.update(view);
+                        const { state } = view;
+                        if (state.phase !== 'editing') {
+                            if (root.open) {
+                                root.close();
+                            }
+                            return;
                         }
-                        return;
-                    }
-                    const title = requireElement(root, '.title', HTMLInputElement);
-                    const description = requireElement(root, '.description', HTMLTextAreaElement);
-                    if (title.value !== state.draft.title) {
-                        title.value = state.draft.title;
-                    }
-                    if (description.value !== state.draft.description) {
-                        description.value = state.draft.description;
-                    }
-                    title.setAttribute('aria-invalid', String(state.error !== ''));
-                    const status = requireElement(root, '.status', HksSelect);
-                    status.replaceChildren(
-                        ...statuses.map(each => new Option(each.title, each.id)),
-                    );
-                    status.value = selectedStatus;
-                    requireElement(root, '.priority', HksSelect).value = state.draft.priority;
-                    for (const section of root.querySelectorAll('[data-step]')) {
-                        if (section instanceof HTMLElement) {
-                            section.hidden = section.dataset['step'] !== String(state.step);
+                        const changedStep = root.dataset['step'] !== String(state.step);
+                        root.dataset['step'] = String(state.step);
+                        if (!root.open) {
+                            root.showModal();
+                        } else if (changedStep) {
+                            requireChild(root, '#heading').focus();
                         }
-                    }
-                    for (const [index, step] of root.querySelectorAll('.steps li').entries()) {
-                        step.setAttribute('aria-current', index === state.step ? 'step' : 'false');
-                    }
-                    requireChild(root, '#heading').textContent =
-                        state.step === 0 ? 'Basics' : state.step === 1 ? 'Tags & links' : 'Review';
-                    requireElement(root, '.back', HTMLButtonElement).hidden = state.step === 0;
-                    const advance = requireChild(root, '.advance');
-                    advance.setAttribute('aria-label', state.step === 2 ? 'create ticket' : 'next');
-                    advance.title = state.step === 2 ? 'Create ticket' : 'Next';
-                    advance.toggleAttribute('data-final', state.step === 2);
-                    const path = advance.querySelector('path');
-                    path?.setAttribute(
-                        'd',
-                        state.step === 2 ? 'm5 12 4 4 10-10' : 'M5 12h14m-6-6 6 6-6 6',
-                    );
-                    const error = requireChild(root, '.error');
-                    error.textContent = state.error;
-                    error.hidden = state.error === '';
-                    requireChild(root, '.review').replaceChildren(
-                        ...summary.flatMap(row => {
-                            const term = document.createElement('dt');
-                            term.textContent = row.label;
-                            const value = document.createElement('dd');
-                            value.textContent = row.value;
-                            return [term, value];
-                        }),
-                    );
-                    const changedStep = root.dataset['step'] !== String(state.step);
-                    root.dataset['step'] = String(state.step);
-                    if (!root.open) {
-                        root.showModal();
-                    } else if (changedStep) {
-                        requireChild(root, '#heading').focus();
-                    }
-                    if (state.error !== '') {
-                        title.focus();
-                    }
-                }),
-                map(() => undefined),
-            ),
-        ).pipe(map(() => undefined));
+                        if (state.error !== '') {
+                            requireChild(root, '.title').focus();
+                        }
+                    }),
+                    map(() => undefined),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

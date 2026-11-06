@@ -1,3 +1,5 @@
+import { html } from 'lit-html';
+import { mountView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, pairwise, scan, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -27,10 +29,9 @@ type Frame = {
     readonly evolution: Evolution;
 };
 
-const TEMPLATE = `
-    <div class="viewport"><slot name="status"></slot></div>
-    <slot name="controls"></slot>
-`;
+const TEMPLATE = () =>
+    html`<div class="viewport"><slot name="status"></slot></div>
+        <slot name="controls"></slot>`;
 
 export class HksSketch extends HTMLElement {
     readonly gl: WebGL2RenderingContext;
@@ -41,12 +42,14 @@ export class HksSketch extends HTMLElement {
 
     private readonly surface: Surface<HTMLCanvasElement>;
 
+    private readonly rendering: Rendering;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         const viewport = requireChild(shadow, '.viewport');
         this.surface = createSurface(viewport);
@@ -160,7 +163,7 @@ export class HksSketch extends HTMLElement {
             }),
         );
 
-        return merge(frames$, retired$).pipe(map(() => undefined));
+        return merge(this.rendering.lifetime$, merge(frames$, retired$).pipe(map(() => undefined)));
     }
 }
 

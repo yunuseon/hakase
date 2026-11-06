@@ -1,35 +1,56 @@
+import { html } from 'lit-html';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import type { Box, GhostView, PlacementEvent } from './placement.ts';
+import type { GhostView, PlacementEvent } from './placement.ts';
 import css from './placement.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="ghost"><span class="label"></span></div>
-    <p class="hint">Click to place <b class="what"></b><span class="keys">Esc to cancel · scroll to move around</span></p>
-`;
-
-const placedAt = (element: HTMLElement, { x, y, width, height }: Box) => {
-    element.style.transform = `translate(${x}px, ${y}px)`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
-};
+const TEMPLATE = (view: GhostView | null) =>
+    html`<div
+            class="ghost"
+            style=${styleMap({
+                transform: `translate(${view?.section.x ?? 0}px, ${view?.section.y ?? 0}px)`,
+                width: `${view?.section.width ?? 0}px`,
+                height: `${view?.section.height ?? 0}px`,
+            })}
+        >
+            <span class="label">${view?.name}</span>${repeat(
+                view?.windows ?? [],
+                (_item, index) => index,
+                box =>
+                    html`<span
+                        class="window"
+                        style=${styleMap({
+                            transform: `translate(${box.x - (view?.section.x ?? 0)}px, ${box.y - (view?.section.y ?? 0)}px)`,
+                            width: `${box.width}px`,
+                            height: `${box.height}px`,
+                        })}
+                    ></span>`,
+            )}
+        </div>
+        <p class="hint">
+            Click to place <b class="what">${view?.name}</b
+            ><span class="keys">Esc to cancel · scroll to move around</span>
+        </p>`;
 
 export class HksPlacement extends HTMLElement {
     readonly changes$: Observable<PlacementEvent>;
 
-    private readonly shadow: ShadowRoot;
+    private readonly rendering: RenderView<GhostView | null>;
 
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<GhostView | null>(shadow, null, TEMPLATE);
         this.hidden = true;
         // Read by the canvas: a wheel over the ghost still pans and zooms, as it would over the ground.
         this.dataset['ground'] = '';
@@ -63,44 +84,15 @@ export class HksPlacement extends HTMLElement {
     }
 
     connect$(ghost$: Observable<GhostView | null>): Observable<void> {
-        const ghost = requireChild(this.shadow, '.ghost');
-        const label = requireChild(this.shadow, '.label');
-        const what = requireChild(this.shadow, '.what');
-
-        return ghost$.pipe(
-            tap(view => {
-                this.hidden = view === null;
-
-                if (view === null) {
-                    return;
-                }
-
-                placedAt(ghost, view.section);
-                label.textContent = view.name;
-                what.textContent = view.name;
-
-                const rooms = [...ghost.querySelectorAll('.window')];
-
-                view.windows.forEach((box, index) => {
-                    const room =
-                        rooms[index] ??
-                        ghost.appendChild(
-                            Object.assign(document.createElement('span'), { className: 'window' }),
-                        );
-
-                    if (room instanceof HTMLElement) {
-                        placedAt(room, {
-                            ...box,
-                            x: box.x - view.section.x,
-                            y: box.y - view.section.y,
-                        });
-                    }
-                });
-                rooms.slice(view.windows.length).forEach(room => {
-                    room.remove();
-                });
-            }),
-            map(() => undefined),
+        return merge(
+            this.rendering.lifetime$,
+            ghost$.pipe(
+                tap(view => {
+                    this.hidden = view === null;
+                    this.rendering.update(view);
+                }),
+                map(() => undefined),
+            ),
         );
     }
 }

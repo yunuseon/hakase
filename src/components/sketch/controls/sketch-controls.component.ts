@@ -1,3 +1,8 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { renderOptions, type SelectChoice } from '../../../shared/select/options.component.ts';
+
+import { mountView, type RenderView, type Rendering } from '../../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
@@ -40,8 +45,10 @@ const DRIVEN_FIELDS = [
     ['trails', 'trails'],
 ] as const;
 
-const RESET_ICON =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"/></svg>';
+const RESET_ICON = () =>
+    html`<svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"></path>
+    </svg>`;
 
 const slider = (
     key: string,
@@ -52,158 +59,236 @@ const slider = (
     step: number,
     value: number,
     only: DrawMode | null = null,
-) => `
-    <label class="row"${only === null ? '' : ` data-only="${only}"`} title="${hint}">
-        <span class="key">${label}</span>
-        <input class="dial" data-field="${key}" type="range"
-               min="${min}" max="${max}" step="${step}" value="${value}" />
-        <output class="read" data-read="${key}"></output>
-    </label>
-`;
+) =>
+    html`<label class="row" data-only=${ifDefined(only ?? undefined)} title=${ifDefined(hint)}
+        ><span class="key">${label}</span
+        ><input
+            class="dial"
+            data-field=${ifDefined(key)}
+            type="range"
+            min=${ifDefined(min)}
+            max=${ifDefined(max)}
+            step=${ifDefined(step)}
+            .value=${value} /><output class="read" data-read=${ifDefined(key)}></output
+    ></label>`;
 
-const knobRow = (knob: Knob) => `
-    <div class="knob" data-knob="${knob}" hidden>
-        <label class="row">
-            <span class="key" data-label="${knob}">${knob}</span>
-            <input class="dial" data-field="${knob}" type="range" min="0" max="1" step="0.01"
-                   value="${defaultPanel.knobs[knob]}" />
-            <output class="read" data-read="${knob}"></output>
-        </label>
-        <span class="driven" title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand">follows</span>
-        <hks-select class="pick motion" data-cycles="${knob}" aria-label="${knob} motion"
-                title="let it swing from 0 to its value and back, a whole number of times per loop">
-            ${CYCLES.map(count => `<option value="${count}">${count === 0 ? 'still' : `${count}× per loop`}</option>`).join('')}
-        </hks-select>
-    </div>
-`;
+const knobRow = (knob: Knob) =>
+    html`<div class="knob" data-knob=${ifDefined(knob)} hidden>
+        <label class="row"
+            ><span class="key" data-label=${ifDefined(knob)}>${knob}</span
+            ><input
+                class="dial"
+                data-field=${ifDefined(knob)}
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                .value=${defaultPanel.knobs[knob]} /><output
+                class="read"
+                data-read=${ifDefined(knob)}
+            ></output></label
+        ><span
+            class="driven"
+            title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand"
+            >follows</span
+        ><hks-select
+            class="pick motion"
+            data-cycles=${ifDefined(knob)}
+            aria-label=${ifDefined(`${knob} motion`)}
+            title="let it swing from 0 to its value and back, a whole number of times per loop"
+            >${CYCLES.map(
+                count =>
+                    html`<option .value=${count}>
+                        ${count === 0 ? 'still' : `${count}× per loop`}
+                    </option>`,
+            )}</hks-select
+        >
+    </div>`;
 
-const segments = (name: string, label: string, values: readonly string[], hint: string) => `
-    <div class="row" title="${hint}">
+const segments = (name: string, label: string, values: readonly string[], hint: string) =>
+    html`<div class="row" title=${ifDefined(hint)}>
         <span class="key">${label}</span>
-        <div class="segments" role="radiogroup" aria-label="${label}">
-            ${values
-                .map(
-                    value => `
-                        <label class="segment">
-                            <input type="radio" name="${name}" value="${value}" />
-                            <span>${value}</span>
-                        </label>`,
-                )
-                .join('')}
+        <div class="segments" role="radiogroup" aria-label=${ifDefined(label)}>
+            ${values.map(
+                value =>
+                    html`<label class="segment"
+                        ><input type="radio" name=${ifDefined(name)} .value=${value} /><span
+                            >${value}</span
+                        ></label
+                    >`,
+            )}
         </div>
-    </div>
-`;
+    </div>`;
 
-const option = (key: string, label: string, values: readonly string[], hint: string) => `
-    <label class="row" title="${hint}">
-        <span class="key">${label}</span>
-        <hks-select class="pick" data-pick="${key}" aria-label="${label}">
-            ${values.map(value => `<option value="${value}">${value}</option>`).join('')}
-        </hks-select>
-    </label>
-`;
+const option = (key: string, label: string, values: readonly string[], hint: string) =>
+    html`<label class="row" title=${ifDefined(hint)}
+        ><span class="key">${label}</span
+        ><hks-select class="pick" data-pick=${ifDefined(key)} aria-label=${ifDefined(label)}
+            >${values.map(value => html`<option .value=${value}>${value}</option>`)}</hks-select
+        ></label
+    >`;
 
-const flag = (key: string, label: string, hint: string) => `
-    <label class="row" title="${hint}">
-        <span class="key">${label}</span>
-        <input class="switch" data-flag="${key}" type="checkbox" />
-    </label>
-`;
+const flag = (key: string, label: string, hint: string) =>
+    html`<label class="row" title=${ifDefined(hint)}
+        ><span class="key">${label}</span
+        ><input class="switch" data-flag=${ifDefined(key)} type="checkbox"
+    /></label>`;
 
-const choice = (key: string, label: string) => `
-    <label class="item">
-        <span class="key">${label}</span>
-        <hks-select class="pick" data-pick="${key}" aria-label="${label}"></hks-select>
-    </label>
-`;
+const choice = (key: string, label: string) =>
+    html`<label class="item"
+        ><span class="key">${label}</span
+        ><hks-select
+            class="pick"
+            data-pick=${ifDefined(key)}
+            aria-label=${ifDefined(label)}
+        ></hks-select
+    ></label>`;
 
-const reset = (group: Group, what: string) => `
-    <button class="reset" type="button" data-reset="${group}" title="reset ${what}" aria-label="reset ${what}" disabled>
-        ${RESET_ICON}
-    </button>
-`;
+const reset = (group: Group, what: string) =>
+    html`<button
+        class="reset"
+        type="button"
+        data-reset=${ifDefined(group)}
+        title=${ifDefined(`reset ${what}`)}
+        aria-label=${ifDefined(`reset ${what}`)}
+        disabled
+    >
+        ${RESET_ICON()}
+    </button>`;
 
-const group = (name: Group, title: string, rows: string) => `
-    <section class="group" aria-label="${title}">
+const group = (name: Group, title: string, rows: unknown) =>
+    html`<section class="group" aria-label=${ifDefined(title)}>
         <header class="group-head">
             <h3>${title}</h3>
             ${reset(name, title.toLowerCase())}
         </header>
         ${rows}
-    </section>
-`;
+    </section>`;
 
-const tabs = TABS.map(
-    tab => `
-        <label class="segment">
-            <input type="radio" name="tab" value="${tab}"${tab === 'parameters' ? ' checked' : ''} />
-            <span>${tab}</span>
-        </label>
-    `,
-).join('');
+const tabs = () =>
+    TABS.map(
+        tab =>
+            html`<label class="segment"
+                ><input
+                    type="radio"
+                    name="tab"
+                    .value=${tab}
+                    .checked=${tab === 'parameters'}
+                /><span>${tab}</span></label
+            >`,
+    );
 
-const TEMPLATE = `
-    <div class="head">
-        <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs}</div>
-        <div class="document" role="group" aria-label="what the sketch shows">
-            ${choice('formula', 'formula')}
-            ${choice('theme', 'theme')}
+const TEMPLATE = () =>
+    html`<div class="head">
+            <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs()}</div>
+            <div class="document" role="group" aria-label="what the sketch shows">
+                ${choice('formula', 'formula')}${choice('theme', 'theme')}
+            </div>
         </div>
-    </div>
-    <div class="panes">
-        <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
-            <header class="group-head">
-                <h3>Parameters</h3>
-                <button class="reset labelled" type="button" data-reset="parameters" disabled>
-                    ${RESET_ICON}<span>reset parameters</span>
-                </button>
-            </header>
-            <div class="knobs">${KNOBS.map(knobRow).join('')}</div>
-            <p class="empty">This formula reads no knobs. Use k1 to k4 in its code and they appear here.</p>
-        </section>
-        <div class="pane groups" data-pane="scene" hidden>
-            ${group(
-                'sampling',
-                'Sampling',
-                `${option('lattice', 'lattice', LATTICES, 'where the formula is evaluated')}
-                 ${slider('dimension', 'density', 'how many points: the lattice has twice this many on a side', 1, 128, 1, defaultPanel.dimension)}
-                 ${slider('focus', 'focus', 'bunch the points toward the middle (above 1) or the edges (below 1)', 0.3, 3, 0.05, defaultPanel.focus)}`,
-            )}
-            ${group(
-                'drawing',
-                'Drawing',
-                `${segments('mode', 'mode', DRAW_MODES, 'how each point is drawn')}
-                 ${slider('baseSize', 'dot size', 'the size of a dot at the camera target, in screen pixels', 1, 20, 1, defaultPanel.baseSize, 'dots')}
-                 ${slider('depthScalar', 'depth', 'how much nearer dots grow and farther ones shrink', 0.01, 2, 0.01, defaultPanel.depthScalar, 'dots')}
-                 ${slider('trails', 'trails', 'fade each frame into the next instead of clearing it', 0, 0.97, 0.01, defaultPanel.trails)}
-                 ${flag('axes', 'axes', 'draw x, y and z and the -1 to 1 square')}`,
-            )}
-            ${group(
-                'space',
-                'Space',
-                option(
+        <div class="panes">
+            <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
+                <header class="group-head">
+                    <h3>Parameters</h3>
+                    <button class="reset labelled" type="button" data-reset="parameters" disabled>
+                        ${RESET_ICON()}<span>reset parameters</span>
+                    </button>
+                </header>
+                <div class="knobs">${KNOBS.map(knobRow)}</div>
+                <p class="empty">
+                    This formula reads no knobs. Use k1 to k4 in its code and they appear here.
+                </p>
+            </section>
+            <div class="pane groups" data-pane="scene" hidden>
+                ${group(
+                    'sampling',
+                    'Sampling',
+                    html`${option('lattice', 'lattice', LATTICES, 'where the formula is evaluated')}${slider(
+                        'dimension',
+                        'density',
+                        'how many points: the lattice has twice this many on a side',
+                        1,
+                        128,
+                        1,
+                        defaultPanel.dimension,
+                    )}${slider(
+                        'focus',
+                        'focus',
+                        'bunch the points toward the middle (above 1) or the edges (below 1)',
+                        0.3,
+                        3,
+                        0.05,
+                        defaultPanel.focus,
+                    )}`,
+                )}${group(
+                    'drawing',
+                    'Drawing',
+                    html`${segments('mode', 'mode', DRAW_MODES, 'how each point is drawn')}${slider(
+                        'baseSize',
+                        'dot size',
+                        'the size of a dot at the camera target, in screen pixels',
+                        1,
+                        20,
+                        1,
+                        defaultPanel.baseSize,
+                        'dots',
+                    )}${slider(
+                        'depthScalar',
+                        'depth',
+                        'how much nearer dots grow and farther ones shrink',
+                        0.01,
+                        2,
+                        0.01,
+                        defaultPanel.depthScalar,
+                        'dots',
+                    )}${slider(
+                        'trails',
+                        'trails',
+                        'fade each frame into the next instead of clearing it',
+                        0,
+                        0.97,
+                        0.01,
+                        defaultPanel.trails,
+                    )}${flag('axes', 'axes', 'draw x, y and z and the -1 to 1 square')}`,
+                )}${group(
                     'space',
-                    'space',
-                    SPACES,
-                    'the coordinate system the formula output is read in',
-                ),
-            )}
-            ${group(
-                'camera',
-                'Camera',
-                `${segments('lens', 'lens', LENSES, 'perspective shrinks what is far away; orthographic keeps sizes')}
-                 ${segments('fit', 'fit', FITS, 'how the -1 to 1 square meets a canvas that is not square')}
-                 <div class="row">
-                     <span class="key">view</span>
-                     <button class="view" type="button" title="undo your own turning and zooming of the camera" disabled>
-                         ${RESET_ICON}<span>reset view</span>
-                     </button>
-                 </div>`,
-            )}
-        </div>
-        <div class="pane animation" data-pane="animation" hidden><slot name="animation"></slot></div>
-    </div>
-`;
+                    'Space',
+                    option(
+                        'space',
+                        'space',
+                        SPACES,
+                        'the coordinate system the formula output is read in',
+                    ),
+                )}${group(
+                    'camera',
+                    'Camera',
+                    html`${segments(
+                            'lens',
+                            'lens',
+                            LENSES,
+                            'perspective shrinks what is far away; orthographic keeps sizes',
+                        )}${segments(
+                            'fit',
+                            'fit',
+                            FITS,
+                            'how the -1 to 1 square meets a canvas that is not square',
+                        )}
+                        <div class="row">
+                            <span class="key">view</span
+                            ><button
+                                class="view"
+                                type="button"
+                                title="undo your own turning and zooming of the camera"
+                                disabled
+                            >
+                                ${RESET_ICON()}<span>reset view</span>
+                            </button>
+                        </div>`,
+                )}
+            </div>
+            <div class="pane animation" data-pane="animation" hidden>
+                <slot name="animation"></slot>
+            </div>
+        </div>`;
 
 export type PresetOption = {
     readonly value: string;
@@ -223,13 +308,20 @@ export class HksSketchControls extends HTMLElement {
     private readonly view: HTMLButtonElement;
     private readonly empty: HTMLElement;
 
+    private readonly rendering: Rendering;
+
+    private readonly formulaOptions: RenderView<readonly SelectChoice[]>;
+    private readonly themeOptions: RenderView<readonly SelectChoice[]>;
+
     constructor() {
         super();
 
         this.shadow = this.attachShadow({ mode: 'open' });
         this.shadow.adoptedStyleSheets = [sheet];
-        this.shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(this.shadow, () => TEMPLATE());
 
+        this.themeOptions = renderOptions(this.pick('theme'));
+        this.formulaOptions = renderOptions(this.pick('formula'));
         const panes = requireChild(this.shadow, '.panes');
         this.empty = requireChild(this.shadow, '.empty');
         this.view = requireElement(this.shadow, '.view', HTMLButtonElement);
@@ -311,9 +403,7 @@ export class HksSketchControls extends HTMLElement {
     }
 
     presets(themes: readonly PresetOption[]): this {
-        this.pick('theme').replaceChildren(
-            ...themes.map(({ value, label }) => new Option(label, value)),
-        );
+        this.themeOptions.update(themes);
 
         return this;
     }
@@ -342,16 +432,7 @@ export class HksSketchControls extends HTMLElement {
         const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
             tap(([options, value]) => {
                 const pick = this.pick('formula');
-                const current = [...pick.options]
-                    .map(option => `${option.value}=${option.label}`)
-                    .join();
-
-                if (current !== options.map(option => `${option.value}=${option.label}`).join()) {
-                    pick.replaceChildren(
-                        ...options.map(({ value: v, label }) => new Option(label, v)),
-                    );
-                }
-
+                this.formulaOptions.update(options);
                 pick.value = value;
             }),
         );
@@ -537,21 +618,26 @@ export class HksSketchControls extends HTMLElement {
         );
 
         return merge(
-            connectSelects$(this.shadow),
-            tab$,
-            formula$,
-            ...picks$,
-            ...radios$,
-            ...numbers$,
-            ...flags$,
-            ...motion$,
-            ...resets$,
-            only$,
-            shown$,
-            drivers$,
-            readings$,
-            turned$,
-        ).pipe(map(() => undefined));
+            this.rendering.lifetime$,
+            this.themeOptions.lifetime$,
+            this.formulaOptions.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                tab$,
+                formula$,
+                ...picks$,
+                ...radios$,
+                ...numbers$,
+                ...flags$,
+                ...motion$,
+                ...resets$,
+                only$,
+                shown$,
+                drivers$,
+                readings$,
+                turned$,
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

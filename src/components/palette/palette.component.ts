@@ -1,3 +1,8 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
@@ -7,48 +12,47 @@ import css from './palette.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="scrim"></div>
-    <div class="panel" role="dialog" aria-label="command palette">
-        <input class="query" type="text" placeholder="Type a command" aria-label="command"
-               autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="results" />
-        <ul class="results" id="results" role="listbox"></ul>
-        <p class="empty">No command matches.</p>
-    </div>
-`;
+const TEMPLATE = (matches: readonly Match[]) =>
+    html`<div class="scrim"></div>
+        <div class="panel" role="dialog" aria-label="command palette">
+            <input
+                class="query"
+                type="text"
+                placeholder="Type a command"
+                aria-label="command"
+                autocomplete="off"
+                spellcheck="false"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="results"
+            />
+            <ul class="results" id="results" role="listbox">
+                ${repeat(
+                    matches,
+                    (_item, index) => index,
+                    (match, index) =>
+                        html`<li
+                            class="row"
+                            id=${ifDefined(`command-${index}`)}
+                            data-command=${ifDefined(match.command.id)}
+                            data-keyword=${ifDefined(match.command.keyword ?? undefined)}
+                            data-text=${ifDefined(match.text ?? undefined)}
+                            role="option"
+                        >
+                            <span class="label"
+                                >${
+                                    match.text === null
+                                        ? match.command.label
+                                        : `${match.command.label}: ${match.text}`
+                                }</span
+                            ><span class="hint">${match.command.hint}</span>
+                        </li>`,
+                )}
+            </ul>
+            <p class="empty">No command matches.</p>
+        </div>`;
 
 export type Pick = { readonly id: string; readonly text: string | null };
-
-const rowOf = (
-    { command: { id, label, hint, keyword }, text }: Match,
-    index: number,
-): HTMLElement => {
-    const row = document.createElement('li');
-    row.className = 'row';
-    row.id = `command-${index}`;
-    row.dataset['command'] = id;
-    row.setAttribute('role', 'option');
-
-    if (keyword !== null) {
-        row.dataset['keyword'] = keyword;
-    }
-
-    if (text !== null) {
-        row.dataset['text'] = text;
-    }
-
-    const name = document.createElement('span');
-    name.className = 'label';
-    name.textContent = text === null ? label : `${label}: ${text}`;
-
-    const kind = document.createElement('span');
-    kind.className = 'hint';
-    kind.textContent = hint;
-
-    row.append(name, kind);
-
-    return row;
-};
 
 export class HksPalette extends HTMLElement {
     readonly opens$: Observable<void>;
@@ -59,12 +63,14 @@ export class HksPalette extends HTMLElement {
     private readonly chosen$: Observable<HTMLElement>;
     private readonly results: HTMLElement;
 
+    private readonly rendering: RenderView<readonly Match[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<readonly Match[]>(shadow, [], TEMPLATE);
 
         this.query = requireElement(shadow, '.query', HTMLInputElement);
         this.results = requireChild(shadow, '.results');
@@ -179,7 +185,7 @@ export class HksPalette extends HTMLElement {
         ]).pipe(
             map(([commands, query]) => matched(commands, query)),
             tap(shown => {
-                this.results.replaceChildren(...shown.map(rowOf));
+                this.rendering.update(shown);
                 this.activate(this.rows()[0]);
             }),
         );
@@ -195,7 +201,10 @@ export class HksPalette extends HTMLElement {
             }),
         );
 
-        return merge(shown$, filtered$, moved$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            merge(shown$, filtered$, moved$).pipe(map(() => undefined)),
+        );
     }
 }
 

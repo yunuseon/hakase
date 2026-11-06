@@ -1,3 +1,11 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { ref } from 'lit-html/directives/ref.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { when } from 'lit-html/directives/when.js';
+import { withValue } from '../../lib/lit.ts';
+
+import { renderView, displayValue, type RenderView } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
@@ -24,16 +32,13 @@ import {
     STAGES,
     statusOf,
     ticketsIn,
-    tagsOf,
     type Drag,
     type DragPhase,
     type Facts,
     type Lane,
-    type Status,
     type Step,
     type Ticket,
     type TicketCommand,
-    type Tickets,
     type TicketView,
     type View,
 } from '../../shared/tickets.ts';
@@ -41,9 +46,12 @@ import css from './tickets.css?inline';
 
 const sheet = styleSheet(css);
 
-const PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-const TRASH =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"/></svg>';
+const PLUS = () =>
+    html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>`;
+const TRASH = () =>
+    html`<svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"></path>
+    </svg>`;
 
 const PRIORITY_LABELS: Readonly<Record<(typeof PRIORITIES)[number], string>> = {
     none: 'No priority',
@@ -59,60 +67,439 @@ const STAGE_LABELS: Readonly<Record<(typeof STAGES)[number], string>> = {
     done: 'Done',
 };
 
-const TEMPLATE = `
-    <div class="frame">
-    <header class="bar">
-        <div class="views" role="radiogroup" aria-label="view">
-            <label class="view"><input type="radio" name="view" value="list" /> List</label>
-            <label class="view"><input type="radio" name="view" value="board" /> Board</label>
+type TicketRender = {
+    readonly screen: TicketView | null;
+    readonly selected: Ticket | undefined;
+    readonly all: ReadonlyMap<string, Ticket>;
+    readonly facts: ReadonlyMap<string, Facts>;
+    readonly mode: View;
+    readonly left: string;
+};
+
+const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | undefined }) =>
+    html`<li
+        class="ticket"
+        data-ticket=${ifDefined(props.ticket.id)}
+        data-priority=${ifDefined(props.ticket.priority)}
+        data-done=${ifDefined(props.facts?.done ? '' : undefined)}
+        data-blocked=${ifDefined((props.facts?.blockers.length ?? 0) > 0 ? '' : undefined)}
+    >
+        <button
+            type="button"
+            class="grip"
+            data-grip=${ifDefined(props.ticket.id)}
+            aria-label=${ifDefined(`move "${props.ticket.title}"; arrow keys move it`)}
+            title="drag, or focus and press the arrow keys, to move"
+        ></button
+        ><input
+            type="checkbox"
+            class="check"
+            data-toggle=${ifDefined(props.ticket.id)}
+            .checked=${props.facts?.done === true}
+            aria-label=${ifDefined(`${props.ticket.title} done`)}
+        /><button
+            type="button"
+            class="number"
+            data-open=${ifDefined(props.ticket.id)}
+            aria-label="open ticket"
+        >
+            #${props.ticket.number}</button
+        ><textarea
+            class="text"
+            data-edit=${ifDefined(props.ticket.id)}
+            rows="1"
+            aria-label="ticket title"
+            ${ref(element => {
+                if (element instanceof HTMLTextAreaElement) {
+                    displayValue(element, props.ticket.title);
+                }
+            })}
+        ></textarea
+        ><button
+            type="button"
+            class="remove"
+            data-remove=${ifDefined(props.ticket.id)}
+            aria-label=${ifDefined(`delete "${props.ticket.title}"`)}
+        >
+            ×
+        </button>
+        <div class="meta">
+            ${repeat(
+                props.ticket.tags,
+                item => item,
+                tag =>
+                    html`<button
+                        type="button"
+                        class="tag"
+                        data-filter-tag=${ifDefined(tag)}
+                        aria-label=${ifDefined(`filter by tag ${tag}`)}
+                    >
+                        ${tag}
+                    </button>`,
+            )}${when(props.ticket.priority !== 'none', () => html`<span class="priority">${PRIORITY_LABELS[props.ticket.priority]}</span>`)}${when(props.facts?.parent != null, () => html`<span class="parent">↳ #${props.facts?.parent}</span>`)}${when(
+                (props.facts?.blockers.length ?? 0) > 0,
+                () =>
+                    html`<span class="blockers"
+                        >blocked
+                        by${' '}${props.facts?.blockers
+                            .map(number => `#${number}`)
+                            .join(', ')}</span
+                    >`,
+            )}${when((props.facts?.children.total ?? 0) > 0, () => html`<span class="children">${props.facts?.children.done}/${props.facts?.children.total} sub-tickets</span>`)}${when(props.ticket.description !== '', () => html`<span class="described">≡ notes</span>`)}
         </div>
-        <div class="bar-actions"><button class="add-status icon-action" type="button" aria-label="add status" title="Add a status before Done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h11v14H3zM8.5 5v14M19 9v10M14 14h10"/></svg></button>
-        <button class="new-ticket icon-action" type="button" data-create="" aria-label="new ticket" title="New ticket">${PLUS}</button></div>
-    </header>
-    <input class="ticket-search" type="search" aria-label="search tickets" placeholder="Search tickets by title, #number, or tag" />
-    <label class="tag-filter">Tags <hks-select class="filter-tags" aria-label="filter by tag"><option value="">All tags</option></hks-select></label>
-    <div class="scroller"><div class="statuses"></div></div>
-    <footer class="foot">
-        <span class="left"></span>
-        <button class="clear-done icon-action" type="button" aria-label="clear completed tickets" title="Clear completed tickets"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 3 3 6-6M15 7h5M4 14h16M4 19h11"/></svg></button>
-    </footer>
-    <aside class="detail" aria-label="ticket" hidden>
-        <header class="detail-head">
-            <span class="detail-number"></span>
-            <button class="close-detail" type="button" aria-label="close ticket">×</button>
+    </li>`;
+
+const TEMPLATE = (view: TicketRender) =>
+    html`<div class="frame">
+        <header class="bar">
+            <div class="views" role="radiogroup" aria-label="view">
+                <label class="view"
+                    ><input
+                        type="radio"
+                        name="view"
+                        value="list"
+                        .checked=${view.mode === 'list'}
+                    />${' '}List</label
+                ><label class="view"
+                    ><input
+                        type="radio"
+                        name="view"
+                        value="board"
+                        .checked=${view.mode === 'board'}
+                    />${' '}Board</label
+                >
+            </div>
+            <div class="bar-actions">
+                <button
+                    class="add-status icon-action"
+                    type="button"
+                    aria-label="add status"
+                    title="Add a status before Done"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 5h11v14H3zM8.5 5v14M19 9v10M14 14h10"></path>
+                    </svg></button
+                ><button
+                    class="new-ticket icon-action"
+                    type="button"
+                    data-create=""
+                    aria-label="new ticket"
+                    title="New ticket"
+                >
+                    ${PLUS()}
+                </button>
+            </div>
         </header>
-        <input class="detail-title" aria-label="title" autocomplete="off" />
-        <div class="fields">
-            <label>Status <hks-select class="detail-status"></hks-select></label>
-            <label>Priority <hks-select class="detail-priority">${PRIORITIES.map(
-                priority => `<option value="${priority}">${PRIORITY_LABELS[priority]}</option>`,
-            ).join('')}</hks-select></label>
+        <input
+            class="ticket-search"
+            type="search"
+            aria-label="search tickets"
+            placeholder="Search tickets by title, #number, or tag"
+        /><label class="tag-filter"
+            >Tags${' '}<hks-select
+                class="filter-tags"
+                aria-label="filter by tag"
+                .value=${view.screen?.filter ?? ''}
+                ><option value="">All tags</option>
+                ${repeat(
+                    view.screen?.tags ?? [],
+                    item => item,
+                    tag => html`<option .value=${tag}>${tag}</option>`,
+                )}</hks-select
+            ></label
+        >
+        <div class="scroller">
+            <div class="statuses">
+                ${repeat(
+                    view.screen?.listing.statuses.map(status => status.id) ?? [],
+                    item => item,
+                    id =>
+                        withValue(
+                            view.screen?.listing.statuses.find(status => status.id === id),
+                            status =>
+                                html`<section
+                                    class="status"
+                                    data-status=${ifDefined(id)}
+                                    data-stage-of=${ifDefined(status.stage)}
+                                >
+                                    <header class="head">
+                                        <button
+                                            type="button"
+                                            class="status-grip"
+                                            data-status-grip=${ifDefined(id)}
+                                            aria-label="move status; arrow keys move it"
+                                            title="drag, or focus and press the arrow keys, to move the status"
+                                        ></button
+                                        ><input
+                                            class="title"
+                                            data-title=${ifDefined(id)}
+                                            autocomplete="off"
+                                            aria-label="status name"
+                                            ${ref(element => {
+                                                if (element instanceof HTMLInputElement) {
+                                                    displayValue(element, status.title);
+                                                }
+                                            })}
+                                        /><hks-select
+                                            class="stage"
+                                            data-stage=${ifDefined(id)}
+                                            aria-label="what this status means"
+                                            .value=${status.stage}
+                                            >${STAGES.map(
+                                                stage =>
+                                                    html`<option .value=${stage}>
+                                                        ${STAGE_LABELS[stage]}
+                                                    </option>`,
+                                            )}</hks-select
+                                        ><span class="count">${status.tickets.length}</span
+                                        ><button
+                                            type="button"
+                                            class="remove-status"
+                                            data-remove-status=${ifDefined(id)}
+                                            aria-label="delete status"
+                                            title="only an empty status can be deleted"
+                                            ?disabled=${
+                                                view.screen?.tickets.statuses.length === 1 ||
+                                                (view.screen?.tickets.statuses.find(
+                                                    each => each.id === id,
+                                                )?.tickets.length ?? 0) > 0
+                                            }
+                                        >
+                                            ×
+                                        </button>
+                                    </header>
+                                    <ul class="tickets">
+                                        ${repeat(
+                                            status.tickets.map(ticket => ticket.id),
+                                            item => item,
+                                            ticketId =>
+                                                withValue(
+                                                    status.tickets.find(
+                                                        ticket => ticket.id === ticketId,
+                                                    ),
+                                                    ticket =>
+                                                        TicketRow({
+                                                            ticket: ticket,
+                                                            facts: view.facts.get(ticketId),
+                                                        }),
+                                                ),
+                                        )}
+                                    </ul>
+                                    <div class="add-here">
+                                        <button
+                                            type="button"
+                                            class="new-ticket icon-action"
+                                            data-create=${ifDefined(id)}
+                                            aria-label="new ticket with details in this status"
+                                            title="New ticket in this status"
+                                        >
+                                            ${PLUS()}
+                                        </button>
+                                    </div>
+                                </section>`,
+                        ),
+                )}
+            </div>
         </div>
-        <slot name="parent"></slot>
-        <section class="group">
-            <h3>Tags</h3>
-            <ul class="ticket-tags"></ul>
-            <form class="add-tag">
-                <hks-select editable class="tag-draft" placeholder="Add tags, separated by commas" aria-label="new tags"></hks-select>
-                <button class="submit-tag icon-action" type="submit" aria-label="add tags" title="Add tags">${PLUS}</button>
-            </form>
-            
-        </section>
-        <section class="group">
-            <h3>Blocked by</h3>
-            <ul class="blocker-list"></ul>
-            <slot name="blocker"></slot>
-        </section>
-        <section class="group">
-            <div class="group-head"><h3>Sub-tickets</h3><button class="new-ticket new-child icon-action" type="button" data-create="" aria-label="new sub-ticket" title="New sub-ticket">${PLUS}</button></div>
-            <ul class="child-list"></ul>
-        </section>
-        <textarea class="detail-description" rows="4" placeholder="Add a description (optional)" aria-label="description"></textarea>
-        <button class="delete-ticket icon-action" type="button" aria-label="delete ticket" title="Delete ticket">${TRASH}</button>
-    </aside>
-    <slot name="creator"></slot>
-    </div>
-`;
+        <footer class="foot">
+            <span class="left">${view.left}</span
+            ><button
+                ?hidden=${view.screen?.filter != null || (view.screen?.query.trim() ?? '') !== ''}
+                class="clear-done icon-action"
+                type="button"
+                aria-label="clear completed tickets"
+                title="Clear completed tickets"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m4 7 3 3 6-6M15 7h5M4 14h16M4 19h11"></path>
+                </svg>
+            </button>
+        </footer>
+        <aside
+            class="detail"
+            aria-label="ticket"
+            ?hidden=${view.selected === undefined}
+            data-ticket=${ifDefined(view.selected?.id)}
+        >
+            <header class="detail-head">
+                <span class="detail-number">#${view.selected?.number}</span
+                ><button class="close-detail" type="button" aria-label="close ticket">×</button>
+            </header>
+            <input
+                class="detail-title"
+                ${ref(element => {
+                    if (element instanceof HTMLInputElement) {
+                        displayValue(element, view.selected?.title ?? '');
+                    }
+                })}
+                aria-label="title"
+                autocomplete="off"
+            />
+            <div class="fields">
+                <label
+                    >Status${' '}<hks-select class="detail-status" .value=${selectedStatus(view)}
+                        >${repeat(
+                            view.screen?.tickets.statuses.map(status => status.id) ?? [],
+                            item => item,
+                            id =>
+                                html`<option .value=${id}>
+                                    ${
+                                        view.screen?.tickets.statuses.find(
+                                            status => status.id === id,
+                                        )?.title
+                                    }
+                                </option>`,
+                        )}</hks-select
+                    ></label
+                ><label
+                    >Priority${' '}<hks-select
+                        class="detail-priority"
+                        .value=${view.selected?.priority ?? 'none'}
+                        >${PRIORITIES.map(
+                            priority =>
+                                html`<option .value=${priority}>
+                                    ${PRIORITY_LABELS[priority]}
+                                </option>`,
+                        )}</hks-select
+                    ></label
+                >
+            </div>
+            <slot name="parent"></slot>
+            <section class="group">
+                <h3>Tags</h3>
+                <ul class="ticket-tags">
+                    ${repeat(
+                        view.selected?.tags ?? [],
+                        item => item,
+                        tag =>
+                            html`<li class="tag">
+                                ${tag}<button
+                                    type="button"
+                                    class="remove-tag"
+                                    data-untag=${ifDefined(tag)}
+                                    aria-label=${ifDefined(`remove tag ${tag}`)}
+                                >
+                                    ×
+                                </button>
+                            </li>`,
+                    )}
+                </ul>
+                <form class="add-tag">
+                    <hks-select
+                        editable=""
+                        class="tag-draft"
+                        placeholder="Add tags, separated by commas"
+                        aria-label="new tags"
+                        >${repeat(
+                            view.screen?.tags ?? [],
+                            item => item,
+                            tag => html`<option .value=${tag}>${tag}</option>`,
+                        )}</hks-select
+                    ><button
+                        class="submit-tag icon-action"
+                        type="submit"
+                        aria-label="add tags"
+                        title="Add tags"
+                    >
+                        ${PLUS()}
+                    </button>
+                </form>
+            </section>
+            <section class="group">
+                <h3>Blocked by</h3>
+                <ul class="blocker-list">
+                    ${repeat(
+                        view.selected?.blockedBy ?? [],
+                        item => item,
+                        id =>
+                            withValue(
+                                view.all.get(id),
+                                blocker =>
+                                    html`<li
+                                        data-done=${ifDefined(view.facts.get(id)?.done ? '' : undefined)}
+                                    >
+                                        <button
+                                            type="button"
+                                            class="link"
+                                            data-open=${ifDefined(id)}
+                                            aria-label=${ifDefined(`open ${labelOf(blocker)}`)}
+                                        >
+                                            ${labelOf(blocker)}</button
+                                        ><button
+                                            type="button"
+                                            class="unblock"
+                                            data-unblock=${ifDefined(id)}
+                                            aria-label=${ifDefined(`no longer blocked by #${blocker.number}`)}
+                                        >
+                                            ×
+                                        </button>
+                                    </li>`,
+                            ),
+                    )}
+                </ul>
+                <slot name="blocker"></slot>
+            </section>
+            <section class="group">
+                <div class="group-head">
+                    <h3>Sub-tickets</h3>
+                    <button
+                        class="new-ticket new-child icon-action"
+                        type="button"
+                        data-create=""
+                        aria-label="new sub-ticket"
+                        title="New sub-ticket"
+                    >
+                        ${PLUS()}
+                    </button>
+                </div>
+                <ul class="child-list">
+                    ${repeat(
+                        [...view.all.values()]
+                            .filter(ticket => ticket.parent === view.selected?.id)
+                            .map(ticket => ticket.id),
+                        item => item,
+                        id =>
+                            withValue(
+                                view.all.get(id),
+                                child =>
+                                    html`<li
+                                        data-done=${ifDefined(view.facts.get(id)?.done ? '' : undefined)}
+                                    >
+                                        <button
+                                            type="button"
+                                            class="link"
+                                            data-open=${ifDefined(id)}
+                                            aria-label=${ifDefined(`open ${labelOf(child)}`)}
+                                        >
+                                            ${labelOf(child)}
+                                        </button>
+                                    </li>`,
+                            ),
+                    )}
+                </ul>
+            </section>
+            <textarea
+                class="detail-description"
+                ${ref(element => {
+                    if (element instanceof HTMLTextAreaElement) {
+                        displayValue(element, view.selected?.description ?? '');
+                    }
+                })}
+                rows="4"
+                placeholder="Add a description (optional)"
+                aria-label="description"
+            ></textarea
+            ><button
+                class="delete-ticket icon-action"
+                type="button"
+                aria-label="delete ticket"
+                title="Delete ticket"
+            >
+                ${TRASH()}
+            </button>
+        </aside>
+        <slot name="creator"></slot>
+    </div>`;
 
 const ARROWS: Readonly<Record<string, Step>> = {
     ArrowUp: 'up',
@@ -128,381 +515,28 @@ type Submitted = {
     readonly command: TicketCommand;
 };
 
-const button = (className: string, key: string, id: string, label: string): HTMLButtonElement => {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = className;
-    element.dataset[key] = id;
-    element.setAttribute('aria-label', label);
-
-    return element;
-};
-
-const span = (className: string, text: string): HTMLSpanElement => {
-    const element = document.createElement('span');
-    element.className = className;
-    element.textContent = text;
-
-    return element;
-};
-
-const ticketOf = (id: string): HTMLElement => {
-    const item = document.createElement('li');
-    item.className = 'ticket';
-    item.dataset['ticket'] = id;
-
-    const grip = button('grip', 'grip', id, 'move ticket');
-    grip.title = 'drag, or focus and press the arrow keys, to move';
-
-    const check = document.createElement('input');
-    check.type = 'checkbox';
-    check.className = 'check';
-    check.dataset['toggle'] = id;
-
-    const number = button('number', 'open', id, 'open ticket');
-
-    const edit = document.createElement('textarea');
-    edit.className = 'text';
-    edit.dataset['edit'] = id;
-    edit.rows = 1;
-    edit.setAttribute('aria-label', 'ticket title');
-
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-
-    const remove = button('remove', 'remove', id, 'delete ticket');
-    remove.textContent = '×';
-
-    item.append(grip, check, number, edit, remove, meta);
-
-    return item;
-};
-
-const fillTicket = (
-    item: HTMLElement,
-    ticket: Ticket,
-    facts: Facts | undefined,
-    active: Element | null,
-): void => {
-    const edit = item.querySelector('.text');
-    const check = item.querySelector('.check');
-    const number = item.querySelector('.number');
-
-    // Not while focused: that would overwrite what is being typed with another window's edit.
-    if (edit instanceof HTMLTextAreaElement && edit !== active) {
-        edit.value = ticket.title;
-    }
-
-    if (check instanceof HTMLInputElement) {
-        check.checked = facts?.done === true;
-        check.setAttribute('aria-label', `${ticket.title} done`);
-    }
-
-    if (number !== null) {
-        number.textContent = `#${ticket.number}`;
-    }
-
-    item.dataset['priority'] = ticket.priority;
-    item.toggleAttribute('data-done', facts?.done === true);
-    item.toggleAttribute('data-blocked', (facts?.blockers.length ?? 0) > 0);
-    item.querySelector('.grip')?.setAttribute(
-        'aria-label',
-        `move "${ticket.title}"; arrow keys move it`,
-    );
-    item.querySelector('.remove')?.setAttribute('aria-label', `delete "${ticket.title}"`);
-    item.querySelector('.meta')?.replaceChildren(
-        ...ticket.tags.map(tag => {
-            const chip = button('tag', 'filterTag', tag, `filter by tag ${tag}`);
-            chip.textContent = tag;
-
-            return chip;
-        }),
-        ...(ticket.priority === 'none' ? [] : [span('priority', PRIORITY_LABELS[ticket.priority])]),
-        ...(facts?.parent === null || facts === undefined
-            ? []
-            : [span('parent', `↳ #${facts.parent}`)]),
-        ...(facts === undefined || facts.blockers.length === 0
-            ? []
-            : [
-                  span(
-                      'blockers',
-                      `blocked by ${facts.blockers.map(each => `#${each}`).join(', ')}`,
-                  ),
-              ]),
-        ...(facts === undefined || facts.children.total === 0
-            ? []
-            : [span('children', `${facts.children.done}/${facts.children.total} sub-tickets`)]),
-        ...(ticket.description === '' ? [] : [span('described', '≡ notes')]),
-    );
-};
-
-const sectionOf = (id: string): HTMLElement => {
-    const section = document.createElement('section');
-    section.className = 'status';
-    section.dataset['status'] = id;
-
-    const head = document.createElement('header');
-    head.className = 'head';
-
-    const grip = button('status-grip', 'statusGrip', id, 'move status; arrow keys move it');
-    grip.title = 'drag, or focus and press the arrow keys, to move the status';
-
-    const title = document.createElement('input');
-    title.className = 'title';
-    title.dataset['title'] = id;
-    title.autocomplete = 'off';
-    title.setAttribute('aria-label', 'status name');
-
-    const stage = new HksSelect();
-    stage.className = 'stage';
-    stage.dataset['stage'] = id;
-    stage.setAttribute('aria-label', 'what this status means');
-    stage.append(
-        ...STAGES.map(each => {
-            const option = document.createElement('option');
-            option.value = each;
-            option.textContent = STAGE_LABELS[each];
-
-            return option;
-        }),
-    );
-
-    const count = document.createElement('span');
-    count.className = 'count';
-
-    const remove = button('remove-status', 'removeStatus', id, 'delete status');
-    remove.textContent = '×';
-    remove.title = 'only an empty status can be deleted';
-
-    head.append(grip, title, stage, count, remove);
-
-    const tickets = document.createElement('ul');
-    tickets.className = 'tickets';
-
-    const add = document.createElement('div');
-    add.className = 'add-here';
-    const create = button(
-        'new-ticket icon-action',
-        'create',
-        id,
-        'new ticket with details in this status',
-    );
-    create.title = 'New ticket in this status';
-    create.innerHTML = PLUS;
-    add.append(create);
-
-    section.append(head, tickets, add);
-
-    return section;
-};
-
-const fillStatus = (
-    section: HTMLElement,
-    status: Status,
-    items: readonly HTMLElement[],
-    active: Element | null,
-    last: boolean,
-): void => {
-    const title = section.querySelector('.title');
-    const stage = section.querySelector('.stage');
-    const count = section.querySelector('.count');
-    const remove = section.querySelector('.remove-status');
-    const list = section.querySelector('.tickets');
-
-    if (title instanceof HTMLInputElement && title !== active) {
-        title.value = status.title;
-    }
-
-    if (stage instanceof HksSelect && stage !== active) {
-        stage.value = status.stage;
-    }
-
-    section.dataset['stageOf'] = status.stage;
-
-    if (count !== null) {
-        count.textContent = String(status.tickets.length);
-    }
-
-    if (remove instanceof HTMLButtonElement) {
-        remove.disabled = last || status.tickets.length > 0;
-    }
-
-    if (list !== null) {
-        ordered(list, items);
-    }
-};
-
-// Only when the order differs: moving a node drops its focus, and a click that lands on it.
-const ordered = (parent: Element, children: readonly HTMLElement[]): void => {
-    const current = elementsIn(parent);
-
-    if (
-        current.length !== children.length ||
-        children.some((child, index) => current[index] !== child)
-    ) {
-        parent.replaceChildren(...children);
-    }
-};
-
-const rendered = (
-    shadow: ShadowRoot,
-    statuses: HTMLElement,
-    { listing, tickets }: TicketView,
-): void => {
-    const active = shadow.activeElement;
-    const facts = factsOf(tickets);
-    const sections = new Map(
-        elementsIn(statuses).map(section => [section.dataset['status'], section]),
-    );
-    const items = new Map(
-        [...statuses.querySelectorAll('.ticket')]
-            .filter(item => item instanceof HTMLElement)
-            .map(item => [item.dataset['ticket'], item]),
-    );
-
-    ordered(
-        statuses,
-        listing.statuses.map(status => {
-            const section = sections.get(status.id) ?? sectionOf(status.id);
-            const inside = status.tickets.map(ticket => {
-                const item = items.get(ticket.id) ?? ticketOf(ticket.id);
-                fillTicket(item, ticket, facts.get(ticket.id), active);
-
-                return item;
-            });
-            fillStatus(section, status, inside, active, tickets.statuses.length === 1);
-            const remove = section.querySelector('.remove-status');
-            if (remove instanceof HTMLButtonElement) {
-                remove.disabled =
-                    tickets.statuses.length === 1 ||
-                    (tickets.statuses.find(each => each.id === status.id)?.tickets.length ?? 0) > 0;
-            }
-
-            return section;
-        }),
-    );
-
-    // A ticket moved to another status was re-inserted, which drops its focus.
-    if (active instanceof HTMLElement && active.isConnected && active !== shadow.activeElement) {
-        active.focus();
-    }
-};
-
-const option = (value: string, text: string): HTMLOptionElement => {
-    const element = document.createElement('option');
-    element.value = value;
-    element.textContent = text;
-
-    return element;
-};
-
-// Rebuilt only when the choices change, or an open dropdown would close under the pointer.
-const offered = (select: HksSelect, options: readonly HTMLOptionElement[]): void => {
-    const key = options
-        .map(({ value, textContent }) => `${value}\u0000${textContent}`)
-        .join('\u0001');
-
-    if (select.dataset['offered'] !== key) {
-        select.dataset['offered'] = key;
-        select.replaceChildren(...options);
-    }
-};
-
 const labelOf = ({ number, title }: Ticket): string => `#${number} ${title}`;
-
-const detailed = (
-    shadow: ShadowRoot,
-    aside: HTMLElement,
-    tickets: Tickets,
-    selected: string | null,
-): void => {
-    const ticket = ticketsIn(tickets).find(({ id }) => id === selected);
-    const active = shadow.activeElement;
-    aside.hidden = ticket === undefined;
-
-    if (ticket === undefined) {
-        delete aside.dataset['ticket'];
-
-        return;
-    }
-
-    aside.dataset['ticket'] = ticket.id;
-    requireChild(aside, '.ticket-tags').replaceChildren(
-        ...ticket.tags.map(tag => {
-            const item = document.createElement('li');
-            item.className = 'tag';
-            const remove = button('remove-tag', 'untag', tag, `remove tag ${tag}`);
-            remove.textContent = '×';
-            item.append(document.createTextNode(tag), remove);
-
-            return item;
-        }),
-    );
-    requireChild(aside, '.tag-draft').replaceChildren(
-        ...tagsOf(tickets).map(tag => option(tag, tag)),
-    );
-    requireChild(aside, '.detail-number').textContent = `#${ticket.number}`;
-
-    const title = requireElement(aside, '.detail-title', HTMLInputElement);
-    const status = requireElement(aside, '.detail-status', HksSelect);
-    const priority = requireElement(aside, '.detail-priority', HksSelect);
-    const description = requireElement(aside, '.detail-description', HTMLTextAreaElement);
-
-    if (title !== active) {
-        title.value = ticket.title;
-    }
-
-    offered(
-        status,
-        tickets.statuses.map(each => option(each.id, each.title)),
-    );
-    status.value = statusOf(tickets, ticket.id)?.id ?? '';
-    priority.value = ticket.priority;
-
-    if (description !== active) {
-        description.value = ticket.description;
-    }
-
-    const all = ticketsIn(tickets);
-    const facts = factsOf(tickets);
-
-    requireChild(aside, '.blocker-list').replaceChildren(
-        ...ticket.blockedBy.flatMap(id => {
-            const blocker = all.find(each => each.id === id);
-
-            if (blocker === undefined) {
-                return [];
-            }
-
-            const item = document.createElement('li');
-            item.toggleAttribute('data-done', facts.get(id)?.done === true);
-            const open = button('link', 'open', id, `open ${labelOf(blocker)}`);
-            open.textContent = labelOf(blocker);
-            const remove = button(
-                'unblock',
-                'unblock',
-                id,
-                `no longer blocked by #${blocker.number}`,
-            );
-            remove.textContent = '×';
-            item.append(open, remove);
-
-            return [item];
-        }),
-    );
-    requireChild(aside, '.child-list').replaceChildren(
-        ...all
-            .filter(each => each.parent === ticket.id)
-            .map(child => {
-                const item = document.createElement('li');
-                item.toggleAttribute('data-done', facts.get(child.id)?.done === true);
-                const open = button('link', 'open', child.id, `open ${labelOf(child)}`);
-                open.textContent = labelOf(child);
-                item.append(open);
-
-                return item;
-            }),
-    );
+const selectedStatus = ({ screen, selected }: TicketRender): string =>
+    screen === null || selected === undefined
+        ? ''
+        : (statusOf(screen.tickets, selected.id)?.id ?? '');
+const renderModel = (screen: TicketView, selected: string | null, mode: View): TicketRender => {
+    const all = new Map(ticketsIn(screen.tickets).map(ticket => [ticket.id, ticket]));
+    const facts = [...factsOf(screen.listing).values()];
+    const left = facts.filter(({ done }) => !done).length;
+    return {
+        screen,
+        selected: all.get(selected ?? ''),
+        all,
+        facts: factsOf(screen.tickets),
+        mode,
+        left:
+            facts.length === 0
+                ? screen.filter === null
+                    ? 'Nothing to do'
+                    : 'No matching tickets'
+                : `${left} open of ${facts.length}${screen.filter === null && screen.query.trim() === '' ? '' : ' matching'}`,
+    };
 };
 
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
@@ -546,13 +580,26 @@ export class HksTickets extends HTMLElement {
     }>;
     readonly searches$: Observable<string>;
 
+    private readonly rendering: RenderView<TicketRender>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<TicketRender>(
+            shadow,
+            {
+                screen: null,
+                selected: undefined,
+                all: new Map(),
+                facts: new Map(),
+                mode: 'list',
+                left: 'Nothing to do',
+            },
+            TEMPLATE,
+        );
 
         this.statuses = requireChild(shadow, '.statuses');
         this.aside = requireChild(shadow, '.detail');
@@ -885,69 +932,64 @@ export class HksTickets extends HTMLElement {
         const shown$ = tickets$.pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
         return merge(
-            connectSelects$(this.shadow),
-            shown$.pipe(
-                tap(screen => {
-                    rendered(shadow, this.statuses, screen);
-                    const filter = requireElement(shadow, '.filter-tags', HksSelect);
-                    offered(filter, [
-                        option('', 'All tags'),
-                        ...screen.tags.map(tag => option(tag, tag)),
-                    ]);
-                    filter.value = screen.filter ?? '';
-                    requireChild(shadow, '.clear-done').hidden =
-                        screen.filter !== null || screen.query.trim() !== '';
-
-                    const facts = [...factsOf(screen.listing).values()];
-                    const left = facts.filter(({ done }) => !done).length;
-                    requireChild(shadow, '.left').textContent =
-                        facts.length === 0
-                            ? screen.filter === null
-                                ? 'Nothing to do'
-                                : 'No matching tickets'
-                            : `${left} open of ${facts.length}${screen.filter === null && screen.query.trim() === '' ? '' : ' matching'}`;
-                }),
-            ),
-            combineLatest([shown$, this.selected$]).pipe(
-                tap(([screen, selected]) => {
-                    detailed(shadow, this.aside, screen.tickets, selected);
-                }),
-            ),
-            view$.pipe(
-                tap(view => {
-                    this.dataset['view'] = view;
-
-                    for (const radio of shadow.querySelectorAll('input[name="view"]')) {
-                        if (radio instanceof HTMLInputElement) {
-                            radio.checked = radio.value === view;
+            this.rendering.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                combineLatest([shown$, this.selected$, view$]).pipe(
+                    map(([screen, selected, mode]) => renderModel(screen, selected, mode)),
+                    tap(view => {
+                        const active = shadow.activeElement;
+                        const key =
+                            active instanceof HTMLElement
+                                ? (active.dataset['grip'] ?? active.dataset['edit'])
+                                : undefined;
+                        const text =
+                            active instanceof HTMLTextAreaElement ? active.value : undefined;
+                        this.dataset['view'] = view.mode;
+                        this.rendering.update(view);
+                        if (
+                            key !== undefined &&
+                            active instanceof HTMLElement &&
+                            !active.isConnected
+                        ) {
+                            const replacement = shadow.querySelector(
+                                `[data-${text === undefined ? 'grip' : 'edit'}="${CSS.escape(key)}"]`,
+                            );
+                            if (replacement instanceof HTMLTextAreaElement && text !== undefined) {
+                                replacement.value = text;
+                            }
+                            if (replacement instanceof HTMLElement) {
+                                replacement.focus();
+                            }
                         }
-                    }
-                }),
-            ),
-            this.tagSubmitted$.pipe(
-                tap(({ form }) => {
-                    form.reset();
-                    requireElement(form, '.tag-draft', HksSelect).value = '';
-                }),
-            ),
-            fromElementEvent$(this.statuses, 'keydown').pipe(
-                tap(event => {
-                    const { target } = event;
-                    const editing =
-                        target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement;
+                    }),
+                ),
+                this.tagSubmitted$.pipe(
+                    tap(({ form }) => {
+                        form.reset();
+                        requireElement(form, '.tag-draft', HksSelect).value = '';
+                    }),
+                ),
+                fromElementEvent$(this.statuses, 'keydown').pipe(
+                    tap(event => {
+                        const { target } = event;
+                        const editing =
+                            target instanceof HTMLTextAreaElement ||
+                            target instanceof HTMLInputElement;
 
-                    if (editing && event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        target.blur();
-                    }
-                }),
-            ),
-            this.drags$.pipe(
-                tap(drag => {
-                    indicated(shadow, this.statuses, drag);
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                        if (editing && event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            target.blur();
+                        }
+                    }),
+                ),
+                this.drags$.pipe(
+                    tap(drag => {
+                        indicated(shadow, this.statuses, drag);
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

@@ -1,3 +1,18 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { when } from 'lit-html/directives/when.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { ref } from 'lit-html/directives/ref.js';
+
+import {
+    mountView,
+    renderView,
+    displayValue,
+    type RenderView,
+    type Rendering,
+} from '../../lib/lit.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -28,55 +43,101 @@ import {
 import css from './window.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 
-const TEMPLATE = `
-    <div class="title">
-        <span class="glyph"></span>
-        <button class="name" type="button" aria-haspopup="true" aria-expanded="false" title="change program"></button>
-        <button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
-            <span class="dot"></span><span class="store-name"></span>
-        </button>
-        <button class="close" type="button" aria-label="quit">
-            <svg viewBox="0 0 12 12" aria-hidden="true">
-                <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"/>
-            </svg>
-        </button>
-    </div>
-    <div class="body"><slot></slot></div>
-    <div class="stores" role="dialog" aria-label="window state" hidden>
-        <header class="stores-head" title="the state this window keeps: what it reads and writes">
-            <span class="direction" aria-hidden="true">→</span>
-            <span>Output</span>
-            <button class="add connections" type="button" title="Show every connection on the canvas (state mode, or hold W)" aria-label="show connections">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M17 17 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M7 7 C13 7 11 17 17 17"/></svg>
-            </button>
-            <button class="add" type="button" data-copy="false" title="New empty state" aria-label="new empty state">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
-            </button>
-            <button class="add" type="button" data-copy="true" title="Fork: continue on a copy of this state" aria-label="fork this state into a copy">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="7" cy="5.5" r="2"/><circle cx="7" cy="18.5" r="2"/><circle cx="17" cy="5.5" r="2"/>
-                    <path d="M7 7.5 V16.5 M17 7.5 C17 12 7 11 7 16.5"/>
+const TEMPLATE = () =>
+    html`<div class="title">
+            <span class="glyph"></span
+            ><button
+                class="name"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                title="change program"
+            ></button
+            ><button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
+                <span class="dot"></span><span class="store-name"></span></button
+            ><button class="close" type="button" aria-label="quit">
+                <svg viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"></path>
                 </svg>
             </button>
-        </header>
-        <ul class="options"></ul>
-        <div class="follows"></div>
-    </div>
-    <div class="switcher" role="dialog" aria-label="change program" hidden>
-        <header class="stores-head">
-            <button class="back" type="button" aria-label="back to programs" title="back to programs" hidden>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6 L8 12 L14 18"/></svg>
-            </button>
-            <span class="switch-title">Program</span>
-            <button class="add switch-new" type="button" title="New empty state" aria-label="new empty state" hidden>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>
-            </button>
-        </header>
-        <div class="switch-list"></div>
-    </div>
-`;
+        </div>
+        <div class="body"><slot></slot></div>
+        <div class="stores" role="dialog" aria-label="window state" hidden>
+            <header
+                class="stores-head"
+                title="the state this window keeps: what it reads and writes"
+            >
+                <span class="direction" aria-hidden="true">→</span><span>Output</span
+                ><button
+                    class="add connections"
+                    type="button"
+                    title="Show every connection on the canvas (state mode, or hold W)"
+                    aria-label="show connections"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="M3 7 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M17 17 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M7 7 C13 7 11 17 17 17"
+                        ></path>
+                    </svg></button
+                ><button
+                    class="add"
+                    type="button"
+                    data-copy="false"
+                    title="New empty state"
+                    aria-label="new empty state"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5 V19 M5 12 H19"></path>
+                    </svg></button
+                ><button
+                    class="add"
+                    type="button"
+                    data-copy="true"
+                    title="Fork: continue on a copy of this state"
+                    aria-label="fork this state into a copy"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="7" cy="5.5" r="2"></circle>
+                        <circle cx="7" cy="18.5" r="2"></circle>
+                        <circle cx="17" cy="5.5" r="2"></circle>
+                        <path d="M7 7.5 V16.5 M17 7.5 C17 12 7 11 7 16.5"></path>
+                    </svg>
+                </button>
+            </header>
+            <ul class="options"></ul>
+            <div class="follows"></div>
+        </div>
+        <div class="switcher" role="dialog" aria-label="change program" hidden>
+            <header class="stores-head">
+                <button
+                    class="back"
+                    type="button"
+                    aria-label="back to programs"
+                    title="back to programs"
+                    hidden
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M14 6 L8 12 L14 18"></path>
+                    </svg></button
+                ><span class="switch-title">Program</span
+                ><button
+                    class="add switch-new"
+                    type="button"
+                    title="New empty state"
+                    aria-label="new empty state"
+                    hidden
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5 V19 M5 12 H19"></path>
+                    </svg>
+                </button>
+            </header>
+            <div class="switch-list"></div>
+        </div>
+        ${RESIZE_EDGES.map(
+            edge => html`<div class=${ifDefined(`handle handle--${edge}`)}></div>`,
+        )}`;
 
 // Further than this between press and click, and the press was a drag of the title, not a click on the name.
 const CLICK_SLOP = 4;
@@ -105,250 +166,186 @@ const reduceSwitching = (state: Switching, action: SwitchAction): Switching => {
     }
 };
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-const switchRow = (
-    label: string,
-    meta: string,
-    current: boolean,
-    icon: string | null,
-    colour: string | null,
-): HTMLElement => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'pick switch-row';
-    row.toggleAttribute('data-current', current);
-
-    if (icon !== null) {
-        const svg = document.createElementNS(SVG_NS, 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('aria-hidden', 'true');
-        const path = document.createElementNS(SVG_NS, 'path');
-        path.setAttribute('d', icon);
-        svg.append(path);
-        row.append(svg);
-    }
-
-    if (colour !== null) {
-        const dot = document.createElement('span');
-        dot.className = 'dot';
-        dot.style.setProperty('--store', colour);
-        row.append(dot);
-    }
-
-    const name = document.createElement('span');
-    name.className = 'option-name';
-    name.textContent = label;
-
-    const extra = document.createElement('span');
-    extra.className = 'users';
-    extra.textContent = meta;
-
-    row.append(name, extra);
-
-    return row;
-};
-
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
     const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
-
     return element instanceof HTMLElement ? element.dataset[key] : undefined;
 };
-
-const optionOf = ({ id, name, colour, users, current }: StoreOption): HTMLElement => {
-    const row = document.createElement('li');
-    row.className = 'option';
-    row.toggleAttribute('data-current', current);
-
-    // The current store is not a button: a click on it renames it, since switching to it would do nothing.
-    const pick = document.createElement(current ? 'div' : 'button');
-    pick.className = 'pick';
-
-    if (pick instanceof HTMLButtonElement) {
-        pick.type = 'button';
-        pick.dataset['bind'] = id;
-    }
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.setProperty('--store', colour);
-
-    const label = document.createElement(current ? 'input' : 'span');
-    label.className = 'option-name';
-
-    if (label instanceof HTMLInputElement) {
-        label.value = name;
-        label.defaultValue = name;
-        label.dataset['rename'] = id;
-        label.autocomplete = 'off';
-        label.title = 'rename';
-        label.setAttribute('aria-label', 'name of this state');
-    } else {
-        label.textContent = name;
-    }
-
-    const count = document.createElement('span');
-    count.className = 'users';
-    count.textContent = users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
-
-    pick.append(dot, label, count);
-    row.append(pick);
-
-    if (users === 0) {
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'remove';
-        remove.dataset['remove'] = id;
-        remove.textContent = '×';
-        remove.setAttribute('aria-label', `delete ${name}`);
-        row.append(remove);
-    }
-
-    return row;
+const usersLabel = (users: number): string =>
+    users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
+type SwitchRender = {
+    readonly groups: readonly SwitchGroup[];
+    readonly item: SwitchItem | undefined;
 };
-
-const followRow = ({ id, name, colour, users, current }: StoreOption): HTMLElement => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'pick follow';
-    row.dataset['followStore'] = id;
-    row.toggleAttribute('data-current', current);
-    row.setAttribute('aria-pressed', String(current));
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.setProperty('--store', colour);
-
-    const label = document.createElement('span');
-    label.className = 'option-name';
-    label.textContent = name;
-
-    const count = document.createElement('span');
-    count.className = 'users';
-    count.textContent = users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
-
-    row.append(dot, label, count);
-
-    return row;
-};
-
-const noneRow = (input: string, current: boolean): HTMLElement => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'pick follow none';
-    row.dataset['unfollow'] = input;
-    row.toggleAttribute('data-current', current);
-    row.setAttribute('aria-pressed', String(current));
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-
-    const label = document.createElement('span');
-    label.className = 'option-name';
-    label.textContent = 'None';
-
-    row.append(dot, label);
-
-    return row;
-};
-
-const inputLine = (
-    input: string,
-    label: string,
-    current: StoreOption | undefined,
-    open: boolean,
-): HTMLElement => {
-    const line = document.createElement('button');
-    line.type = 'button';
-    line.className = 'input-line';
-    line.dataset['expand'] = input;
-    line.setAttribute('aria-expanded', String(open));
-    line.title = open ? 'close the list' : `choose what ${label} follows`;
-
-    const direction = document.createElement('span');
-    direction.className = 'direction';
-    direction.setAttribute('aria-hidden', 'true');
-    direction.textContent = '←';
-
-    const key = document.createElement('span');
-    key.className = 'input-name';
-    key.textContent = label;
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-
-    if (current === undefined) {
-        dot.toggleAttribute('data-none', true);
-    } else {
-        dot.style.setProperty('--store', current.colour);
-    }
-
-    const value = document.createElement('span');
-    value.className = 'option-name';
-    value.textContent = current?.name ?? 'None';
-
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.setAttribute('aria-hidden', 'true');
-
-    line.append(direction, key, dot, value, chevron);
-
-    return line;
-};
-
-const inputsView = (follows: readonly FollowGroup[], expanded: string | null): HTMLElement[] => {
-    const inputs = [...new Set(follows.map(({ input }) => input))];
-
-    if (inputs.length === 0) {
-        return [];
-    }
-
-    const heading = document.createElement('p');
-    heading.className = 'follow-title';
-    heading.title = 'what this window reads from other state';
-    heading.textContent = 'Inputs';
-
-    return [
-        heading,
-        ...inputs.flatMap(input => {
-            const groups = follows.filter(group => group.input === input);
-            const current = groups
-                .flatMap(({ options: list }) => list)
-                .find(option => option.current);
-            const open = expanded === input;
-            const line = inputLine(input, groups[0]?.label ?? input, current, open);
-
-            if (!open) {
-                return [line];
-            }
-
-            const list = document.createElement('div');
-            list.className = 'input-list';
-            list.append(
-                ...(groups[0]?.optional === true ? [noneRow(input, current === undefined)] : []),
-                ...groups.flatMap(({ source, title, options: rows }) => [
-                    ...(groups.length > 1
-                        ? [
-                              Object.assign(document.createElement('p'), {
-                                  className: 'source-title',
-                                  textContent: title,
-                              }),
-                          ]
-                        : []),
-                    ...rows.map(option => {
-                        const row = followRow(option);
-                        row.dataset['followInput'] = input;
-                        row.dataset['followSource'] = source;
-
-                        return row;
-                    }),
-                ]),
-            );
-
-            return [line, list];
-        }),
-    ];
-};
+type FollowRender = { readonly follows: readonly FollowGroup[]; readonly expanded: string | null };
+const StoreOptions = (options: readonly StoreOption[]) =>
+    repeat(
+        options.map(option => option.id),
+        item => item,
+        id =>
+            withValue(
+                options.find(option => option.id === id),
+                option =>
+                    html`<li
+                        class="option"
+                        data-current=${ifDefined(option.current ? '' : undefined)}
+                    >
+                        ${when(
+                            option.current,
+                            () =>
+                                html`<div class="pick">
+                                    <span
+                                        class="dot"
+                                        style=${styleMap({ '--store': option.colour })}
+                                    ></span
+                                    ><input
+                                        class="option-name"
+                                        data-rename=${ifDefined(id)}
+                                        autocomplete="off"
+                                        title="rename"
+                                        aria-label="name of this state"
+                                        ${ref(element => {
+                                            if (element instanceof HTMLInputElement) {
+                                                {
+                                                    displayValue(element, option.name);
+                                                    (() => {
+                                                        element.defaultValue = option.name;
+                                                    })();
+                                                }
+                                            }
+                                        })}
+                                    /><span class="users">${usersLabel(option.users)}</span>
+                                </div>`,
+                            () =>
+                                html`<button type="button" class="pick" data-bind=${ifDefined(id)}>
+                                    <span
+                                        class="dot"
+                                        style=${styleMap({ '--store': option.colour })}
+                                    ></span
+                                    ><span class="option-name">${option.name}</span
+                                    ><span class="users">${usersLabel(option.users)}</span>
+                                </button>`,
+                        )}${when(option.users === 0, () => html`<button type="button" class="remove" data-remove=${ifDefined(id)} aria-label=${ifDefined(`delete ${option.name}`)}>×</button>`)}
+                    </li>`,
+            ),
+    );
+const FollowOptions = (state: FollowRender) =>
+    when(
+        state.follows.length > 0,
+        () =>
+            html`<p class="follow-title" title="what this window reads from other state">Inputs</p>
+                ${repeat(
+                    [...new Set(state.follows.map(group => group.input))],
+                    item => item,
+                    input => {
+                        const groups = () => state.follows.filter(group => group.input === input);
+                        const current = () =>
+                            groups()
+                                .flatMap(group => group.options)
+                                .find(option => option.current);
+                        const open = () => state.expanded === input;
+                        const label = () => groups()[0]?.label ?? input;
+                        return html`<button
+                                type="button"
+                                class="input-line"
+                                data-expand=${ifDefined(input)}
+                                aria-expanded=${ifDefined(open())}
+                                title=${ifDefined(open() ? 'close the list' : `choose what ${label()} follows`)}
+                            >
+                                <span class="direction" aria-hidden="true">←</span
+                                ><span class="input-name">${label()}</span
+                                ><span
+                                    class="dot"
+                                    data-none=${ifDefined(current() === undefined ? '' : undefined)}
+                                    style=${styleMap({ '--store': current()?.colour ?? '' })}
+                                ></span
+                                ><span class="option-name">${current()?.name ?? 'None'}</span
+                                ><span class="chevron" aria-hidden="true"></span></button
+                            >${when(
+                                open(),
+                                () =>
+                                    html`<div class="input-list">
+                                        ${when(groups()[0]?.optional === true, () => html`<button type="button" class="pick follow none" data-unfollow=${ifDefined(input)} data-current=${ifDefined(current() === undefined ? '' : undefined)} aria-pressed=${ifDefined(current() === undefined)}><span class="dot"></span><span class="option-name">None</span></button>`)}${repeat(
+                                            groups(),
+                                            item => item,
+                                            group =>
+                                                html`${when(groups().length > 1, () => html`<p class="source-title">${group.title}</p>`)}${repeat(
+                                                    group.options,
+                                                    item => item,
+                                                    option =>
+                                                        html`<button
+                                                            type="button"
+                                                            class="pick follow"
+                                                            data-follow-store=${ifDefined(option.id)}
+                                                            data-follow-input=${ifDefined(input)}
+                                                            data-follow-source=${ifDefined(group.source)}
+                                                            data-current=${ifDefined(option.current ? '' : undefined)}
+                                                            aria-pressed=${ifDefined(option.current)}
+                                                        >
+                                                            <span
+                                                                class="dot"
+                                                                style=${styleMap({ '--store': option.colour })}
+                                                            ></span
+                                                            ><span class="option-name"
+                                                                >${option.name}</span
+                                                            ><span class="users"
+                                                                >${usersLabel(option.users)}</span
+                                                            >
+                                                        </button>`,
+                                                )}`,
+                                        )}
+                                    </div>`,
+                            )}`;
+                    },
+                )}`,
+    );
+const SwitchOptions = (state: SwitchRender) =>
+    withValue(
+        state.item,
+        item =>
+            repeat(
+                item.stores ?? [],
+                item => item,
+                store =>
+                    html`<button
+                        type="button"
+                        class="pick switch-row"
+                        data-program=${ifDefined(item.id)}
+                        data-width=${ifDefined(item.minimum.width)}
+                        data-height=${ifDefined(item.minimum.height)}
+                        data-stateful="true"
+                        data-store=${ifDefined(store.id)}
+                    >
+                        <span class="dot" style=${styleMap({ '--store': store.colour })}></span
+                        ><span class="option-name">${store.name}</span
+                        ><span class="users">${usersLabel(store.users)}</span>
+                    </button>`,
+            ),
+        repeat(
+            state.groups,
+            item => item,
+            group =>
+                html`<p class="switch-group">${group.title}</p>
+                    ${repeat(
+                        group.items,
+                        item => item,
+                        entry =>
+                            html`<button
+                                type="button"
+                                class="pick switch-row"
+                                data-current=${ifDefined(entry.current ? '' : undefined)}
+                                data-program=${ifDefined(entry.id)}
+                                data-width=${ifDefined(entry.minimum.width)}
+                                data-height=${ifDefined(entry.minimum.height)}
+                                data-stateful=${ifDefined(String(entry.stores !== null))}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d=${ifDefined(entry.icon)}></path></svg
+                                ><span class="option-name">${entry.title}</span
+                                ><span class="users">${entry.current ? 'open here' : ''}</span>
+                            </button>`,
+                    )}`,
+        ),
+    );
 
 const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
@@ -365,22 +362,47 @@ export class HksWindow extends HTMLElement {
     readonly menus$: Observable<boolean>;
     private readonly switching$: Observable<SwitchAction>;
 
+    private readonly rendering: Rendering;
+
+    private readonly glyphView: RenderView<string | null>;
+    private readonly optionView: RenderView<readonly StoreOption[]>;
+    private readonly followView: RenderView<FollowRender>;
+    private readonly switchView: RenderView<SwitchRender>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
-
-        for (const edge of RESIZE_EDGES) {
-            const handle = document.createElement('div');
-            handle.className = `handle handle--${edge}`;
-            shadow.appendChild(handle);
-        }
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.shadow = shadow;
         this.name = requireChild(shadow, '.name');
         this.glyph = requireChild(shadow, '.glyph');
+        this.glyphView = renderView<string | null>(this.glyph, null, icon =>
+            withValue(
+                icon,
+                path =>
+                    html`<svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d=${ifDefined(path)}></path>
+                    </svg>`,
+            ),
+        );
+        this.optionView = renderView<readonly StoreOption[]>(
+            requireChild(shadow, '.options'),
+            [],
+            StoreOptions,
+        );
+        this.followView = renderView<FollowRender>(
+            requireChild(shadow, '.follows'),
+            { follows: [], expanded: null },
+            FollowOptions,
+        );
+        this.switchView = renderView<SwitchRender>(
+            requireChild(shadow, '.switch-list'),
+            { groups: [], item: undefined },
+            SwitchOptions,
+        );
 
         const chip = requireChild(shadow, '.store');
         const popover = requireChild(shadow, '.stores');
@@ -629,20 +651,7 @@ export class HksWindow extends HTMLElement {
     label(title: string, icon: string | null): this {
         this.name.textContent = title;
 
-        if (icon === null) {
-            this.glyph.replaceChildren();
-
-            return this;
-        }
-
-        const svg = document.createElementNS(SVG, 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('aria-hidden', 'true');
-
-        const path = document.createElementNS(SVG, 'path');
-        path.setAttribute('d', icon);
-        svg.append(path);
-        this.glyph.replaceChildren(svg);
+        this.glyphView.update(icon);
 
         return this;
     }
@@ -659,7 +668,6 @@ export class HksWindow extends HTMLElement {
         const popover = requireChild(shadow, '.stores');
         const options = requireChild(shadow, '.options');
         const switcher = requireChild(shadow, '.switcher');
-        const list = requireChild(shadow, '.switch-list');
         const back = requireChild(shadow, '.back');
         const fresh = requireChild(shadow, '.switch-new');
         const heading = requireChild(shadow, '.switch-title');
@@ -673,199 +681,158 @@ export class HksWindow extends HTMLElement {
         };
 
         return merge(
-            combineLatest([
-                this.switching$.pipe(
-                    scan(reduceSwitching, { step: 'closed' }),
-                    startWith<Switching>({ step: 'closed' }),
-                ),
-                programs$,
-            ]).pipe(
-                tap(([state, groups]) => {
-                    const item =
-                        state.step === 'stores'
-                            ? groups
-                                  ?.flatMap(({ items }) => items)
-                                  .find(({ id }) => id === state.program)
-                            : undefined;
-                    const open = groups !== null && state.step !== 'closed';
-
-                    name.toggleAttribute('data-switchable', groups !== null);
-                    name.setAttribute('aria-expanded', String(open));
-                    switcher.hidden = !open;
-
-                    if (!open || groups === null) {
-                        return;
-                    }
-
-                    back.hidden = item === undefined;
-                    fresh.hidden = item === undefined;
-
-                    if (item === undefined) {
-                        heading.textContent = 'Program';
-                        list.replaceChildren(
-                            ...groups.flatMap(({ title, items }) => {
-                                const label = document.createElement('p');
-                                label.className = 'switch-group';
-                                label.textContent = title;
-
-                                return [
-                                    label,
-                                    ...items.map(entry => {
-                                        const row = sized(
-                                            switchRow(
-                                                entry.title,
-                                                entry.current ? 'open here' : '',
-                                                entry.current,
-                                                entry.icon,
-                                                null,
-                                            ),
-                                            entry,
-                                        );
-                                        row.dataset['stateful'] = String(entry.stores !== null);
-
-                                        return row;
-                                    }),
-                                ];
-                            }),
-                        );
-
-                        return;
-                    }
-
-                    heading.textContent = item.title;
-                    sized(fresh, item);
-                    fresh.dataset['stateful'] = 'true';
-                    fresh.dataset['store'] = '';
-                    list.replaceChildren(
-                        ...(item.stores ?? []).map(store => {
-                            const row = sized(
-                                switchRow(
-                                    store.name,
-                                    store.users === 0
-                                        ? 'unused'
-                                        : store.users === 1
-                                          ? '1 window'
-                                          : `${store.users} windows`,
-                                    false,
-                                    null,
-                                    store.colour,
-                                ),
-                                item,
-                            );
-                            row.dataset['stateful'] = 'true';
-                            row.dataset['store'] = store.id;
-
-                            return row;
-                        }),
-                    );
-                }),
-            ),
-            combineLatest([stores$, follows$, this.expanded$]).pipe(
-                tap(([stores, follows, expanded]) => {
-                    // A window with no store of its own shows the one it runs on: the dial shows its clock.
-                    const current =
-                        stores?.find(option => option.current) ??
-                        follows
-                            ?.flatMap(({ options: list }) => list)
-                            .find(option => option.current);
-                    chip.hidden = current === undefined;
-                    popover.toggleAttribute('data-own', stores !== null);
-
-                    if (current === undefined) {
-                        return;
-                    }
-
-                    if (!(shadow.activeElement instanceof HTMLInputElement)) {
-                        requireChild(shadow, '.follows').replaceChildren(
-                            ...inputsView(follows ?? [], expanded),
-                        );
-                    }
-
-                    chip.style.setProperty('--store', current.colour);
-                    chip.title = `${current.name}: shared with ${current.users - 1} other window${current.users === 2 ? '' : 's'}`;
-                    chip.toggleAttribute('data-shared', current.users > 1);
-
-                    const label = chip.querySelector('.store-name');
-
-                    if (label !== null) {
-                        label.textContent = current.name;
-                    }
-
-                    // Not while a name is being typed: rebuilding the list would take the input away.
-                    if (stores !== null && !(shadow.activeElement instanceof HTMLInputElement)) {
-                        options.replaceChildren(...stores.map(optionOf));
-                    }
-                }),
-            ),
-            manage$.pipe(
-                distinctUntilChanged(),
-                tap(open => {
-                    popover.hidden = !open;
-                    chip.setAttribute('aria-expanded', String(open));
-                }),
-            ),
-            // Captured, so the binding is read before the add is applied, whichever listener runs first.
-            fromElementEvent$(popover, 'click', { capture: true }).pipe(
-                filter(({ target }) => dataOf(target, 'copy') !== undefined),
-                map(() => {
-                    const name = options.querySelector('input.option-name');
-
-                    return name instanceof HTMLInputElement ? name.dataset['rename'] : undefined;
-                }),
-                switchMap(was =>
-                    stores$.pipe(
-                        map(stores => stores?.find(option => option.current)?.id),
-                        filter(id => id !== undefined && id !== was),
-                        take(1),
+            this.rendering.lifetime$,
+            this.glyphView.lifetime$,
+            this.optionView.lifetime$,
+            this.followView.lifetime$,
+            this.switchView.lifetime$,
+            merge(
+                combineLatest([
+                    this.switching$.pipe(
+                        scan(reduceSwitching, { step: 'closed' }),
+                        startWith<Switching>({ step: 'closed' }),
                     ),
+                    programs$,
+                ]).pipe(
+                    tap(([state, groups]) => {
+                        const item =
+                            state.step === 'stores'
+                                ? groups
+                                      ?.flatMap(({ items }) => items)
+                                      .find(({ id }) => id === state.program)
+                                : undefined;
+                        const open = groups !== null && state.step !== 'closed';
+
+                        name.toggleAttribute('data-switchable', groups !== null);
+                        name.setAttribute('aria-expanded', String(open));
+                        switcher.hidden = !open;
+
+                        if (!open || groups === null) {
+                            return;
+                        }
+
+                        back.hidden = item === undefined;
+                        fresh.hidden = item === undefined;
+
+                        this.switchView.update({ groups, item });
+                        heading.textContent = item?.title ?? 'Program';
+                        if (item !== undefined) {
+                            sized(fresh, item);
+                            fresh.dataset['stateful'] = 'true';
+                            fresh.dataset['store'] = '';
+                        }
+                    }),
                 ),
-                tap(() => {
-                    const name = options.querySelector('input.option-name');
+                combineLatest([stores$, follows$, this.expanded$]).pipe(
+                    tap(([stores, follows, expanded]) => {
+                        // A window with no store of its own shows the one it runs on: the dial shows its clock.
+                        const current =
+                            stores?.find(option => option.current) ??
+                            follows
+                                ?.flatMap(({ options: list }) => list)
+                                .find(option => option.current);
+                        chip.hidden = current === undefined;
+                        popover.toggleAttribute('data-own', stores !== null);
 
-                    if (name instanceof HTMLInputElement) {
-                        name.focus();
-                        name.select();
-                    }
-                }),
-            ),
-            fromElementEvent$(popover, 'keydown').pipe(
-                tap(event => {
-                    const { target } = event;
+                        if (current === undefined) {
+                            return;
+                        }
 
-                    if (!(target instanceof HTMLInputElement)) {
-                        return;
-                    }
+                        if (!(shadow.activeElement instanceof HTMLInputElement)) {
+                            this.followView.update({ follows: follows ?? [], expanded });
+                        }
 
-                    // Escape puts the old name back first, so the blur that follows changes nothing.
-                    if (event.key === 'Escape') {
-                        target.value = target.defaultValue;
-                    }
+                        chip.style.setProperty('--store', current.colour);
+                        chip.title = `${current.name}: shared with ${current.users - 1} other window${current.users === 2 ? '' : 's'}`;
+                        chip.toggleAttribute('data-shared', current.users > 1);
 
-                    if (event.key === 'Enter' || event.key === 'Escape') {
-                        event.preventDefault();
-                        target.blur();
-                    }
-                }),
-            ),
-            view$.pipe(
-                distinctUntilChanged(sameView),
-                tap(({ kind, frame, focused }) => {
-                    this.toggleAttribute('data-focused', focused);
-                    this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
-                    this.style.zIndex = frame.z.toFixed(0);
+                        const label = chip.querySelector('.store-name');
 
-                    if (kind === 'fitted') {
-                        this.style.removeProperty('width');
-                        this.style.removeProperty('height');
+                        if (label !== null) {
+                            label.textContent = current.name;
+                        }
 
-                        return;
-                    }
+                        // Not while a name is being typed: rebuilding the list would take the input away.
+                        if (
+                            stores !== null &&
+                            !(shadow.activeElement instanceof HTMLInputElement)
+                        ) {
+                            this.optionView.update(stores);
+                        }
+                    }),
+                ),
+                manage$.pipe(
+                    distinctUntilChanged(),
+                    tap(open => {
+                        popover.hidden = !open;
+                        chip.setAttribute('aria-expanded', String(open));
+                    }),
+                ),
+                // Captured, so the binding is read before the add is applied, whichever listener runs first.
+                fromElementEvent$(popover, 'click', { capture: true }).pipe(
+                    filter(({ target }) => dataOf(target, 'copy') !== undefined),
+                    map(() => {
+                        const name = options.querySelector('input.option-name');
 
-                    this.style.width = `${frame.width.toFixed(0)}px`;
-                    this.style.height = `${frame.height.toFixed(0)}px`;
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                        return name instanceof HTMLInputElement
+                            ? name.dataset['rename']
+                            : undefined;
+                    }),
+                    switchMap(was =>
+                        stores$.pipe(
+                            map(stores => stores?.find(option => option.current)?.id),
+                            filter(id => id !== undefined && id !== was),
+                            take(1),
+                        ),
+                    ),
+                    tap(() => {
+                        const name = options.querySelector('input.option-name');
+
+                        if (name instanceof HTMLInputElement) {
+                            name.focus();
+                            name.select();
+                        }
+                    }),
+                ),
+                fromElementEvent$(popover, 'keydown').pipe(
+                    tap(event => {
+                        const { target } = event;
+
+                        if (!(target instanceof HTMLInputElement)) {
+                            return;
+                        }
+
+                        // Escape puts the old name back first, so the blur that follows changes nothing.
+                        if (event.key === 'Escape') {
+                            target.value = target.defaultValue;
+                        }
+
+                        if (event.key === 'Enter' || event.key === 'Escape') {
+                            event.preventDefault();
+                            target.blur();
+                        }
+                    }),
+                ),
+                view$.pipe(
+                    distinctUntilChanged(sameView),
+                    tap(({ kind, frame, focused }) => {
+                        this.toggleAttribute('data-focused', focused);
+                        this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
+                        this.style.zIndex = frame.z.toFixed(0);
+
+                        if (kind === 'fitted') {
+                            this.style.removeProperty('width');
+                            this.style.removeProperty('height');
+
+                            return;
+                        }
+
+                        this.style.width = `${frame.width.toFixed(0)}px`;
+                        this.style.height = `${frame.height.toFixed(0)}px`;
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

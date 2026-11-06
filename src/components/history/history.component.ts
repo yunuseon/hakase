@@ -1,3 +1,10 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { when } from 'lit-html/directives/when.js';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -6,10 +13,62 @@ import css from './history.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <ol class="steps" aria-label="history"></ol>
-    <footer class="foot"><span class="summary"></span></footer>
-`;
+const TEMPLATE = (entries: readonly HistoryEntry[]) =>
+    html`<ol class="steps" aria-label="history">
+            ${repeat(
+                entries.map(entry => entry.id),
+                item => item,
+                id =>
+                    withValue(
+                        entries.find(entry => entry.id === id),
+                        entry =>
+                            html`<li data-taken=${ifDefined(entry.taken ? '' : undefined)}>
+                                <button
+                                    type="button"
+                                    class="step"
+                                    data-offset=${ifDefined(entry.offset)}
+                                    aria-current=${ifDefined(entry.offset === 0 ? 'true' : undefined)}
+                                    data-when=${ifDefined(
+                                        entry.offset < 0
+                                            ? 'past'
+                                            : entry.offset > 0
+                                              ? 'future'
+                                              : 'now',
+                                    )}
+                                    title=${ifDefined(`${entry.offset === 0 ? 'where you are' : entry.offset < 0 ? `back ${-entry.offset}` : `forward ${entry.offset}`}${entry.taken ? ', taken back' : ''}`)}
+                                >
+                                    <span class="dot"></span
+                                    ><span class="label">${entry.label}</span></button
+                                >${when(
+                                    id !== 0 &&
+                                        entry.offset <= 0 &&
+                                        !entry.taken &&
+                                        !entry.takesBack,
+                                    () =>
+                                        html`<button
+                                            type="button"
+                                            class="take"
+                                            data-take=${ifDefined(id)}
+                                            title=${ifDefined(`take back “${entry.label}”, keeping everything done since`)}
+                                            aria-label=${ifDefined(`take back ${entry.label}`)}
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path
+                                                    d="M9 14 L4 9 L9 4 M4 9 H15 A5 5 0 0 1 15 19 H11"
+                                                ></path>
+                                            </svg>
+                                        </button>`,
+                                )}
+                            </li>`,
+                    ),
+            )}
+        </ol>
+        <footer class="foot">
+            <span class="summary"
+                >${entries.filter(entry => entry.offset < 0).length} back
+                ·${' '}${entries.filter(entry => entry.offset > 0).length} forward</span
+            >
+        </footer>`;
 
 export type HistoryEntry = {
     readonly id: number;
@@ -18,49 +77,6 @@ export type HistoryEntry = {
     readonly offset: number;
     readonly taken: boolean;
     readonly takesBack: boolean;
-};
-
-const UNDO_ICON =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 L4 9 L9 4 M4 9 H15 A5 5 0 0 1 15 19 H11"/></svg>';
-
-const stepOf = ({ id, label, offset, taken, takesBack }: HistoryEntry): HTMLElement => {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'step';
-    button.dataset['offset'] = String(offset);
-    button.dataset['when'] = offset < 0 ? 'past' : offset > 0 ? 'future' : 'now';
-    button.setAttribute('aria-current', String(offset === 0));
-    button.title =
-        offset === 0 ? 'where you are' : offset < 0 ? `back ${-offset}` : `forward ${offset}`;
-
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-
-    const text = document.createElement('span');
-    text.className = 'label';
-    text.textContent = label;
-
-    button.append(dot, text);
-    item.append(button);
-    item.toggleAttribute('data-taken', taken);
-
-    if (id !== 0 && offset <= 0 && !taken && !takesBack) {
-        const take = document.createElement('button');
-        take.type = 'button';
-        take.className = 'take';
-        take.dataset['take'] = String(id);
-        take.innerHTML = UNDO_ICON;
-        take.title = `take back “${label}”, keeping everything done since`;
-        take.setAttribute('aria-label', `take back ${label}`);
-        item.append(take);
-    }
-
-    if (taken) {
-        button.title = `${button.title}, taken back`;
-    }
-
-    return item;
 };
 
 const keyOf = (entries: readonly HistoryEntry[]): string =>
@@ -74,13 +90,15 @@ export class HksHistory extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
 
+    private readonly rendering: RenderView<readonly HistoryEntry[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<readonly HistoryEntry[]>(shadow, [], TEMPLATE);
 
         this.takeBacks$ = fromElementEvent$(requireChild(shadow, '.steps'), 'click').pipe(
             mergeMap(({ target }) => {
@@ -103,24 +121,22 @@ export class HksHistory extends HTMLElement {
 
     connect$(entries$: Observable<readonly HistoryEntry[]>): Observable<void> {
         const steps = requireChild(this.shadow, '.steps');
-        const summary = requireChild(this.shadow, '.summary');
 
         return merge(
-            entries$.pipe(
-                distinctUntilChanged((a, b) => keyOf(a) === keyOf(b)),
-                tap(entries => {
-                    steps.replaceChildren(...entries.map(stepOf));
+            this.rendering.lifetime$,
+            merge(
+                entries$.pipe(
+                    distinctUntilChanged((a, b) => keyOf(a) === keyOf(b)),
+                    tap(entries => {
+                        this.rendering.update(entries);
 
-                    const back = entries.filter(({ offset }) => offset < 0).length;
-                    const forward = entries.filter(({ offset }) => offset > 0).length;
-                    summary.textContent = `${back} back · ${forward} forward`;
-
-                    steps
-                        .querySelector('[aria-current="true"]')
-                        ?.scrollIntoView({ block: 'nearest' });
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                        steps
+                            .querySelector('[aria-current="true"]')
+                            ?.scrollIntoView({ block: 'nearest' });
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

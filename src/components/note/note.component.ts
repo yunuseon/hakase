@@ -1,3 +1,6 @@
+import { html } from 'lit-html';
+import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
+import { mountView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, scan, share, switchMap, tap } from 'rxjs/operators';
@@ -7,19 +10,23 @@ import css from './note.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <header class="bar">
-        <hks-select class="pick" aria-label="note"></hks-select>
-        <button class="new" type="button" title="new note" aria-label="new note">+</button>
-        <button class="delete" type="button">Delete</button>
-    </header>
-    <textarea class="body" placeholder="Write something…" aria-label="note text" spellcheck="true"></textarea>
-    <div class="empty">
-        <p>No notes yet.</p>
-        <button class="first" type="button">New note</button>
-    </div>
-    <footer class="foot"><span class="count"></span></footer>
-`;
+const TEMPLATE = () =>
+    html`<header class="bar">
+            <hks-select class="pick" aria-label="note"></hks-select
+            ><button class="new" type="button" title="new note" aria-label="new note">+</button
+            ><button class="delete" type="button">Delete</button>
+        </header>
+        <textarea
+            class="body"
+            placeholder="Write something…"
+            aria-label="note text"
+            spellcheck="true"
+        ></textarea>
+        <div class="empty">
+            <p>No notes yet.</p>
+            <button class="first" type="button">New note</button>
+        </div>
+        <footer class="foot"><span class="count"></span></footer>`;
 
 const ARM_MS = 3000;
 
@@ -54,15 +61,20 @@ export class HksNote extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
 
+    private readonly rendering: Rendering;
+
+    private readonly optionsView: RenderView<readonly SelectChoice[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.picker = requireElement(shadow, '.pick', HksSelect);
+        this.optionsView = renderOptions(this.picker);
         this.body = requireElement(shadow, '.body', HTMLTextAreaElement);
         this.deleter = requireElement(shadow, '.delete', HTMLButtonElement);
         this.count = requireChild(shadow, '.count');
@@ -95,42 +107,44 @@ export class HksNote extends HTMLElement {
 
     connect$({ options$, selected$, text$, count$ }: NoteView): Observable<void> {
         return merge(
-            connectSelects$(this.shadow),
-            combineLatest([options$, selected$]).pipe(
-                tap(([options, selected]) => {
-                    this.picker.replaceChildren(
-                        ...options.map(({ value, label }) => new Option(label, value)),
-                    );
-                    this.picker.value = selected ?? '';
-                    this.toggleAttribute('data-empty', selected === null);
-                }),
-            ),
-            text$.pipe(
-                tap(text => {
-                    // Only when it differs: writing the textarea's own text back resets the caret.
-                    if (this.body.value !== text) {
-                        this.body.value = text;
-                    }
-                }),
-            ),
-            count$.pipe(
-                distinctUntilChanged(),
-                tap(count => {
-                    this.count.textContent = count;
-                }),
-            ),
-            this.arming$.pipe(
-                switchMap(({ armed }) =>
-                    armed === null
-                        ? of(false)
-                        : concat(of(true), timer(ARM_MS).pipe(map(() => false))),
+            this.rendering.lifetime$,
+            this.optionsView.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                combineLatest([options$, selected$]).pipe(
+                    tap(([options, selected]) => {
+                        this.optionsView.update(options);
+                        this.picker.value = selected ?? '';
+                        this.toggleAttribute('data-empty', selected === null);
+                    }),
                 ),
-                tap(armed => {
-                    this.deleter.toggleAttribute('data-armed', armed);
-                    this.deleter.textContent = armed ? 'Delete?' : 'Delete';
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                text$.pipe(
+                    tap(text => {
+                        // Only when it differs: writing the textarea's own text back resets the caret.
+                        if (this.body.value !== text) {
+                            this.body.value = text;
+                        }
+                    }),
+                ),
+                count$.pipe(
+                    distinctUntilChanged(),
+                    tap(count => {
+                        this.count.textContent = count;
+                    }),
+                ),
+                this.arming$.pipe(
+                    switchMap(({ armed }) =>
+                        armed === null
+                            ? of(false)
+                            : concat(of(true), timer(ARM_MS).pipe(map(() => false))),
+                    ),
+                    tap(armed => {
+                        this.deleter.toggleAttribute('data-armed', armed);
+                        this.deleter.textContent = armed ? 'Delete?' : 'Delete';
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

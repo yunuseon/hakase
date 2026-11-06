@@ -1,3 +1,12 @@
+import { html, svg } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { when } from 'lit-html/directives/when.js';
+import { classMap } from 'lit-html/directives/class-map.js';
+import { withValue } from '../../lib/lit.ts';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -24,7 +33,6 @@ import {
 import css from './state-wiring.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 
 type Drag = {
     readonly start: string | null;
@@ -68,109 +76,99 @@ const focusedIn = (shadow: ShadowRoot) => {
     })[0];
 };
 
-const button = (className: string) => {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = className;
-
-    return element;
+type WiringRender = {
+    readonly view: WiringView | null;
+    readonly rows: readonly (Socket | GroupRow)[];
 };
+const socketOf = (row: Socket | GroupRow | undefined): Socket | undefined =>
+    row !== undefined && 'end' in row ? row : undefined;
+const groupOf = (row: Socket | GroupRow | undefined): GroupRow | undefined =>
+    row !== undefined && !('end' in row) ? row : undefined;
 
-const inputRow = (socket: Socket) => {
-    const row = document.createElement('div');
-    row.className = `socket ${socket.end.kind === 'store' ? 'output' : 'input'}`;
-    row.toggleAttribute('data-member', socket.group !== null);
-    row.style.left = `${socket.x}px`;
-    row.style.top = `${socket.y}px`;
-    row.style.setProperty('--socket-width', `${socket.width}px`);
-    row.style.setProperty('--store', socket.colour);
-    const jack = button('jack');
-    jack.dataset['jack'] = socket.key;
-    jack.setAttribute('aria-label', `connect ${socket.title}`);
-    jack.title = `drag to connect ${socket.title}`;
-    const label = document.createElement('span');
-    label.textContent = socket.title;
-    const picker = button('selector');
-    picker.dataset['picker'] = socket.key;
-    picker.setAttribute('role', 'combobox');
-    picker.setAttribute('aria-haspopup', 'listbox');
-    picker.setAttribute('aria-expanded', 'false');
-    picker.setAttribute('aria-label', `${socket.title} state`);
-    picker.textContent =
-        socket.options.find(option => option.id === socket.current)?.name ?? 'None';
-    const choices = document.createElement('div');
-    choices.className = 'choices';
-    choices.setAttribute('role', 'listbox');
-    choices.setAttribute('aria-label', `${socket.title} states`);
-    choices.style.maxHeight = `${socket.menu.height}px`;
-    choices.toggleAttribute('data-above', socket.menu.above);
-    const options = socket.optional
-        ? [{ id: '', name: 'None', colour: 'var(--muted)' }, ...socket.options]
-        : socket.options;
-    options.forEach(option => {
-        const choice = button('choice');
-        choice.dataset['choice'] = socket.key;
-        choice.dataset['value'] = option.id;
-        choice.setAttribute('role', 'option');
-        choice.setAttribute('aria-selected', String(option.id === socket.current));
-        choice.textContent = option.name;
-        choice.style.setProperty('--choice-colour', option.colour);
-        choices.append(choice);
-    });
-    row.dataset['socket'] = socket.key;
-    row.append(jack, label, picker, choices);
-
-    if (socket.end.kind === 'store') {
-        const manage = button('manage');
-        manage.dataset['manage'] = socket.window;
-        manage.textContent = '⋯';
-        manage.setAttribute('aria-label', 'manage output state');
-        row.append(manage);
-    }
-
-    return row;
-};
-
-const groupRow = (group: GroupRow) => {
-    const row = button('group');
-    row.dataset['group'] = group.key;
-    row.style.left = `${group.x}px`;
-    row.style.top = `${group.y}px`;
-    row.style.setProperty('--socket-width', `${group.width}px`);
-    row.style.setProperty('--store', group.colour);
-    row.setAttribute('aria-expanded', String(group.open));
-    row.toggleAttribute('data-bound', group.bound > 0);
-    const bound = group.bound === 0 ? 'none' : `${group.bound} of ${group.total}`;
-    row.title = `${group.title}: ${bound} connected. Click to ${group.open ? 'hide' : 'show'} its inputs.`;
-    const hub = document.createElement('span');
-    hub.className = 'hub';
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = group.title;
-    const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = group.bound === 0 ? '' : String(group.bound);
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.setAttribute('aria-hidden', 'true');
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.append(name, count, chevron);
-    row.append(hub, pill);
-
-    return row;
-};
-
-const railOf = (group: GroupRow, sockets: readonly Socket[]) => {
-    const last = sockets.filter(socket => group.members.includes(socket.key)).at(-1);
-    const rail = document.createElement('div');
-    rail.className = 'rail';
-    rail.style.left = `${group.x + 10}px`;
-    rail.style.top = `${group.y + 14}px`;
-    rail.style.height = `${(last?.y ?? group.y) - group.y}px`;
-
-    return rail;
-};
+const SocketRow = (props: { readonly socket: Socket }) =>
+    html`<div
+        class=${ifDefined(`socket ${props.socket.end.kind === 'store' ? 'output' : 'input'}`)}
+        data-socket=${ifDefined(props.socket.key)}
+        data-member=${ifDefined(props.socket.group !== null ? '' : undefined)}
+        style=${styleMap({
+            left: `${props.socket.x}px`,
+            top: `${props.socket.y}px`,
+            '--socket-width': `${props.socket.width}px`,
+            '--store': props.socket.colour,
+        })}
+    >
+        <button
+            type="button"
+            class="jack"
+            data-jack=${ifDefined(props.socket.key)}
+            aria-label=${ifDefined(`connect ${props.socket.title}`)}
+            title=${ifDefined(`drag to connect ${props.socket.title}`)}
+        ></button
+        ><span>${props.socket.title}</span
+        ><button
+            type="button"
+            class="selector"
+            data-picker=${ifDefined(props.socket.key)}
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-label=${ifDefined(`${props.socket.title} state`)}
+        >
+            ${
+                props.socket.options.find(option => option.id === props.socket.current)?.name ??
+                'None'
+            }
+        </button>
+        <div
+            class="choices"
+            role="listbox"
+            aria-label=${ifDefined(`${props.socket.title} states`)}
+            style=${styleMap({ 'max-height': `${props.socket.menu.height}px` })}
+            data-above=${ifDefined(props.socket.menu.above ? '' : undefined)}
+        >
+            ${repeat(
+                props.socket.optional
+                    ? [{ id: '', name: 'None', colour: 'var(--muted)' }, ...props.socket.options]
+                    : props.socket.options,
+                item => item,
+                option =>
+                    html`<button
+                        type="button"
+                        class="choice"
+                        data-choice=${ifDefined(props.socket.key)}
+                        data-value=${ifDefined(option.id)}
+                        role="option"
+                        aria-selected=${ifDefined(option.id === props.socket.current)}
+                        style=${styleMap({ '--choice-colour': option.colour })}
+                    >
+                        ${option.name}
+                    </button>`,
+            )}
+        </div>
+        ${when(props.socket.end.kind === 'store', () => html`<button type="button" class="manage" data-manage=${ifDefined(props.socket.window)} aria-label="manage output state">⋯</button>`)}
+    </div>`;
+const GroupPill = (props: { readonly group: GroupRow }) =>
+    html`<button
+        type="button"
+        class="group"
+        data-group=${ifDefined(props.group.key)}
+        data-bound=${ifDefined(props.group.bound > 0 ? '' : undefined)}
+        style=${styleMap({
+            left: `${props.group.x}px`,
+            top: `${props.group.y}px`,
+            '--socket-width': `${props.group.width}px`,
+            '--store': props.group.colour,
+        })}
+        aria-expanded=${ifDefined(props.group.open)}
+        title=${ifDefined(`${props.group.title}: ${props.group.bound === 0 ? 'none' : `${props.group.bound} of ${props.group.total}`} connected. Click to ${props.group.open ? 'hide' : 'show'} its inputs.`)}
+    >
+        <span class="hub"></span
+        ><span class="pill"
+            ><span class="name">${props.group.title}</span
+            ><span class="count">${props.group.bound === 0 ? '' : props.group.bound}</span
+            ><span class="chevron" aria-hidden="true"></span
+        ></span>
+    </button>`;
 
 export class HksStateWiring extends HTMLElement {
     readonly changes$: Observable<WiringEvent>;
@@ -179,12 +177,56 @@ export class HksStateWiring extends HTMLElement {
     private readonly opened$: Observable<string | null>;
     private readonly choices$: Observable<{ readonly key: string; readonly value: string }>;
 
+    private readonly rendering: RenderView<WiringRender>;
+
     constructor() {
         super();
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML =
-            '<svg class="wires" aria-hidden="true"></svg><svg class="rubber" aria-hidden="true"><path/></svg><div class="ports"></div>';
+        this.rendering = renderView<WiringRender>(
+            shadow,
+            { view: null, rows: [] },
+            state =>
+                html`<svg class="wires" aria-hidden="true">
+                        ${repeat(
+                            state.view?.wires ?? [],
+                            item => item,
+                            wire =>
+                                svg`<path d=${ifDefined(wire.path)} style=${styleMap({ '--store': wire.colour })} class=${classMap({ shared: wire.shared })}></path>`,
+                        )}</svg
+                    ><svg class="rubber" aria-hidden="true"><path></path></svg>
+                    <div class="ports">
+                        ${repeat(
+                            state.rows.map(row => row.key),
+                            item => item,
+                            key =>
+                                html`${withValue(socketOf(state.rows.find(row => row.key === key)), socket => SocketRow({ socket: socket }))}${withValue(
+                                    groupOf(state.rows.find(row => row.key === key)),
+                                    group =>
+                                        html`${when(
+                                            group.open,
+                                            () =>
+                                                html`<div
+                                                    class="rail"
+                                                    style=${styleMap({
+                                                        left: `${group.x + 10}px`,
+                                                        top: `${group.y + 14}px`,
+                                                        height: `${
+                                                            (state.view?.sockets
+                                                                .filter(socket =>
+                                                                    group.members.includes(
+                                                                        socket.key,
+                                                                    ),
+                                                                )
+                                                                .at(-1)?.y ?? group.y) - group.y
+                                                        }px`,
+                                                    })}
+                                                ></div>`,
+                                        )}${GroupPill({ group: group })}`,
+                                )}`,
+                        )}
+                    </div>`,
+        );
         this.shadow = shadow;
         const ports = requireChild(shadow, '.ports');
         this.drags$ = pointerGesture$(ports, event => keyOf(event.target) !== null).pipe(
@@ -328,42 +370,21 @@ export class HksStateWiring extends HTMLElement {
     connect$(view$: Observable<WiringView | null>): Observable<void> {
         const shadow = this.shadow;
         const ports = requireChild(shadow, '.ports');
-        const wires = requireElement(shadow, '.wires', SVGSVGElement);
         const rubber = requireElement(shadow, '.rubber path', SVGPathElement);
         const drawn$ = view$.pipe(
             tap(view => {
                 this.hidden = view === null;
 
-                wires.replaceChildren(
-                    ...(view?.wires ?? []).map(wire => {
-                        const path = document.createElementNS(SVG, 'path');
-                        path.setAttribute('d', wire.path);
-                        path.style.setProperty('--store', wire.colour);
-                        path.classList.toggle('shared', wire.shared);
-
-                        return path;
-                    }),
-                );
                 const focused = focusedIn(shadow);
                 const sockets = view?.sockets ?? [];
-
                 const windows = [...new Set(sockets.map(socket => socket.window))];
-                // In reading order, window by window and top to bottom, so Tab walks the rows as they are seen.
                 const rows = [
-                    ...(view?.groups ?? []).map(group => ({
-                        ...group,
-                        nodes: group.open
-                            ? [railOf(group, sockets), groupRow(group)]
-                            : [groupRow(group)],
-                    })),
-                    ...sockets
-                        .filter(socket => !socket.hidden)
-                        .map(socket => ({ ...socket, nodes: [inputRow(socket)] })),
+                    ...(view?.groups ?? []),
+                    ...sockets.filter(socket => !socket.hidden),
                 ].sort(
                     (a, b) => windows.indexOf(a.window) - windows.indexOf(b.window) || a.y - b.y,
                 );
-
-                ports.replaceChildren(...rows.flatMap(row => row.nodes));
+                this.rendering.update({ view, rows });
 
                 const replacement = focused === undefined ? null : ports.querySelector(focused);
 
@@ -426,7 +447,9 @@ export class HksStateWiring extends HTMLElement {
             }),
         );
 
-        return merge(drawn$, dragged$, opened$).pipe(map(() => undefined));
+        return merge(this.rendering.lifetime$, drawn$, dragged$, opened$).pipe(
+            map(() => undefined),
+        );
     }
 }
 

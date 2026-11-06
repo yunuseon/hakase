@@ -1,3 +1,5 @@
+import { html } from 'lit-html';
+import { mountView, type Rendering } from '../../lib/lit.ts';
 import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -21,11 +23,10 @@ import css from './canvas.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="ground"></div>
-    <div class="world"><slot></slot></div>
-    <slot name="chrome"></slot>
-`;
+const TEMPLATE = () =>
+    html`<div class="ground"></div>
+        <div class="world"><slot></slot></div>
+        <slot name="chrome"></slot>`;
 
 export class HksCanvas extends HTMLElement {
     readonly stateHolds$: Observable<boolean>;
@@ -39,12 +40,14 @@ export class HksCanvas extends HTMLElement {
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
 
+    private readonly rendering: Rendering;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.stateHolds$ = merge(
             fromDocumentEvent$('keydown').pipe(
@@ -163,47 +166,50 @@ export class HksCanvas extends HTMLElement {
         stateMode$: Observable<boolean>,
     ): Observable<void> {
         return merge(
-            stateMode$.pipe(
-                distinctUntilChanged(),
-                tap(active => {
-                    this.toggleAttribute('data-state-mode', active);
-                }),
-            ),
-            // On the host, so every window and the toolbar inherit them across their shadow roots.
-            variables$.pipe(
-                distinctUntilChanged(sameVariables),
-                tap(variables => {
-                    for (const [name, value] of variables) {
-                        this.style.setProperty(name, value);
-                    }
-                }),
-            ),
-            camera$.pipe(
-                map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),
-                distinctUntilChanged(),
-                tap(transform => {
-                    this.world.style.transform = transform;
-                }),
-            ),
-            camera$.pipe(
-                map(camera => `${gridOf(camera).size}px`),
-                distinctUntilChanged(),
-                tap(size => {
-                    this.ground.style.backgroundSize = `${size} ${size}`;
-                }),
-            ),
-            camera$.pipe(
-                map(camera => {
-                    const { x, y } = gridOf(camera);
+            this.rendering.lifetime$,
+            merge(
+                stateMode$.pipe(
+                    distinctUntilChanged(),
+                    tap(active => {
+                        this.toggleAttribute('data-state-mode', active);
+                    }),
+                ),
+                // On the host, so every window and the toolbar inherit them across their shadow roots.
+                variables$.pipe(
+                    distinctUntilChanged(sameVariables),
+                    tap(variables => {
+                        for (const [name, value] of variables) {
+                            this.style.setProperty(name, value);
+                        }
+                    }),
+                ),
+                camera$.pipe(
+                    map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),
+                    distinctUntilChanged(),
+                    tap(transform => {
+                        this.world.style.transform = transform;
+                    }),
+                ),
+                camera$.pipe(
+                    map(camera => `${gridOf(camera).size}px`),
+                    distinctUntilChanged(),
+                    tap(size => {
+                        this.ground.style.backgroundSize = `${size} ${size}`;
+                    }),
+                ),
+                camera$.pipe(
+                    map(camera => {
+                        const { x, y } = gridOf(camera);
 
-                    return `${x}px ${y}px`;
-                }),
-                distinctUntilChanged(),
-                tap(position => {
-                    this.ground.style.backgroundPosition = position;
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                        return `${x}px ${y}px`;
+                    }),
+                    distinctUntilChanged(),
+                    tap(position => {
+                        this.ground.style.backgroundPosition = position;
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

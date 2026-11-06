@@ -1,3 +1,6 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { mountView, type Rendering } from '../../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
@@ -14,45 +17,46 @@ import css from './export-panel.css?inline';
 
 const sheet = styleSheet(css);
 
-const select = (field: string, label: string, options: readonly (readonly [string, string])[]) => `
-    <label class="item"${field === 'quality' ? ' data-video' : ''}>
-        <span class="key">${label}</span>
-        <hks-select class="pick" data-field="${field}" aria-label="${label}">
-            ${options.map(([value, text]) => `<option value="${value}">${text}</option>`).join('')}
-        </hks-select>
-    </label>
-`;
+const select = (field: string, label: string, options: readonly (readonly [string, string])[]) =>
+    html`<label class="item" data-video=${ifDefined(field === 'quality' ? '' : undefined)}
+        ><span class="key">${label}</span
+        ><hks-select class="pick" data-field=${ifDefined(field)} aria-label=${ifDefined(label)}
+            >${options.map(
+                ([value, text]) => html`<option .value=${value}>${text}</option>`,
+            )}</hks-select
+        ></label
+    >`;
 
-const TEMPLATE = `
-    <div class="row">
-        ${select('format', 'format', [
-            ['webm', 'WebM video'],
-            ['png', 'PNG frames (zip)'],
-        ])}
-        ${select(
-            'fps',
-            'fps',
-            FRAME_RATES.map(rate => [String(rate), String(rate)]),
-        )}
-        ${select(
-            'size',
-            'size',
-            EXPORT_SIZES.map(size => [String(size), `${size} px`]),
-        )}
-        ${select(
-            'quality',
-            'quality',
-            QUALITIES.map(quality => [quality, quality]),
-        )}
-    </div>
-    <div class="row actions">
-        <span class="summary"></span>
-        <span class="status" role="status"></span>
-        <button class="button cancel" type="button" hidden>Cancel</button>
-        <button class="button still" type="button" title="save the frame under the playhead as a PNG">Save frame</button>
-        <button class="button primary start" type="button">Export</button>
-    </div>
-`;
+const TEMPLATE = () =>
+    html`<div class="row">
+            ${select('format', 'format', [
+                ['webm', 'WebM video'],
+                ['png', 'PNG frames (zip)'],
+            ])}${select(
+                'fps',
+                'fps',
+                FRAME_RATES.map(rate => [String(rate), String(rate)]),
+            )}${select(
+                'size',
+                'size',
+                EXPORT_SIZES.map(size => [String(size), `${size} px`]),
+            )}${select(
+                'quality',
+                'quality',
+                QUALITIES.map(quality => [quality, quality]),
+            )}
+        </div>
+        <div class="row actions">
+            <span class="summary"></span><span class="status" role="status"></span
+            ><button class="button cancel" type="button" hidden>Cancel</button
+            ><button
+                class="button still"
+                type="button"
+                title="save the frame under the playhead as a PNG"
+            >
+                Save frame</button
+            ><button class="button primary start" type="button">Export</button>
+        </div>`;
 
 export type SavedFile = {
     readonly blob: Blob;
@@ -79,13 +83,15 @@ export class HksExportPanel extends HTMLElement {
     private readonly summary: HTMLElement;
     private readonly status: HTMLElement;
 
+    private readonly rendering: Rendering;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.start = requireElement(shadow, '.start', HTMLButtonElement);
         this.cancel = requireElement(shadow, '.cancel', HTMLButtonElement);
@@ -178,13 +184,16 @@ export class HksExportPanel extends HTMLElement {
         );
 
         return merge(
-            connectSelects$(this.shadow),
-            ...fields$,
-            video$,
-            summarised$,
-            shown$,
-            saved$,
-        ).pipe(map(() => undefined));
+            this.rendering.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                ...fields$,
+                video$,
+                summarised$,
+                shown$,
+                saved$,
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

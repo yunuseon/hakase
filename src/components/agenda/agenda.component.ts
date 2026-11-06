@@ -1,3 +1,17 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { ref } from 'lit-html/directives/ref.js';
+
+import {
+    mountView,
+    renderView,
+    displayValue,
+    type RenderView,
+    type Rendering,
+} from '../../lib/lit.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -22,22 +36,26 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const FIRST_HOUR = 8;
 const NEW_LENGTH = 60;
 
-const TEMPLATE = `
-    <header class="bar">
-        <button class="prev" type="button" aria-label="previous day">‹</button>
-        <button class="today" type="button">Today</button>
-        <button class="next" type="button" aria-label="next day">›</button>
-        <span class="date"></span>
-    </header>
-    <div class="scroll">
-        <div class="hours">
-            ${HOURS.map(hour => `<div class="hour" style="--hour: ${hour}"><span>${timeOf(hour * 60)}</span></div>`).join('')}
-            <div class="blocks"></div>
-            <div class="ghost" hidden></div>
-            <div class="now" hidden></div>
-        </div>
-    </div>
-`;
+const TEMPLATE = () =>
+    html`<header class="bar">
+            <button class="prev" type="button" aria-label="previous day">‹</button
+            ><button class="today" type="button">Today</button
+            ><button class="next" type="button" aria-label="next day">›</button
+            ><span class="date"></span>
+        </header>
+        <div class="scroll">
+            <div class="hours">
+                ${HOURS.map(
+                    hour =>
+                        html`<div class="hour" style=${ifDefined(`--hour: ${hour}`)}>
+                            <span>${timeOf(hour * 60)}</span>
+                        </div>`,
+                )}
+                <div class="blocks"></div>
+                <div class="ghost" hidden></div>
+                <div class="now" hidden></div>
+            </div>
+        </div>`;
 
 export type AgendaView = {
     readonly label: string;
@@ -71,59 +89,6 @@ type Gesture =
 
 const ENDS = ['pointerup', 'pointercancel'] as const;
 
-const blockOf = (id: string): HTMLElement => {
-    const element = document.createElement('div');
-    element.className = 'block';
-    element.dataset['block'] = id;
-
-    const time = document.createElement('span');
-    time.className = 'time';
-
-    const title = document.createElement('input');
-    title.className = 'title';
-    title.dataset['title'] = id;
-    title.placeholder = 'Untitled';
-    title.autocomplete = 'off';
-    title.setAttribute('aria-label', 'block title');
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remove';
-    remove.dataset['remove'] = id;
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', 'delete block');
-
-    const handle = document.createElement('div');
-    handle.className = 'handle';
-    handle.dataset['handle'] = id;
-
-    element.append(time, title, remove, handle);
-
-    return element;
-};
-
-const filled = (element: HTMLElement, block: Placed, active: Element | null): void => {
-    element.style.setProperty('--start', String(block.start));
-    element.style.setProperty('--length', String(block.end - block.start));
-    element.style.setProperty('--lane', String(block.lane));
-    element.style.setProperty('--lanes', String(block.lanes));
-    element.dataset['start'] = String(block.start);
-    element.dataset['end'] = String(block.end);
-    element.toggleAttribute('data-short', block.end - block.start < 60);
-
-    const time = element.querySelector('.time');
-    const title = element.querySelector('.title');
-
-    if (time !== null) {
-        time.textContent = `${timeOf(block.start)}–${timeOf(block.end)}`;
-    }
-
-    // Not while focused: that would overwrite a title being typed with another window's edit.
-    if (title instanceof HTMLInputElement && title !== active) {
-        title.value = block.title;
-    }
-};
-
 const dataOf = (target: EventTarget | null, key: string): string | undefined => {
     const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
 
@@ -137,13 +102,66 @@ export class HksAgenda extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly gestures$: Observable<Gesture>;
 
+    private readonly rendering: Rendering;
+
+    private readonly blockView: RenderView<readonly Placed[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.blockView = renderView<readonly Placed[]>(
+            requireChild(shadow, '.blocks'),
+            [],
+            blocks =>
+                repeat(
+                    blocks.map(block => block.id),
+                    item => item,
+                    id =>
+                        withValue(
+                            blocks.find(block => block.id === id),
+                            block =>
+                                html`<div
+                                    class="block"
+                                    data-block=${ifDefined(id)}
+                                    data-start=${ifDefined(block.start)}
+                                    data-end=${ifDefined(block.end)}
+                                    data-short=${ifDefined(block.end - block.start < 60 ? '' : undefined)}
+                                    style=${styleMap({
+                                        '--start': String(block.start),
+                                        '--length': String(block.end - block.start),
+                                        '--lane': String(block.lane),
+                                        '--lanes': String(block.lanes),
+                                    })}
+                                >
+                                    <span class="time"
+                                        >${`${timeOf(block.start)}–${timeOf(block.end)}`}</span
+                                    ><input
+                                        class="title"
+                                        data-title=${ifDefined(id)}
+                                        aria-label="block title"
+                                        placeholder="Untitled"
+                                        ${ref(element => {
+                                            if (element instanceof HTMLInputElement) {
+                                                displayValue(element, block.title);
+                                            }
+                                        })}
+                                    /><button
+                                        class="remove"
+                                        type="button"
+                                        data-remove=${ifDefined(id)}
+                                        aria-label="delete block"
+                                    >
+                                        ×
+                                    </button>
+                                    <div class="handle" data-handle=${ifDefined(id)}></div>
+                                </div>`,
+                        ),
+                ),
+        );
 
         const hours = requireChild(shadow, '.hours');
         const blocks = requireChild(shadow, '.blocks');
@@ -278,78 +296,63 @@ export class HksAgenda extends HTMLElement {
 
     connect$(view$: Observable<AgendaView>): Observable<void> {
         const shadow = this.shadow;
+        const blocks = requireChild(shadow, '.blocks');
         const scroll = requireChild(shadow, '.scroll');
         const hours = requireChild(shadow, '.hours');
-        const blocks = requireChild(shadow, '.blocks');
         const ghost = requireChild(shadow, '.ghost');
         const now = requireChild(shadow, '.now');
         const date = requireChild(shadow, '.date');
 
         return merge(
-            view$.pipe(
-                take(1),
-                tap(() => {
-                    scroll.scrollTop = (hours.offsetHeight / 24) * FIRST_HOUR;
-                }),
-            ),
-            view$.pipe(
-                tap(({ label, blocks: placed, now: minute }) => {
-                    date.textContent = label;
-                    now.hidden = minute === null;
-                    now.style.setProperty('--start', String(minute ?? 0));
+            this.rendering.lifetime$,
+            this.blockView.lifetime$,
+            merge(
+                view$.pipe(
+                    take(1),
+                    tap(() => {
+                        scroll.scrollTop = (hours.offsetHeight / 24) * FIRST_HOUR;
+                    }),
+                ),
+                view$.pipe(
+                    tap(({ label, blocks: placed, now: minute }) => {
+                        date.textContent = label;
+                        now.hidden = minute === null;
+                        now.style.setProperty('--start', String(minute ?? 0));
 
-                    const active = shadow.activeElement;
-                    const existing = new Map(
-                        [...blocks.children]
-                            .filter(child => child instanceof HTMLElement)
-                            .map(child => [child.dataset['block'], child]),
-                    );
-                    const shown = placed.map(block => {
-                        const element = existing.get(block.id) ?? blockOf(block.id);
-                        filled(element, block, active);
+                        this.blockView.update(placed);
+                    }),
+                ),
+                this.gestures$.pipe(
+                    tap(gesture => {
+                        const creating = gesture.kind === 'create' && !gesture.done;
+                        ghost.hidden = !creating;
 
-                        return element;
-                    });
+                        if (gesture.kind === 'create') {
+                            const low = snapped(Math.min(gesture.from, gesture.to));
+                            const high = Math.max(
+                                snapped(Math.max(gesture.from, gesture.to)),
+                                low + SNAP,
+                            );
+                            ghost.style.setProperty('--start', String(low));
+                            ghost.style.setProperty('--length', String(high - low));
+                        }
 
-                    // Only new or removed blocks change the children; moving a node would drop the focus of a title.
-                    if (
-                        shown.length !== blocks.children.length ||
-                        shown.some(element => element.parentElement !== blocks)
-                    ) {
-                        blocks.replaceChildren(...shown);
-                    }
-                }),
-            ),
-            this.gestures$.pipe(
-                tap(gesture => {
-                    const creating = gesture.kind === 'create' && !gesture.done;
-                    ghost.hidden = !creating;
-
-                    if (gesture.kind === 'create') {
-                        const low = snapped(Math.min(gesture.from, gesture.to));
-                        const high = Math.max(
-                            snapped(Math.max(gesture.from, gesture.to)),
-                            low + SNAP,
+                        this.toggleAttribute(
+                            'data-dragging',
+                            !gesture.done && gesture.kind !== 'create',
                         );
-                        ghost.style.setProperty('--start', String(low));
-                        ghost.style.setProperty('--length', String(high - low));
-                    }
-
-                    this.toggleAttribute(
-                        'data-dragging',
-                        !gesture.done && gesture.kind !== 'create',
-                    );
-                }),
-            ),
-            fromElementEvent$(blocks, 'keydown').pipe(
-                tap(event => {
-                    if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
-                        event.preventDefault();
-                        event.target.blur();
-                    }
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                    }),
+                ),
+                fromElementEvent$(blocks, 'keydown').pipe(
+                    tap(event => {
+                        if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+                            event.preventDefault();
+                            event.target.blur();
+                        }
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

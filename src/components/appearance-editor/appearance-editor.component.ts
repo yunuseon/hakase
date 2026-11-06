@@ -1,3 +1,10 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+
+import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
@@ -7,14 +14,12 @@ import css from './appearance-editor.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <label class="head">
-        <span class="key">look</span>
-        <hks-select class="pick" aria-label="look"></hks-select>
-    </label>
-    <div class="swatches"></div>
-    <div class="rows"></div>
-`;
+const TEMPLATE = () =>
+    html`<label class="head"
+            ><span class="key">look</span><hks-select class="pick" aria-label="look"></hks-select
+        ></label>
+        <div class="swatches"></div>
+        <div class="rows"></div>`;
 
 export type PresetOption = {
     readonly value: string;
@@ -31,17 +36,51 @@ export class HksAppearanceEditor extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
 
+    private readonly rendering: Rendering;
+
+    private readonly tokenView: RenderView<readonly string[]>;
+    private readonly swatchView: RenderView<readonly string[]>;
+    private readonly optionsView: RenderView<readonly SelectChoice[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.picker = requireElement(shadow, '.pick', HksSelect);
+        this.optionsView = renderOptions(this.picker);
         this.rows = requireChild(shadow, '.rows');
         this.swatches = requireChild(shadow, '.swatches');
+        this.tokenView = renderView<readonly string[]>(this.rows, [], tokens =>
+            repeat(
+                tokens,
+                item => item,
+                token =>
+                    html`<label class="row"
+                        ><input
+                            type="color"
+                            class="ink"
+                            data-token=${ifDefined(token)}
+                            aria-label=${ifDefined(token)}
+                        /><span class="name">${token}</span></label
+                    >`,
+            ),
+        );
+        this.swatchView = renderView<readonly string[]>(this.swatches, [], tokens =>
+            repeat(
+                tokens,
+                item => item,
+                token =>
+                    html`<span
+                        class="swatch"
+                        style=${styleMap({ background: `var(--${token})` })}
+                        title=${ifDefined(token)}
+                    ></span>`,
+            ),
+        );
 
         // Only on change: the active look is app state, so the picker shows it rather than seeds it.
         this.selections$ = fromElementEvent$(this.picker, 'change').pipe(
@@ -54,51 +93,14 @@ export class HksAppearanceEditor extends HTMLElement {
     }
 
     presets(options: readonly PresetOption[]): this {
-        this.picker.replaceChildren(
-            ...options.map(({ value, label }) => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = label;
-
-                return option;
-            }),
-        );
+        this.optionsView.update(options);
 
         return this;
     }
 
     tokens(tokens: readonly string[]): this {
-        this.rows.replaceChildren(
-            ...tokens.map(token => {
-                const row = document.createElement('label');
-                row.className = 'row';
-
-                const name = document.createElement('span');
-                name.className = 'name';
-                name.textContent = token;
-
-                const input = document.createElement('input');
-                input.type = 'color';
-                input.className = 'ink';
-                input.dataset['token'] = token;
-                input.setAttribute('aria-label', token);
-
-                row.append(input, name);
-
-                return row;
-            }),
-        );
-
-        this.swatches.replaceChildren(
-            ...tokens.map(token => {
-                const swatch = document.createElement('span');
-                swatch.className = 'swatch';
-                swatch.style.background = `var(--${token})`;
-                swatch.title = token;
-
-                return swatch;
-            }),
-        );
+        this.tokenView.update(tokens);
+        this.swatchView.update(tokens);
 
         return this;
     }
@@ -116,24 +118,30 @@ export class HksAppearanceEditor extends HTMLElement {
         values$: Observable<ReadonlyMap<string, string>>,
     ): Observable<void> {
         return merge(
-            connectSelects$(this.shadow),
-            selected$.pipe(
-                tap(name => {
-                    this.picker.value = name;
-                }),
-            ),
-            values$.pipe(
-                tap(values => {
-                    for (const input of this.inputs()) {
-                        const value = values.get(input.dataset['token'] ?? '');
+            this.rendering.lifetime$,
+            this.optionsView.lifetime$,
+            this.tokenView.lifetime$,
+            this.swatchView.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                selected$.pipe(
+                    tap(name => {
+                        this.picker.value = name;
+                    }),
+                ),
+                values$.pipe(
+                    tap(values => {
+                        for (const input of this.inputs()) {
+                            const value = values.get(input.dataset['token'] ?? '');
 
-                        if (value !== undefined && input.value !== value) {
-                            input.value = value;
+                            if (value !== undefined && input.value !== value) {
+                                input.value = value;
+                            }
                         }
-                    }
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

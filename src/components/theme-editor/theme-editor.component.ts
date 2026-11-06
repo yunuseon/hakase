@@ -1,3 +1,9 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+
+import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
@@ -8,24 +14,22 @@ import css from './theme-editor.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="head">
-        <span class="key">theme</span>
-        <hks-select class="pick" aria-label="theme"></hks-select>
-    </div>
-    <div class="bar"></div>
-    <div class="body">
-        <label class="row">
-            <span class="key">blend</span>
-            <hks-select class="blend" aria-label="blend">
-                <option value="smooth">smooth</option>
-                <option value="steps">steps</option>
-            </hks-select>
-        </label>
-        <div class="stops"></div>
-        <button class="add" type="button" data-command="add">add stop</button>
-    </div>
-`;
+const TEMPLATE = () =>
+    html`<div class="head">
+            <span class="key">theme</span><hks-select class="pick" aria-label="theme"></hks-select>
+        </div>
+        <div class="bar"></div>
+        <div class="body">
+            <label class="row"
+                ><span class="key">blend</span
+                ><hks-select class="blend" aria-label="blend"
+                    ><option value="smooth">smooth</option>
+                    <option value="steps">steps</option></hks-select
+                ></label
+            >
+            <div class="stops"></div>
+            <button class="add" type="button" data-command="add">add stop</button>
+        </div>`;
 
 export type PresetOption = {
     readonly value: string;
@@ -46,17 +50,54 @@ export class HksThemeEditor extends HTMLElement {
     private readonly stops: HTMLElement;
     private readonly bar: HTMLElement;
 
+    private readonly rendering: Rendering;
+
+    private readonly stopView: RenderView<readonly Stop[]>;
+    private readonly optionsView: RenderView<readonly SelectChoice[]>;
+
     constructor() {
         super();
 
         this.shadow = this.attachShadow({ mode: 'open' });
         this.shadow.adoptedStyleSheets = [sheet];
-        this.shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(this.shadow, () => TEMPLATE());
 
         this.stops = requireChild(this.shadow, '.stops');
         this.bar = requireChild(this.shadow, '.bar');
+        this.stopView = renderView<readonly Stop[]>(this.stops, [], stops =>
+            repeat(
+                stops,
+                (_item, index) => index,
+                (stop, index) =>
+                    html`<div class="row stop">
+                        <input
+                            class="at"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            .value=${stop.at}
+                            aria-label=${ifDefined(`stop ${index + 1} position`)}
+                        /><input
+                            class="hue"
+                            type="color"
+                            .value=${stop.color}
+                            aria-label=${ifDefined(`stop ${index + 1} colour`)}
+                        /><button
+                            class="drop"
+                            type="button"
+                            data-command=${ifDefined(index)}
+                            aria-label=${ifDefined(`remove stop ${index + 1}`)}
+                            ?disabled=${stops.length < 2}
+                        >
+                            ×
+                        </button>
+                    </div>`,
+            ),
+        );
 
         const picker = requireElement(this.shadow, '.pick', HksSelect);
+        this.optionsView = renderOptions(picker);
         const body = requireChild(this.shadow, '.body');
 
         this.selections$ = fromElementEvent$(picker, 'change').pipe(map(() => picker.value));
@@ -85,17 +126,7 @@ export class HksThemeEditor extends HTMLElement {
     }
 
     presets(options: readonly PresetOption[]): this {
-        const picker = requireElement(this.shadow, '.pick', HksSelect);
-
-        picker.replaceChildren(
-            ...options.map(({ value, label }) => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = label;
-
-                return option;
-            }),
-        );
+        this.optionsView.update(options);
 
         return this;
     }
@@ -108,21 +139,26 @@ export class HksThemeEditor extends HTMLElement {
         const picker = requireElement(this.shadow, '.pick', HksSelect);
 
         return merge(
-            connectSelects$(this.shadow),
-            selected$.pipe(
-                distinctUntilChanged(),
-                tap(value => {
-                    picker.value = value;
-                }),
-            ),
-            rows$.pipe(tap(theme => this.render(theme))),
-            gradient$.pipe(
-                map(gradientCss),
-                tap(background => {
-                    this.bar.style.background = background;
-                }),
-            ),
-        ).pipe(map(() => undefined));
+            this.rendering.lifetime$,
+            this.optionsView.lifetime$,
+            this.stopView.lifetime$,
+            merge(
+                connectSelects$(this.shadow),
+                selected$.pipe(
+                    distinctUntilChanged(),
+                    tap(value => {
+                        picker.value = value;
+                    }),
+                ),
+                rows$.pipe(tap(theme => this.render(theme))),
+                gradient$.pipe(
+                    map(gradientCss),
+                    tap(background => {
+                        this.bar.style.background = background;
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 
     private read(): Theme {
@@ -139,39 +175,7 @@ export class HksThemeEditor extends HTMLElement {
     private render({ stops, blend }: Theme): void {
         requireElement(this.shadow, '.blend', HksSelect).value = blend;
 
-        this.stops.replaceChildren(
-            ...stops.map((stop, index) => {
-                const row = document.createElement('div');
-                row.className = 'row stop';
-
-                const at = document.createElement('input');
-                at.className = 'at';
-                at.type = 'range';
-                at.min = '0';
-                at.max = '1';
-                at.step = '0.01';
-                at.value = String(stop.at);
-                at.setAttribute('aria-label', `stop ${String(index + 1)} position`);
-
-                const hue = document.createElement('input');
-                hue.className = 'hue';
-                hue.type = 'color';
-                hue.value = stop.color;
-                hue.setAttribute('aria-label', `stop ${String(index + 1)} colour`);
-
-                const drop = document.createElement('button');
-                drop.className = 'drop';
-                drop.type = 'button';
-                drop.dataset['command'] = String(index);
-                drop.textContent = '×';
-                drop.setAttribute('aria-label', `remove stop ${String(index + 1)}`);
-                drop.disabled = stops.length < 2;
-
-                row.append(at, hue, drop);
-
-                return row;
-            }),
-        );
+        this.stopView.update(stops);
     }
 }
 

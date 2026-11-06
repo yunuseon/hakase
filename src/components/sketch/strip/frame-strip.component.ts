@@ -1,66 +1,46 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
 import { filter, map, mergeMap, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$, observeResize$ } from '../../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../../shared/drag.ts';
-import {
-    frameAt,
-    markerX,
-    type StripGeometry,
-    type StripLayout,
-    type Visible,
-} from '../animation.ts';
+import { frameAt, markerX, type StripLayout, type Visible } from '../animation.ts';
 import type { Filmstrip } from './thumbnails.ts';
 import css from './frame-strip.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="head">
-        <span class="readout">frame <span class="now"></span> / <span class="total"></span></span>
-        <div class="zoom" role="group" aria-label="zoom the frames">
-            <button type="button" data-zoom="out" aria-label="zoom out" title="zoom out">−</button>
-            <button type="button" data-zoom="fit" title="fit the whole loop">fit</button>
-            <button type="button" data-zoom="in" aria-label="zoom in" title="zoom in, down to single frames">+</button>
+const TEMPLATE = () =>
+    html`<div class="head">
+            <span class="readout"
+                >frame <span class="now"></span> / <span class="total"></span
+            ></span>
+            <div class="zoom" role="group" aria-label="zoom the frames">
+                <button type="button" data-zoom="out" aria-label="zoom out" title="zoom out">
+                    −</button
+                ><button type="button" data-zoom="fit" title="fit the whole loop">fit</button
+                ><button
+                    type="button"
+                    data-zoom="in"
+                    aria-label="zoom in"
+                    title="zoom in, down to single frames"
+                >
+                    +
+                </button>
+            </div>
         </div>
-    </div>
-    <div class="scroller">
-        <div class="track">
-            <canvas class="film"></canvas>
-            <div class="tiles"></div>
-            <div class="playhead" aria-hidden="true"></div>
-        </div>
-    </div>
-`;
-
-// Tiles are rebuilt only when what a tile stands for changes; a pinch between whole levels only widens them.
-const framingOf = ({ frames, perTile, tileHeight }: StripGeometry): string =>
-    `${frames}:${perTile}:${tileHeight}`;
-
-const place = (
-    element: HTMLElement,
-    tile: number,
-    { tileWidth, tileHeight }: StripGeometry,
-): void => {
-    element.style.left = `${tile * tileWidth}px`;
-    element.style.width = `${tileWidth}px`;
-    element.style.height = `${tileHeight}px`;
-};
-
-const tileOf = (tile: number, geometry: StripGeometry): HTMLElement => {
-    const element = document.createElement('div');
-    element.className = 'tile';
-    element.dataset['tile'] = String(tile);
-    place(element, tile, geometry);
-
-    const number = document.createElement('span');
-    number.className = 'number';
-    number.textContent = String(tile * geometry.perTile + 1);
-
-    element.append(number);
-
-    return element;
-};
+        <div class="scroller">
+            <div class="track">
+                <canvas class="film"></canvas>
+                <div class="tiles"></div>
+                <div class="playhead" aria-hidden="true"></div>
+            </div>
+        </div>`;
 
 export class HksFrameStrip extends HTMLElement {
     readonly zooms$: Observable<string>;
@@ -77,16 +57,48 @@ export class HksFrameStrip extends HTMLElement {
     private readonly now: HTMLElement;
     private readonly total: HTMLElement;
 
+    private readonly rendering: Rendering;
+
+    private readonly tileView: RenderView<StripLayout | null>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.scroller = requireChild(shadow, '.scroller');
         this.track = requireChild(shadow, '.track');
         this.tiles = requireChild(shadow, '.tiles');
+        this.tileView = renderView<StripLayout | null>(this.tiles, null, layout =>
+            repeat(
+                layout === null
+                    ? []
+                    : Array.from(
+                          {
+                              length: Math.max(
+                                  0,
+                                  (layout?.range.last ?? -1) - (layout?.range.first ?? 0) + 1,
+                              ),
+                          },
+                          (_, offset) => (layout?.range.first ?? 0) + offset,
+                      ),
+                item => item,
+                tile =>
+                    html`<div
+                        class="tile"
+                        data-tile=${ifDefined(tile)}
+                        style=${styleMap({
+                            left: `${tile * (layout?.geometry.tileWidth ?? 0)}px`,
+                            width: `${layout?.geometry.tileWidth ?? 0}px`,
+                            height: `${layout?.geometry.tileHeight ?? 0}px`,
+                        })}
+                    >
+                        <span class="number">${tile * (layout?.geometry.perTile ?? 0) + 1}</span>
+                    </div>`,
+            ),
+        );
         this.film = requireElement(shadow, '.film', HTMLCanvasElement);
         this.playhead = requireChild(shadow, '.playhead');
         this.now = requireChild(shadow, '.now');
@@ -137,47 +149,12 @@ export class HksFrameStrip extends HTMLElement {
     ): Observable<void> {
         // Updated in place: a pinch between whole levels moves and widens the tiles in view rather than rebuilding them.
         const shown$ = layout$.pipe(
-            tap(({ geometry, range: { first, last } }) => {
-                const framing = framingOf(geometry);
-
-                if (this.tiles.dataset['framing'] !== framing) {
-                    this.tiles.dataset['framing'] = framing;
-                    this.tiles.replaceChildren();
-                    this.total.textContent = String(geometry.frames);
-                }
-
+            tap(layout => {
+                const { geometry } = layout;
+                this.total.textContent = String(geometry.frames);
                 this.track.style.width = `${geometry.tiles * geometry.tileWidth}px`;
                 this.track.style.height = `${geometry.tileHeight}px`;
-
-                const present = new Set(
-                    [...this.tiles.children].flatMap(tile => {
-                        const index =
-                            tile instanceof HTMLElement ? Number(tile.dataset['tile']) : NaN;
-
-                        if (
-                            !(tile instanceof HTMLElement) ||
-                            Number.isNaN(index) ||
-                            index < first ||
-                            index > last
-                        ) {
-                            tile.remove();
-
-                            return [];
-                        }
-
-                        place(tile, index, geometry);
-
-                        return [index];
-                    }),
-                );
-
-                const missing = Array.from(
-                    { length: Math.max(0, last - first + 1) },
-                    (_, offset) => first + offset,
-                )
-                    .filter(index => !present.has(index))
-                    .map(index => tileOf(index, geometry));
-                this.tiles.append(...missing);
+                this.tileView.update(layout);
             }),
         );
 
@@ -220,7 +197,11 @@ export class HksFrameStrip extends HTMLElement {
             }),
         );
 
-        return merge(painted$, current$, scrolled$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            this.tileView.lifetime$,
+            merge(painted$, current$, scrolled$).pipe(map(() => undefined)),
+        );
     }
 }
 

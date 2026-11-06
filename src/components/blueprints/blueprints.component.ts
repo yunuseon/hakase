@@ -1,3 +1,10 @@
+import { svg, html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { ref } from 'lit-html/directives/ref.js';
+
+import { renderView, displayValue, type RenderView } from '../../lib/lit.ts';
 import { concat, merge, of, timer, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, scan, share, switchMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -12,76 +19,80 @@ import {
 import css from './blueprints.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 const DISARM_MS = 3000;
 
-const TEMPLATE = `
-    <ul class="cards" aria-label="blueprints"></ul>
-    <p class="empty">Your own blueprints join these: hover a section's label and choose <b>Save as blueprint</b>, and its windows, their states and their wiring are kept here, ready to place again.</p>
-`;
+const TEMPLATE = (cards: readonly BlueprintCard[]) =>
+    html`<ul class="cards" aria-label="blueprints">
+            ${repeat(
+                cards.map(card => card.id),
+                item => item,
+                id =>
+                    withValue(
+                        cards.find(card => card.id === id),
+                        card =>
+                            html`<li
+                                class="card"
+                                data-card=${ifDefined(id)}
+                                data-builtin=${ifDefined(card.summary !== null ? '' : undefined)}
+                            >
+                                <svg
+                                    class="preview"
+                                    aria-hidden="true"
+                                    preserveAspectRatio="xMidYMid meet"
+                                    viewBox=${ifDefined(`0 0 ${card.size.width} ${card.size.height}`)}
+                                >
+                                    ${repeat(
+                                        card.windows,
+                                        (_item, index) => index,
+                                        window =>
+                                            svg`<rect x=${ifDefined(window.x)} y=${ifDefined(window.y)} width=${ifDefined(window.width)} height=${ifDefined(window.height)} rx=${ifDefined(Math.min(window.width, window.height) * 0.06)}></rect>`,
+                                    )}
+                                </svg>
+                                <div class="text">
+                                    <input
+                                        class="name"
+                                        spellcheck=${ifDefined(false)}
+                                        data-rename=${ifDefined(id)}
+                                        aria-label="blueprint name"
+                                        ?readonly=${card.summary !== null}
+                                        ${ref(element => {
+                                            if (element instanceof HTMLInputElement) {
+                                                displayValue(element, card.name);
+                                            }
+                                        })}
+                                    /><span class="meta"
+                                        >${card.summary ?? describedCount(card.windows.length)}</span
+                                    >
+                                </div>
+                                <button
+                                    type="button"
+                                    class="place"
+                                    data-place=${ifDefined(id)}
+                                    title="Place a fresh copy in view: its states are new, so the saved blueprint stays as it is"
+                                >
+                                    Place</button
+                                ><button
+                                    type="button"
+                                    class="remove"
+                                    data-remove=${ifDefined(id)}
+                                    aria-label="delete blueprint"
+                                >
+                                    ×
+                                </button>
+                            </li>`,
+                    ),
+            )}
+        </ul>
+        <p class="empty" ?hidden=${cards.some(card => card.summary === null)}>
+            Your own blueprints join these: hover a section's label and choose${' '}<b
+                >Save as blueprint</b
+            >, and its windows, their states and their wiring are kept here, ready to place again.
+        </p>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element
         ? (target.closest(`[data-${name}]`)?.getAttribute(`data-${name}`) ?? undefined)
         : undefined;
-
-const cardOf = (id: string): HTMLElement => {
-    const card = document.createElement('li');
-    card.className = 'card';
-    card.dataset['card'] = id;
-
-    const preview = document.createElementNS(SVG, 'svg');
-    preview.classList.add('preview');
-    preview.setAttribute('aria-hidden', 'true');
-    preview.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-
-    const name = document.createElement('input');
-    name.className = 'name';
-    name.spellcheck = false;
-    name.dataset['rename'] = id;
-    name.setAttribute('aria-label', 'blueprint name');
-
-    const meta = document.createElement('span');
-    meta.className = 'meta';
-
-    const place = document.createElement('button');
-    place.type = 'button';
-    place.className = 'place';
-    place.dataset['place'] = id;
-    place.textContent = 'Place';
-    place.title =
-        'Place a fresh copy in view: its states are new, so the saved blueprint stays as it is';
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remove';
-    remove.dataset['remove'] = id;
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', 'delete blueprint');
-
-    const text = document.createElement('div');
-    text.className = 'text';
-    text.append(name, meta);
-    card.append(preview, text, place, remove);
-
-    return card;
-};
-
-const drawPreview = (preview: Element, { size, windows }: BlueprintCard) => {
-    preview.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
-    preview.replaceChildren(
-        ...windows.map(({ x, y, width, height }) => {
-            const rect = document.createElementNS(SVG, 'rect');
-            rect.setAttribute('x', String(x));
-            rect.setAttribute('y', String(y));
-            rect.setAttribute('width', String(width));
-            rect.setAttribute('height', String(height));
-            rect.setAttribute('rx', String(Math.min(width, height) * 0.06));
-
-            return rect;
-        }),
-    );
-};
 
 export class HksBlueprints extends HTMLElement {
     readonly changes$: Observable<BlueprintEvent>;
@@ -89,13 +100,15 @@ export class HksBlueprints extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly armed$: Observable<string | null>;
 
+    private readonly rendering: RenderView<readonly BlueprintCard[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<readonly BlueprintCard[]>(shadow, [], TEMPLATE);
 
         const clicks$ = fromElementEvent$(this, 'click').pipe(
             map(event => event.composedPath()[0] ?? null),
@@ -156,58 +169,8 @@ export class HksBlueprints extends HTMLElement {
     connect$(cards$: Observable<readonly BlueprintCard[]>): Observable<void> {
         const shadow = this.shadow;
         const list = requireChild(shadow, '.cards');
-        const empty = requireChild(shadow, '.empty');
 
-        // In place by id, never rebuilt: a name being typed belongs to its node.
-        const shown$ = cards$.pipe(
-            tap(cards => {
-                const existing = new Map(
-                    [...list.children].flatMap(child =>
-                        child instanceof HTMLElement && child.dataset['card'] !== undefined
-                            ? [[child.dataset['card'], child] as const]
-                            : [],
-                    ),
-                );
-                const nodes = cards.map(card => {
-                    const node = existing.get(card.id) ?? cardOf(card.id);
-                    const name = node.querySelector('.name');
-                    const preview = node.querySelector('.preview');
-
-                    if (
-                        name instanceof HTMLInputElement &&
-                        shadow.activeElement !== name &&
-                        name.value !== card.name
-                    ) {
-                        name.value = card.name;
-                    }
-
-                    node.querySelector('.meta')?.replaceChildren(
-                        card.summary ?? describedCount(card.windows.length),
-                    );
-                    node.toggleAttribute('data-builtin', card.summary !== null);
-                    if (name instanceof HTMLInputElement) {
-                        name.readOnly = card.summary !== null;
-                    }
-                    if (preview !== null) {
-                        drawPreview(preview, card);
-                    }
-
-                    return node;
-                });
-
-                existing.forEach((node, id) => {
-                    if (!cards.some(card => card.id === id)) {
-                        node.remove();
-                    }
-                });
-                nodes.forEach((node, index) => {
-                    if (list.children[index] !== node) {
-                        list.insertBefore(node, list.children[index] ?? null);
-                    }
-                });
-                empty.hidden = cards.some(({ summary }) => summary === null);
-            }),
-        );
+        const shown$ = cards$.pipe(tap(cards => this.rendering.update(cards)));
 
         const armedShown$ = this.armed$.pipe(
             tap(armed => {
@@ -219,7 +182,10 @@ export class HksBlueprints extends HTMLElement {
             }),
         );
 
-        return merge(shown$, armedShown$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            merge(shown$, armedShown$).pipe(map(() => undefined)),
+        );
     }
 }
 

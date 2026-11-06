@@ -1,9 +1,15 @@
+import { html, svg } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { SymmetryIcon } from '../../shared/brush-icon.component.ts';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { parseHexColor } from '../../lib/color.ts';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { guidesOf, isSymmetry, symmetryGlyph, SYMMETRIES } from '../../shared/brush.ts';
+import { guidesOf, isSymmetry, SYMMETRIES } from '../../shared/brush.ts';
 import { createInkPass, inked, loadStroke, type InkPass } from '../../shared/gl/ink.ts';
 import { dabCount, dabsAt, type Stroke } from '../../shared/stroke.ts';
 import {
@@ -18,45 +24,70 @@ import {
 import css from './pen.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 const SHEET = 768;
 
-const TEMPLATE = `
-    <div class="bar">
-        <div class="modes" role="radiogroup" aria-label="mode">
-            ${MODES.map(
-                mode =>
-                    `<button type="button" role="radio" data-mode="${mode}" title="${
-                        mode === 'draw'
-                            ? 'the line is drawn across the loop, and starts again with it'
-                            : 'the whole figure at once'
-                    }">${mode}</button>`,
-            ).join('')}
+const TEMPLATE = () =>
+    html`<div class="bar">
+            <div class="modes" role="radiogroup" aria-label="mode">
+                ${MODES.map(
+                    mode =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-mode=${ifDefined(mode)}
+                            title=${ifDefined(
+                                mode === 'draw'
+                                    ? 'the line is drawn across the loop, and starts again with it'
+                                    : 'the whole figure at once',
+                            )}
+                        >
+                            ${mode}
+                        </button>`,
+                )}
+            </div>
+            <label class="dial" title="how thick the line is; a size signal swells it"
+                ><span>weight</span
+                ><input
+                    type="range"
+                    data-weight
+                    min=${ifDefined(MIN_WEIGHT)}
+                    max=${ifDefined(MAX_WEIGHT)}
+                    step="0.25" /><output></output
+            ></label>
+            <div class="symmetries" role="radiogroup" aria-label="symmetry">
+                ${SYMMETRIES.map(
+                    symmetry =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-symmetry=${ifDefined(symmetry)}
+                            aria-label=${ifDefined(symmetry)}
+                            title=${ifDefined(symmetry)}
+                        >
+                            ${SymmetryIcon({ symmetry: symmetry })}
+                        </button>`,
+                )}
+            </div>
         </div>
-        <label class="dial" title="how thick the line is; a size signal swells it">
-            <span>weight</span>
-            <input type="range" data-weight min="${MIN_WEIGHT}" max="${MAX_WEIGHT}" step="0.25" />
-            <output></output>
-        </label>
-        <div class="symmetries" role="radiogroup" aria-label="symmetry">
-            ${SYMMETRIES.map(
-                symmetry =>
-                    `<button type="button" role="radio" data-symmetry="${symmetry}" aria-label="${symmetry}" title="${symmetry}">${symmetryGlyph(symmetry)}</button>`,
-            ).join('')}
+        <div class="stage">
+            <div class="sheet">
+                <canvas class="whole" width=${ifDefined(SHEET)} height=${ifDefined(SHEET)}></canvas
+                ><canvas class="ink" width=${ifDefined(SHEET)} height=${ifDefined(SHEET)}></canvas
+                ><svg
+                    class="guides"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                ></svg
+                ><span class="tip"></span>
+            </div>
         </div>
-    </div>
-    <div class="stage">
-        <div class="sheet">
-            <canvas class="whole" width="${SHEET}" height="${SHEET}"></canvas>
-            <canvas class="ink" width="${SHEET}" height="${SHEET}"></canvas>
-            <svg class="guides" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-            <span class="tip"></span>
-        </div>
-    </div>
-    <div class="foot">
-        <p class="hint">Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the pen follows them. Unplugged, it goes round in a circle.</p>
-    </div>
-`;
+        <div class="foot">
+            <p class="hint">
+                Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the
+                pen follows them. Unplugged, it goes round in a circle.
+            </p>
+        </div>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element
@@ -84,13 +115,27 @@ export class HksPen extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly pass: InkPass;
 
+    private readonly rendering: Rendering;
+
+    private readonly guideView: RenderView<readonly string[]>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.guideView = renderView<readonly string[]>(
+            requireElement(shadow, '.guides', SVGSVGElement),
+            [],
+            paths =>
+                repeat(
+                    paths,
+                    item => item,
+                    path => svg`<path d=${ifDefined(path)}></path>`,
+                ),
+        );
 
         const gl = requireElement(shadow, '.ink', HTMLCanvasElement).getContext('webgl2', {
             premultipliedAlpha: true,
@@ -136,7 +181,6 @@ export class HksPen extends HTMLElement {
         const whole = requireElement(shadow, '.whole', HTMLCanvasElement);
         const ink = requireElement(shadow, '.ink', HTMLCanvasElement);
         const pass = this.pass;
-        const guides = requireElement(shadow, '.guides', SVGSVGElement);
         const tip = requireChild(shadow, '.tip');
         const hint = requireChild(shadow, '.hint');
         const colour = (token: string) =>
@@ -165,14 +209,7 @@ export class HksPen extends HTMLElement {
 
                 requireChild(shadow, '.dial output').textContent = pen.weight.toFixed(1);
                 hint.hidden = plugged;
-                guides.replaceChildren(
-                    ...guidesOf(pen.symmetry).map(path => {
-                        const line = document.createElementNS(SVG, 'path');
-                        line.setAttribute('d', path);
-
-                        return line;
-                    }),
-                );
+                this.guideView.update(guidesOf(pen.symmetry));
             }),
         );
 
@@ -202,7 +239,11 @@ export class HksPen extends HTMLElement {
             }),
         );
 
-        return merge(controls$, figure$, now$, tip$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            this.guideView.lifetime$,
+            merge(controls$, figure$, now$, tip$).pipe(map(() => undefined)),
+        );
     }
 }
 

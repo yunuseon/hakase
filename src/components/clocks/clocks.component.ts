@@ -1,6 +1,12 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+
+import { renderView, type RenderView } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
-import { map, mergeMap, share, take, tap } from 'rxjs/operators';
+import { map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import type { ClockCommand, ClockRow } from './clocks.ts';
@@ -8,83 +14,67 @@ import css from './clocks.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <ul class="rows"></ul>
-    <p class="empty">No clocks yet.</p>
-    <form class="add">
-        <hks-select editable class="draft" placeholder="Add a city or time zone" aria-label="time zone"></hks-select>
-        <button class="submit" type="submit">Add</button>
-    </form>
-`;
-
-const SVG = 'http://www.w3.org/2000/svg';
-
-const dialOf = (): SVGSVGElement => {
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.classList.add('dial');
-
-    const face = document.createElementNS(SVG, 'circle');
-    face.setAttribute('cx', '12');
-    face.setAttribute('cy', '12');
-    face.setAttribute('r', '10');
-    face.classList.add('face');
-
-    const hand = document.createElementNS(SVG, 'line');
-    hand.setAttribute('x1', '12');
-    hand.setAttribute('y1', '12');
-    hand.setAttribute('x2', '12');
-    hand.setAttribute('y2', '4.5');
-    hand.classList.add('hand');
-
-    svg.append(face, hand);
-
-    return svg;
-};
-
-const rowOf = (zone: string): HTMLElement => {
-    const row = document.createElement('li');
-    row.className = 'row';
-    row.dataset['zone'] = zone;
-
-    const place = document.createElement('div');
-    place.className = 'place';
-    place.innerHTML = '<span class="city"></span><span class="meta"></span>';
-
-    const time = document.createElement('div');
-    time.className = 'time';
-    time.innerHTML = '<span class="hm"></span><span class="s"></span>';
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remove';
-    remove.dataset['remove'] = zone;
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', `remove ${zone}`);
-
-    row.append(dialOf(), place, time, remove);
-
-    return row;
-};
-
-const filled = (row: HTMLElement, clock: ClockRow): void => {
-    row.toggleAttribute('data-night', !clock.daylight);
-    row.title = clock.zone;
-    row.querySelector('.hand')?.setAttribute('transform', `rotate(${clock.turn * 360} 12 12)`);
-
-    const set = (selector: string, text: string): void => {
-        const element = row.querySelector(selector);
-
-        if (element !== null && element.textContent !== text) {
-            element.textContent = text;
-        }
-    };
-
-    set('.city', clock.city);
-    set('.meta', `${clock.day} · ${clock.difference}`);
-    set('.hm', clock.time);
-    set('.s', clock.seconds);
-};
+type ClockRender = { readonly rows: readonly ClockRow[]; readonly choices: readonly string[] };
+const TEMPLATE = (view: ClockRender) =>
+    html`<ul class="rows">
+            ${repeat(
+                view.rows.map(row => row.zone),
+                item => item,
+                zone =>
+                    withValue(
+                        view.rows.find(row => row.zone === zone),
+                        row =>
+                            html`<li
+                                class="row"
+                                data-zone=${ifDefined(zone)}
+                                data-night=${ifDefined(!row.daylight ? '' : undefined)}
+                                title=${ifDefined(zone)}
+                            >
+                                <svg class="dial" viewBox="0 0 24 24">
+                                    <circle class="face" cx="12" cy="12" r="10"></circle>
+                                    <line
+                                        class="hand"
+                                        x1="12"
+                                        y1="12"
+                                        x2="12"
+                                        y2="4.5"
+                                        transform=${ifDefined(`rotate(${row.turn * 360} 12 12)`)}
+                                    ></line>
+                                </svg>
+                                <div class="place">
+                                    <span class="city">${row.city}</span
+                                    ><span class="meta">${row.day} · ${row.difference}</span>
+                                </div>
+                                <div class="time">
+                                    <span class="hm">${row.time}</span
+                                    ><span class="s">${row.seconds}</span>
+                                </div>
+                                <button
+                                    class="remove"
+                                    type="button"
+                                    data-remove=${ifDefined(zone)}
+                                    aria-label=${ifDefined(`remove ${zone}`)}
+                                >
+                                    ×
+                                </button>
+                            </li>`,
+                    ),
+            )}
+        </ul>
+        <p class="empty" ?hidden=${view.rows.length > 0}>No clocks yet.</p>
+        <form class="add">
+            <hks-select
+                editable=""
+                class="draft"
+                placeholder="Add a city or time zone"
+                aria-label="time zone"
+                >${repeat(
+                    view.choices,
+                    item => item,
+                    zone => html`<option .value=${zone}>${zone.replaceAll('_', ' ')}</option>`,
+                )}</hks-select
+            ><button class="submit" type="submit">Add</button>
+        </form>`;
 
 export class HksClocks extends HTMLElement {
     readonly commands$: Observable<ClockCommand>;
@@ -92,13 +82,15 @@ export class HksClocks extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly submitted$: Observable<string>;
 
+    private readonly rendering: RenderView<ClockRender>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<ClockRender>(shadow, { rows: [], choices: [] }, TEMPLATE);
 
         const form = requireElement(shadow, '.add', HTMLFormElement);
         const draft = requireElement(shadow, '.draft', HksSelect);
@@ -130,51 +122,25 @@ export class HksClocks extends HTMLElement {
 
     connect$(rows$: Observable<readonly ClockRow[]>, choices: readonly string[]): Observable<void> {
         const shadow = this.shadow;
-        const list = requireChild(shadow, '.rows');
-        const options = requireChild(shadow, '.draft');
         const form = requireElement(shadow, '.add', HTMLFormElement);
-
         return merge(
-            connectSelects$(shadow),
-            rows$.pipe(
-                take(1),
-                tap(() => {
-                    options.replaceChildren(
-                        ...choices.map(zone => new Option(zone.replaceAll('_', ' '), zone)),
-                    );
-                }),
-            ),
-            rows$.pipe(
-                tap(rows => {
-                    this.toggleAttribute('data-empty', rows.length === 0);
-
-                    const existing = new Map(
-                        [...list.children]
-                            .filter(child => child instanceof HTMLElement)
-                            .map(child => [child.dataset['zone'], child]),
-                    );
-                    const shown = rows.map(clock => {
-                        const row = existing.get(clock.zone) ?? rowOf(clock.zone);
-                        filled(row, clock);
-
-                        return row;
-                    });
-
-                    if (
-                        shown.length !== list.children.length ||
-                        shown.some((row, index) => list.children[index] !== row)
-                    ) {
-                        list.replaceChildren(...shown);
-                    }
-                }),
-            ),
-            this.submitted$.pipe(
-                tap(() => {
-                    form.reset();
-                    requireElement(shadow, '.draft', HksSelect).value = '';
-                }),
-            ),
-        ).pipe(map(() => undefined));
+            this.rendering.lifetime$,
+            merge(
+                connectSelects$(shadow),
+                rows$.pipe(
+                    tap(rows => {
+                        this.toggleAttribute('data-empty', rows.length === 0);
+                        this.rendering.update({ rows, choices });
+                    }),
+                ),
+                this.submitted$.pipe(
+                    tap(() => {
+                        form.reset();
+                        requireElement(shadow, '.draft', HksSelect).value = '';
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

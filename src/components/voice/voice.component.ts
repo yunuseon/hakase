@@ -1,3 +1,6 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { mountView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
@@ -34,7 +37,7 @@ const GLYPHS: Readonly<Record<Shape, string>> = {
 };
 
 const glyph = (path: string) =>
-    `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+    html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ifDefined(path)}></path></svg>`;
 
 const SPEAKER = 'M4 9 H8 L13 5 V19 L8 15 H4 Z';
 const SOUNDING = 'M16 9 Q18 12 16 15 M18.5 6.5 Q22 12 18.5 17.5';
@@ -45,71 +48,119 @@ const ROOT_NOTES = Array.from(
     (_, index) => ROOTS.low + index,
 );
 
-const TEMPLATE = `
-    <div class="bar">
-        <button class="listen" type="button" aria-pressed="false" title="Listen: the voice plays while its clock does">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="speaker" d="${SPEAKER}"/><path class="on" d="${SOUNDING}"/><path class="off" d="${SILENT}"/></svg>
-            <span>Listen</span>
-        </button>
-        <div class="shapes" role="radiogroup" aria-label="shape" data-synth>
-            ${SHAPES.map(
-                shape =>
-                    `<button type="button" role="radio" data-shape="${shape}" aria-label="${shape}" title="${shape}">${glyph(GLYPHS[shape])}</button>`,
-            ).join('')}
+const TEMPLATE = () =>
+    html`<div class="bar">
+            <button
+                class="listen"
+                type="button"
+                aria-pressed="false"
+                title="Listen: the voice plays while its clock does"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="speaker" d=${ifDefined(SPEAKER)}></path>
+                    <path class="on" d=${ifDefined(SOUNDING)}></path>
+                    <path class="off" d=${ifDefined(SILENT)}></path></svg
+                ><span>Listen</span>
+            </button>
+            <div class="shapes" role="radiogroup" aria-label="shape" data-synth>
+                ${SHAPES.map(
+                    shape =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-shape=${ifDefined(shape)}
+                            aria-label=${ifDefined(shape)}
+                            title=${ifDefined(shape)}
+                        >
+                            ${glyph(GLYPHS[shape])}
+                        </button>`,
+                )}
+            </div>
+            <div class="articulations" role="radiogroup" aria-label="articulation" data-synth>
+                ${ARTICULATIONS.map(
+                    articulation =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-articulation=${ifDefined(articulation)}
+                            title=${ifDefined(
+                                articulation === 'pluck'
+                                    ? 'each new note strikes and fades'
+                                    : 'one tone that follows the pitch',
+                            )}
+                        >
+                            ${articulation}
+                        </button>`,
+                )}
+            </div>
         </div>
-        <div class="articulations" role="radiogroup" aria-label="articulation" data-synth>
-            ${ARTICULATIONS.map(
-                articulation =>
-                    `<button type="button" role="radio" data-articulation="${articulation}" title="${
-                        articulation === 'pluck'
-                            ? 'each new note strikes and fades'
-                            : 'one tone that follows the pitch'
-                    }">${articulation}</button>`,
-            ).join('')}
+        <div class="instruments" role="radiogroup" aria-label="instrument">
+            ${VOICE_INSTRUMENTS.map(
+                instrument =>
+                    html`<button
+                        type="button"
+                        role="radio"
+                        data-instrument=${ifDefined(instrument)}
+                    >
+                        ${instrument}
+                    </button>`,
+            )}
         </div>
-    </div>
-    <div class="instruments" role="radiogroup" aria-label="instrument">
-        ${VOICE_INSTRUMENTS.map(
-            instrument =>
-                `<button type="button" role="radio" data-instrument="${instrument}">${instrument}</button>`,
-        ).join('')}
-    </div>
-    <div class="roll">
-        <canvas width="600" height="240"></canvas>
-        <span class="cursor"></span>
-        <span class="now"></span>
-    </div>
-    <p class="hint">Plug a signal into <b>pitch</b> in the state menu or in state mode: its value is octaves above the root, snapped to the scale. A steps signal plays a melody.</p>
-    <div class="settings">
-        <label class="field">
-            <span>root</span>
-            <hks-select data-root>
-                ${ROOT_NOTES.map(note => `<option value="${note}">${noteName(note)}</option>`).join('')}
-            </hks-select>
-        </label>
-        <div class="scales" role="radiogroup" aria-label="scale">
-            ${SCALES.map(
-                scale =>
-                    `<button type="button" role="radio" data-scale="${scale}">${scale}</button>`,
-            ).join('')}
+        <div class="roll">
+            <canvas width="600" height="240"></canvas><span class="cursor"></span
+            ><span class="now"></span>
         </div>
-        <label class="dial" data-only="pluck" data-synth title="how long a struck note takes to fade">
-            <span>decay</span>
-            <input type="range" data-dial="decay" min="${DECAY.low}" max="${DECAY.high}" step="0.01" />
-            <output></output>
-        </label>
-        <label class="dial" data-synth title="how long the pitch takes to slide to a new note">
-            <span>glide</span>
-            <input type="range" data-dial="glide" min="${GLIDE.low}" max="${GLIDE.high}" step="0.01" />
-            <output></output>
-        </label>
-        <label class="dial" title="how loud; a volume signal swells it">
-            <span>volume</span>
-            <input type="range" data-dial="volume" min="0" max="1" step="0.01" />
-            <output></output>
-        </label>
-    </div>
-`;
+        <p class="hint">
+            Plug a signal into <b>pitch</b> in the state menu or in state mode: its value is octaves
+            above the root, snapped to the scale. A steps signal plays a melody.
+        </p>
+        <div class="settings">
+            <label class="field"
+                ><span>root</span
+                ><hks-select data-root
+                    >${ROOT_NOTES.map(
+                        note => html`<option .value=${note}>${noteName(note)}</option>`,
+                    )}</hks-select
+                ></label
+            >
+            <div class="scales" role="radiogroup" aria-label="scale">
+                ${SCALES.map(
+                    scale =>
+                        html`<button type="button" role="radio" data-scale=${ifDefined(scale)}>
+                            ${scale}
+                        </button>`,
+                )}
+            </div>
+            <label
+                class="dial"
+                data-only="pluck"
+                data-synth
+                title="how long a struck note takes to fade"
+                ><span>decay</span
+                ><input
+                    type="range"
+                    data-dial="decay"
+                    min=${ifDefined(DECAY.low)}
+                    max=${ifDefined(DECAY.high)}
+                    step="0.01" /><output></output></label
+            ><label class="dial" data-synth title="how long the pitch takes to slide to a new note"
+                ><span>glide</span
+                ><input
+                    type="range"
+                    data-dial="glide"
+                    min=${ifDefined(GLIDE.low)}
+                    max=${ifDefined(GLIDE.high)}
+                    step="0.01" /><output></output></label
+            ><label class="dial" title="how loud; a volume signal swells it"
+                ><span>volume</span
+                ><input
+                    type="range"
+                    data-dial="volume"
+                    min="0"
+                    max="1"
+                    step="0.01" /><output></output
+            ></label>
+        </div>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element
@@ -162,13 +213,15 @@ export class HksVoice extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
 
+    private readonly rendering: Rendering;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         // From the host, as what was really clicked: inside a shadow root the event is retargeted to it.
         const picked$ = fromElementEvent$(this, 'click').pipe(
@@ -313,8 +366,11 @@ export class HksVoice extends HTMLElement {
             }),
         );
 
-        return merge(connectSelects$(this.shadow), controls$, roll$, moment$, listened$).pipe(
-            map(() => undefined),
+        return merge(
+            this.rendering.lifetime$,
+            merge(connectSelects$(this.shadow), controls$, roll$, moment$, listened$).pipe(
+                map(() => undefined),
+            ),
         );
     }
 }

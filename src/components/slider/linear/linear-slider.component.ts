@@ -1,3 +1,5 @@
+import { html } from 'lit-html';
+import { mountView, type Rendering } from '../../../lib/lit.ts';
 import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../../lib/dom.ts';
@@ -9,10 +11,9 @@ import css from './linear-slider.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="track"><div class="indicator"></div></div>
-    <slot name="controls"></slot>
-`;
+const TEMPLATE = () =>
+    html`<div class="track"><div class="indicator"></div></div>
+        <slot name="controls"></slot>`;
 
 const indicatorWidth = (value: number): string => `${(value * 100).toFixed(3)}%`;
 
@@ -22,12 +23,14 @@ export class HksLinearSlider extends HTMLElement implements Slider {
     private readonly track: HTMLElement;
     private readonly indicator: HTMLElement;
 
+    private readonly rendering: Rendering;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.track = requireChild(shadow, '.track');
         this.indicator = requireChild(shadow, '.indicator');
@@ -42,14 +45,17 @@ export class HksLinearSlider extends HTMLElement implements Slider {
 
     connect$(playhead$: Observable<number>): Observable<void> {
         return merge(
-            playhead$.pipe(
-                map(indicatorWidth),
-                distinctUntilChanged(),
-                tap(width => {
-                    this.indicator.style.width = width;
-                }),
-            ),
-        ).pipe(map(() => undefined));
+            this.rendering.lifetime$,
+            merge(
+                playhead$.pipe(
+                    map(indicatorWidth),
+                    distinctUntilChanged(),
+                    tap(width => {
+                        this.indicator.style.width = width;
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

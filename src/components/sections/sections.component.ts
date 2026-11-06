@@ -1,3 +1,11 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { ref } from 'lit-html/directives/ref.js';
+
+import { renderView, displayValue, type RenderView } from '../../lib/lit.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -10,7 +18,7 @@ import {
     takeUntil,
     tap,
 } from 'rxjs/operators';
-import { styleSheet } from '../../lib/dom.ts';
+import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import { sameSections, type SectionGesture, type SectionView } from './sections.ts';
 import css from './sections.css?inline';
@@ -23,66 +31,77 @@ const dataOf = (target: EventTarget | null, key: string): string | undefined => 
     return element instanceof HTMLElement ? element.dataset[key] : undefined;
 };
 
-const sectionOf = (id: string): HTMLElement => {
-    // A fieldset and its legend, so the border opens a real gap for the name with nothing painted behind it.
-    const section = document.createElement('fieldset');
-    section.className = 'section';
-    section.dataset['section'] = id;
-
-    const label = document.createElement('legend');
-    label.className = 'label';
-    label.dataset['move'] = id;
-
-    const name = document.createElement('input');
-    name.className = 'name';
-    name.readOnly = true;
-    name.spellcheck = false;
-    name.dataset['rename'] = id;
-    name.setAttribute('aria-label', 'section name, double-click to rename');
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remove';
-    remove.dataset['remove'] = id;
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', 'delete section');
-
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'save';
-    save.dataset['save'] = id;
-    save.textContent = 'Save as blueprint';
-    save.title = 'Keep everything in this section as a blueprint you can place again';
-
-    // Out of the flow together: the legend's width, and so the border's gap, is the name alone.
-    const actions = document.createElement('span');
-    actions.className = 'actions';
-    actions.append(save, remove);
-
-    const corner = document.createElement('div');
-    corner.className = 'corner';
-    corner.dataset['resize'] = id;
-
-    label.append(name, actions);
-    section.append(label, corner);
-
-    return section;
-};
-
 export class HksSections extends HTMLElement {
     readonly gestures$: Observable<SectionGesture>;
 
     private readonly layer: HTMLElement;
+    private readonly rendering: RenderView<readonly SectionView[]>;
 
     constructor() {
         super();
 
         const root = this.attachShadow({ mode: 'open' });
         root.adoptedStyleSheets = [sheet];
-        this.layer = document.createElement('div');
-        this.layer.className = 'layer';
-        root.append(this.layer);
+        this.rendering = renderView<readonly SectionView[]>(
+            root,
+            [],
+            sections =>
+                html`<div class="layer">
+                    ${repeat(
+                        sections.map(section => section.id),
+                        item => item,
+                        id =>
+                            withValue(
+                                sections.find(section => section.id === id),
+                                section =>
+                                    html`<fieldset
+                                        class="section"
+                                        data-section=${ifDefined(id)}
+                                        style=${styleMap({
+                                            left: `${section.x}px`,
+                                            top: `${section.y}px`,
+                                            width: `${section.width}px`,
+                                            height: `${section.height}px`,
+                                        })}
+                                    >
+                                        <legend class="label" data-move=${ifDefined(id)}>
+                                            <input
+                                                class="name"
+                                                readonly
+                                                spellcheck=${ifDefined(false)}
+                                                data-rename=${ifDefined(id)}
+                                                aria-label="section name, double-click to rename"
+                                                ${ref(element => {
+                                                    if (element instanceof HTMLInputElement) {
+                                                        displayValue(element, section.name);
+                                                    }
+                                                })}
+                                            /><span class="actions"
+                                                ><button
+                                                    class="save"
+                                                    type="button"
+                                                    data-save=${ifDefined(id)}
+                                                    title="Keep everything in this section as a blueprint you can place again"
+                                                >
+                                                    Save as blueprint</button
+                                                ><button
+                                                    class="remove"
+                                                    type="button"
+                                                    data-remove=${ifDefined(id)}
+                                                    aria-label="delete section"
+                                                >
+                                                    ×
+                                                </button></span
+                                            >
+                                        </legend>
+                                        <div class="corner" data-resize=${ifDefined(id)}></div>
+                                    </fieldset>`,
+                            ),
+                    )}
+                </div>`,
+        );
 
+        this.layer = requireChild(root, '.layer');
         const drags$ = (kind: 'move' | 'resize'): Observable<SectionGesture> =>
             fromElementEvent$(this, 'pointerdown').pipe(
                 mergeMap(start => {
@@ -191,44 +210,10 @@ export class HksSections extends HTMLElement {
 
         const drawn$ = sections$.pipe(
             distinctUntilChanged(sameSections),
-            tap(sections => {
-                const existing = new Map(
-                    [...this.layer.querySelectorAll('.section')].flatMap(element =>
-                        element instanceof HTMLElement && element.dataset['section'] !== undefined
-                            ? [[element.dataset['section'], element] as const]
-                            : [],
-                    ),
-                );
-
-                const wanted = new Set(sections.map(({ id }) => id));
-
-                for (const [id, element] of existing) {
-                    if (!wanted.has(id)) {
-                        element.remove();
-                    }
-                }
-
-                // In place, never re-inserted: moving a node would drop the focus of a name being typed.
-                for (const { id, name, x, y, width, height } of sections) {
-                    const element = existing.get(id) ?? this.layer.appendChild(sectionOf(id));
-                    element.style.left = `${x}px`;
-                    element.style.top = `${y}px`;
-                    element.style.width = `${width}px`;
-                    element.style.height = `${height}px`;
-
-                    const input = element.querySelector('.name');
-                    if (
-                        input instanceof HTMLInputElement &&
-                        input.readOnly &&
-                        input.value !== name
-                    ) {
-                        input.value = name;
-                    }
-                }
-            }),
+            tap(sections => this.rendering.update(sections)),
         );
 
-        return merge(drawn$, editing$).pipe(map(() => undefined));
+        return merge(this.rendering.lifetime$, drawn$, editing$).pipe(map(() => undefined));
     }
 }
 

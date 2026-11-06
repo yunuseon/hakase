@@ -168,11 +168,3 @@ export const guidesOf = (symmetry: Symmetry): readonly string[] => {
 };
 
 // Markup, not an element: the guides drawn small, for a symmetry picker's buttons.
-export const symmetryGlyph = (symmetry: Symmetry) =>
-    `<svg viewBox="0 0 100 100" aria-hidden="true">${
-        symmetry === 'none'
-            ? '<circle cx="50" cy="50" r="7"/>'
-            : guidesOf(symmetry)
-                  .map(path => `<path d="${path}"/>`)
-                  .join('')
-    }<circle cx="50" cy="50" r="38" class="rim"/></svg>`;

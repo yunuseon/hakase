@@ -1,3 +1,8 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, concat, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -38,45 +43,70 @@ const SPEAKER = 'M4 9 H8 L13 5 V19 L8 15 H4 Z';
 const SOUNDING = 'M16 9 Q18 12 16 15 M18.5 6.5 Q22 12 18.5 17.5';
 const SILENT = 'M17 9.5 L22 14.5 M22 9.5 L17 14.5';
 
-const TEMPLATE = `
-    <div class="bar">
-        <button class="listen" type="button" aria-pressed="false" title="Listen: the drums play while their clock does">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="speaker" d="${SPEAKER}"/><path class="on" d="${SOUNDING}"/><path class="off" d="${SILENT}"/></svg>
-            <span>Listen</span>
-        </button>
-        <div class="presets" aria-label="patterns">
-            ${PRESET_NAMES.map(
-                preset => `<button type="button" data-preset="${preset}">${preset}</button>`,
-            ).join('')}
-            <button type="button" data-clear>clear</button>
+const TEMPLATE = () =>
+    html`<div class="bar">
+            <button
+                class="listen"
+                type="button"
+                aria-pressed="false"
+                title="Listen: the drums play while their clock does"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="speaker" d=${ifDefined(SPEAKER)}></path>
+                    <path class="on" d=${ifDefined(SOUNDING)}></path>
+                    <path class="off" d=${ifDefined(SILENT)}></path></svg
+                ><span>Listen</span>
+            </button>
+            <div class="presets" aria-label="patterns">
+                ${PRESET_NAMES.map(
+                    preset =>
+                        html`<button type="button" data-preset=${ifDefined(preset)}>
+                            ${preset}
+                        </button>`,
+                )}<button type="button" data-clear>clear</button>
+            </div>
         </div>
-    </div>
-    <div class="grid" role="grid" aria-label="pattern"></div>
-    <div class="settings">
-        <div class="steps" role="radiogroup" aria-label="steps">
-            ${STEP_COUNTS.map(
-                steps =>
-                    `<button type="button" role="radio" data-steps="${steps}">${steps}</button>`,
-            ).join('')}
-        </div>
-        <div class="repeats" role="radiogroup" aria-label="times per loop" title="how many times the pattern plays per loop">
-            ${REPEATS.map(
-                repeat =>
-                    `<button type="button" role="radio" data-repeat="${repeat}">×${repeat}</button>`,
-            ).join('')}
-        </div>
-        <label class="dial" title="holds back every second step, for a shuffle">
-            <span>swing</span>
-            <input type="range" data-dial="swing" min="0" max="${MAX_SWING}" step="0.01" />
-            <output></output>
-        </label>
-        <label class="dial" title="how loud; a volume signal swells it">
-            <span>volume</span>
-            <input type="range" data-dial="volume" min="0" max="1" step="0.01" />
-            <output></output>
-        </label>
-    </div>
-`;
+        <div class="grid" role="grid" aria-label="pattern"></div>
+        <div class="settings">
+            <div class="steps" role="radiogroup" aria-label="steps">
+                ${STEP_COUNTS.map(
+                    steps =>
+                        html`<button type="button" role="radio" data-steps=${ifDefined(steps)}>
+                            ${steps}
+                        </button>`,
+                )}
+            </div>
+            <div
+                class="repeats"
+                role="radiogroup"
+                aria-label="times per loop"
+                title="how many times the pattern plays per loop"
+            >
+                ${REPEATS.map(
+                    repeat =>
+                        html`<button type="button" role="radio" data-repeat=${ifDefined(repeat)}>
+                            ×${repeat}
+                        </button>`,
+                )}
+            </div>
+            <label class="dial" title="holds back every second step, for a shuffle"
+                ><span>swing</span
+                ><input
+                    type="range"
+                    data-dial="swing"
+                    min="0"
+                    max=${ifDefined(MAX_SWING)}
+                    step="0.01" /><output></output></label
+            ><label class="dial" title="how loud; a volume signal swells it"
+                ><span>volume</span
+                ><input
+                    type="range"
+                    data-dial="volume"
+                    min="0"
+                    max="1"
+                    step="0.01" /><output></output
+            ></label>
+        </div>`;
 
 export type DrumsEvent =
     { readonly kind: 'command'; readonly command: DrumsCommand } | { readonly kind: 'listen' };
@@ -96,38 +126,14 @@ const dataOf = (target: EventTarget | null, name: string) =>
         ? (target.closest(`[data-${name}]`)?.getAttribute(`data-${name}`) ?? null)
         : null;
 
-const rowsOf = (steps: number) =>
-    DRUMS.map(drum => {
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.setAttribute('role', 'row');
-
-        const label = document.createElement('span');
-        label.className = 'drum';
-        label.textContent = DRUM_LABELS[drum];
-
-        const cells = Array.from({ length: steps }, (_, step) => {
-            const cell = document.createElement('button');
-            cell.type = 'button';
-            cell.className = 'cell';
-            cell.dataset['cell'] = '';
-            cell.dataset['drum'] = drum;
-            cell.dataset['step'] = String(step);
-            cell.dataset['beat'] = beatOf(step, steps) % 2 === 1 ? 'odd' : 'even';
-            cell.setAttribute('aria-label', `${DRUM_LABELS[drum]}, step ${step + 1}`);
-
-            return cell;
-        });
-
-        row.append(label, ...cells);
-
-        return row;
-    });
-
 export class HksDrums extends HTMLElement {
     readonly changes$: Observable<DrumsEvent>;
 
     private readonly shadow: ShadowRoot;
+
+    private readonly rendering: Rendering;
+
+    private readonly gridView: RenderView<number>;
 
     constructor() {
         super();
@@ -135,7 +141,30 @@ export class HksDrums extends HTMLElement {
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.gridView = renderView(requireChild(shadow, '.grid'), 0, steps =>
+            repeat(
+                DRUMS,
+                item => item,
+                drum =>
+                    html`<div class="row" role="row">
+                        <span class="drum">${DRUM_LABELS[drum]}</span>${repeat(
+                            Array.from({ length: steps }, (_, index) => index),
+                            item => item,
+                            step =>
+                                html`<button
+                                    type="button"
+                                    class="cell"
+                                    data-cell=""
+                                    data-drum=${ifDefined(drum)}
+                                    data-step=${ifDefined(step)}
+                                    data-beat=${ifDefined(beatOf(step, steps) % 2 === 1 ? 'odd' : 'even')}
+                                    aria-label=${ifDefined(`${DRUM_LABELS[drum]}, step ${step + 1}`)}
+                                ></button>`,
+                        )}
+                    </div>`,
+            ),
+        );
 
         const grid = requireChild(shadow, '.grid');
         const command = (made: DrumsCommand): DrumsEvent => ({ kind: 'command', command: made });
@@ -266,7 +295,7 @@ export class HksDrums extends HTMLElement {
             distinctUntilChanged(),
             tap(steps => {
                 grid.style.setProperty('--steps', String(steps));
-                grid.replaceChildren(...rowsOf(steps));
+                this.gridView.update(steps);
             }),
         );
 
@@ -311,7 +340,11 @@ export class HksDrums extends HTMLElement {
             }),
         );
 
-        return merge(built$, marked$, now$, listened$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            this.gridView.lifetime$,
+            merge(built$, marked$, now$, listened$).pipe(map(() => undefined)),
+        );
     }
 }
 

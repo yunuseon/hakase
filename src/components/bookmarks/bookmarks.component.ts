@@ -1,3 +1,10 @@
+import { html } from 'lit-html';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { ref } from 'lit-html/directives/ref.js';
+
+import { renderView, displayValue, type RenderView } from '../../lib/lit.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { filter, map, mergeMap, share, startWith, switchMap, takeWhile, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -7,10 +14,8 @@ import {
     faviconOf,
     hostOf,
     safeUrl,
-    type Bookmark,
     type BookmarkCommand,
     type Bookmarks,
-    type Group,
     type Shelf,
     type Target,
 } from './bookmarks.ts';
@@ -18,12 +23,203 @@ import css from './bookmarks.css?inline';
 
 const sheet = styleSheet(css);
 
-const TEMPLATE = `
-    <div class="scroll">
-        <div class="groups"></div>
+const TEMPLATE = (view: Bookmarks) =>
+    html`<div class="scroll">
+        <div class="groups">
+            ${repeat(
+                view.groups.map(group => group.id),
+                item => item,
+                id =>
+                    withValue(
+                        view.groups.find(group => group.id === id),
+                        group =>
+                            html`<section
+                                class="group"
+                                data-group=${ifDefined(id)}
+                                data-closed=${ifDefined(!group.open ? '' : undefined)}
+                            >
+                                <header class="head">
+                                    <button
+                                        type="button"
+                                        class="toggle"
+                                        data-toggle=${ifDefined(id)}
+                                        aria-label="open or close group"
+                                        aria-expanded=${ifDefined(group.open)}
+                                    ></button
+                                    ><button
+                                        type="button"
+                                        class="group-grip"
+                                        data-group-grip=${ifDefined(id)}
+                                        aria-label="move group; arrow keys move it"
+                                    ></button
+                                    ><input
+                                        class="group-name"
+                                        data-group-name=${ifDefined(id)}
+                                        placeholder="Group name"
+                                        aria-label="Group name"
+                                        autocomplete="off"
+                                        ${ref(element => {
+                                            if (element instanceof HTMLInputElement) {
+                                                displayValue(element, group.name);
+                                            }
+                                        })}
+                                    /><span class="count">${group.items.length}</span
+                                    ><button
+                                        type="button"
+                                        class="remove-group"
+                                        data-remove-group=${ifDefined(id)}
+                                        aria-label="delete group"
+                                        title="only an empty group can be deleted"
+                                        ?disabled=${group.items.length > 0}
+                                    >
+                                        ×
+                                    </button>
+                                </header>
+                                <ul class="items">
+                                    ${repeat(
+                                        group.items.map(item => item.id),
+                                        item => item,
+                                        bookmarkId =>
+                                            withValue(
+                                                group.items.find(item => item.id === bookmarkId),
+                                                bookmark =>
+                                                    html`<li
+                                                        class="bookmark"
+                                                        data-bookmark=${ifDefined(bookmarkId)}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="grip"
+                                                            data-grip=${ifDefined(bookmarkId)}
+                                                            aria-label="move bookmark; arrow keys move it"
+                                                        ></button
+                                                        ><span class="badge"
+                                                            ><span class="letter"
+                                                                >${(
+                                                                    hostOf(bookmark.url)[0] ?? '?'
+                                                                ).toUpperCase()}</span
+                                                            ><img
+                                                                class="icon"
+                                                                alt=""
+                                                                decoding="async"
+                                                                referrerpolicy="no-referrer"
+                                                                ${ref(image => {
+                                                                    if (
+                                                                        image instanceof
+                                                                        HTMLImageElement
+                                                                    ) {
+                                                                        (() => {
+                                                                            const url =
+                                                                                bookmark.url;
+                                                                            image.parentElement?.removeAttribute(
+                                                                                'data-icon',
+                                                                            );
+                                                                            const src =
+                                                                                faviconOf(url);
+                                                                            if (src === null) {
+                                                                                image.removeAttribute(
+                                                                                    'src',
+                                                                                );
+                                                                            } else {
+                                                                                image.src = src;
+                                                                            }
+                                                                        })();
+                                                                    }
+                                                                })} /></span
+                                                        ><a
+                                                            class="link"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            href=${ifDefined(bookmark.url)}
+                                                            title=${ifDefined(bookmark.url)}
+                                                            ><span class="name"
+                                                                >${bookmark.name}</span
+                                                            ><span class="host"
+                                                                >${
+                                                                    bookmark.name ===
+                                                                    hostOf(bookmark.url)
+                                                                        ? ''
+                                                                        : hostOf(bookmark.url)
+                                                                }</span
+                                                            ></a
+                                                        >
+                                                        <div class="editor">
+                                                            <input
+                                                                class="rename"
+                                                                data-rename=${ifDefined(bookmarkId)}
+                                                                placeholder="Name"
+                                                                aria-label="Name"
+                                                                autocomplete="off"
+                                                                ${ref(element => {
+                                                                    if (
+                                                                        element instanceof
+                                                                        HTMLInputElement
+                                                                    ) {
+                                                                        displayValue(
+                                                                            element,
+                                                                            bookmark.name,
+                                                                        );
+                                                                    }
+                                                                })}
+                                                            /><input
+                                                                class="readdress"
+                                                                data-readdress=${ifDefined(bookmarkId)}
+                                                                placeholder="Address"
+                                                                aria-label="Address"
+                                                                autocomplete="off"
+                                                                ${ref(element => {
+                                                                    if (
+                                                                        element instanceof
+                                                                        HTMLInputElement
+                                                                    ) {
+                                                                        displayValue(
+                                                                            element,
+                                                                            bookmark.url,
+                                                                        );
+                                                                    }
+                                                                })}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            class="edit"
+                                                            data-edit=${ifDefined(bookmarkId)}
+                                                            aria-label="edit bookmark"
+                                                        >
+                                                            ✎</button
+                                                        ><button
+                                                            type="button"
+                                                            class="remove"
+                                                            data-remove=${ifDefined(bookmarkId)}
+                                                            aria-label="delete bookmark"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </li>`,
+                                            ),
+                                    )}
+                                </ul>
+                                <form class="add" data-add=${ifDefined(id)}>
+                                    <input
+                                        class="new-name"
+                                        data-new-name=${ifDefined(id)}
+                                        placeholder="Name"
+                                        aria-label="Name"
+                                        autocomplete="off"
+                                    /><input
+                                        class="new-address"
+                                        data-new-address=${ifDefined(id)}
+                                        placeholder="https://…"
+                                        aria-label="https://…"
+                                        autocomplete="off"
+                                    /><button type="submit" class="submit">Add</button>
+                                </form>
+                            </section>`,
+                    ),
+            )}
+        </div>
         <button class="add-group" type="button">+ group</button>
-    </div>
-`;
+    </div>`;
 
 const ENDS = ['pointerup', 'pointercancel'] as const;
 
@@ -65,250 +261,6 @@ const middleY = (element: Element): number => {
     const { top, height } = element.getBoundingClientRect();
 
     return top + height / 2;
-};
-
-const button = (
-    className: string,
-    key: string,
-    id: string,
-    text: string,
-    label: string,
-): HTMLButtonElement => {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = className;
-    element.dataset[key] = id;
-    element.textContent = text;
-    element.setAttribute('aria-label', label);
-
-    return element;
-};
-
-const input = (
-    className: string,
-    key: string,
-    id: string,
-    placeholder: string,
-): HTMLInputElement => {
-    const element = document.createElement('input');
-    element.className = className;
-    element.dataset[key] = id;
-    element.placeholder = placeholder;
-    element.autocomplete = 'off';
-    element.setAttribute('aria-label', placeholder);
-
-    return element;
-};
-
-const groupOf = (id: string): HTMLElement => {
-    const section = document.createElement('section');
-    section.className = 'group';
-    section.dataset['group'] = id;
-
-    const head = document.createElement('header');
-    head.className = 'head';
-
-    const toggle = button('toggle', 'toggle', id, '', 'open or close group');
-    const grip = button('group-grip', 'groupGrip', id, '', 'move group; arrow keys move it');
-    const name = input('group-name', 'groupName', id, 'Group name');
-
-    const count = document.createElement('span');
-    count.className = 'count';
-
-    const remove = button('remove-group', 'removeGroup', id, '×', 'delete group');
-    remove.title = 'only an empty group can be deleted';
-
-    head.append(toggle, grip, name, count, remove);
-
-    const items = document.createElement('ul');
-    items.className = 'items';
-
-    const add = document.createElement('form');
-    add.className = 'add';
-    add.dataset['add'] = id;
-    const submit = document.createElement('button');
-    submit.type = 'submit';
-    submit.className = 'submit';
-    submit.textContent = 'Add';
-    add.append(
-        input('new-name', 'newName', id, 'Name'),
-        input('new-address', 'newAddress', id, 'https://…'),
-        submit,
-    );
-
-    section.append(head, items, add);
-
-    return section;
-};
-
-const bookmarkOf = (id: string): HTMLElement => {
-    const item = document.createElement('li');
-    item.className = 'bookmark';
-    item.dataset['bookmark'] = id;
-
-    const grip = button('grip', 'grip', id, '', 'move bookmark; arrow keys move it');
-
-    const badge = document.createElement('span');
-    badge.className = 'badge';
-    const letter = document.createElement('span');
-    letter.className = 'letter';
-    const icon = document.createElement('img');
-    icon.className = 'icon';
-    icon.alt = '';
-    icon.decoding = 'async';
-    // The site learns its icon was asked for, but not from which page.
-    icon.referrerPolicy = 'no-referrer';
-    badge.append(letter, icon);
-
-    const anchor = document.createElement('a');
-    anchor.className = 'link';
-    anchor.target = '_blank';
-    // Not just target: without noopener the opened page can navigate this one.
-    anchor.rel = 'noopener noreferrer';
-    anchor.innerHTML = '<span class="name"></span><span class="host"></span>';
-
-    const editor = document.createElement('div');
-    editor.className = 'editor';
-    editor.append(
-        input('rename', 'rename', id, 'Name'),
-        input('readdress', 'readdress', id, 'Address'),
-    );
-
-    item.append(
-        grip,
-        badge,
-        anchor,
-        editor,
-        button('edit', 'edit', id, '✎', 'edit bookmark'),
-        button('remove', 'remove', id, '×', 'delete bookmark'),
-    );
-
-    return item;
-};
-
-const write = (field: Element | null, value: string, active: Element | null): void => {
-    // Not while focused: that would overwrite what is being typed with another window's edit.
-    if (field instanceof HTMLInputElement && field !== active && field.value !== value) {
-        field.value = value;
-    }
-};
-
-const fillBookmark = (item: HTMLElement, { name, url }: Bookmark, active: Element | null): void => {
-    const host = hostOf(url);
-    const anchor = item.querySelector('.link');
-
-    if (anchor instanceof HTMLAnchorElement) {
-        anchor.href = url;
-        anchor.title = url;
-    }
-
-    const shownName = item.querySelector('.name');
-    const shownHost = item.querySelector('.host');
-    const letter = item.querySelector('.letter');
-
-    if (shownName !== null) {
-        shownName.textContent = name;
-    }
-
-    if (shownHost !== null) {
-        shownHost.textContent = name === host ? '' : host;
-    }
-
-    if (letter !== null) {
-        letter.textContent = (host[0] ?? '?').toUpperCase();
-    }
-
-    write(item.querySelector('.rename'), name, active);
-    write(item.querySelector('.readdress'), url, active);
-
-    const icon = item.querySelector('.icon');
-    const wanted = faviconOf(url);
-
-    // Only when it changes: setting src again would refetch and flash the letter back.
-    if (icon instanceof HTMLImageElement && icon.dataset['for'] !== url) {
-        icon.dataset['for'] = url;
-        item.querySelector('.badge')?.removeAttribute('data-icon');
-
-        if (wanted === null) {
-            icon.removeAttribute('src');
-        } else {
-            icon.src = wanted;
-        }
-    }
-};
-
-// Only when the order differs: moving a node drops its focus, and a click that lands on it.
-const ordered = (parent: Element, children: readonly HTMLElement[]): void => {
-    const current = elementsIn(parent);
-
-    if (
-        current.length !== children.length ||
-        children.some((child, index) => current[index] !== child)
-    ) {
-        parent.replaceChildren(...children);
-    }
-};
-
-const fillGroup = (
-    section: HTMLElement,
-    group: Group,
-    items: readonly HTMLElement[],
-    active: Element | null,
-): void => {
-    section.toggleAttribute('data-closed', !group.open);
-    section.querySelector('.toggle')?.setAttribute('aria-expanded', String(group.open));
-    write(section.querySelector('.group-name'), group.name, active);
-
-    const count = section.querySelector('.count');
-
-    if (count !== null) {
-        count.textContent = String(group.items.length);
-    }
-
-    const remove = section.querySelector('.remove-group');
-
-    if (remove instanceof HTMLButtonElement) {
-        remove.disabled = group.items.length > 0;
-    }
-
-    const list = section.querySelector('.items');
-
-    if (list !== null) {
-        ordered(list, items);
-    }
-};
-
-const rendered = (shadow: ShadowRoot, groups: HTMLElement, { groups: model }: Bookmarks): void => {
-    const active = shadow.activeElement;
-    const sections = new Map(
-        elementsIn(groups).map(section => [section.dataset['group'], section]),
-    );
-    const items = new Map(
-        [...shadow.querySelectorAll('.bookmark')]
-            .filter(item => item instanceof HTMLElement)
-            .map(item => [item.dataset['bookmark'], item]),
-    );
-
-    ordered(
-        groups,
-        model.map(group => {
-            const section = sections.get(group.id) ?? groupOf(group.id);
-            const shown = group.items.map(bookmark => {
-                const item = items.get(bookmark.id) ?? bookmarkOf(bookmark.id);
-                fillBookmark(item, bookmark, active);
-
-                return item;
-            });
-            fillGroup(section, group, shown, active);
-
-            return section;
-        }),
-    );
-
-    // A bookmark moved to another group was re-inserted, which drops its focus.
-    if (active instanceof HTMLElement && active.isConnected && active !== shadow.activeElement) {
-        active.focus();
-    }
 };
 
 const indicated = (shadow: ShadowRoot, groups: HTMLElement, drag: Drag): void => {
@@ -379,13 +331,15 @@ export class HksBookmarks extends HTMLElement {
     private readonly submitted$: Observable<Submitted>;
     private readonly editing$: Observable<string | null>;
 
+    private readonly rendering: RenderView<Bookmarks>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = renderView<Bookmarks>(shadow, { groups: [], made: 0 }, TEMPLATE);
 
         const scroll = requireChild(shadow, '.scroll');
         this.groups = requireChild(shadow, '.groups');
@@ -604,85 +558,106 @@ export class HksBookmarks extends HTMLElement {
         const scroll = requireChild(shadow, '.scroll');
 
         return merge(
-            // Captured: load and error do not bubble, so the list only hears them on the way down.
+            this.rendering.lifetime$,
             merge(
-                fromElementEvent$(scroll, 'load', { capture: true }),
-                fromElementEvent$(scroll, 'error', { capture: true }),
-            ).pipe(
-                tap(({ type, target }) => {
-                    if (target instanceof HTMLImageElement && target.classList.contains('icon')) {
-                        target.parentElement?.toggleAttribute(
-                            'data-icon',
-                            type === 'load' && target.naturalWidth > 1,
-                        );
-                    }
-                }),
-            ),
-            bookmarks$.pipe(
-                tap(bookmarks => {
-                    rendered(shadow, groups, bookmarks);
-                }),
-            ),
-            this.submitted$.pipe(
-                tap(({ form, address }) => {
-                    const valid = safeUrl(address) !== null;
-                    const field = form.querySelector('.new-address');
+                // Captured: load and error do not bubble, so the list only hears them on the way down.
+                merge(
+                    fromElementEvent$(scroll, 'load', { capture: true }),
+                    fromElementEvent$(scroll, 'error', { capture: true }),
+                ).pipe(
+                    tap(({ type, target }) => {
+                        if (
+                            target instanceof HTMLImageElement &&
+                            target.classList.contains('icon')
+                        ) {
+                            target.parentElement?.toggleAttribute(
+                                'data-icon',
+                                type === 'load' && target.naturalWidth > 1,
+                            );
+                        }
+                    }),
+                ),
+                bookmarks$.pipe(
+                    tap(bookmarks => {
+                        const active = shadow.activeElement;
+                        const id =
+                            active instanceof HTMLElement ? active.dataset['grip'] : undefined;
+                        this.rendering.update(bookmarks);
+                        if (
+                            id !== undefined &&
+                            active instanceof HTMLElement &&
+                            !active.isConnected
+                        ) {
+                            const replacement = shadow.querySelector(
+                                `[data-grip="${CSS.escape(id)}"]`,
+                            );
+                            if (replacement instanceof HTMLElement) {
+                                replacement.focus();
+                            }
+                        }
+                    }),
+                ),
+                this.submitted$.pipe(
+                    tap(({ form, address }) => {
+                        const valid = safeUrl(address) !== null;
+                        const field = form.querySelector('.new-address');
 
-                    if (valid) {
-                        form.reset();
-                    }
+                        if (valid) {
+                            form.reset();
+                        }
 
-                    field?.toggleAttribute('data-invalid', !valid);
-                }),
-            ),
-            fromElementEvent$(scroll, 'input').pipe(
-                tap(({ target }) => {
-                    if (target instanceof HTMLInputElement) {
-                        target.removeAttribute('data-invalid');
-                    }
-                }),
-            ),
-            this.editing$.pipe(
-                tap(editing => {
-                    for (const item of shadow.querySelectorAll('.bookmark')) {
-                        item.toggleAttribute(
-                            'data-editing',
-                            item instanceof HTMLElement && item.dataset['bookmark'] === editing,
-                        );
-                    }
+                        field?.toggleAttribute('data-invalid', !valid);
+                    }),
+                ),
+                fromElementEvent$(scroll, 'input').pipe(
+                    tap(({ target }) => {
+                        if (target instanceof HTMLInputElement) {
+                            target.removeAttribute('data-invalid');
+                        }
+                    }),
+                ),
+                this.editing$.pipe(
+                    tap(editing => {
+                        for (const item of shadow.querySelectorAll('.bookmark')) {
+                            item.toggleAttribute(
+                                'data-editing',
+                                item instanceof HTMLElement && item.dataset['bookmark'] === editing,
+                            );
+                        }
 
-                    const field =
-                        editing === null
-                            ? null
-                            : shadow.querySelector(`[data-rename="${CSS.escape(editing)}"]`);
+                        const field =
+                            editing === null
+                                ? null
+                                : shadow.querySelector(`[data-rename="${CSS.escape(editing)}"]`);
 
-                    if (field instanceof HTMLInputElement) {
-                        field.focus();
-                        field.select();
-                    }
-                }),
-            ),
-            fromElementEvent$(scroll, 'keydown').pipe(
-                mergeMap(event => {
-                    const { target } = event;
+                        if (field instanceof HTMLInputElement) {
+                            field.focus();
+                            field.select();
+                        }
+                    }),
+                ),
+                fromElementEvent$(scroll, 'keydown').pipe(
+                    mergeMap(event => {
+                        const { target } = event;
 
-                    return event.key === 'Enter' &&
-                        target instanceof HTMLInputElement &&
-                        target.closest('.add') === null
-                        ? [{ event, target }]
-                        : [];
-                }),
-                tap(({ event, target }) => {
-                    event.preventDefault();
-                    target.blur();
-                }),
-            ),
-            this.drags$.pipe(
-                tap(drag => {
-                    indicated(shadow, groups, drag);
-                }),
-            ),
-        ).pipe(map(() => undefined));
+                        return event.key === 'Enter' &&
+                            target instanceof HTMLInputElement &&
+                            target.closest('.add') === null
+                            ? [{ event, target }]
+                            : [];
+                    }),
+                    tap(({ event, target }) => {
+                        event.preventDefault();
+                        target.blur();
+                    }),
+                ),
+                this.drags$.pipe(
+                    tap(drag => {
+                        indicated(shadow, groups, drag);
+                    }),
+                ),
+            ).pipe(map(() => undefined)),
+        );
     }
 }
 

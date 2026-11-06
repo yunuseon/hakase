@@ -1,3 +1,11 @@
+import { html, svg } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { when } from 'lit-html/directives/when.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { withValue } from '../../lib/lit.ts';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import {
     commandOf,
     sameEnd,
@@ -36,129 +44,36 @@ import {
     type Inspected,
     type Point,
 } from './state-map.ts';
-import type { Row } from './rows.ts';
 import css from './state-map.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 
 const COPIED_MS = 1500;
 const ARM_MS = 3000;
 
-const TEMPLATE = `
-    <div class="bar">
-        <span class="hint">Click a state or a window to inspect it.</span>
-        <button class="tool" data-tool="tidy" type="button" title="put every node back where the map would place it">Tidy</button>
-        <button class="tool" data-tool="fit" type="button" title="frame the whole map">Fit</button>
-        <button class="prune" type="button"></button>
-    </div>
-    <div class="graph">
-        <div class="board">
-            <svg class="wires" aria-hidden="true"><path class="rubber" /></svg>
-            <div class="nodes"></div>
+const TEMPLATE = () =>
+    html`<div class="bar">
+            <span class="hint">Click a state or a window to inspect it.</span
+            ><button
+                class="tool"
+                data-tool="tidy"
+                type="button"
+                title="put every node back where the map would place it"
+            >
+                Tidy</button
+            ><button class="tool" data-tool="fit" type="button" title="frame the whole map">
+                Fit</button
+            ><button class="prune" type="button"></button>
         </div>
-    </div>
-    <div class="inspect"></div>
-`;
+        <div class="graph">
+            <div class="board">
+                <svg class="wires" aria-hidden="true"><path class="rubber"></path></svg>
+                <div class="nodes"></div>
+            </div>
+        </div>
+        <div class="inspect"></div>`;
 
 type Arming = { readonly armed: number | null; readonly fire: boolean };
-
-const treeRow = (path: string): HTMLElement => {
-    const row = document.createElement('div');
-    row.className = 'tree-row';
-    row.dataset['path'] = path;
-    row.setAttribute('role', 'treeitem');
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'toggle';
-    row.append(toggle, span('tree-key'), span('tree-value'));
-
-    return row;
-};
-
-const filledRow = (row: HTMLElement, { depth, key, kind, text, open }: Row): void => {
-    const container = kind === 'object' || kind === 'array';
-    row.style.setProperty('--depth', String(depth));
-    row.dataset['kind'] = kind;
-    row.toggleAttribute('data-open', open);
-
-    if (container) {
-        row.setAttribute('aria-expanded', String(open));
-    } else {
-        row.removeAttribute('aria-expanded');
-    }
-
-    const toggle = row.querySelector('.toggle');
-    const name = row.querySelector('.tree-key');
-    const value = row.querySelector('.tree-value');
-
-    if (toggle instanceof HTMLButtonElement) {
-        toggle.hidden = !container;
-        toggle.setAttribute('aria-label', open ? `collapse ${key}` : `expand ${key}`);
-    }
-
-    if (name !== null && name.textContent !== key) {
-        name.textContent = key;
-    }
-
-    if (value !== null && value.textContent !== text) {
-        value.textContent = text;
-    }
-};
-
-const sectionOf = (target: string): HTMLElement => {
-    const section = document.createElement('section');
-    section.className = 'section';
-    section.dataset['target'] = target;
-
-    const head = document.createElement('header');
-    head.className = 'section-head';
-    const copy = document.createElement('button');
-    copy.type = 'button';
-    copy.className = 'copy';
-    copy.dataset['copy'] = target;
-    copy.textContent = 'Copy JSON';
-    head.append(span('dot'), span('section-title'), copy);
-
-    const rows = document.createElement('div');
-    rows.className = 'tree';
-    rows.setAttribute('role', 'tree');
-    section.append(head, rows);
-
-    return section;
-};
-
-const filledSection = (section: HTMLElement, { title, name, colour, rows }: Inspected): void => {
-    section.style.setProperty('--store', colour);
-    const heading = section.querySelector('.section-title');
-
-    if (heading !== null && heading.textContent !== `${title} · ${name}`) {
-        heading.textContent = `${title} · ${name}`;
-    }
-
-    const tree = section.querySelector('.tree');
-
-    if (!(tree instanceof HTMLElement)) {
-        return;
-    }
-
-    const existing = new Map(
-        [...tree.children]
-            .filter(child => child instanceof HTMLElement)
-            .map(child => [child.dataset['path'], child]),
-    );
-    const shown = rows.map(row => {
-        const element = existing.get(row.path) ?? treeRow(row.path);
-        filledRow(element, row);
-
-        return element;
-    });
-    const current = [...tree.children];
-
-    if (current.length !== shown.length || shown.some((row, index) => current[index] !== row)) {
-        tree.replaceChildren(...shown);
-    }
-};
 
 type Drag = {
     readonly phase: Phase;
@@ -227,129 +142,105 @@ const unfocused: Focus | null = null;
 
 const LOCATE = 'M12 4 V7 M12 17 V20 M4 12 H7 M17 12 H20 M12 8 A4 4 0 1 1 12 16 A4 4 0 1 1 12 8';
 
-const iconOf = (path: string): SVGSVGElement => {
-    const icon = document.createElementNS(SVG, 'svg');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.classList.add('icon');
-    const shape = document.createElementNS(SVG, 'path');
-    shape.setAttribute('d', path);
-    icon.append(shape);
-
-    return icon;
-};
-
-const span = (className: string, text = ''): HTMLSpanElement => {
-    const element = document.createElement('span');
-    element.className = className;
-    element.textContent = text;
-
-    return element;
-};
-
-const placed = (element: HTMLElement, x: number, y: number, height: number): HTMLElement => {
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.height = `${height}px`;
-
-    return element;
-};
-
-const storeNode = ({
-    id,
-    global,
-    program,
-    kind,
-    title,
-    name,
-    colour,
-    ports,
-    x,
-    y,
-    height,
-}: PlacedStore) => {
-    const node = placed(document.createElement('div'), x, y, height);
-    node.className = 'node store';
-    node.dataset['store'] = id;
-    node.dataset['program'] = program;
-    node.toggleAttribute('data-global', global);
-
-    if (kind !== null) {
-        node.dataset['feeds'] = kind;
-    }
-
-    node.style.setProperty('--store', colour);
-    node.title = global
-        ? `${name}: state of the whole app; click to inspect it`
-        : `${title} · ${name}: click to inspect it, drag its jack onto a window to bind or follow it`;
-
-    const label = span('label');
-    label.append(span('kind', title), span('name', name));
-    const head = document.createElement('div');
-    head.className = 'store-head';
-    head.append(span('dot'), label, span('jack'));
-    node.append(head, ...ports.map(port => portRow('store', id, port)));
-
-    return node;
-};
-
-const portRow = (
-    owner: 'window' | 'store',
-    sink: string,
-    { input, title, accepts, optional, bound }: PlacedPort,
-) => {
-    const row = document.createElement('div');
-    row.className = 'port';
-    row.dataset['owner'] = owner;
-    row.dataset['sink'] = sink;
-    row.dataset['input'] = input;
-    row.dataset['accepts'] = accepts.join(' ');
-    row.toggleAttribute('data-bound', bound !== null);
-    row.toggleAttribute('data-cuttable', optional && bound !== null);
-    row.append(span('jack'), span('title', title));
-
-    if (optional && bound !== null) {
-        const cut = document.createElement('button');
-        cut.type = 'button';
-        cut.className = 'cut';
-        cut.dataset['cut'] = '';
-        cut.textContent = '×';
-        cut.setAttribute('aria-label', `stop ${title} following`);
-        row.append(cut);
-    }
-
-    return row;
-};
-
-const windowNode = ({ id, program, label, icon, own, ports, x, y, height }: PlacedWindow) => {
-    const node = placed(document.createElement('div'), x, y, height);
-    node.className = 'node window';
-    node.dataset['windowNode'] = id;
-
-    const head = document.createElement('div');
-    head.className = 'head';
-    head.append(iconOf(icon), span('label', label));
-
-    if (own !== null) {
-        head.dataset['own'] = id;
-        head.dataset['program'] = program;
-        head.dataset['current'] = own;
-        head.prepend(span('jack'));
-    }
-
-    const locate = document.createElement('button');
-    locate.type = 'button';
-    locate.className = 'locate';
-    locate.dataset['locate'] = id;
-    locate.title = `fly to ${label}`;
-    locate.setAttribute('aria-label', `fly to ${label}`);
-    locate.append(iconOf(LOCATE));
-    head.append(locate);
-
-    node.append(head, ...ports.map(port => portRow('window', id, port)));
-
-    return node;
-};
+const PortRow = (props: {
+    readonly owner: 'window' | 'store';
+    readonly sink: string;
+    readonly port: PlacedPort;
+}) =>
+    html`<div
+        class="port"
+        data-owner=${ifDefined(props.owner)}
+        data-sink=${ifDefined(props.sink)}
+        data-input=${ifDefined(props.port.input)}
+        data-accepts=${ifDefined(props.port.accepts.join(' '))}
+        data-bound=${ifDefined(props.port.bound !== null ? '' : undefined)}
+        data-cuttable=${ifDefined(props.port.optional && props.port.bound !== null ? '' : undefined)}
+    >
+        <span class="jack"></span
+        ><span class="title">${props.port.title}</span
+        >${when(props.port.optional && props.port.bound !== null, () => html`<button type="button" class="cut" data-cut="" aria-label=${ifDefined(`stop ${props.port.title} following`)}>×</button>`)}
+    </div>`;
+const StoreNode = (props: { readonly store: PlacedStore }) =>
+    html`<div
+        class="node store"
+        data-store=${ifDefined(props.store.id)}
+        data-program=${ifDefined(props.store.program)}
+        data-global=${ifDefined(props.store.global ? '' : undefined)}
+        data-feeds=${ifDefined(props.store.kind ?? undefined)}
+        style=${styleMap({
+            left: `${props.store.x}px`,
+            top: `${props.store.y}px`,
+            height: `${props.store.height}px`,
+            '--store': props.store.colour,
+        })}
+        title=${ifDefined(
+            props.store.global
+                ? `${props.store.name}: state of the whole app; click to inspect it`
+                : `${props.store.title} · ${props.store.name}: click to inspect it, drag its jack onto a window to bind or follow it`,
+        )}
+    >
+        <div class="store-head">
+            <span class="dot"></span
+            ><span class="label"
+                ><span class="kind">${props.store.title}</span
+                ><span class="name">${props.store.name}</span></span
+            ><span class="jack"></span>
+        </div>
+        ${repeat(
+            props.store.ports.map(port => port.input),
+            item => item,
+            input =>
+                withValue(
+                    props.store.ports.find(port => port.input === input),
+                    port => PortRow({ owner: 'store', sink: props.store.id, port: port }),
+                ),
+        )}
+    </div>`;
+const WindowNode = (props: { readonly window: PlacedWindow }) =>
+    html`<div
+        class="node window"
+        data-window-node=${ifDefined(props.window.id)}
+        style=${styleMap({
+            left: `${props.window.x}px`,
+            top: `${props.window.y}px`,
+            height: `${props.window.height}px`,
+        })}
+    >
+        <div
+            class="head"
+            data-own=${ifDefined(props.window.own !== null ? props.window.id : undefined)}
+            data-program=${ifDefined(props.window.own !== null ? props.window.program : undefined)}
+            data-current=${ifDefined(props.window.own ?? undefined)}
+        >
+            ${when(props.window.own !== null, () => html`<span class="jack"></span>`)}<svg
+                class="icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+            >
+                <path d=${ifDefined(props.window.icon)}></path></svg
+            ><span class="label">${props.window.label}</span
+            ><button
+                type="button"
+                class="locate"
+                data-locate=${ifDefined(props.window.id)}
+                title=${ifDefined(`fly to ${props.window.label}`)}
+                aria-label=${ifDefined(`fly to ${props.window.label}`)}
+            >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d=${ifDefined(LOCATE)}></path>
+                </svg>
+            </button>
+        </div>
+        ${repeat(
+            props.window.ports.map(port => port.input),
+            item => item,
+            input =>
+                withValue(
+                    props.window.ports.find(port => port.input === input),
+                    port => PortRow({ owner: 'window', sink: props.window.id, port: port }),
+                ),
+        )}
+    </div>`;
 
 export class HksStateMap extends HTMLElement {
     readonly commands$: Observable<StateCommand>;
@@ -371,13 +262,129 @@ export class HksStateMap extends HTMLElement {
     private readonly drags$: Observable<Drag>;
     private readonly arming$: Observable<Arming>;
 
+    private readonly rendering: Rendering;
+
+    private readonly inspectionView: RenderView<readonly Inspected[]>;
+    private readonly nodeView: RenderView<GraphLayout | null>;
+    private readonly wireView: RenderView<GraphLayout['wires']>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.inspectionView = renderView<readonly Inspected[]>(
+            requireChild(shadow, '.inspect'),
+            [],
+            entries =>
+                repeat(
+                    entries.map(entry => entry.target),
+                    item => item,
+                    target =>
+                        withValue(
+                            entries.find(entry => entry.target === target),
+                            entry =>
+                                html`<section
+                                    class="section"
+                                    data-target=${ifDefined(target)}
+                                    style=${styleMap({ '--store': entry.colour })}
+                                >
+                                    <header class="section-head">
+                                        <span class="dot"></span
+                                        ><span class="section-title"
+                                            >${`${entry.title} · ${entry.name}`}</span
+                                        ><button
+                                            type="button"
+                                            class="copy"
+                                            data-copy=${ifDefined(target)}
+                                        >
+                                            Copy JSON
+                                        </button>
+                                    </header>
+                                    <div class="tree" role="tree">
+                                        ${repeat(
+                                            entry.rows.map(row => row.path),
+                                            item => item,
+                                            path =>
+                                                withValue(
+                                                    entry.rows.find(row => row.path === path),
+                                                    row =>
+                                                        html`<div
+                                                            class="tree-row"
+                                                            data-path=${ifDefined(path)}
+                                                            role="treeitem"
+                                                            style=${styleMap({
+                                                                '--depth': String(row.depth),
+                                                            })}
+                                                            data-kind=${ifDefined(row.kind)}
+                                                            data-open=${ifDefined(row.open ? '' : undefined)}
+                                                            aria-expanded=${ifDefined(
+                                                                row.kind === 'object' ||
+                                                                    row.kind === 'array'
+                                                                    ? row.open
+                                                                    : undefined,
+                                                            )}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                class="toggle"
+                                                                ?hidden=${
+                                                                    row.kind !== 'object' &&
+                                                                    row.kind !== 'array'
+                                                                }
+                                                                aria-label=${ifDefined(`${row.open ? 'collapse' : 'expand'} ${row.key}`)}
+                                                            ></button
+                                                            ><span class="tree-key">${row.key}</span
+                                                            ><span class="tree-value"
+                                                                >${row.text}</span
+                                                            >
+                                                        </div>`,
+                                                ),
+                                        )}
+                                    </div>
+                                </section>`,
+                        ),
+                ),
+        );
+        this.nodeView = renderView<GraphLayout | null>(
+            requireChild(shadow, '.nodes'),
+            null,
+            layout =>
+                html`${repeat(
+                    layout?.stores.map(store => store.id) ?? [],
+                    item => item,
+                    id =>
+                        withValue(
+                            layout?.stores.find(store => store.id === id),
+                            store => StoreNode({ store: store }),
+                        ),
+                )}${repeat(
+                    layout?.windows.map(window => window.id) ?? [],
+                    item => item,
+                    id =>
+                        withValue(
+                            layout?.windows.find(window => window.id === id),
+                            window => WindowNode({ window: window }),
+                        ),
+                )}`,
+        );
+        this.wireView = renderView<GraphLayout['wires']>(
+            requireElement(shadow, '.wires', SVGSVGElement),
+            [],
+            wires =>
+                html`${repeat(
+                        wires.map(wire => wireKey(wire)),
+                        item => item,
+                        key =>
+                            withValue(
+                                wires.find(wire => wireKey(wire) === key),
+                                wire =>
+                                    svg`<path class=${ifDefined(`wire ${wire.kind}`)} data-key=${ifDefined(key)} data-fixed=${ifDefined(!wire.removable ? '' : undefined)} d=${ifDefined(wire.path)} style=${styleMap({ '--store': wire.colour })}></path>`,
+                            ),
+                    )}<path class="rubber"></path>`,
+        );
 
         const board = requireChild(shadow, '.board');
         const graph = requireChild(shadow, '.graph');
@@ -629,26 +636,7 @@ export class HksStateMap extends HTMLElement {
 
         const shownInspection$ = inspected$.pipe(
             tap(list => {
-                const existing = new Map(
-                    [...inspect.children]
-                        .filter(child => child instanceof HTMLElement)
-                        .map(child => [child.dataset['target'], child]),
-                );
-                const sections = list.map(item => {
-                    const section = existing.get(item.target) ?? sectionOf(item.target);
-                    filledSection(section, item);
-
-                    return section;
-                });
-                const current = [...inspect.children];
-
-                if (
-                    current.length !== sections.length ||
-                    sections.some((section, index) => current[index] !== section)
-                ) {
-                    inspect.replaceChildren(...sections);
-                }
-
+                this.inspectionView.update(list);
                 this.toggleAttribute('data-inspecting', list.length > 0);
             }),
         );
@@ -704,15 +692,20 @@ export class HksStateMap extends HTMLElement {
             }),
         );
 
-        return merge(this.mapped$(layout$), viewed$, shownInspection$, pruning$, copying$).pipe(
-            map(() => undefined),
+        return merge(
+            this.rendering.lifetime$,
+            this.inspectionView.lifetime$,
+            this.nodeView.lifetime$,
+            this.wireView.lifetime$,
+            merge(this.mapped$(layout$), viewed$, shownInspection$, pruning$, copying$).pipe(
+                map(() => undefined),
+            ),
         );
     }
 
     private mapped$(layout$: Observable<GraphLayout>): Observable<unknown> {
         const shadow = this.shadow;
         const board = requireChild(shadow, '.board');
-        const nodes = requireChild(shadow, '.nodes');
         const wires = requireElement(shadow, '.wires', SVGSVGElement);
         const rubber = requireElement(shadow, '.rubber', SVGPathElement);
 
@@ -726,18 +719,8 @@ export class HksStateMap extends HTMLElement {
                 wires.setAttribute('width', String(width));
                 wires.setAttribute('height', String(height));
 
-                const paths = list.map(({ kind, sink, input, path, colour, removable }) => {
-                    const wire = document.createElementNS(SVG, 'path');
-                    wire.classList.add('wire', kind);
-                    wire.dataset['key'] = wireKey({ sink, input });
-                    wire.toggleAttribute('data-fixed', !removable);
-                    wire.setAttribute('d', path);
-                    wire.style.setProperty('--store', colour);
-
-                    return wire;
-                });
-                wires.replaceChildren(...paths, rubber);
-                nodes.replaceChildren(...stores.map(storeNode), ...windows.map(windowNode));
+                this.wireView.update(list);
+                this.nodeView.update({ bounds, stores, windows, wires: list });
             }),
         );
 

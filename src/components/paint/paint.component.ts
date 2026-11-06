@@ -1,3 +1,9 @@
+import { html, svg } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { SymmetryIcon } from '../../shared/brush-icon.component.ts';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, scan, share, tap } from 'rxjs/operators';
 import { parseHexColor } from '../../lib/color.ts';
@@ -16,18 +22,10 @@ import {
     type PaintView,
     type Tool,
 } from './paint.ts';
-import {
-    guidesOf,
-    isSymmetry,
-    symmetryGlyph,
-    SYMMETRIES,
-    type Point,
-    type Symmetry,
-} from '../../shared/brush.ts';
+import { guidesOf, isSymmetry, SYMMETRIES, type Point, type Symmetry } from '../../shared/brush.ts';
 import css from './paint.css?inline';
 
 const sheet = styleSheet(css);
-const SVG = 'http://www.w3.org/2000/svg';
 
 const TOOL_GLYPHS: Readonly<Record<Tool, string>> = {
     brush: 'M5 19 C5 15 8 14 10 14 L18 6 L20 8 L12 16 C12 18 10 20 5 19 Z',
@@ -52,62 +50,127 @@ const SYMMETRY_TITLES: Readonly<Record<Symmetry, string>> = {
     kaleido: 'kaleidoscope: six turns, mirrored',
 };
 
-const dial = (field: string, label: string, min: number, max: number, step: number) => `
-    <label class="dial" title="${label}">
-        <span>${label}</span>
-        <input type="range" data-brush="${field}" min="${min}" max="${max}" step="${step}" />
-        <output data-read="${field}"></output>
-    </label>`;
+const dial = (field: string, label: string, min: number, max: number, step: number) =>
+    html`<label class="dial" title=${ifDefined(label)}
+        ><span>${label}</span
+        ><input
+            type="range"
+            data-brush=${ifDefined(field)}
+            min=${ifDefined(min)}
+            max=${ifDefined(max)}
+            step=${ifDefined(step)} /><output data-read=${ifDefined(field)}></output
+    ></label>`;
 
-const TEMPLATE = `
-    <div class="bar">
-        <div class="tools" role="radiogroup" aria-label="tool">
-            ${TOOLS.map(
-                tool => `
-                <button type="button" role="radio" data-tool="${tool}" title="${tool} (${TOOL_KEYS[tool].toUpperCase()})" aria-label="${tool}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${TOOL_GLYPHS[tool]}"/></svg>
-                </button>`,
-            ).join('')}
+const TEMPLATE = () =>
+    html`<div class="bar">
+            <div class="tools" role="radiogroup" aria-label="tool">
+                ${TOOLS.map(
+                    tool =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-tool=${ifDefined(tool)}
+                            title=${ifDefined(`${tool} (${TOOL_KEYS[tool].toUpperCase()})`)}
+                            aria-label=${ifDefined(tool)}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d=${ifDefined(TOOL_GLYPHS[tool])}></path>
+                            </svg>
+                        </button>`,
+                )}
+            </div>
+            ${dial('size', 'size', 1, MAX_BRUSH, 1)}${dial('hardness', 'edge', 0, 1, 0.05)}${dial('flow', 'flow', 0.05, 1, 0.05)}
+            <div class="symmetries" role="radiogroup" aria-label="symmetry">
+                ${SYMMETRIES.map(
+                    symmetry =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-symmetry=${ifDefined(symmetry)}
+                            title=${ifDefined(SYMMETRY_TITLES[symmetry])}
+                            aria-label=${ifDefined(SYMMETRY_TITLES[symmetry])}
+                        >
+                            ${SymmetryIcon({ symmetry: symmetry })}
+                        </button>`,
+                )}
+            </div>
         </div>
-        ${dial('size', 'size', 1, MAX_BRUSH, 1)}
-        ${dial('hardness', 'edge', 0, 1, 0.05)}
-        ${dial('flow', 'flow', 0.05, 1, 0.05)}
-        <div class="symmetries" role="radiogroup" aria-label="symmetry">
-            ${SYMMETRIES.map(
-                symmetry => `
-                <button type="button" role="radio" data-symmetry="${symmetry}" title="${SYMMETRY_TITLES[symmetry]}" aria-label="${SYMMETRY_TITLES[symmetry]}">
-                    ${symmetryGlyph(symmetry)}
-                </button>`,
-            ).join('')}
+        <div
+            class="stage"
+            tabindex="0"
+            aria-label="painting: arrow keys shift it, [ and ] size the brush, comma and full stop step through frames"
+        >
+            <div class="sheet">
+                <canvas class="onion" width="1" height="1"></canvas
+                ><canvas class="ink" width="1" height="1"></canvas
+                ><svg
+                    class="guides"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                ></svg>
+                <div class="cursor" hidden></div>
+            </div>
         </div>
-    </div>
-    <div class="stage" tabindex="0" aria-label="painting: arrow keys shift it, [ and ] size the brush, comma and full stop step through frames">
-        <div class="sheet">
-            <canvas class="onion" width="1" height="1"></canvas>
-            <canvas class="ink" width="1" height="1"></canvas>
-            <svg class="guides" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-            <div class="cursor" hidden></div>
+        <div class="frames">
+            <ol class="strip" aria-label="frames"></ol>
+            <button
+                type="button"
+                class="key"
+                data-add
+                title="add a frame: a copy of this one"
+                aria-label="add a frame"
+            >
+                +</button
+            ><button
+                type="button"
+                class="key"
+                data-remove
+                title="delete this frame"
+                aria-label="delete this frame"
+            >
+                −</button
+            ><button
+                type="button"
+                class="toggle"
+                data-fade
+                aria-pressed="false"
+                title="fade each frame into the next as the loop plays"
+            >
+                fade</button
+            ><button
+                type="button"
+                class="toggle"
+                data-onion
+                aria-pressed="false"
+                title="show the frame before this one faintly underneath"
+            >
+                onion
+            </button>
         </div>
-    </div>
-    <div class="frames">
-        <ol class="strip" aria-label="frames"></ol>
-        <button type="button" class="key" data-add title="add a frame: a copy of this one" aria-label="add a frame">+</button>
-        <button type="button" class="key" data-remove title="delete this frame" aria-label="delete this frame">−</button>
-        <button type="button" class="toggle" data-fade aria-pressed="false" title="fade each frame into the next as the loop plays">fade</button>
-        <button type="button" class="toggle" data-onion aria-pressed="false" title="show the frame before this one faintly underneath">onion</button>
-    </div>
-    <div class="foot">
-        <div class="sides" role="radiogroup" aria-label="resolution">
-            ${SIZES.map(
-                size =>
-                    `<button type="button" role="radio" data-side="${size}" title="${size} × ${size} pixels">${size}</button>`,
-            ).join('')}
-        </div>
-        <div class="actions">
-            ${ACTIONS.map(action => `<button type="button" data-action="${action}">${action}</button>`).join('')}
-        </div>
-    </div>
-`;
+        <div class="foot">
+            <div class="sides" role="radiogroup" aria-label="resolution">
+                ${SIZES.map(
+                    size =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-side=${ifDefined(size)}
+                            title=${ifDefined(`${size} × ${size} pixels`)}
+                        >
+                            ${size}
+                        </button>`,
+                )}
+            </div>
+            <div class="actions">
+                ${ACTIONS.map(
+                    action =>
+                        html`<button type="button" data-action=${ifDefined(action)}>
+                            ${action}
+                        </button>`,
+                )}
+            </div>
+        </div>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element
@@ -145,13 +208,44 @@ export class HksPaint extends HTMLElement {
 
     private readonly shadow: ShadowRoot;
 
+    private readonly rendering: Rendering;
+
+    private readonly guideView: RenderView<readonly string[]>;
+    private readonly thumbView: RenderView<number>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.guideView = renderView<readonly string[]>(
+            requireElement(shadow, '.guides', SVGSVGElement),
+            [],
+            paths =>
+                repeat(
+                    paths,
+                    item => item,
+                    path => svg`<path d=${ifDefined(path)}></path>`,
+                ),
+        );
+        this.thumbView = renderView(requireChild(shadow, '.strip'), 0, count =>
+            repeat(
+                Array.from({ length: count }, (_, index) => index),
+                item => item,
+                index =>
+                    html`<li>
+                        <button
+                            type="button"
+                            data-frame=${ifDefined(index)}
+                            aria-label=${ifDefined(`frame ${index + 1}`)}
+                        >
+                            <canvas width="1" height="1"></canvas>
+                        </button>
+                    </li>`,
+            ),
+        );
 
         const paper = requireChild(shadow, '.sheet');
         const stage = requireChild(shadow, '.stage');
@@ -278,7 +372,6 @@ export class HksPaint extends HTMLElement {
         const shadow = this.shadow;
         const ink = requireElement(shadow, '.ink', HTMLCanvasElement);
         const onion = requireElement(shadow, '.onion', HTMLCanvasElement);
-        const guides = requireElement(shadow, '.guides', SVGSVGElement);
         const cursor = requireChild(shadow, '.cursor');
         const paper = requireChild(shadow, '.sheet');
         const strip = requireChild(shadow, '.strip');
@@ -322,24 +415,7 @@ export class HksPaint extends HTMLElement {
             map(({ picture }) => picture),
             distinctUntilChanged((a, b) => a.frames === b.frames && a.side === b.side),
             tap(({ frames, side }) => {
-                if (strip.children.length !== frames.length) {
-                    strip.replaceChildren(
-                        ...frames.map((_, index) => {
-                            const item = document.createElement('li');
-                            const button = document.createElement('button');
-                            button.type = 'button';
-                            button.dataset['frame'] = String(index);
-                            button.setAttribute('aria-label', `frame ${index + 1}`);
-                            const thumb = document.createElement('canvas');
-                            thumb.width = 1;
-                            thumb.height = 1;
-                            button.append(thumb);
-                            item.append(button);
-
-                            return item;
-                        }),
-                    );
-                }
+                this.thumbView.update(frames.length);
 
                 frames.forEach((frame, index) => {
                     const thumb = strip.children[index]?.querySelector('canvas');
@@ -394,14 +470,7 @@ export class HksPaint extends HTMLElement {
                         field === 'size' ? String(value) : value.toFixed(2);
                 }
 
-                guides.replaceChildren(
-                    ...guidesOf(symmetry).map(path => {
-                        const line = document.createElementNS(SVG, 'path');
-                        line.setAttribute('d', path);
-
-                        return line;
-                    }),
-                );
+                this.guideView.update(guidesOf(symmetry));
                 paper.dataset['tool'] = tool;
             }),
         );
@@ -438,7 +507,12 @@ export class HksPaint extends HTMLElement {
             }),
         );
 
-        return merge(sheet$, thumbs$, marks$, controls$, cursor$).pipe(map(() => undefined));
+        return merge(
+            this.rendering.lifetime$,
+            this.guideView.lifetime$,
+            this.thumbView.lifetime$,
+            merge(sheet$, thumbs$, marks$, controls$, cursor$).pipe(map(() => undefined)),
+        );
     }
 }
 

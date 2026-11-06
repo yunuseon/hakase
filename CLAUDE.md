@@ -444,8 +444,32 @@ the component, not as a method on it. Every component's whole surface is `change
 Every view our code owns is a **component**: a custom element with a shadow root,
 in a folder of its own under `components/<name>/`, holding `<name>.component.ts`
 plus `<name>.css` — imported with Vite's `?inline` and adopted once per module via
-`adoptedStyleSheets`. There is no framework and no second state model — the
-element is a DOM container, the streams stay outside it.
+`adoptedStyleSheets`. Standalone lit-html renders templates inside the shadow root. Application state
+and orchestration stay in RxJS; there is no second reactive state model.
+
+**lit-html owns DOM structure; RxJS owns the process.** Components remain plain
+`.component.ts` custom elements with shadow roots, slots and adopted CSS. Use
+`html`/`svg` tagged templates from standalone `lit-html`; there is no JSX compiler,
+LitElement lifecycle, signal layer or framework store. `mountView` mounts static
+markup; `renderView` takes plain view data and renders synchronously on `update`.
+Both come from `lib/lit.ts`. Merge each rendering's `lifetime$` into `connect$`:
+process teardown disconnects directives, clears rendered content and prevents late
+updates. The AbortController in that adapter guards only the render lifetime;
+it holds no application or interaction state. Components own no subscriptions.
+
+Use `.value` and `.checked` property bindings, `?disabled`/`?hidden` boolean
+bindings, `ifDefined` for optional attributes, and `styleMap` for style objects.
+Use `repeat` with stable ids for editable lists and indices for positional slots.
+`withValue` is a typed, stateless conditional for optional rows. `displayValue`
+applies remote text through a `ref` callback while preserving a focused draft.
+Avoid `unsafeHTML`; Prism's generated token markup is the sole HTML injection in
+a component. SVG fragments use `svg` templates so their namespace stays correct.
+Geometry measurements, focus, scroll, clipboard, popover/dialog methods and
+canvas/WebGL drawing remain explicit effects. Custom-element routing uses normal
+`data-*` attributes, and editable controls use a normal `editable` attribute.
+The mount adapter upgrades disconnected subtrees before constructors query child
+controls. The renderer never derives business state; pure functions and RxJS
+still decide what a component displays and when it changes.
 
 **A component folder holds everything only that component needs**, whatever layer
 it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
@@ -2497,12 +2521,18 @@ to prevent.
 - **Tests are Vitest, beside the module they cover** (`shared/tickets.ts` → `shared/tickets.test.ts`),
   and only for pure code: folds, geometry, the muxers. That is the payoff of the
   layering — anything worth testing is a function of its arguments, so a test
-  is a call and an assertion, with no DOM, no GL and no mocks. A test that wants
+  is a call and an assertion, with no DOM, no GL and no mocks. A business-logic test that wants
   the DOM is a sign the logic it checks sits in a component instead of a pure
   sibling. Byte formats are tested by parsing what they write (the WebM test
   walks the EBML tree; the zip test reads the directory back), not by comparing
   against a stored file. The first run found a real bug: section stepping
   followed creation order, not the reading order documented above.
+
+Rendering integration tests use `.render.test.ts` in Vitest's `ui` project with
+Happy DOM. Other `.test.ts` tests run in the `logic` project under Node. DOM tests
+cover the RxJS/lit-html boundary, keyed identity, focused edits, custom-element
+attributes and cleanup; reducers remain tested as pure functions. Browser
+verification still covers actual layout, popovers, dialogs and GPU rendering.
 
 ## Performance
 

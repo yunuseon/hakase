@@ -1,3 +1,9 @@
+import { html } from 'lit-html';
+import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { repeat } from 'lit-html/directives/repeat.js';
+import { styleMap } from 'lit-html/directives/style-map.js';
+
+import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -52,52 +58,81 @@ const HINTS: Readonly<Record<Field, string>> = {
     glide: 'how much of each step eases into the next: drag, or click to type a percentage',
 };
 
-const TEMPLATE = `
-    <div class="scope" title="drag the wave: up and down moves its offset, left and right its phase">
-        <svg viewBox="0 -4 ${WIDTH} ${HEIGHT + 8}" preserveAspectRatio="none" aria-hidden="true">
-            <line class="zero" x1="0" x2="${WIDTH}" />
-            <path class="wave" />
-            <line class="now" y1="-4" y2="${HEIGHT + 4}" />
-        </svg>
-        <span class="bound max"></span>
-        <span class="bound min"></span>
-        <span class="dot"></span>
-    </div>
-    <div class="row">
-        <div class="shapes" role="radiogroup" aria-label="shape">
-            ${SHAPES.map(
-                shape => `
-                <button type="button" role="radio" data-shape="${shape}" title="${shape}" aria-label="${shape}">
-                    <svg viewBox="0 0 24 12" aria-hidden="true"><path d="${GLYPHS[shape]}" /></svg>
-                </button>`,
-            ).join('')}
+const TEMPLATE = () =>
+    html`<div
+            class="scope"
+            title="drag the wave: up and down moves its offset, left and right its phase"
+        >
+            <svg
+                viewBox=${ifDefined(`0 -4 ${WIDTH} ${HEIGHT + 8}`)}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+            >
+                <line class="zero" x1="0" x2=${ifDefined(WIDTH)}></line>
+                <path class="wave"></path>
+                <line class="now" y1="-4" y2=${ifDefined(HEIGHT + 4)}></line></svg
+            ><span class="bound max"></span><span class="bound min"></span><span class="dot"></span>
         </div>
-        <div class="rates" role="radiogroup" aria-label="cycles per loop" title="cycles per loop">
-            ${RATES.map(
-                rate => `<button type="button" role="radio" data-rate="${rate}">${rate}</button>`,
-            ).join('')}
+        <div class="row">
+            <div class="shapes" role="radiogroup" aria-label="shape">
+                ${SHAPES.map(
+                    shape =>
+                        html`<button
+                            type="button"
+                            role="radio"
+                            data-shape=${ifDefined(shape)}
+                            title=${ifDefined(shape)}
+                            aria-label=${ifDefined(shape)}
+                        >
+                            <svg viewBox="0 0 24 12" aria-hidden="true">
+                                <path d=${ifDefined(GLYPHS[shape])}></path>
+                            </svg>
+                        </button>`,
+                )}
+            </div>
+            <div
+                class="rates"
+                role="radiogroup"
+                aria-label="cycles per loop"
+                title="cycles per loop"
+            >
+                ${RATES.map(
+                    rate =>
+                        html`<button type="button" role="radio" data-rate=${ifDefined(rate)}>
+                            ${rate}
+                        </button>`,
+                )}
+            </div>
         </div>
-    </div>
-    <div class="steps" data-only="steps">
-        <div class="bars" title="draw the steps"></div>
-        <div class="counts" role="radiogroup" aria-label="steps" title="steps per cycle">
-            ${STEP_COUNTS.map(
-                count =>
-                    `<button type="button" role="radio" data-count="${count}">${count}</button>`,
-            ).join('')}
+        <div class="steps" data-only="steps">
+            <div class="bars" title="draw the steps"></div>
+            <div class="counts" role="radiogroup" aria-label="steps" title="steps per cycle">
+                ${STEP_COUNTS.map(
+                    count =>
+                        html`<button type="button" role="radio" data-count=${ifDefined(count)}>
+                            ${count}
+                        </button>`,
+                )}
+            </div>
         </div>
-    </div>
-    <div class="params">
-        ${FIELDS.map(
-            param => `
-            <label class="param" title="${HINTS[param]}"${param === 'glide' ? ' data-only="steps"' : ''}>
-                <span class="key">${param}</span>
-                <input class="num" data-param="${param}" type="text" inputmode="decimal"
-                       spellcheck="false" autocomplete="off" />
-            </label>`,
-        ).join('')}
-    </div>
-`;
+        <div class="params">
+            ${FIELDS.map(
+                param =>
+                    html`<label
+                        class="param"
+                        title=${ifDefined(HINTS[param])}
+                        data-only=${ifDefined(param === 'glide' ? 'steps' : undefined)}
+                        ><span class="key">${param}</span
+                        ><input
+                            class="num"
+                            data-param=${ifDefined(param)}
+                            type="text"
+                            inputmode="decimal"
+                            spellcheck="false"
+                            autocomplete="off"
+                    /></label>`,
+            )}
+        </div>`;
 
 type Pull = {
     readonly phase: Phase;
@@ -129,17 +164,39 @@ export class HksSignal extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly pulls$: Observable<Pull>;
 
+    private readonly rendering: Rendering;
+
+    private readonly barView: RenderView<{
+        readonly steps: readonly number[];
+        readonly current: number | null;
+    }>;
+
     constructor() {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
         shadow.adoptedStyleSheets = [sheet];
-        shadow.innerHTML = TEMPLATE;
+        this.rendering = mountView(shadow, () => TEMPLATE());
+        this.barView = renderView<{
+            readonly steps: readonly number[];
+            readonly current: number | null;
+        }>(requireChild(shadow, '.bars'), { steps: [], current: -1 }, view =>
+            repeat(
+                view.steps,
+                (_item, index) => index,
+                (value, index) =>
+                    html`<span
+                        class="bar"
+                        style=${styleMap({ '--value': String(value) })}
+                        data-current=${ifDefined(index === view.current ? '' : undefined)}
+                    ></span>`,
+            ),
+        );
 
+        const bars = requireChild(shadow, '.bars');
         const scope = requireChild(shadow, '.scope');
         const params = requireChild(shadow, '.params');
-        const bars = requireChild(shadow, '.bars');
 
         // Shared: the nudges and the click that opens the field for typing must read one gesture.
         this.pulls$ = pointerGesture$(
@@ -289,7 +346,6 @@ export class HksSignal extends HTMLElement {
     ): Observable<void> {
         const shadow = this.shadow;
         const params = requireChild(shadow, '.params');
-        const bars = requireChild(shadow, '.bars');
         const line = requireElement(shadow, '.wave', SVGPathElement);
         const now = requireElement(shadow, '.now', SVGLineElement);
         const zero = requireElement(shadow, '.zero', SVGLineElement);
@@ -416,30 +472,16 @@ export class HksSignal extends HTMLElement {
             tap(({ steps, current }) => {
                 checked('[data-count]', 'count', String(steps.length));
 
-                if (bars.children.length !== steps.length) {
-                    bars.replaceChildren(
-                        ...steps.map(() => {
-                            const bar = document.createElement('span');
-                            bar.className = 'bar';
-
-                            return bar;
-                        }),
-                    );
-                }
-
-                steps.forEach((value, index) => {
-                    const bar = bars.children[index];
-
-                    if (bar instanceof HTMLElement) {
-                        bar.style.setProperty('--value', String(value));
-                        bar.toggleAttribute('data-current', index === current);
-                    }
-                });
+                this.barView.update({ steps, current });
             }),
         );
 
-        return merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
-            map(() => undefined),
+        return merge(
+            this.rendering.lifetime$,
+            this.barView.lifetime$,
+            merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
+                map(() => undefined),
+            ),
         );
     }
 }

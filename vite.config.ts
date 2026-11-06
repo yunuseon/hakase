@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const flag = (name: string, fallback: boolean): boolean => {
     const value = process.env[name];
@@ -7,6 +7,27 @@ const flag = (name: string, fallback: boolean): boolean => {
 };
 
 export default defineConfig({
+    test: {
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: 'logic',
+                    environment: 'node',
+                    include: ['src/**/*.test.ts'],
+                    exclude: ['src/**/*.render.test.ts'],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: 'ui',
+                    environment: 'happy-dom',
+                    include: ['src/**/*.render.test.ts'],
+                },
+            },
+        ],
+    },
     server: {
         // Listen on all interfaces so the server is reachable from outside a container.
         host: true,
