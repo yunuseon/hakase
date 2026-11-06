@@ -2,7 +2,7 @@ import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { mountView, type Rendering } from '../../lib/lit.ts';
 import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
@@ -36,6 +36,7 @@ export class HksCanvas extends HTMLElement {
     readonly gestures$: Observable<ViewGesture>;
     readonly keys$: Observable<KeyZoom>;
     readonly edits$: Observable<KeyEdit>;
+    readonly clipboard$: Observable<'copy' | 'paste'>;
     readonly steps$: Observable<KeyStep>;
 
     private readonly ground: HTMLElement;
@@ -110,6 +111,21 @@ export class HksCanvas extends HTMLElement {
                     event.preventDefault();
                 }),
                 map(({ claimed }) => claimed),
+            ),
+        );
+
+        this.clipboard$ = fromDocumentEvent$('keydown').pipe(
+            filter(
+                event =>
+                    !event.defaultPrevented &&
+                    (event.ctrlKey || event.metaKey) &&
+                    !event.altKey &&
+                    !isEditable(event.composedPath()[0] ?? null) &&
+                    ['c', 'v'].includes(event.key.toLowerCase()),
+            ),
+            tap(event => event.preventDefault()),
+            map(event =>
+                event.key.toLowerCase() === 'c' ? ('copy' as const) : ('paste' as const),
             ),
         );
 

@@ -88,7 +88,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
                 {
                     id: 'section-1',
                     name: 'Twinkle',
-                    rect: { x: 80, y: 80, width: 700, height: 700 },
+                    rects: [{ x: 80, y: 80, width: 700, height: 700 }],
                 },
             ],
             links: [{ a: 'signal-1', b: 'voice-1' }],
@@ -132,7 +132,12 @@ const scene = (extra: readonly Process[] = []): Documents => {
 const playback = new Map([['timeline', { duration: 6, looping: true }]]);
 
 const saved = (documents: Documents): Blueprint => {
-    const captured = blueprintOf(documents, playback, 'section-1');
+    const captured = blueprintOf(
+        documents,
+        playback,
+        documents.workspace.processes.map(p => p.id),
+        'Twinkle',
+    );
 
     if (captured === null) {
         throw new Error('nothing captured');
@@ -142,12 +147,12 @@ const saved = (documents: Documents): Blueprint => {
 };
 
 describe('a blueprint', () => {
-    it('keeps a section: its windows, the states they keep and follow, chains and all', () => {
+    it('captures selected windows and the states they keep and follow, chains and all', () => {
         const blueprint = saved(scene());
 
         expect(blueprint.name).toBe('Twinkle');
         expect(blueprint.windows.map(({ id }) => id)).toEqual(['signal-1', 'voice-1', 'sketch-1']);
-        expect(blueprint.windows[0]?.frame).toMatchObject({ x: 20, y: 20 });
+        expect(blueprint.windows[0]?.frame).toMatchObject({ x: 0, y: 0 });
         expect(blueprint.stores.map(({ id }) => id).sort()).toEqual([
             'sketch-1',
             'store-a',
@@ -176,14 +181,14 @@ describe('a blueprint', () => {
             k1: { kind: 'voice', store: ids.get('voice') },
             k2: { kind: 'signal', store: ids.get('store-a') },
         });
-        expect(sketch?.frame).toMatchObject({ x: 2000 + 350 + 20, y: 100 + 340 });
+        expect(sketch?.frame).toMatchObject({ x: 2390, y: 460 });
         expect(after.signals.get(ids.get('store-a') ?? '')?.sources.depth).toBe(ids.get('store-b'));
         expect(after.voices.get(ids.get('voice') ?? '')?.sources.pitch).toBe(ids.get('store-a'));
         expect(after.settings.get(ids.get('sketch-1') ?? '')).toMatchObject({
             formula: 'custom-1',
         });
         expect(after.library).toBe(before.library);
-        expect(after.workspace.sections.at(-1)).toMatchObject({ name: 'Twinkle' });
+        expect(after.workspace.sections).toEqual(before.workspace.sections);
         expect(after.workspace.stores.find(({ id }) => id === ids.get('voice'))?.name).toBe(
             'Twinkle',
         );
@@ -347,4 +352,41 @@ describe('ticket blueprint migration', () => {
             'Ship',
         );
     });
+});
+
+it('captures an explicit selection without any section and excludes unselected programs', () => {
+    const before = scene();
+    const captured = blueprintOf(
+        { ...before, workspace: { ...before.workspace, sections: [] } },
+        playback,
+        ['voice-1', 'sketch-1'],
+    );
+    expect(captured?.windows.map(p => p.id)).toEqual(['voice-1', 'sketch-1']);
+    expect(captured?.stores.map(s => s.id)).toContain('store-a');
+    expect(captured?.links).toEqual([]);
+    expect(blueprintOf(before, playback, [])).toBe(null);
+});
+
+it('pastes a temporary snapshot as one undoable step without saving a blueprint or area', () => {
+    const before = scene();
+    const snapshot = saved(before);
+    const reduce = reduceHistory(documentsKit(inputsFor));
+    const pasted = reduce(startTimeline(before, seqFloor(before)), {
+        kind: 'paste',
+        blueprint: snapshot,
+        view: {
+            x: 1000,
+            y: 1000,
+            width: snapshot.size.width,
+            height: snapshot.size.height,
+        },
+    });
+    expect(pasted.present.workspace.processes).toHaveLength(6);
+    expect(pasted.present.blueprints).toBe(before.blueprints);
+    expect(pasted.present.workspace.sections).toBe(before.workspace.sections);
+    const undone = reduce(pasted, { kind: 'undo' });
+    expect(undone.present.workspace.processes).toHaveLength(3);
+    expect(reduce(undone, { kind: 'redo' }).present.workspace.processes).toEqual(
+        pasted.present.workspace.processes,
+    );
 });

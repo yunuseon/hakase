@@ -1,118 +1,66 @@
-/* Zero-sized at the world origin: only labels and corners take the pointer, the ground stays grabbable.
-   No z-index and no transform on the host or a section: either would trap the labels under the windows. */
 :host {
     position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-    inline-size: 0;
-    block-size: 0;
-}
-
-.section {
-    position: absolute;
-    box-sizing: border-box;
-    min-inline-size: 0;
-    margin: 0;
-    padding: 0 0 0 18px;
-    border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
-    border-radius: 22px;
-    background: color-mix(in srgb, var(--accent) 3%, transparent);
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
     pointer-events: none;
 }
-
-.label {
-    position: relative;
-    z-index: 99999;
-    display: block;
-    padding: 0 8px;
-    font: 600 15px var(--font-ui);
-    color: color-mix(in srgb, var(--accent) 80%, var(--ink));
-    cursor: grab;
-    pointer-events: auto;
-    user-select: none;
-}
-
-.label:active {
-    cursor: grabbing;
-}
-
-.name {
-    /* As wide as the text, so the border's gap is even on both sides of the name. */
-    field-sizing: content;
-    min-inline-size: 1ch;
-    padding: 2px 0;
-    color: inherit;
-    background: transparent;
-    border: none;
-    outline: none;
-    cursor: inherit;
-}
-
-.name:not([readonly]) {
-    cursor: text;
-    border-block-end: 1px dashed currentColor;
-}
-
-.actions {
-    /* Out of the flow: the legend's width, and so the gap, is the name alone. */
+.areas {
     position: absolute;
-    inset-inline-start: 100%;
-    inset-block-start: 50%;
-    translate: 0 -50%;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+}
+.fill {
+    fill: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.edge {
+    fill: none;
+    stroke: color-mix(in srgb, var(--accent) 50%, transparent);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+}
+.label {
+    position: absolute;
+    z-index: 99999;
     display: flex;
-    gap: 2px;
+    gap: 4px;
     align-items: center;
-    padding-inline-start: 4px;
-    opacity: 0;
+    padding: 0 6px;
+    border-radius: 6px;
+    color: color-mix(in srgb, var(--accent) 80%, var(--ink));
+    pointer-events: auto;
 }
-
-.label:hover .actions,
-.actions:focus-within {
-    opacity: 1;
+.name {
+    field-sizing: content;
+    min-width: 1ch;
+    padding: 2px 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: 600 15px var(--font-ui);
 }
-
-.remove,
-.save {
-    block-size: 22px;
+.name:not([readonly]) {
+    border-bottom: 1px dashed currentColor;
+}
+.remove {
+    width: 22px;
+    height: 22px;
+    min-height: 0;
     padding: 0;
     color: inherit;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-    border-radius: 11px;
-    cursor: pointer;
-    opacity: 0.8;
+    opacity: 0;
 }
-
-.remove {
-    inline-size: 22px;
-    font-size: 15px;
-    line-height: 1;
+.remove:hover:not(:disabled) {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-
-.save {
-    padding-inline: 8px;
-    font: 500 11px var(--font-ui);
+.remove:focus-visible {
+    outline-color: var(--accent);
 }
-
-.remove:hover,
-.save:hover,
-.remove:focus-visible,
-.save:focus-visible {
+.label:hover .remove,
+.label:focus-within .remove {
     opacity: 1;
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-.corner {
-    position: absolute;
-    z-index: 99999;
-    inset-block-end: -6px;
-    inset-inline-end: -6px;
-    inline-size: 18px;
-    block-size: 18px;
-    border-block-end: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
-    border-inline-end: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
-    border-end-end-radius: 12px;
-    cursor: nwse-resize;
-    pointer-events: auto;
 }

@@ -836,33 +836,45 @@ app was open reset a user's layout, sections and camera to the default, which
 the next save then made permanent. Retiring a program id needs that mapping, or
 its windows quietly disappear.
 
-**Sections are named borders on the canvas**, for grouping programs by place.
-They live in the workspace (`Workspace.sections`, saved with it) as an id, a name
-and a world `Rect`. **Which windows a section holds is derived, never stored**:
-`holds` asks whether a window's middle lies inside, so dropping a window into a
-section or dragging it out needs no bookkeeping. Dragging a section's label
-moves it and everything it holds in one reducer step (members measured before
-the step); its corner resizes it; double-clicking the name renames it; the ×
-deletes the section and leaves its windows where they are. **+ section** in the
-navigator frames the current view.
+**Sections are painted workspace areas**, used only for navigation. They own no
+programs and never move or save them. Each section stores its id, name and a
+non-overlapping set of rectangles (`rects`), whose exact union is its area.
+Bounds, outlines and membership are derived by the pure geometry in
+`shared/area.ts`; `section-areas.ts` merges connected sections and splits erased
+ones. Never replace an area's shape with its bounding rectangle: that fills
+cutouts and the empty corners of L-shapes.
 
-`hks-sections` draws them in the world layer, under the windows, and only labels
-and corners take the pointer, so the inside of a section is still ground you can
-pan. Two traps in its CSS: the host and the sections set **no `z-index` and no
-`transform`** — either creates a stacking context, and the labels (which do set
-a high `z-index`) would be trapped under the windows. That is why sections are
-placed with `left`/`top`. And they are updated in place by id, never re-inserted:
-moving a node drops the focus of a name being typed.
+The navigator offers **Paint area**, **Erase area** and **Select programs**.
+Each starts a mouse/touch rectangle gesture, previewed by `hks-section-drawing`.
+Release commits one undo step; Escape, right-click, pointer cancellation and
+blur cancel it. Overlapping or edge-touching paint merges sections transitively,
+keeping the oldest name and id. Erasing can cut a hole, split a section into
+separate named areas, or remove it entirely, without touching any program.
+Split ids derive from the action's sequence for stable undo replay.
 
-The name floats in a gap in the top border, with nothing painted behind it. That
-gap is a real `<fieldset>` and `<legend>`: the browser opens the border around
-the legend, which no background patch could do over the dotted ground. The gap is
-exactly the legend's width, so only the name may set it: the input sizes to its
-text with `field-sizing: content`, and the × is positioned out of the flow
-beside it, or the gap grows lopsided on the × side. The
-rename is read from `change`, and **`change` is not a composed event**, so it
-never leaves the shadow root — it is listened for on an inner `.layer`, not on
-the host where `click`, `dblclick` and the pointer events (all composed) arrive.
+`hks-sections` draws only the filled union and its external and hole boundaries,
+never the internal rectangle edges. Labels can be renamed by double-click and
+areas deleted. Only labels accept pointer events; the ground remains pannable.
+Its host must create no stacking context or its labels become trapped under
+program windows. The navigator renders the same area geometry. Legacy sections
+saved as `rect` migrate to `rects`; overlapping old rectangles merge on restore.
+
+**Selection is independent of areas.** Drag the selection tool over intersecting
+programs to highlight them. `selectedIn` and `selectionView` in `selection.ts`
+derive ids and screen-space highlights; the transient selection and copied
+snapshot live in streams, outside documents and history. Closing a selected
+program removes its highlight. The selection bar offers Copy, Paste, Save as
+blueprint and Clear. Cmd/Ctrl+C copies; Cmd/Ctrl+V enters placement, both left to
+native controls while editing. Copying nothing leaves the previous copy intact.
+The clipboard is local to the running app and is not a saved blueprint.
+
+Copy and Save as blueprint share `blueprintOf(documents, clocks, selectedIds)`.
+Capture uses the selected programs' measured bounds and carries their states,
+follow chains, settings, formulas and connections between selected programs.
+Paste logs the captured snapshot itself, so replay never depends on a changed
+clipboard, and makes one undoable placement with fresh ids. Neither paste nor
+blueprint placement creates an area. `hks-selection` only displays highlights
+and emits action intents; it has no document or program knowledge.
 
 **Jumping to a section flies the camera there.** The navigator, with its map
 open, lists the sections; clicking one emits a jump, and `main.ts` turns it into
@@ -896,7 +908,11 @@ expanding card. Its compact pill keeps the slotted launcher, State, a live minim
 and the zoom readout; clicking the thumbnail expands the same surface upward, keeping
 its bottom-right anchor. State and undo/redo sit in the upper corners; zoom,
 fit, section creation and collapse sit along the lower edge. Section names are
-keyboard-accessible jump buttons on the map, not a separate row of chips.
+keyboard-accessible jump buttons on the map, not a separate row of chips. Each
+section is **one** button over its bounds, holding its area as an SVG path; the
+button takes no pointer events and the path does, so hover lights the whole
+shape and a click in an L's empty corner falls through. A button per rectangle
+lit only the piece under the pointer.
 
 `minimapOf` in `navigator.ts` maps every window frame and the visible world rect
 into a fixed coordinate system with one uniform scale. The component draws those
@@ -1575,16 +1591,15 @@ signal feeding a pen or a voice is kept by a prune and a pen cannot be wired int
 
 ## Blueprints
 
-A **blueprint** is a creation kept to be placed again: everything inside a
-section, saved from the section label's **Save as blueprint**, listed in the
+A **blueprint** is a creation kept to be placed again: selected programs, saved from the selection bar's **Save as blueprint**, listed in the
 **blueprints** window and placed from there. It was called a piece; `RENAMED`
 maps the old `pieces` window, and the snapshot is read from `pieces` when it
 has no `blueprints`. It is a document like the formula library
 (`Documents.blueprints`, saved in the snapshot), so saving, renaming, deleting and
 placing are ordinary steps; one undo takes a whole placement back.
 
-`blueprintOf` (in `src/blueprints.ts`, pure) captures the section's windows with frames
-relative to it, their settings, every store they keep or follow **and what
+`blueprintOf` (in `src/blueprints.ts`, pure) captures the selected windows with frames
+relative to their collective bounds, their settings, every store they keep or follow **and what
 those follow** (`reachedFrom`, so a signal that only modulates another comes
 along), the documents of those stores, the formulas they show (a saved formula,
 or a built-in's edited text, as label and source), and the links among them.
@@ -1599,7 +1614,7 @@ hands it to the clocks fold as the store first appears, the way `copy` does
 for a fork.
 
 **Placing makes a fresh copy, never a link.** `placed` names every store,
-window and section from the log's sequence (`store-<seq>-<n>`), so a blueprint
+window from the log's sequence (`store-<seq>-<n>`), so a blueprint
 placed twice is two copies, and rewrites every reference to the copies:
 bindings, a signal's, pen's or voice's sources, the settings keys, the links.
 A formula is matched against the library by its source and added only if it

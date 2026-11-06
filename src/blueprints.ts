@@ -1,3 +1,4 @@
+import { boundsOf } from './shared/area.ts';
 import { parseAgenda } from './components/agenda/agenda.ts';
 import { parseBookmarks } from './components/bookmarks/bookmarks.ts';
 import { parseClocks } from './components/clocks/clocks.ts';
@@ -29,7 +30,7 @@ import {
 import type { Size } from './components/window/frame.ts';
 import type { Rect } from './shared/camera.ts';
 import {
-    holds,
+    boxOf,
     linkFrom,
     ownsInputs,
     processFrom,
@@ -128,13 +129,14 @@ const formulaOf = (settings: Settings | null) =>
 export const blueprintOf = (
     documents: Documents,
     playback: ReadonlyMap<StoreId, ClockSeed>,
-    sectionId: string,
+    selected: readonly string[],
+    name = 'Selection',
 ): Captured | null => {
     const { workspace } = documents;
-    const section = workspace.sections.find(({ id }) => id === sectionId);
-    const inside = section === undefined ? [] : workspace.processes.filter(p => holds(section, p));
+    const inside = workspace.processes.filter(p => selected.includes(p.id));
+    const bounds = boundsOf(inside.map(boxOf));
 
-    if (section === undefined || inside.length === 0) {
+    if (inside.length === 0) {
         return null;
     }
 
@@ -155,8 +157,8 @@ export const blueprintOf = (
         follows: followsOf(process),
         frame: {
             ...process.frame,
-            x: process.frame.x - section.rect.x,
-            y: process.frame.y - section.rect.y,
+            x: process.frame.x - bounds.x,
+            y: process.frame.y - bounds.y,
         },
         measured: process.measured,
         settings:
@@ -201,8 +203,8 @@ export const blueprintOf = (
     const ids = new Set(windows.map(({ id }) => id));
 
     return {
-        name: section.name,
-        size: { width: section.rect.width, height: section.rect.height },
+        name,
+        size: { width: bounds.width, height: bounds.height },
         windows,
         stores: entries,
         held: {
@@ -336,14 +338,6 @@ export const placed = (
 
                     return from === undefined || to === undefined ? [] : [{ a: from, b: to }];
                 }),
-            ],
-            sections: [
-                ...workspace.sections,
-                {
-                    id: `section-${seq}`,
-                    name: blueprint.name,
-                    rect: { x, y, width: blueprint.size.width, height: blueprint.size.height },
-                },
             ],
         },
         settings: new Map([...documents.settings, ...settings]),

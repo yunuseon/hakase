@@ -1,3 +1,6 @@
+import { sameArea, unionArea } from './shared/area.ts';
+import { mergeSections, eraseSections, type Section } from './section-areas.ts';
+export type { Section } from './section-areas.ts';
 import {
     accepts,
     definitionOf,
@@ -56,12 +59,6 @@ import {
     type StoreId,
     type ClockSeed,
 } from './stores.ts';
-
-export type Section = {
-    readonly id: string;
-    readonly name: string;
-    readonly rect: Rect;
-};
 
 type ProcessBase = {
     readonly id: ProcessId;
@@ -133,22 +130,18 @@ export type WorkspaceAction =
     | { readonly kind: 'undo' }
     | { readonly kind: 'redo' }
     | { readonly kind: 'set-camera'; readonly camera: Camera }
-    | { readonly kind: 'add-section'; readonly viewport: Extent; readonly camera?: Camera }
     | {
-          readonly kind: 'move-section';
-          readonly id: string;
-          readonly dx: number;
-          readonly dy: number;
+          readonly kind: 'add-section';
+          readonly viewport: Extent;
           readonly camera?: Camera;
+          readonly rect?: Rect;
       }
+    | { readonly kind: 'erase-sections'; readonly rect: Rect }
     | {
-          readonly kind: 'resize-section';
+          readonly kind: 'rename-section';
           readonly id: string;
-          readonly dx: number;
-          readonly dy: number;
-          readonly camera?: Camera;
+          readonly name: string;
       }
-    | { readonly kind: 'rename-section'; readonly id: string; readonly name: string }
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
     // What signals follow, so a store that only feeds another signal survives the prune.
@@ -606,7 +599,6 @@ const resizedToNeighbours = (
 };
 
 const SECTION_INSET = 0.12;
-const MIN_SECTION = 160;
 
 export const visibleWorld = (camera: Camera, viewport: Extent): Rect => ({
     ...worldAt(camera, { x: 0, y: 0 }),
@@ -614,42 +606,14 @@ export const visibleWorld = (camera: Camera, viewport: Extent): Rect => ({
     height: viewport.height / camera.zoom,
 });
 
-const contains = (rect: Rect, x: number, y: number): boolean =>
-    x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
-
-export const holds = (section: Section, process: Process): boolean => {
-    const box = boxOf(process);
-
-    return contains(section.rect, box.x + box.width / 2, box.y + box.height / 2);
-};
-
 const withSection = (
     workspace: Workspace,
     id: string,
     next: (section: Section) => Section,
 ): Workspace => ({
     ...workspace,
-    sections: workspace.sections.map(section => (section.id === id ? next(section) : section)),
+    sections: mergeSections(workspace.sections.map(s => (s.id === id ? next(s) : s))),
 });
-
-// Measured before moving: a member is whatever sat inside when the drag step began.
-const movedSection = (workspace: Workspace, id: string, dx: number, dy: number): Workspace => {
-    const section = workspace.sections.find(candidate => candidate.id === id);
-
-    if (section === undefined) {
-        return workspace;
-    }
-
-    return {
-        ...withSection(workspace, id, current => ({
-            ...current,
-            rect: { ...current.rect, x: current.rect.x + dx, y: current.rect.y + dy },
-        })),
-        processes: workspace.processes.map(process =>
-            holds(section, process) ? { ...process, frame: moved(process.frame, dx, dy) } : process,
-        ),
-    };
-};
 
 const step = (
     workspace: Workspace,
@@ -902,43 +866,37 @@ const step = (
             return {
                 ...workspace,
                 launched,
-                sections: [
+                sections: mergeSections([
                     ...workspace.sections,
                     {
                         id: `section-${tag(launched)}`,
                         name: `Section ${workspace.sections.length + 1}`,
-                        rect: {
-                            x: Math.round(view.x + inset),
-                            y: Math.round(view.y + inset),
-                            width: Math.round(view.width - 2 * inset),
-                            height: Math.round(view.height - 2 * inset),
-                        },
+                        rects: [
+                            action.rect ?? {
+                                x: Math.round(view.x + inset),
+                                y: Math.round(view.y + inset),
+                                width: Math.round(view.width - 2 * inset),
+                                height: Math.round(view.height - 2 * inset),
+                            },
+                        ],
                     },
-                ],
+                ]),
             };
         }
-        case 'move-section':
-            return movedSection(
-                workspace,
-                action.id,
-                action.dx / workspace.camera.zoom,
-                action.dy / workspace.camera.zoom,
+        case 'erase-sections': {
+            const sections = eraseSections(
+                workspace.sections,
+                action.rect,
+                seq ?? workspace.launched,
             );
-        case 'resize-section':
-            return withSection(workspace, action.id, section => ({
-                ...section,
-                rect: {
-                    ...section.rect,
-                    width: Math.max(
-                        MIN_SECTION,
-                        section.rect.width + action.dx / workspace.camera.zoom,
-                    ),
-                    height: Math.max(
-                        MIN_SECTION,
-                        section.rect.height + action.dy / workspace.camera.zoom,
-                    ),
-                },
-            }));
+            return sections.length === workspace.sections.length &&
+                sections.every((s, i) => {
+                    const old = workspace.sections[i];
+                    return old !== undefined && old.id === s.id && sameArea(old.rects, s.rects);
+                })
+                ? workspace
+                : { ...workspace, sections };
+        }
         case 'rename-section': {
             const name = action.name.trim();
 
@@ -1029,14 +987,8 @@ const rebound = (workspace: Workspace, id: ProcessId, store: StoreId): Workspace
     ),
 });
 
-export const sectionAction = (
-    gesture: Exclude<SectionGesture, { readonly kind: 'save' }>,
-): WorkspaceAction => {
+export const sectionAction = (gesture: SectionGesture): WorkspaceAction => {
     switch (gesture.kind) {
-        case 'move':
-            return { kind: 'move-section', id: gesture.id, dx: gesture.dx, dy: gesture.dy };
-        case 'resize':
-            return { kind: 'resize-section', id: gesture.id, dx: gesture.dx, dy: gesture.dy };
         case 'rename':
             return { kind: 'rename-section', id: gesture.id, name: gesture.name };
         case 'remove':
@@ -1306,17 +1258,35 @@ const sectionFrom = (value: unknown): Section[] => {
     if (
         typeof value !== 'object' ||
         value === null ||
-        !('id' in value && 'name' in value && 'rect' in value)
-    ) {
+        !('id' in value && 'name' in value) ||
+        typeof value.id !== 'string' ||
+        typeof value.name !== 'string'
+    )
         return [];
-    }
-
-    const { id, name, rect } = value;
-    const frame = frameFrom(typeof rect === 'object' && rect !== null ? { z: 0, ...rect } : null);
-
-    return typeof id === 'string' && typeof name === 'string' && frame !== null
-        ? [{ id, name, rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height } }]
-        : [];
+    const raw =
+        'rects' in value && Array.isArray(value.rects)
+            ? value.rects
+            : 'rect' in value
+              ? [value.rect]
+              : [];
+    const rects = unionArea(
+        raw.flatMap((rect: unknown) => {
+            const frame = frameFrom(
+                typeof rect === 'object' && rect !== null ? { z: 0, ...rect } : null,
+            );
+            return frame === null
+                ? []
+                : [
+                      {
+                          x: frame.x,
+                          y: frame.y,
+                          width: frame.width,
+                          height: frame.height,
+                      },
+                  ];
+        }),
+    );
+    return rects.length === 0 ? [] : [{ id: value.id, name: value.name, rects }];
 };
 
 export const parseWorkspace = (value: unknown, inputsFor: InputsFor): Workspace | null => {
@@ -1336,7 +1306,7 @@ export const parseWorkspace = (value: unknown, inputsFor: InputsFor): Workspace 
     const minimap = 'minimap' in value && value.minimap === true;
     const sections =
         'sections' in value && Array.isArray(value.sections)
-            ? value.sections.flatMap(sectionFrom)
+            ? mergeSections(value.sections.flatMap(sectionFrom))
             : [];
 
     if (launched === null || !Array.isArray(stored) || camera === null || toolbar === null) {
@@ -1447,8 +1417,6 @@ export const stepOf = (action: WorkspaceAction): Step | null => {
     switch (action.kind) {
         case 'move':
         case 'resize':
-        case 'move-section':
-        case 'resize-section':
             return { key: `${action.kind}:${action.id}`, joins: true };
         case 'launch':
         case 'quit':
@@ -1463,6 +1431,7 @@ export const stepOf = (action: WorkspaceAction): Step | null => {
         case 'follow':
         case 'unfollow':
         case 'add-section':
+        case 'erase-sections':
         case 'rename-section':
         case 'remove-section':
             return { key: action.kind, joins: false };
@@ -1516,11 +1485,9 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
         case 'resize':
             return `Resized ${programOf(before, action.id)}`;
         case 'add-section':
-            return 'Added a section';
-        case 'move-section':
-            return `Moved section ${sectionName(before, action.id)}`;
-        case 'resize-section':
-            return `Resized section ${sectionName(before, action.id)}`;
+            return 'Painted a section area';
+        case 'erase-sections':
+            return 'Erased section area';
         case 'rename-section':
             return `Renamed section to ${action.name.trim()}`;
         case 'remove-section':
@@ -1545,8 +1512,6 @@ export const settledAction = (workspace: Workspace, action: WorkspaceAction): Wo
         case 'launch':
             return { ...action, camera: workspace.camera, order: workspace.launched + 1 };
         case 'add-section':
-        case 'move-section':
-        case 'resize-section':
         case 'move':
         case 'resize':
             return { ...action, camera: workspace.camera };

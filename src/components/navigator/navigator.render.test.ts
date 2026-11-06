@@ -7,7 +7,13 @@ import type { MiniMap } from './navigator.ts';
 
 const example: MiniMap = {
     windows: [{ x: 40, y: 45, width: 70, height: 55 }],
-    sections: [{ id: 'make', name: 'Make', rect: { x: 25, y: 20, width: 160, height: 120 } }],
+    sections: [
+        {
+            id: 'make',
+            name: 'Make',
+            rects: [{ x: 25, y: 20, width: 160, height: 120 }],
+        },
+    ],
     view: { x: 16, y: 12, width: 190, height: 150 },
 };
 afterEach(() => document.body.replaceChildren());
@@ -76,7 +82,7 @@ describe('unified navigator card', () => {
                 {
                     id: 'make',
                     name: 'Creative work',
-                    rect: { x: 30, y: 20, width: 150, height: 120 },
+                    rects: [{ x: 30, y: 20, width: 150, height: 120 }],
                 },
             ],
             view: { x: 20, y: 18, width: 190, height: 150 },
@@ -98,6 +104,34 @@ describe('unified navigator card', () => {
         expect(requireChild(root, '.readout').textContent).toBe('125%');
         expect(requireElement(root, '[data-edit="undo"]', HTMLButtonElement).disabled).toBe(false);
         expect(requireChild(root, '.state-mode').getAttribute('aria-pressed')).toBe('true');
+        running.unsubscribe();
+    });
+    it('gives a shaped section one target covering its whole area', () => {
+        const element = new HksNavigator();
+        document.body.append(element);
+        const root = element.shadowRoot ?? element;
+        const shaped: MiniMap = {
+            ...example,
+            sections: [
+                {
+                    id: 'make',
+                    name: 'Make',
+                    rects: [
+                        { x: 20, y: 20, width: 100, height: 40 },
+                        { x: 20, y: 60, width: 40, height: 60 },
+                    ],
+                },
+            ],
+        };
+        const running = element
+            .connect$(of(shaped), of('100%'), of(true), of({ undo: false, redo: false }), of(false))
+            .subscribe();
+        const targets = root.querySelectorAll('[data-jump="make"]');
+        expect(targets).toHaveLength(1);
+        const area = targets[0]?.querySelector('.jump-area');
+        expect(area?.getAttribute('viewBox')).toBe('20 20 100 100');
+        expect(area?.querySelector('path')?.getAttribute('d')).toContain('M');
+        expect(targets[0]?.textContent?.trim()).toBe('Make');
         running.unsubscribe();
     });
 });

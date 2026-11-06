@@ -84,26 +84,44 @@
 .jump {
     position: absolute;
     box-sizing: border-box;
-    min-inline-size: 12px;
-    min-block-size: 12px;
-    overflow: hidden;
-    display: flex;
-    align-items: flex-start;
-    padding: 2px 3px;
+    padding: 0;
     font: 500 9px/1.2 var(--font-ui);
     white-space: nowrap;
     color: var(--accent);
     background: transparent;
     border: 0;
-    border-radius: 4px;
-    text-align: start;
+    outline: none;
+    /* Only the area's own path takes the pointer, or a cutout would fly to it. */
+    pointer-events: none;
+}
+.jump-area {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+}
+.jump-area path {
+    fill: transparent;
+    stroke: transparent;
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+    pointer-events: all;
+    cursor: pointer;
+}
+.jump:hover .jump-area path {
+    fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.jump:focus-visible .jump-area path {
+    fill: color-mix(in srgb, var(--accent) 12%, transparent);
+    stroke: var(--accent);
 }
 .jump span {
+    position: absolute;
+    box-sizing: border-box;
+    padding: 2px 3px;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-.jump:hover {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .state-mode {
     position: absolute;
@@ -134,10 +152,11 @@
     inline-size: 28px;
     block-size: 28px;
 }
-.add {
+.area-tools {
     position: absolute;
     inset-block-end: 8px;
     inset-inline-start: 8px;
+    gap: 2px;
 }
 .zoom-controls {
     position: absolute;
@@ -148,7 +167,7 @@
     gap: 2px;
 }
 :host([data-open]) .zoom-controls {
-    inset-inline-start: 50%;
+    inset-inline-start: 62%;
     inset-inline-end: auto;
     translate: -50% 0;
 }
@@ -244,5 +263,34 @@
     }
     :host([data-launcher]:not([data-open])) .zoom-controls {
         inset-block-end: 8px;
+    }
+}
+
+.section-outline {
+    stroke: none;
+}
+.section-edge {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1px;
+    opacity: 0.4;
+}
+
+.area-tools .ui-icon {
+    inline-size: 26px;
+    block-size: 28px;
+    min-block-size: 0;
+}
+
+@container (max-width:280px) {
+    :host([data-open]) .navigator {
+        padding-block-end: 76px;
+    }
+    :host([data-open]) .area-tools {
+        inset-block-end: 42px;
+    }
+    :host([data-open]) .zoom-controls {
+        inset-inline-start: 8px;
+        translate: none;
     }
 }

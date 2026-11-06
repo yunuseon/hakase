@@ -758,3 +758,84 @@ describe('focus progress bindings', () => {
         });
     });
 });
+
+describe('drawn sections', () => {
+    it('keeps an explicit world rectangle when the camera changes', () => {
+        const rect = { x: -100, y: 50, width: 480, height: 260 };
+        const before = {
+            ...defaultWorkspace(viewport, inputsFor),
+            camera: { x: 200, y: -80, zoom: 0.5 },
+        };
+        const after = reduceWorkspace(
+            before,
+            { kind: 'add-section', viewport, rect },
+            inputsFor,
+            42,
+        );
+        expect(after.sections.at(-1)).toEqual({
+            id: 'section-42',
+            name: 'Section 1',
+            rects: [rect],
+        });
+        expect(after.processes).toEqual(before.processes);
+    });
+});
+
+it('migrates overlapping legacy section rectangles without touching programs', () => {
+    const before = defaultWorkspace(viewport, inputsFor);
+    const parsed = parseWorkspace(
+        {
+            ...before,
+            sections: [
+                {
+                    id: 'first',
+                    name: 'First',
+                    rect: { x: 0, y: 0, width: 300, height: 300 },
+                },
+                {
+                    id: 'second',
+                    name: 'Second',
+                    rect: { x: 200, y: 200, width: 300, height: 300 },
+                },
+            ],
+        },
+        inputsFor,
+    );
+    expect(parsed?.sections).toHaveLength(1);
+    expect(parsed?.sections[0]).toMatchObject({ id: 'first', name: 'First' });
+    expect(parsed?.processes).toEqual(before.processes);
+    expect(parseWorkspace(JSON.parse(JSON.stringify(parsed)), inputsFor)?.sections).toEqual(
+        parsed?.sections,
+    );
+});
+
+it('erases an area without changing any programs and refuses an empty erasure', () => {
+    const before = reduceWorkspace(
+        defaultWorkspace(viewport, inputsFor),
+        {
+            kind: 'add-section',
+            viewport,
+            rect: { x: 0, y: 0, width: 500, height: 500 },
+        },
+        inputsFor,
+        10,
+    );
+    const empty = reduceWorkspace(
+        before,
+        { kind: 'erase-sections', rect: { x: 800, y: 800, width: 20, height: 20 } },
+        inputsFor,
+        11,
+    );
+    expect(empty).toBe(before);
+    const cut = reduceWorkspace(
+        before,
+        {
+            kind: 'erase-sections',
+            rect: { x: 200, y: -10, width: 100, height: 520 },
+        },
+        inputsFor,
+        12,
+    );
+    expect(cut.sections).toHaveLength(2);
+    expect(cut.processes).toBe(before.processes);
+});

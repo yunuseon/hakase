@@ -1,3 +1,4 @@
+import { boundsOf, sameArea, type Area } from '../../shared/area.ts';
 import { worldAt, type Camera, type Extent, type Rect } from '../../shared/camera.ts';
 
 export const ZOOM_COMMANDS = ['in', 'out', 'reset', 'fit'] as const;
@@ -15,7 +16,7 @@ const PADDING = 0.08;
 export type Landmark = {
     readonly id: string;
     readonly name: string;
-    readonly rect: Rect;
+    readonly rects: Area;
 };
 
 export type MiniMap = {
@@ -36,7 +37,7 @@ export const minimapOf = (
         width: viewport.width / camera.zoom,
         height: viewport.height / camera.zoom,
     };
-    const all = [...windows, ...sections.map(({ rect }) => rect), view];
+    const all = [...windows, ...sections.flatMap(({ rects }) => rects), view];
 
     const left = Math.min(...all.map(({ x }) => x));
     const top = Math.min(...all.map(({ y }) => y));
@@ -47,16 +48,29 @@ export const minimapOf = (
     const offsetX = (MINIMAP.width - width * scale) / 2;
     const offsetY = (MINIMAP.height - height * scale) / 2;
 
-    const place = (rect: Rect): Rect => ({
-        x: Math.round(offsetX + (rect.x - left) * scale),
-        y: Math.round(offsetY + (rect.y - top) * scale),
-        width: Math.max(2, Math.round(rect.width * scale)),
-        height: Math.max(2, Math.round(rect.height * scale)),
+    const atX = (x: number) => Math.round(offsetX + (x - left) * scale);
+    const atY = (y: number) => Math.round(offsetY + (y - top) * scale);
+    // Edges, not sizes, are rounded: two rects that share an edge must still share it here.
+    const snapped = (rect: Rect): Rect => ({
+        x: atX(rect.x),
+        y: atY(rect.y),
+        width: atX(rect.x + rect.width) - atX(rect.x),
+        height: atY(rect.y + rect.height) - atY(rect.y),
     });
+    const place = (rect: Rect): Rect => {
+        const box = snapped(rect);
+        return { ...box, width: Math.max(2, box.width), height: Math.max(2, box.height) };
+    };
 
     return {
         windows: windows.map(place),
-        sections: sections.map(section => ({ ...section, rect: place(section.rect) })),
+        sections: sections.map(section => {
+            const rects = section.rects.map(snapped).filter(r => r.width > 0 && r.height > 0);
+            return {
+                ...section,
+                rects: rects.length > 0 ? rects : [place(boundsOf(section.rects))],
+            };
+        }),
         view: place(view),
     };
 };
@@ -73,7 +87,7 @@ const sameLandmarks = (a: readonly Landmark[], b: readonly Landmark[]): boolean 
             other !== undefined &&
             landmark.id === other.id &&
             landmark.name === other.name &&
-            sameRect(landmark.rect, other.rect)
+            sameArea(landmark.rects, other.rects)
         );
     });
 

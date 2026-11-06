@@ -1,3 +1,6 @@
+import { selectedIn, selectionView } from './selection.ts';
+import { HksSelection } from './components/selection/selection.component.ts';
+import type { Blueprint } from './blueprints.ts';
 import { categoriesOf } from './program-categories.ts';
 import {
     animationFrames,
@@ -51,6 +54,13 @@ import {
 import type { StateCommand } from './shared/connections.ts';
 import { HksSections } from './components/sections/sections.component.ts';
 import { HksPalette } from './components/palette/palette.component.ts';
+import { HksSectionDrawing } from './components/section-drawing/section-drawing.component.ts';
+import {
+    idleDrawing,
+    reduceDrawing,
+    worldRectangle,
+    type DrawingAction,
+} from './components/section-drawing/section-drawing.ts';
 import { HksPlacement } from './components/placement/placement.component.ts';
 import { footprintAt, ghostOf, idle, reducePlacing, type PlacingAction } from './placing.ts';
 import { capturedActions } from './capture.ts';
@@ -246,6 +256,14 @@ const bootstrap = () => {
     palette.slot = 'chrome';
     canvas.append(palette);
 
+    const selection = new HksSelection();
+    selection.slot = 'chrome';
+    canvas.append(selection);
+
+    const sectionDrawing = new HksSectionDrawing();
+    sectionDrawing.slot = 'chrome';
+    canvas.append(sectionDrawing);
+
     const placement = new HksPlacement();
     placement.slot = 'chrome';
     canvas.append(placement);
@@ -288,20 +306,97 @@ const bootstrap = () => {
 
     const zoomSteps$ = merge(navigator.zooms$, canvas.keys$).pipe(
         withLatestFrom(viewport$),
-        map(([command, viewport]): WorkspaceAction => ({ kind: 'zoom-step', command, viewport })),
+        map(([command, viewport]): WorkspaceAction => ({
+            kind: 'zoom-step',
+            command,
+            viewport,
+        })),
     );
+
+    const selectionCommands$ = merge(
+        selection.changes$,
+        canvas.clipboard$,
+        picked$.pipe(
+            mergeMap(picked =>
+                picked.kind === 'workspace' && picked.action === 'paste' ? ['paste' as const] : [],
+            ),
+        ),
+    ).pipe(share());
+    const toolRequests$ = merge(
+        navigator.adds$.pipe(map((): DrawingAction => ({ kind: 'start', tool: 'paint' }))),
+        navigator.erases$.pipe(map((): DrawingAction => ({ kind: 'start', tool: 'erase' }))),
+        navigator.selects$.pipe(map((): DrawingAction => ({ kind: 'start', tool: 'select' }))),
+        picked$.pipe(
+            mergeMap((picked): DrawingAction[] =>
+                picked.kind !== 'workspace'
+                    ? []
+                    : picked.action === 'add-section'
+                      ? [{ kind: 'start', tool: 'paint' }]
+                      : picked.action === 'erase-sections'
+                        ? [{ kind: 'start', tool: 'erase' }]
+                        : picked.action === 'select-programs'
+                          ? [{ kind: 'start', tool: 'select' }]
+                          : [],
+            ),
+        ),
+    ).pipe(share());
+    const drawing$ = merge(
+        toolRequests$,
+        sectionDrawing.changes$,
+        merge(canvas.escapes$, canvas.blurs$).pipe(map((): DrawingAction => ({ kind: 'cancel' }))),
+        selectionCommands$.pipe(
+            filter(c => c === 'paste'),
+            map((): DrawingAction => ({ kind: 'cancel' })),
+        ),
+    ).pipe(
+        scan(reduceDrawing, idleDrawing),
+        startWith(idleDrawing),
+        distinctUntilChanged(),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const noSelection: readonly ProcessId[] = [];
+    const selectedIds$ = merge(
+        drawing$.pipe(
+            mergeMap(drawing =>
+                drawing.mode === 'done' && drawing.tool === 'select' ? [drawing] : [],
+            ),
+            withLatestFrom(defer(() => workspace$)),
+            map(([drawing, workspace]) =>
+                selectedIn(workspace, worldRectangle(drawing.rect, workspace.camera)),
+            ),
+        ),
+        merge(canvas.escapes$, selectionCommands$.pipe(filter(c => c === 'clear'))).pipe(
+            map((): readonly ProcessId[] => []),
+        ),
+    ).pipe(startWith(noSelection), shareReplay({ bufferSize: 1, refCount: true }));
 
     const toolbarActions$ = merge(
         seams.toggles$.pipe(map(({ a, b }): WorkspaceAction => ({ kind: 'toggle-link', a, b }))),
         navigator.toggles$.pipe(map((): WorkspaceAction => ({ kind: 'toggle-minimap' }))),
-        navigator.adds$.pipe(
-            withLatestFrom(viewport$),
-            map(([, viewport]): WorkspaceAction => ({ kind: 'add-section', viewport })),
+        drawing$.pipe(
+            mergeMap(drawing =>
+                drawing.mode === 'done' && drawing.tool !== 'select' ? [drawing] : [],
+            ),
+            withLatestFrom(
+                defer(() => camera$),
+                viewport$,
+            ),
+            map(([drawing, camera, viewport]): WorkspaceAction => ({
+                ...(drawing.tool === 'erase'
+                    ? { kind: 'erase-sections' as const }
+                    : { kind: 'add-section' as const, viewport }),
+                rect: worldRectangle(drawing.rect, camera),
+            })),
         ),
-        sections.gestures$.pipe(
-            mergeMap(gesture => (gesture.kind === 'save' ? [] : [sectionAction(gesture)])),
-        ),
+        sections.gestures$.pipe(map(sectionAction)),
         picked$.pipe(
+            filter(
+                picked =>
+                    picked.kind !== 'workspace' ||
+                    !['add-section', 'erase-sections', 'select-programs', 'paste'].includes(
+                        picked.action,
+                    ),
+            ),
             withLatestFrom(viewport$),
             mergeMap(([picked, viewport]) => {
                 const action = pickedAction(picked, viewport);
@@ -464,7 +559,7 @@ const bootstrap = () => {
             // At 100% unless the window would not fit: where the view stood says nothing about how to read it.
             const target =
                 section !== undefined
-                    ? fitted([section.rect], viewport)
+                    ? fitted(section.rects, viewport)
                     : process !== undefined
                       ? centredOn(IDENTITY, boxOf(process), viewport)
                       : null;
@@ -791,6 +886,28 @@ const bootstrap = () => {
         ),
     ).pipe(share());
 
+    const captures$ = selectionCommands$.pipe(
+        filter(command => command === 'copy' || command === 'save'),
+        withLatestFrom(
+            selectedIds$,
+            documents$,
+            defer(() => playbacks$),
+        ),
+        map(([command, ids, documents, clocks]) => ({
+            command,
+            blueprint: blueprintOf(documents, clocks, ids, `Selection (${ids.length} programs)`),
+        })),
+        share(),
+    );
+    const clipboard$ = captures$.pipe(
+        filter(capture => capture.command === 'copy'),
+        mergeMap(({ blueprint }): Blueprint[] =>
+            blueprint === null ? [] : [{ ...blueprint, id: 'clipboard' }],
+        ),
+        startWith(null),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
     const placing$ = merge(
         inputs$.pipe(
             mergeMap(({ input }) => (input.kind === 'place-blueprint' ? [input.id] : [])),
@@ -801,6 +918,15 @@ const bootstrap = () => {
                 at: centreOf(viewport),
             })),
         ),
+        selectionCommands$.pipe(
+            filter(command => command === 'paste'),
+            withLatestFrom(clipboard$, viewport$),
+            mergeMap(([, blueprint, viewport]): PlacingAction[] =>
+                blueprint === null ? [] : [{ kind: 'start', blueprint, at: centreOf(viewport) }],
+            ),
+        ),
+        toolRequests$.pipe(map((): PlacingAction => ({ kind: 'cancel' }))),
+        canvas.blurs$.pipe(map((): PlacingAction => ({ kind: 'cancel' }))),
         placement.changes$,
     ).pipe(
         scan(reducePlacing, idle),
@@ -894,33 +1020,27 @@ const bootstrap = () => {
             mergeMap(placing => (placing.mode === 'dropped' ? [placing] : [])),
             withLatestFrom(documents$),
             mergeMap(([{ blueprint, at }, { blueprints, workspace }]): DocumentAction[] => {
-                const chosen = blueprintIn(blueprints, blueprint);
+                const chosen =
+                    typeof blueprint === 'string' ? blueprintIn(blueprints, blueprint) : blueprint;
 
                 return chosen === undefined
                     ? []
                     : [
                           {
-                              kind: 'place',
-                              blueprint,
+                              ...(typeof blueprint === 'string'
+                                  ? { kind: 'place' as const, blueprint }
+                                  : { kind: 'paste' as const, blueprint }),
                               view: footprintAt(chosen.size, at, workspace.camera),
                           },
                       ];
             }),
         ),
-        // defer: the clocks fold is built from what this fold produces.
-        sections.gestures$.pipe(
-            mergeMap(gesture => (gesture.kind === 'save' ? [gesture.id] : [])),
-            withLatestFrom(
-                documents$,
-                defer(() => playbacks$),
+        captures$.pipe(
+            mergeMap(({ command, blueprint }): DocumentAction[] =>
+                command === 'save' && blueprint !== null
+                    ? [{ kind: 'blueprints', command: { kind: 'add', blueprint } }]
+                    : [],
             ),
-            mergeMap(([section, documents, clocks]): DocumentAction[] => {
-                const blueprint = blueprintOf(documents, clocks, section);
-
-                return blueprint === null
-                    ? []
-                    : [{ kind: 'blueprints', command: { kind: 'add', blueprint } }];
-            }),
         ),
         sharedFormulas$.pipe(
             map((shared): DocumentAction => ({
@@ -1454,6 +1574,12 @@ const bootstrap = () => {
             mode$.pipe(map(mode => mode.active)),
         ),
         toolbar.connect$(),
+        sectionDrawing.connect$(drawing$),
+        selection.connect$(
+            combineLatest([selectedIds$, workspace$, clipboard$]).pipe(
+                map(([ids, workspace, copied]) => selectionView(workspace, ids, copied !== null)),
+            ),
+        ),
         seams.connect$(workspace$.pipe(map(seamsOf))),
         wiring.connect$(wiringView$),
         placement.connect$(
@@ -1461,7 +1587,9 @@ const bootstrap = () => {
                 map(([placing, camera, blueprints]) => {
                     const blueprint =
                         placing.mode === 'placing'
-                            ? blueprintIn(blueprints, placing.blueprint)
+                            ? typeof placing.blueprint === 'string'
+                                ? blueprintIn(blueprints, placing.blueprint)
+                                : placing.blueprint
                             : undefined;
 
                     return placing.mode !== 'placing' || blueprint === undefined
@@ -1477,7 +1605,7 @@ const bootstrap = () => {
         sections.connect$(
             workspace$.pipe(
                 map(({ sections: all }) =>
-                    all.map(({ id, name, rect }): SectionView => ({ id, name, ...rect })),
+                    all.map(({ id, name, rects }): SectionView => ({ id, name, rects })),
                 ),
             ),
         ),

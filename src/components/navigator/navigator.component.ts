@@ -1,3 +1,4 @@
+import { areaFill, areaOutline, boundsOf } from '../../shared/area.ts';
 import { Icon } from '../../shared/ui/icon.component.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
@@ -41,7 +42,7 @@ const TEMPLATE = (map: MiniMap) =>
                     map.sections,
                     section => section.id,
                     section =>
-                        svg`<rect class="section-outline" x=${section.rect.x} y=${section.rect.y} width=${section.rect.width} height=${section.rect.height} rx="4"></rect>`,
+                        svg`<path class="section-outline" d=${areaFill(section.rects)}></path><path class="section-edge" d=${areaOutline(section.rects)}></path>`,
                 )}
                 <g class="windows">
                     ${repeat(
@@ -64,17 +65,32 @@ const TEMPLATE = (map: MiniMap) =>
                 ${repeat(
                     map.sections,
                     section => section.id,
-                    section =>
-                        html`<button
+                    section => {
+                        const bounds = boundsOf(section.rects);
+                        const label = section.rects[0] ?? bounds;
+                        return html`<button
                             type="button"
                             class="jump"
                             data-jump=${section.id}
                             title=${`Fly to ${section.name}`}
                             aria-label=${`Fly to ${section.name}`}
-                            style=${styleMap({ left: `${(section.rect.x / MINIMAP.width) * 100}%`, top: `${(section.rect.y / MINIMAP.height) * 100}%`, width: `${(section.rect.width / MINIMAP.width) * 100}%`, height: `${(section.rect.height / MINIMAP.height) * 100}%` })}
+                            style=${styleMap({ left: `${(bounds.x / MINIMAP.width) * 100}%`, top: `${(bounds.y / MINIMAP.height) * 100}%`, width: `${(bounds.width / MINIMAP.width) * 100}%`, height: `${(bounds.height / MINIMAP.height) * 100}%` })}
                         >
-                            <span>${section.name}</span>
-                        </button>`,
+                            <svg
+                                class="jump-area"
+                                viewBox=${`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path d=${areaFill(section.rects)}></path>
+                            </svg>
+                            <span
+                                style=${styleMap({ left: `${((label.x - bounds.x) / bounds.width) * 100}%`, top: `${((label.y - bounds.y) / bounds.height) * 100}%`, maxWidth: `${(label.width / bounds.width) * 100}%` })}
+                                >${section.name}</span
+                            >
+                        </button>`;
+                    },
                 )}
             </div>
         </div>
@@ -111,14 +127,32 @@ const TEMPLATE = (map: MiniMap) =>
                 ${Icon('M15 14L20 9L15 4M20 9H9A5 5 0 0 0 9 19H13')}
             </button>
         </div>
-        <button
-            class="ui-icon add expanded-control"
-            type="button"
-            aria-label="new section around the view"
-            title="New section around the view"
-        >
-            ${Icon('M12 5v14M5 12h14')}
-        </button>
+        <div class="area-tools expanded-control" role="group" aria-label="Workspace tools">
+            <button
+                class="ui-icon add"
+                type="button"
+                aria-label="paint section area"
+                title="Paint section area"
+            >
+                ${Icon('M12 5v14M5 12h14')}
+            </button>
+            <button
+                class="ui-icon erase"
+                type="button"
+                aria-label="erase section area"
+                title="Erase section area"
+            >
+                ${Icon('M4 16L14 6L20 12L12 20H8ZM10 10L16 16')}
+            </button>
+            <button
+                class="ui-icon select"
+                type="button"
+                aria-label="select programs"
+                title="Select programs to copy or save as blueprint"
+            >
+                ${Icon('M8 4H4V8M16 4H20V8M4 16V20H8M20 16V20H16')}
+            </button>
+        </div>
         <div class="zoom-controls" role="group" aria-label="Zoom">
             <button
                 class="ui-icon key expanded-control"
@@ -175,6 +209,8 @@ export class HksNavigator extends HTMLElement {
     readonly toggles$: Observable<void>;
     readonly jumps$: Observable<string>;
     readonly adds$: Observable<void>;
+    readonly erases$: Observable<void>;
+    readonly selects$: Observable<void>;
     readonly edits$: Observable<Edit>;
 
     private readonly readout: HTMLElement;
@@ -207,6 +243,12 @@ export class HksNavigator extends HTMLElement {
             }),
         );
         this.adds$ = fromElementEvent$(requireChild(shadow, '.add'), 'click').pipe(
+            map(() => undefined),
+        );
+        this.erases$ = fromElementEvent$(requireChild(shadow, '.erase'), 'click').pipe(
+            map(() => undefined),
+        );
+        this.selects$ = fromElementEvent$(requireChild(shadow, '.select'), 'click').pipe(
             map(() => undefined),
         );
         this.readout = requireChild(shadow, '.readout');

@@ -1,3 +1,4 @@
+import { boundsOf, areaContains } from './shared/area.ts';
 import { appearances, isAppearanceName, type AppearanceName } from './appearances.ts';
 import type { Command } from './components/palette/palette.ts';
 import { centreOf, worldAt, type Camera, type Extent } from './shared/camera.ts';
@@ -31,10 +32,29 @@ export type Picked =
       }
     | {
           readonly kind: 'workspace';
-          readonly action: 'undo' | 'redo' | 'add-section' | 'fit' | 'reset' | 'minimap';
+          readonly action:
+              | 'undo'
+              | 'redo'
+              | 'add-section'
+              | 'erase-sections'
+              | 'select-programs'
+              | 'paste'
+              | 'fit'
+              | 'reset'
+              | 'minimap';
       };
 
-const WORKSPACE = ['undo', 'redo', 'add-section', 'fit', 'reset', 'minimap'] as const;
+const WORKSPACE = [
+    'undo',
+    'redo',
+    'add-section',
+    'erase-sections',
+    'select-programs',
+    'paste',
+    'fit',
+    'reset',
+    'minimap',
+] as const;
 
 const isWorkspaceCommand = (value: string): value is (typeof WORKSPACE)[number] =>
     WORKSPACE.some(command => command === value);
@@ -79,8 +99,26 @@ export const commandsOf = (
     { id: 'step:previous', label: 'Previous section', hint: '←', keyword: null },
     {
         id: 'workspace:add-section',
-        label: 'New section around the view',
+        label: 'Paint section area',
         hint: 'section',
+        keyword: null,
+    },
+    {
+        id: 'workspace:erase-sections',
+        label: 'Erase section area',
+        hint: 'workspace area',
+        keyword: null,
+    },
+    {
+        id: 'workspace:select-programs',
+        label: 'Select programs',
+        hint: 'copy or blueprint',
+        keyword: null,
+    },
+    {
+        id: 'workspace:paste',
+        label: 'Paste copied programs',
+        hint: '⌘V',
         keyword: null,
     },
     { id: 'workspace:undo', label: 'Undo', hint: '⌘Z', keyword: null },
@@ -136,10 +174,20 @@ export const steppedSection = (
     direction: Direction,
 ): string | null => {
     // Reading order, not the order they were made in, which is how they are stored.
-    const ordered = [...sections].sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+    const ordered = [...sections].sort(
+        (a, b) =>
+            boundsOf(a.rects).y - boundsOf(b.rects).y || boundsOf(a.rects).x - boundsOf(b.rects).x,
+    );
     const centre = worldAt(camera, centreOf(viewport));
-    const distance = ({ rect }: Section): number =>
-        Math.hypot(rect.x + rect.width / 2 - centre.x, rect.y + rect.height / 2 - centre.y);
+    const distance = ({ rects }: Section): number =>
+        Math.min(
+            ...rects.map(rect =>
+                Math.hypot(
+                    Math.max(rect.x - centre.x, 0, centre.x - rect.x - rect.width),
+                    Math.max(rect.y - centre.y, 0, centre.y - rect.y - rect.height),
+                ),
+            ),
+        );
     const nearest = ordered.reduce<Section | null>(
         (best, section) => (best === null || distance(section) < distance(best) ? section : best),
         null,
@@ -149,12 +197,7 @@ export const steppedSection = (
         return null;
     }
 
-    const { rect } = nearest;
-    const inside =
-        centre.x >= rect.x &&
-        centre.x <= rect.x + rect.width &&
-        centre.y >= rect.y &&
-        centre.y <= rect.y + rect.height;
+    const inside = areaContains(nearest.rects, centre);
     const index = ordered.indexOf(nearest);
     const step = inside ? (direction === 'next' ? 1 : -1) : 0;
 
@@ -164,13 +207,17 @@ export const steppedSection = (
 const workspaceAction = (
     action: Extract<Picked, { readonly kind: 'workspace' }>['action'],
     viewport: Extent,
-): WorkspaceAction => {
+): WorkspaceAction | null => {
     switch (action) {
         case 'undo':
         case 'redo':
             return { kind: action };
         case 'add-section':
             return { kind: 'add-section', viewport };
+        case 'erase-sections':
+        case 'select-programs':
+        case 'paste':
+            return null;
         case 'fit':
             return { kind: 'zoom-step', command: 'fit', viewport };
         case 'reset':

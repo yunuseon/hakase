@@ -6,11 +6,23 @@ import { worldAt, type Camera, type Point, type Rect } from './shared/camera.ts'
 // Dropped is a state, not a separate event: the drop reads its blueprint from the very fold that ends the mode.
 export type Placing =
     | { readonly mode: 'idle' }
-    | { readonly mode: 'placing'; readonly blueprint: string; readonly at: Point }
-    | { readonly mode: 'dropped'; readonly blueprint: string; readonly at: Point };
+    | {
+          readonly mode: 'placing';
+          readonly blueprint: string | Blueprint;
+          readonly at: Point;
+      }
+    | {
+          readonly mode: 'dropped';
+          readonly blueprint: string | Blueprint;
+          readonly at: Point;
+      };
 
 export type PlacingAction =
-    | { readonly kind: 'start'; readonly blueprint: string; readonly at: Point }
+    | {
+          readonly kind: 'start';
+          readonly blueprint: string | Blueprint;
+          readonly at: Point;
+      }
     | { readonly kind: 'move'; readonly at: Point }
     | { readonly kind: 'drop'; readonly at: Point }
     | { readonly kind: 'cancel' };

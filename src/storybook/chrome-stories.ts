@@ -1,4 +1,5 @@
 import { merge, of } from 'rxjs';
+import { fromDocumentEvent$ } from '../lib/rx.ts';
 import {
     filter,
     map,
@@ -18,6 +19,12 @@ import { HksSeams } from '../components/seams/seams.component.ts';
 import { HksNavigator } from '../components/navigator/navigator.component.ts';
 import { HksToolbar } from '../components/toolbar/toolbar.component.ts';
 import { HksPalette } from '../components/palette/palette.component.ts';
+import { HksSelection } from '../components/selection/selection.component.ts';
+import { HksSectionDrawing } from '../components/section-drawing/section-drawing.component.ts';
+import {
+    reduceDrawing,
+    type DrawingAction,
+} from '../components/section-drawing/section-drawing.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
 import { categoriesOf } from '../program-categories.ts';
@@ -32,7 +39,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Navigation card',
         group: 'Workspace',
         description:
-            'One expanding minimap surface. The compact pill keeps Make, Plan, System, State, a live thumbnail and zoom; expand it for history, section targets and navigation controls.',
+            'One expanding minimap surface. The compact pill keeps Make, Plan, System, State, a live thumbnail and zoom; expand it for history, section targets and navigation controls. New section enters drag-to-draw mode in the app.',
         elements: ['hks-navigator', 'hks-toolbar'],
         variants: [
             { id: 'compact', title: 'Compact' },
@@ -88,12 +95,12 @@ export const chromeStories: readonly Story[] = [
                               {
                                   id: 'make',
                                   name: 'Make',
-                                  rect: { x: 26, y: 18, width: 214, height: 128 },
+                                  rects: [{ x: 26, y: 18, width: 214, height: 128 }],
                               },
                               {
                                   id: 'plan',
                                   name: 'Plan',
-                                  rect: { x: 242, y: 78, width: 68, height: 82 },
+                                  rects: [{ x: 242, y: 78, width: 68, height: 82 }],
                               },
                           ],
                 view: { x: 18, y: 16, width: 170, height: 135 },
@@ -127,7 +134,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Workspace chrome',
         group: 'Workspace',
         description:
-            'The real canvas, window frame, section outline, attachment seam, toolbar and navigator. Windows fade and rise on mount, then fade downward on close, respecting reduced motion. Close the sample window to preview its exit; reset to replay its entrance. All actions stay here.',
+            'The real canvas, window frame, merged workspace area, attachment seam, toolbar and navigator. Areas are navigation landmarks and never move or own programs. Windows fade and rise on mount, then fade downward on close, respecting reduced motion. Close the sample window to preview its exit; reset to replay its entrance. All actions stay here.',
         elements: [
             'hks-canvas',
             'hks-window',
@@ -223,10 +230,10 @@ export const chromeStories: readonly Story[] = [
                             {
                                 id: 'section-1',
                                 name: 'An isolated workspace',
-                                x: 12,
-                                y: 64,
-                                width: 290,
-                                height: 288,
+                                rects: [
+                                    { x: 12, y: 64, width: 290, height: 130 },
+                                    { x: 12, y: 194, width: 150, height: 158 },
+                                ],
                             },
                         ]),
                     ),
@@ -293,6 +300,106 @@ export const chromeStories: readonly Story[] = [
                     open$,
                 ),
                 events$: picks$.pipe(map(pick => recorded('pick', pick))),
+            };
+        },
+    },
+    {
+        id: 'section-drawing',
+        title: 'Draw a section',
+        group: 'Workspace',
+        description:
+            'Drag from either corner with mouse or touch. Release to finish; Escape, right-click or pointer cancellation discards the preview. Tiny taps keep drawing armed. Nothing is saved by this fixture.',
+        elements: ['hks-section-drawing'],
+        variants: [
+            { id: 'ready', title: 'Ready' },
+            { id: 'drawing', title: 'Painting preview' },
+            { id: 'erase', title: 'Erase area' },
+            { id: 'select', title: 'Select programs' },
+        ],
+        controls: [],
+        defaults,
+        height: 380,
+        action: 'Draw again',
+        code: 'const drawing = new HksSectionDrawing();\nconst state$ = requests$.pipe(scan(reduceDrawing, idleDrawing));\nconst lifetime$ = drawing.connect$(state$);\n// Commit the done rectangle as one workspace action.',
+        create: ({ actions$, variant }) => {
+            const element = new HksSectionDrawing();
+            const events$ = element.changes$.pipe(share());
+            const tool =
+                variant === 'erase'
+                    ? ('erase' as const)
+                    : variant === 'select'
+                      ? ('select' as const)
+                      : ('paint' as const);
+            const initial =
+                variant !== 'ready'
+                    ? {
+                          mode: 'drawing' as const,
+                          tool,
+                          start: { x: 30, y: 80 },
+                          at: { x: 310, y: 260 },
+                      }
+                    : { mode: 'ready' as const, tool };
+            const state$ = merge(
+                actions$.pipe(map((): DrawingAction => ({ kind: 'start', tool }))),
+                events$,
+                fromDocumentEvent$('keydown').pipe(
+                    filter(event => event.key === 'Escape'),
+                    map((): DrawingAction => ({ kind: 'cancel' })),
+                ),
+            ).pipe(scan(reduceDrawing, initial), startWith(initial));
+            return {
+                element,
+                run$: element.connect$(state$),
+                events$: events$.pipe(map(event => recorded(event.kind, event))),
+            };
+        },
+    },
+    {
+        id: 'selection',
+        title: 'Program selection',
+        group: 'Workspace',
+        description:
+            'Independent selection highlights and actions. Copy keeps a temporary snapshot; Paste places a copy without saving a blueprint. Save as blueprint is a separate action. All requests stay in this fixture.',
+        elements: ['hks-selection'],
+        variants: [
+            { id: 'selected', title: 'Programs selected' },
+            { id: 'copied', title: 'Copied programs' },
+            { id: 'empty', title: 'No selection' },
+        ],
+        controls: [],
+        defaults,
+        height: 380,
+        action: null,
+        code: 'const selection = new HksSelection();\nconst lifetime$ = selection.connect$(view$);\n// Fold selection.changes$ into copy, paste, save and clear requests.',
+        create: ({ variant }) => {
+            const element = new HksSelection();
+            const events$ = element.changes$.pipe(share());
+            const seed = {
+                boxes:
+                    variant === 'empty'
+                        ? []
+                        : [
+                              { x: 24, y: 100, width: 140, height: 180 },
+                              { x: 184, y: 100, width: 140, height: 180 },
+                          ],
+                copied: variant === 'copied',
+            };
+            const view$ = events$.pipe(
+                scan(
+                    (view, command) =>
+                        command === 'clear'
+                            ? { ...view, boxes: [] }
+                            : command === 'copy'
+                              ? { ...view, copied: true }
+                              : view,
+                    seed,
+                ),
+                startWith(seed),
+            );
+            return {
+                element,
+                run$: element.connect$(view$),
+                events$: events$.pipe(map(command => recorded(command, command))),
             };
         },
     },

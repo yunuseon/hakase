@@ -45,7 +45,13 @@ import {
     type VoiceCommand,
 } from './components/voice/voice.ts';
 import { isProgramId } from './program.ts';
-import { placed, reduceBlueprints, type BlueprintCommand, type Blueprints } from './blueprints.ts';
+import {
+    placed,
+    reduceBlueprints,
+    type BlueprintCommand,
+    type Blueprints,
+    type Captured,
+} from './blueprints.ts';
 import { blueprintIn } from './starters.ts';
 import type { Rect } from './shared/camera.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
@@ -145,6 +151,11 @@ export type DocumentAction =
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'blueprints'; readonly command: BlueprintCommand }
     | { readonly kind: 'place'; readonly blueprint: string; readonly view: Rect }
+    | {
+          readonly kind: 'paste';
+          readonly blueprint: Captured;
+          readonly view: Rect;
+      }
     | {
           readonly kind: 'link';
           readonly store: StoreId;
@@ -475,6 +486,14 @@ export const reduceDocuments =
                     ? documents
                     : { ...documents, blueprints };
             }
+            case 'paste':
+                return placed(
+                    documents,
+                    { ...action.blueprint, id: 'clipboard' },
+                    action.view,
+                    seq,
+                    inputsFor,
+                );
             case 'place': {
                 const blueprint = blueprintIn(documents.blueprints, action.blueprint);
 
@@ -542,6 +561,7 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'prune':
         case 'library':
         case 'look':
+        case 'paste':
         case 'place':
             return { key: action.kind, joins: false };
         case 'blueprints':
@@ -633,6 +653,8 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
                   ? `Renamed blueprint ${was?.name ?? ''} to ${command.name}`
                   : `Deleted blueprint ${was?.name ?? ''}`;
         }
+        case 'paste':
+            return `Pasted ${action.blueprint.windows.length} programs`;
         case 'place':
             return `Placed blueprint ${blueprintIn(before.blueprints, action.blueprint)?.name ?? ''}`;
         case 'formula':

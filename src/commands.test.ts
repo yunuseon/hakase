@@ -6,7 +6,7 @@ import { defaultWorkspace, type Section, type Workspace } from './workspace.ts';
 const section = (id: string, x: number, y: number): Section => ({
     id,
     name: id,
-    rect: { x, y, width: 100, height: 100 },
+    rects: [{ x, y, width: 100, height: 100 }],
 });
 
 const viewport = { width: 200, height: 200 };

@@ -85,9 +85,9 @@ const TEMPLATE = (cards: readonly BlueprintCard[]) =>
             )}
         </ul>
         <p class="ui-empty empty" ?hidden=${cards.some(card => card.summary === null)}>
-            Your own blueprints join these: hover a section's label and choose${' '}<b
-                >Save as blueprint</b
-            >, and its windows, their states and their wiring are kept here, ready to place again.
+            Your own blueprints join these: select programs with the selection tool and
+            choose${' '}<b>Save as blueprint</b>, and the selected programs, their states and their
+            wiring are kept here, ready to place again.
         </p>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
