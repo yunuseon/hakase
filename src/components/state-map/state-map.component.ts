@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { when } from 'lit-html/directives/when.js';
@@ -273,7 +274,7 @@ export class HksStateMap extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.inspectionView = renderView<readonly Inspected[]>(
             requireChild(shadow, '.inspect'),

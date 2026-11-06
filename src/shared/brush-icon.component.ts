@@ -6,7 +6,7 @@ import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { guidesOf, type Symmetry } from './brush.ts';
 
 export const SymmetryIcon = (props: { readonly symmetry: Symmetry }) =>
-    html`<svg viewBox="0 0 100 100" aria-hidden="true">
+    html`<svg class="ui-symmetry-icon" viewBox="0 0 100 100" aria-hidden="true">
         ${when(
             props.symmetry === 'none',
             () => svg`<circle cx="50" cy="50" r="7"></circle>`,

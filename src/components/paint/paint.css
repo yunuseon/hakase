@@ -15,44 +15,11 @@
     align-items: center;
 }
 
-.tools,
-.symmetries,
-.sides {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
-}
-
 .tools button,
 .symmetries button,
 .sides button {
-    display: grid;
-    place-items: center;
-    min-inline-size: 26px;
-    block-size: 26px;
     padding: 0 4px;
     font: 500 11px var(--font-mono);
-    color: var(--label);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-}
-
-.tools button:hover,
-.symmetries button:hover,
-.sides button:hover {
-    color: var(--ink);
-}
-
-.tools button[aria-checked='true'],
-.symmetries button[aria-checked='true'],
-.sides button[aria-checked='true'] {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
 }
 
 .tools svg {
@@ -63,25 +30,6 @@
     stroke-width: 1.6;
     stroke-linejoin: round;
     stroke-linecap: round;
-}
-
-.symmetries svg {
-    inline-size: 16px;
-    block-size: 16px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 7;
-    stroke-linecap: round;
-}
-
-.symmetries .rim {
-    stroke-width: 5;
-    opacity: 0.35;
-}
-
-.symmetries circle:not(.rim) {
-    fill: currentColor;
-    stroke: none;
 }
 
 .dial {
@@ -291,9 +239,4 @@
 
 .actions button {
     text-transform: capitalize;
-}
-
-button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }

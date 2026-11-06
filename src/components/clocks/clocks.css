@@ -118,7 +118,6 @@
 .empty {
     display: none;
     margin: auto;
-    color: var(--muted);
 }
 
 :host([data-empty]) .empty {
@@ -134,12 +133,7 @@
 
 .draft {
     flex: 1;
-    min-inline-size: 0;
     padding: 6px 10px;
-    font: inherit;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
     border-radius: 9px;
 }
 

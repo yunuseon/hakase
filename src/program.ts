@@ -57,6 +57,7 @@ export const PROGRAM_IDS = [
     'bookmarks',
     'history',
     'state',
+    'storybook',
 ] as const;
 
 export type ProgramId = (typeof PROGRAM_IDS)[number];

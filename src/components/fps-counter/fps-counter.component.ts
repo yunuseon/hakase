@@ -1,4 +1,6 @@
-import { animationFrameScheduler, type Observable } from 'rxjs';
+import { renderView, type RenderView } from '../../lib/lit.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
+import { animationFrameScheduler, merge, type Observable } from 'rxjs';
 import { bufferTime, map, tap } from 'rxjs/operators';
 import { styleSheet } from '../../lib/dom.ts';
 import css from './fps-counter.css?inline';
@@ -6,24 +8,27 @@ import css from './fps-counter.css?inline';
 const sheet = styleSheet(css);
 
 export class HksFpsCounter extends HTMLElement {
-    private readonly readout: ShadowRoot;
+    private readonly rendering: RenderView<string>;
 
     constructor() {
         super();
 
-        this.readout = this.attachShadow({ mode: 'open' });
-        this.readout.adoptedStyleSheets = [sheet];
+        const root = this.attachShadow({ mode: 'open' });
+        root.adoptedStyleSheets = [controlsSheet, sheet];
+        this.rendering = renderView(root, '0 fps', value => value);
     }
 
     connect$(frames$: Observable<unknown>): Observable<void> {
-        return frames$.pipe(
-            bufferTime(1000, animationFrameScheduler),
-            map(frames => `${frames.length} fps`),
-            tap(text => {
-                this.readout.textContent = text;
-            }),
-            map(() => undefined),
-        );
+        return merge(
+            this.rendering.lifetime$,
+            frames$.pipe(
+                bufferTime(1000, animationFrameScheduler),
+                map(frames => `${frames.length} fps`),
+                tap(text => {
+                    this.rendering.update(text);
+                }),
+            ),
+        ).pipe(map(() => undefined));
     }
 }
 

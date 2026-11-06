@@ -42,6 +42,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     bookmarks: document,
     history: null,
     state: null,
+    storybook: null,
 };
 
 export type StoreEntry = {

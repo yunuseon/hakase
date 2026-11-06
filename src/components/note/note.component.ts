@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
 import { mountView, type RenderView, type Rendering } from '../../lib/lit.ts';
@@ -12,19 +13,20 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
     html`<header class="bar">
-            <hks-select class="pick" aria-label="note"></hks-select
-            ><button class="new" type="button" title="new note" aria-label="new note">+</button
-            ><button class="delete" type="button">Delete</button>
+            <hks-select class="ui-field pick" aria-label="note"></hks-select
+            ><button class="ui-icon new" type="button" title="new note" aria-label="new note">
+                +</button
+            ><button class="ui-button delete" type="button">Delete</button>
         </header>
         <textarea
-            class="body"
+            class="ui-field body"
             placeholder="Write something…"
             aria-label="note text"
             spellcheck="true"
         ></textarea>
-        <div class="empty">
+        <div class="ui-empty empty">
             <p>No notes yet.</p>
-            <button class="first" type="button">New note</button>
+            <button class="ui-button first" type="button">New note</button>
         </div>
         <footer class="foot"><span class="count"></span></footer>`;
 
@@ -70,7 +72,7 @@ export class HksNote extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.picker = requireElement(shadow, '.pick', HksSelect);

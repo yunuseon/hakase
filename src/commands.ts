@@ -1,6 +1,5 @@
 import { appearances, isAppearanceName, type AppearanceName } from './appearances.ts';
 import type { Command } from './components/palette/palette.ts';
-import { isPlacement, type Placement } from './components/toolbar/toolbar.ts';
 import { centreOf, worldAt, type Camera, type Extent } from './shared/camera.ts';
 import { isProgramId, type ProgramId } from './program.ts';
 import { withMain, type StoreEntry, type StoreId } from './stores.ts';
@@ -24,7 +23,6 @@ export type Picked =
     | { readonly kind: 'section'; readonly id: string }
     | { readonly kind: 'step'; readonly direction: Direction }
     | { readonly kind: 'look'; readonly name: AppearanceName }
-    | { readonly kind: 'toolbar'; readonly placement: Placement }
     | {
           readonly kind: 'capture';
           readonly target: CaptureTarget;
@@ -89,17 +87,16 @@ export const commandsOf = (
     { id: 'workspace:redo', label: 'Redo', hint: '⇧⌘Z', keyword: null },
     { id: 'workspace:fit', label: 'Fit everything in view', hint: 'zoom', keyword: null },
     { id: 'workspace:reset', label: 'Zoom to 100%', hint: 'zoom', keyword: null },
-    { id: 'workspace:minimap', label: 'Show or hide the map', hint: 'view', keyword: null },
+    {
+        id: 'workspace:minimap',
+        label: 'Expand or collapse workspace controls',
+        hint: 'view',
+        keyword: null,
+    },
     ...Object.keys(appearances).map(name => ({
         id: `look:${name}`,
         label: `Look: ${name}`,
         hint: 'appearance',
-        keyword: null,
-    })),
-    ...(['top', 'bottom', 'left', 'right', 'float'] as const).map(placement => ({
-        id: `toolbar:${placement}`,
-        label: `Toolbar: ${placement === 'float' ? 'own window' : placement}`,
-        hint: 'toolbar',
         keyword: null,
     })),
 ];
@@ -124,8 +121,6 @@ export const pickedOf = (id: string, text: string | null): Picked | null => {
             return value === 'next' || value === 'previous' ? { kind, direction: value } : null;
         case 'look':
             return isAppearanceName(value) ? { kind, name: value } : null;
-        case 'toolbar':
-            return isPlacement(value) ? { kind, placement: value } : null;
         case 'workspace':
             return isWorkspaceCommand(value) ? { kind, action: value } : null;
         default:
@@ -188,8 +183,6 @@ const workspaceAction = (
 // The commands that are workspace actions; launches, jumps and looks go to their own streams.
 export const pickedAction = (picked: Picked, viewport: Extent): WorkspaceAction | null => {
     switch (picked.kind) {
-        case 'toolbar':
-            return { kind: 'place-toolbar', placement: picked.placement };
         case 'workspace':
             return workspaceAction(picked.action, viewport);
         default:

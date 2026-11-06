@@ -82,12 +82,9 @@
 
 .group-name {
     flex: 1;
-    min-inline-size: 0;
     padding: 2px 4px;
     font: 600 12px var(--font-ui);
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
     border-radius: 6px;
 }
 

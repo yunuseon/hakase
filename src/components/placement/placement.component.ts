@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { styleMap } from 'lit-html/directives/style-map.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -35,7 +36,7 @@ const TEMPLATE = (view: GhostView | null) =>
                     ></span>`,
             )}
         </div>
-        <p class="hint">
+        <p class="ui-hint hint">
             Click to place <b class="what">${view?.name}</b
             ><span class="keys">Esc to cancel · scroll to move around</span>
         </p>`;
@@ -49,7 +50,7 @@ export class HksPlacement extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<GhostView | null>(shadow, null, TEMPLATE);
         this.hidden = true;
         // Read by the canvas: a wheel over the ghost still pans and zooms, as it would over the ground.

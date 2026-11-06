@@ -1,0 +1,16 @@
+export const ICONS = {
+    add: 'M12 5v14M5 12h14',
+    close: 'M6 6l12 12M18 6 6 18',
+    remove: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7',
+    reset: 'M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5',
+    previous: 'M15 5l-7 7 7 7',
+    back: 'M19 12H5m6-6-6 6 6 6',
+    forward: 'M5 12h14m-6-6 6 6-6 6',
+    next: 'M9 5l7 7-7 7',
+    check: 'M5 12l4 4L19 6',
+    play: 'M8 5l11 7-11 7z',
+    search: 'M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
+    speaker: 'M4 9H8L13 5V19L8 15H4Z',
+    sounding: 'M16 9Q18 12 16 15M18.5 6.5Q22 12 18.5 17.5',
+    silent: 'M17 9.5L22 14.5M22 9.5L17 14.5',
+} as const;

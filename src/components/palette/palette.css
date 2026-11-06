@@ -39,7 +39,6 @@
     flex: none;
     padding: 16px 18px;
     font: 500 16px var(--font-ui);
-    color: var(--ink);
     background: transparent;
     border: none;
     border-block-end: 1px solid var(--edge);
@@ -64,7 +63,6 @@
 .empty {
     margin: 0;
     padding: 18px;
-    color: var(--muted);
 }
 
 .results:not(:empty) + .empty {

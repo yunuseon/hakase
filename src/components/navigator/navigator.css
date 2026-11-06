@@ -3,197 +3,246 @@
     inset-block-end: 20px;
     inset-inline-end: 20px;
     z-index: 90;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 6px;
+    display: block;
+    inline-size: min(196px, calc(100% - 40px));
+    max-inline-size: calc(100% - 40px);
+    box-sizing: border-box;
+    container-type: inline-size;
     font-family: var(--font-ui);
     color: var(--label);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 16px;
+    border-radius: 24px;
     box-shadow:
         0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
         0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
 }
-
-/* Closed by default: open, it sits over whatever window is in the corner. */
-.map {
+:host([data-open]) {
+    inline-size: min(344px, calc(100% - 40px));
+    border-radius: 16px;
+}
+.navigator {
     position: relative;
-    display: none;
-    inline-size: var(--map-width);
-    block-size: var(--map-height);
-    overflow: hidden;
-    background: var(--well);
-    border-radius: 10px;
-}
-
-:host([data-open]) .map {
-    display: block;
-}
-
-.sections span {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
     box-sizing: border-box;
+    block-size: 44px;
+}
+:host([data-open]) .navigator {
+    block-size: auto;
+    padding: 40px 8px;
+}
+.map {
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-start: 72px;
+    inline-size: 60px;
+    block-size: 32px;
     overflow: hidden;
-    padding: 1px 3px;
-    font: 600 8px/1 var(--font-ui);
-    white-space: nowrap;
-    color: var(--accent);
-    border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
-    border-radius: 4px;
+    border-radius: 6px;
+    background: var(--well);
 }
-
-.places {
+:host([data-open]) .map {
+    position: relative;
+    inset: auto;
+    inline-size: 100%;
+    block-size: auto;
+    aspect-ratio: var(--map-aspect);
+    background: transparent;
+    border-radius: 0;
+    overflow: visible;
+}
+.miniature {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+}
+.section-outline {
+    fill: color-mix(in srgb, var(--accent) 4%, transparent);
+    stroke: color-mix(in srgb, var(--accent) 45%, transparent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.window {
+    fill: var(--rule);
+}
+.window:last-of-type {
+    fill: color-mix(in srgb, var(--accent) 55%, var(--well));
+}
+.viewport {
+    fill: none;
+    stroke: var(--ink);
+    stroke-opacity: 0.65;
+    stroke-width: 1.2;
+    vector-effect: non-scaling-stroke;
+}
+.sections {
     display: none;
-    flex-wrap: wrap;
-    gap: 4px;
-    inline-size: var(--map-width);
 }
-
-:host([data-open]) .places {
-    display: flex;
-}
-
-.list {
+:host([data-open]) .sections {
     display: contents;
 }
-
-.jump,
-.add {
-    block-size: 26px;
-    padding: 0 10px;
-    font: 500 12px var(--font-ui);
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: 999px;
-    cursor: pointer;
-}
-
-.jump:hover {
-    color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.add {
-    color: var(--muted);
-    background: transparent;
-    border-color: var(--edge);
-}
-
-.add:hover {
-    color: var(--ink);
-}
-
-.jump:focus-visible,
-.add:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
-}
-
-.windows span,
-.view {
+.jump {
     position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
     box-sizing: border-box;
-    border-radius: 3px;
+    min-inline-size: 12px;
+    min-block-size: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    padding: 2px 3px;
+    font: 500 9px/1.2 var(--font-ui);
+    white-space: nowrap;
+    color: var(--accent);
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    text-align: start;
 }
-
-.windows span {
-    background: var(--rule);
+.jump span {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-
-.windows span:last-child {
-    background: color-mix(in srgb, var(--accent) 55%, var(--well));
+.jump:hover {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-
-.view {
-    border-radius: 5px;
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+.state-mode {
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline-start: 8px;
+    gap: 5px;
+    block-size: 28px;
+    padding: 0 7px;
+    font-size: 11px;
 }
-
-.row {
+.state-mode[aria-pressed='true'] {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+.history {
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline-end: 8px;
+    gap: 2px;
+}
+.expanded-control {
+    display: none;
+}
+:host([data-open]) .expanded-control {
+    display: inline-flex;
+}
+.key {
+    inline-size: 28px;
+    block-size: 28px;
+}
+.add {
+    position: absolute;
+    inset-block-end: 8px;
+    inset-inline-start: 8px;
+}
+.zoom-controls {
+    position: absolute;
+    inset-block-end: 8px;
+    inset-inline-end: 6px;
     display: flex;
     align-items: center;
     gap: 2px;
-    inline-size: var(--map-width);
 }
-
-.key,
+:host([data-open]) .zoom-controls {
+    inset-inline-start: 50%;
+    inset-inline-end: auto;
+    translate: -50% 0;
+}
 .readout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    block-size: 30px;
-    padding: 0;
-    color: inherit;
-    background: transparent;
-    border: none;
-    border-radius: 9px;
-    cursor: pointer;
-}
-
-.key {
-    flex: none;
-    inline-size: 30px;
-}
-
-.readout {
-    flex: 1;
-    min-inline-size: 6ch;
-    font: 500 12px var(--font-mono);
+    min-inline-size: 48px;
+    block-size: 28px;
+    min-block-size: 0;
+    padding: 0 5px;
+    font: 500 11px var(--font-mono);
     font-variant-numeric: tabular-nums;
-    color: var(--ink);
-    background: var(--well);
+    background: transparent;
+    border-radius: 7px;
 }
-
-.key:hover:not(:disabled),
-.key[aria-pressed='true'] {
-    color: var(--ink);
-    background: var(--well);
+.toggle {
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-start: 72px;
+    inline-size: 60px;
+    block-size: 32px;
+    border-radius: 6px;
+    background: transparent;
 }
-
-.readout:hover {
-    background: var(--edge);
+.toggle .ui-glyph {
+    display: none;
 }
-
-.key:focus-visible,
-.readout:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+.toggle:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
-
-svg {
-    inline-size: 16px;
-    block-size: 16px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+:host([data-open]) .toggle {
+    inset-block-start: auto;
+    inset-inline-start: auto;
+    inset-block-end: 8px;
+    inset-inline-end: 8px;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 50%;
 }
-
-.key:disabled {
-    color: var(--muted);
-    opacity: 0.45;
-    cursor: default;
+:host([data-open]) .toggle .ui-glyph {
+    display: block;
 }
-
-.divider {
-    flex: none;
-    inline-size: 1px;
-    block-size: 16px;
-    margin-inline: 4px;
-    background: var(--edge);
+@container (max-width:240px) {
+    :host([data-open]) .zoom-controls .key {
+        inline-size: 24px;
+    }
+    :host([data-open]) .readout {
+        min-inline-size: 40px;
+    }
+    :host([data-open]) .zoom-controls {
+        gap: 0;
+    }
 }
-
-.state-mode {
-    inline-size: auto;
-    gap: 6px;
-    padding-inline: 8px 10px;
-    font: 500 11px var(--font-ui);
+.launcher {
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline-start: 8px;
+}
+:host([data-launcher]) {
+    inline-size: min(304px, calc(100% - 40px));
+}
+:host([data-launcher][data-open]) {
+    inline-size: min(344px, calc(100% - 40px));
+}
+:host([data-launcher]) .state-mode {
+    inset-inline-start: 104px;
+}
+:host([data-launcher]:not([data-open])) .map,
+:host([data-launcher]:not([data-open])) .toggle {
+    inset-inline-start: 170px;
+}
+@container (max-width:280px) {
+    :host([data-launcher]) .state-mode {
+        inline-size: 28px;
+        padding: 0;
+    }
+    :host([data-launcher]) .state-mode span {
+        display: none;
+    }
+    :host([data-launcher]:not([data-open])) .map,
+    :host([data-launcher]:not([data-open])) .toggle {
+        inset-inline-start: 138px;
+        inline-size: 40px;
+    }
+}
+@container (max-width:230px) {
+    :host([data-launcher]:not([data-open])) .navigator {
+        block-size: 80px;
+    }
+    :host([data-launcher]:not([data-open])) .map,
+    :host([data-launcher]:not([data-open])) .toggle {
+        inset-block-start: 42px;
+        inset-inline-start: 8px;
+        inline-size: 60px;
+    }
+    :host([data-launcher]:not([data-open])) .zoom-controls {
+        inset-block-end: 8px;
+    }
 }

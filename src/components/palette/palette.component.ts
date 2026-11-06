@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -16,7 +17,7 @@ const TEMPLATE = (matches: readonly Match[]) =>
     html`<div class="scrim"></div>
         <div class="panel" role="dialog" aria-label="command palette">
             <input
-                class="query"
+                class="ui-field query"
                 type="text"
                 placeholder="Type a command"
                 aria-label="command"
@@ -49,7 +50,7 @@ const TEMPLATE = (matches: readonly Match[]) =>
                         </li>`,
                 )}
             </ul>
-            <p class="empty">No command matches.</p>
+            <p class="ui-empty empty">No command matches.</p>
         </div>`;
 
 export type Pick = { readonly id: string; readonly text: string | null };
@@ -69,7 +70,7 @@ export class HksPalette extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<readonly Match[]>(shadow, [], TEMPLATE);
 
         this.query = requireElement(shadow, '.query', HTMLInputElement);

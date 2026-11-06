@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -53,7 +54,7 @@ const TEMPLATE = (view: Bookmarks) =>
                                         aria-label="move group; arrow keys move it"
                                     ></button
                                     ><input
-                                        class="group-name"
+                                        class="ui-field group-name"
                                         data-group-name=${ifDefined(id)}
                                         placeholder="Group name"
                                         aria-label="Group name"
@@ -145,7 +146,7 @@ const TEMPLATE = (view: Bookmarks) =>
                                                         >
                                                         <div class="editor">
                                                             <input
-                                                                class="rename"
+                                                                class="ui-field rename"
                                                                 data-rename=${ifDefined(bookmarkId)}
                                                                 placeholder="Name"
                                                                 aria-label="Name"
@@ -162,7 +163,7 @@ const TEMPLATE = (view: Bookmarks) =>
                                                                     }
                                                                 })}
                                                             /><input
-                                                                class="readdress"
+                                                                class="ui-field readdress"
                                                                 data-readdress=${ifDefined(bookmarkId)}
                                                                 placeholder="Address"
                                                                 aria-label="Address"
@@ -201,24 +202,24 @@ const TEMPLATE = (view: Bookmarks) =>
                                 </ul>
                                 <form class="add" data-add=${ifDefined(id)}>
                                     <input
-                                        class="new-name"
+                                        class="ui-field new-name"
                                         data-new-name=${ifDefined(id)}
                                         placeholder="Name"
                                         aria-label="Name"
                                         autocomplete="off"
                                     /><input
-                                        class="new-address"
+                                        class="ui-field new-address"
                                         data-new-address=${ifDefined(id)}
                                         placeholder="https://…"
                                         aria-label="https://…"
                                         autocomplete="off"
-                                    /><button type="submit" class="submit">Add</button>
+                                    /><button type="submit" class="ui-button submit">Add</button>
                                 </form>
                             </section>`,
                     ),
             )}
         </div>
-        <button class="add-group" type="button">+ group</button>
+        <button class="ui-button add-group" type="button">+ group</button>
     </div>`;
 
 const ENDS = ['pointerup', 'pointercancel'] as const;
@@ -338,7 +339,7 @@ export class HksBookmarks extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<Bookmarks>(shadow, { groups: [], made: 0 }, TEMPLATE);
 
         const scroll = requireChild(shadow, '.scroll');

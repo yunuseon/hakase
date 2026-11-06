@@ -1,3 +1,4 @@
+import { categoriesOf } from './program-categories.ts';
 import {
     animationFrames,
     combineLatest,
@@ -55,8 +56,7 @@ import { footprintAt, ghostOf, idle, reducePlacing, type PlacingAction } from '.
 import { capturedActions } from './capture.ts';
 import { commandsOf, pickedAction, pickedOf, steppedSection } from './commands.ts';
 import type { SectionView } from './components/sections/sections.ts';
-import { HksToolbar, type ToolbarCategory } from './components/toolbar/toolbar.component.ts';
-import type { ToolbarView } from './components/toolbar/toolbar.ts';
+import { HksToolbar } from './components/toolbar/toolbar.component.ts';
 import { sourceOf, type FormulaId } from './library.ts';
 import { sharedFormulas$ } from './share.ts';
 import {
@@ -139,7 +139,6 @@ import {
     type TimeCommand,
 } from './documents.ts';
 import { entriesOf, startTimeline } from './timeline.ts';
-import { toolbarHost$ } from './toolbar-host.ts';
 import { persistState$, restoreState } from './state-store.ts';
 import {
     boxOf,
@@ -191,12 +190,7 @@ const programOf = (id: ProgramId) => programs[id];
 // The programs declare what they read from others; the workspace asks through this, never the table itself.
 const inputsFor: InputsFor = program => programs[program].inputs;
 
-const categories: readonly ToolbarCategory[] = CATEGORIES.map(category => ({
-    ...category,
-    items: programList
-        .filter(program => program.category === category.id)
-        .map(({ id, title, icon }) => ({ id, title, icon })),
-})).filter(({ items }) => items.length > 0);
+const categories = categoriesOf(programList);
 
 const sameSlot = ({ frame: a, focused }: Slot, { frame: b, focused: other }: Slot): boolean =>
     focused === other &&
@@ -233,11 +227,11 @@ const bootstrap = () => {
     document.body.append(canvas);
 
     const toolbar = new HksToolbar().categories(categories);
-    toolbar.slot = 'chrome';
-    canvas.append(toolbar);
+    toolbar.slot = 'launcher';
 
     const navigator = new HksNavigator();
     navigator.slot = 'chrome';
+    navigator.append(toolbar);
     canvas.append(navigator);
 
     const seams = new HksSeams();
@@ -299,10 +293,6 @@ const bootstrap = () => {
 
     const toolbarActions$ = merge(
         seams.toggles$.pipe(map(({ a, b }): WorkspaceAction => ({ kind: 'toggle-link', a, b }))),
-        toolbar.placements$.pipe(
-            map((placement): WorkspaceAction => ({ kind: 'place-toolbar', placement })),
-        ),
-        toolbar.retracts$.pipe(map((): WorkspaceAction => ({ kind: 'retract-toolbar' }))),
         navigator.toggles$.pipe(map((): WorkspaceAction => ({ kind: 'toggle-minimap' }))),
         navigator.adds$.pipe(
             withLatestFrom(viewport$),
@@ -322,10 +312,6 @@ const bootstrap = () => {
         // defer: a flight starts from the camera this very fold holds.
         defer(() => flights$),
         defer(() => located$).pipe(map((id): WorkspaceAction => ({ kind: 'raise', id }))),
-        // defer: the toolbar's window is opened from the state this very fold produces.
-        defer(() => toolbarGestures$).pipe(
-            map((gesture): WorkspaceAction => ({ kind: 'toolbar-window', gesture })),
-        ),
     );
 
     const stored = restoreState(inputsFor);
@@ -500,13 +486,6 @@ const bootstrap = () => {
         map(({ camera }) => camera),
         distinctUntilChanged(),
     );
-
-    const toolbarState$ = workspace$.pipe(
-        map(({ toolbar }) => toolbar),
-        distinctUntilChanged(),
-    );
-
-    const toolbarGestures$ = toolbarHost$(toolbar, canvas, toolbarState$);
 
     const ids$ = workspace$.pipe(
         map(({ processes }) => processes.map(({ id }) => id)),
@@ -1433,14 +1412,6 @@ const bootstrap = () => {
         };
     };
 
-    const toolbarView$ = toolbarState$.pipe(
-        map((state): ToolbarView =>
-            state.kind === 'docked'
-                ? { placement: state.edge, retracted: state.retracted }
-                : { placement: 'float', retracted: false },
-        ),
-    );
-
     return merge(
         chime$(timers$, plans$),
         persistState$(
@@ -1481,7 +1452,7 @@ const bootstrap = () => {
             ),
             mode$.pipe(map(mode => mode.active)),
         ),
-        toolbar.connect$(toolbarView$),
+        toolbar.connect$(),
         seams.connect$(workspace$.pipe(map(seamsOf))),
         wiring.connect$(wiringView$),
         placement.connect$(

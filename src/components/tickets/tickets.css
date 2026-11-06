@@ -23,43 +23,11 @@
     gap: 8px;
 }
 
-.views {
-    display: flex;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 8px;
-}
-
-.view {
-    padding: 2px 10px;
-    font-size: 12px;
-    color: var(--muted);
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.view:has(input:checked) {
-    color: var(--ink);
-    background: var(--panel);
-}
-
-.view input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.view:has(input:focus-visible) {
-    outline: 2px solid var(--accent);
-}
-
 button {
-    font: inherit;
     color: var(--muted);
     background: transparent;
     border: none;
     border-radius: 6px;
-    cursor: pointer;
 }
 
 button:hover {
@@ -73,19 +41,6 @@ button:hover {
 
 :host([data-view='list']) .add-status {
     display: none;
-}
-
-.detail-title,
-.detail-description,
-hks-select {
-    box-sizing: border-box;
-    inline-size: 100%;
-    padding: 6px 8px;
-    font: inherit;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: 8px;
 }
 
 .detail-title:focus-visible,
@@ -167,12 +122,9 @@ hks-select:focus-visible {
 
 .title {
     flex: 1;
-    min-inline-size: 0;
     padding: 2px 4px;
     font: 600 12px var(--font-ui);
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
     border-radius: 6px;
 }
 
@@ -305,12 +257,8 @@ hks-select:focus-visible {
 }
 
 .text {
-    min-inline-size: 0;
     padding: 2px 4px;
-    font: inherit;
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
     border-radius: 6px;
     resize: none;
     field-sizing: content;
@@ -504,26 +452,7 @@ hks-select:focus-visible {
 }
 
 .filter-tags {
-    min-inline-size: 0;
     padding-block: 4px;
-}
-
-.tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    max-inline-size: 100%;
-    padding: 2px 7px;
-    border-radius: 5px;
-    font-size: 11px;
-    color: var(--ink);
-    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
-    overflow-wrap: anywhere;
-    text-align: start;
-}
-
-button.tag:hover {
-    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
 }
 
 .group .ticket-tags {
@@ -545,16 +474,7 @@ button.tag:hover {
 }
 
 .tag-draft {
-    min-inline-size: 0;
-    inline-size: 100%;
-    box-sizing: border-box;
-    padding: 6px 8px;
-    font: inherit;
     font-size: 12px;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: 8px;
 }
 
 .tag-draft:focus-visible {
@@ -568,31 +488,14 @@ button.tag:hover {
 }
 
 .ticket-search {
-    box-sizing: border-box;
-    inline-size: 100%;
-    padding: 6px 8px;
-    font: inherit;
     font-size: 12px;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: 8px;
 }
+
 .ticket-search:focus-visible {
     outline: 2px solid var(--accent);
 }
 
 .icon-action {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    inline-size: 28px;
-    block-size: 28px;
-    padding: 0;
-    color: var(--muted);
-    background: transparent;
-    border-radius: 50%;
     opacity: 0.7;
     transition:
         color 120ms ease,
@@ -600,31 +503,9 @@ button.tag:hover {
         opacity 120ms ease;
 }
 
-.icon-action svg {
-    inline-size: 15px;
-    block-size: 15px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    pointer-events: none;
-}
-
-.icon-action[hidden] {
-    display: none;
-}
-
-.icon-action:hover,
+.icon-action:hover:not(:disabled),
 .icon-action:focus-visible {
-    color: var(--ink);
-    background: var(--well);
     opacity: 1;
-}
-
-button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }
 
 .add-tag {

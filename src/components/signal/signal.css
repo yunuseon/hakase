@@ -91,44 +91,12 @@
     justify-content: space-between;
 }
 
-.shapes,
-.rates,
-.counts {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
-}
-
 .shapes button,
 .rates button,
 .counts button {
-    display: grid;
-    place-items: center;
-    min-inline-size: 26px;
     block-size: 24px;
     padding: 0 5px;
     font: 500 11px var(--font-mono);
-    color: var(--label);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-}
-
-.shapes button:hover,
-.rates button:hover,
-.counts button:hover {
-    color: var(--ink);
-}
-
-.shapes button[aria-checked='true'],
-.rates button[aria-checked='true'],
-.counts button[aria-checked='true'] {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
 }
 
 .shapes svg {
@@ -243,11 +211,4 @@
 .param[data-driven] .num {
     color: var(--accent);
     cursor: default;
-}
-
-.shapes button:focus-visible,
-.rates button:focus-visible,
-.counts button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }

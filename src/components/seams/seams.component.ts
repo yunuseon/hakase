@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -23,7 +24,7 @@ export class HksSeams extends HTMLElement {
         super();
 
         const root = this.attachShadow({ mode: 'open' });
-        root.adoptedStyleSheets = [sheet];
+        root.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<readonly SeamView[]>(root, [], seams =>
             repeat(
                 seams,

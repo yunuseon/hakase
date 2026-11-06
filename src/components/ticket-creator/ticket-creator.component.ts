@@ -1,3 +1,6 @@
+import { ICONS } from '../../shared/ui/icons.ts';
+import { Icon } from '../../shared/ui/icon.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -23,7 +26,7 @@ export class HksTicketCreator extends HTMLElement {
     constructor() {
         super();
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<CreatorView | null>(
             shadow,
             null,
@@ -44,14 +47,13 @@ export class HksTicketCreator extends HTMLElement {
                                 </h2>
                             </div>
                             <button
+                                class="ui-icon"
                                 type="button"
                                 data-action="cancel"
                                 aria-label="cancel ticket creation"
                                 title="Cancel"
                             >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="m6 6 12 12M18 6 6 18"></path>
-                                </svg>
+                                ${Icon(ICONS.close)}
                             </button>
                         </header>
                         <ol class="steps" aria-label="creation steps">
@@ -68,7 +70,7 @@ export class HksTicketCreator extends HTMLElement {
                             <section data-step="0" ?hidden=${view?.state.step !== 0}>
                                 <label
                                     >Title${' '}<input
-                                        class="title"
+                                        class="ui-field title"
                                         .value=${view?.state.draft.title ?? ''}
                                         aria-invalid=${ifDefined(view?.state.error !== '')}
                                         aria-label="ticket title"
@@ -78,7 +80,7 @@ export class HksTicketCreator extends HTMLElement {
                                         required /></label
                                 ><label
                                     >Description${' '}<textarea
-                                        class="description"
+                                        class="ui-field description"
                                         .value=${view?.state.draft.description ?? ''}
                                         aria-label="ticket description"
                                         rows="4"
@@ -88,7 +90,7 @@ export class HksTicketCreator extends HTMLElement {
                                 <div class="pair">
                                     <label
                                         >Status${' '}<hks-select
-                                            class="status"
+                                            class="ui-field status"
                                             aria-label="ticket status"
                                             .value=${view?.status ?? ''}
                                             >${repeat(
@@ -102,7 +104,7 @@ export class HksTicketCreator extends HTMLElement {
                                         ></label
                                     ><label
                                         >Priority${' '}<hks-select
-                                            class="priority"
+                                            class="ui-field priority"
                                             aria-label="ticket priority"
                                             .value=${view?.state.draft.priority ?? 'none'}
                                             >${PRIORITIES.map(
@@ -120,7 +122,7 @@ export class HksTicketCreator extends HTMLElement {
                                 </div>
                             </section>
                             <section data-step="1" ?hidden=${view?.state.step !== 1}>
-                                <p class="hint">
+                                <p class="ui-hint hint">
                                     Categorise this ticket and connect related work. All fields here
                                     are optional.
                                 </p>
@@ -128,7 +130,9 @@ export class HksTicketCreator extends HTMLElement {
                                 ><slot name="blockers"></slot>
                             </section>
                             <section data-step="2" ?hidden=${view?.state.step !== 2}>
-                                <p class="hint">Check the details before creating your ticket.</p>
+                                <p class="ui-hint hint">
+                                    Check the details before creating your ticket.
+                                </p>
                                 <dl class="review">
                                     ${repeat(
                                         view?.summary ?? [],
@@ -145,33 +149,24 @@ export class HksTicketCreator extends HTMLElement {
                         </div>
                         <footer>
                             <button
+                                class="ui-icon"
                                 type="button"
-                                class="back"
+                                class="ui-icon back"
                                 ?hidden=${view?.state.step === 0}
                                 data-action="back"
                                 aria-label="back"
                                 title="Back"
                             >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M19 12H5m6-6-6 6 6 6"></path>
-                                </svg></button
+                                ${Icon(ICONS.back)}</button
                             ><span></span
                             ><button
-                                class="advance"
+                                class="ui-icon advance"
                                 type="submit"
                                 data-final=${ifDefined(view?.state.step === 2 ? '' : undefined)}
                                 aria-label=${ifDefined(view?.state.step === 2 ? 'create ticket' : 'next')}
                                 title=${ifDefined(view?.state.step === 2 ? 'Create ticket' : 'Next')}
                             >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path
-                                        d=${ifDefined(
-                                            view?.state.step === 2
-                                                ? 'm5 12 4 4 10-10'
-                                                : 'M5 12h14m-6-6 6 6-6 6',
-                                        )}
-                                    ></path>
-                                </svg>
+                                ${Icon(view?.state.step === 2 ? ICONS.check : ICONS.forward)}
                             </button>
                         </footer>
                     </form>

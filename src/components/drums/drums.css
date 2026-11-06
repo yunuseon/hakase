@@ -19,44 +19,21 @@
 .presets,
 .steps,
 .repeats {
-    display: flex;
     flex-wrap: wrap;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
 }
 
 button {
-    font: inherit;
     color: inherit;
-    cursor: pointer;
 }
 
 .presets button,
 .steps button,
 .repeats button {
     block-size: 24px;
-    padding: 0 7px;
-    font: 500 11px var(--font-ui);
-    color: var(--label);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
 }
 
-.presets button:hover,
-.steps button:hover,
-.repeats button:hover {
-    color: var(--ink);
+.presets button:hover {
     background: var(--panel);
-}
-
-.steps button[aria-checked='true'],
-.repeats button[aria-checked='true'] {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
 }
 
 svg {
@@ -67,37 +44,6 @@ svg {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-
-.listen {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    block-size: 30px;
-    padding: 0 10px 0 8px;
-    font-weight: 500;
-    color: var(--label);
-    background: var(--well);
-    border: none;
-    border-radius: 9px;
-}
-
-.listen:hover {
-    color: var(--ink);
-}
-
-.listen[aria-pressed='true'] {
-    color: var(--panel);
-    background: var(--accent);
-}
-
-.listen .speaker {
-    fill: currentColor;
-}
-
-.listen[aria-pressed='true'] .off,
-.listen[aria-pressed='false'] .on {
-    display: none;
 }
 
 .grid {
@@ -174,9 +120,4 @@ svg {
     min-inline-size: 4ch;
     font: 500 11px var(--font-mono);
     color: var(--ink);
-}
-
-button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }

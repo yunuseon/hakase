@@ -76,7 +76,6 @@
     font-family: var(--font-mono);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
-    color: var(--ink);
     background: transparent;
     border: 1px solid var(--edge);
     border-radius: 6px;

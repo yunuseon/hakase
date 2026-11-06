@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -16,7 +17,8 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
     html`<label class="head"
-            ><span class="key">look</span><hks-select class="pick" aria-label="look"></hks-select
+            ><span class="key">look</span
+            ><hks-select class="ui-field pick" aria-label="look"></hks-select
         ></label>
         <div class="swatches"></div>
         <div class="rows"></div>`;
@@ -47,7 +49,7 @@ export class HksAppearanceEditor extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.picker = requireElement(shadow, '.pick', HksSelect);
@@ -62,7 +64,7 @@ export class HksAppearanceEditor extends HTMLElement {
                     html`<label class="row"
                         ><input
                             type="color"
-                            class="ink"
+                            class="ui-colour ink"
                             data-token=${ifDefined(token)}
                             aria-label=${ifDefined(token)}
                         /><span class="name">${token}</span></label

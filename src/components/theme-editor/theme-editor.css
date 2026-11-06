@@ -46,10 +46,8 @@
 
 .pick,
 .blend {
-    font: inherit;
     padding: 0 2px;
     color: var(--label);
-    background: var(--well);
     border: 1px solid var(--edge);
     border-radius: 6px;
     cursor: pointer;
@@ -59,68 +57,6 @@
 .blend:hover {
     color: var(--ink);
     border-color: var(--track);
-}
-
-.at {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 100%;
-    block-size: 11px;
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-}
-
-.at::-webkit-slider-runnable-track {
-    block-size: 1px;
-    background: var(--rule);
-}
-
-.at::-moz-range-track {
-    block-size: 1px;
-    background: var(--rule);
-}
-
-.at::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 9px;
-    block-size: 9px;
-    margin-block-start: -4px;
-    background: var(--panel);
-    border: 1px solid var(--ink);
-    border-radius: 0;
-}
-
-.at::-moz-range-thumb {
-    inline-size: 7px;
-    block-size: 7px;
-    background: var(--panel);
-    border: 1px solid var(--ink);
-    border-radius: 0;
-}
-
-.hue {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 100%;
-    block-size: 12px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid var(--edge);
-    cursor: pointer;
-}
-
-.hue::-webkit-color-swatch-wrapper {
-    padding: 0;
-}
-
-.hue::-webkit-color-swatch {
-    border: none;
-}
-
-.hue::-moz-color-swatch {
-    border: none;
 }
 
 .add,
@@ -154,4 +90,8 @@
 .drop:disabled {
     color: var(--edge);
     cursor: default;
+}
+
+.at {
+    inline-size: 100%;
 }

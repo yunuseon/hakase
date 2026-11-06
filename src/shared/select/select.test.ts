@@ -148,3 +148,19 @@ describe('popup placement', () => {
         ).toMatchObject({ top: null, bottom: 104, height: 300 });
     });
 });
+
+describe('upward launcher popovers', () => {
+    it('prefers the space above the launcher, while still clamping to the viewport', () => {
+        const rect = { left: 580, top: 220, bottom: 248, width: 28 };
+        const viewport = { width: 640, height: 800 };
+        expect(popupPlacement(rect, viewport).top).toBe(252);
+        expect(popupPlacement(rect, viewport, true)).toEqual({
+            left: 442,
+            top: null,
+            bottom: 584,
+            width: 190,
+            height: 208,
+        });
+        expect(popupPlacement({ ...rect, top: 20, bottom: 48 }, viewport, true).top).toBe(52);
+    });
+});

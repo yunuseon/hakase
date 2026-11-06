@@ -18,10 +18,7 @@
 .pick {
     font: 500 12px var(--font-ui);
     padding: 4px 6px;
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
     cursor: pointer;
 }
 
@@ -34,119 +31,7 @@
     outline-offset: 1px;
 }
 
-.segments {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
-}
-
-.segment {
-    position: relative;
-    display: flex;
-}
-
 /* Visually hidden, still a real radio: arrow keys, focus and the change event all keep working. */
-.segment input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-}
-
-.segment span {
-    display: flex;
-    align-items: center;
-    block-size: 26px;
-    padding: 0 10px;
-    border-radius: 7px;
-    font-weight: 500;
-    text-transform: capitalize;
-    color: var(--label);
-}
-
-.segment input:checked + span {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 22%, transparent);
-}
-
-.segment input:focus-visible + span {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
-}
-
-.dial {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 88px;
-    block-size: 16px;
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-}
-
-.dial::-webkit-slider-runnable-track {
-    block-size: 4px;
-    background: var(--edge);
-    border-radius: 2px;
-}
-
-.dial::-moz-range-track {
-    block-size: 4px;
-    background: var(--edge);
-    border-radius: 2px;
-}
-
-.dial::-moz-range-progress {
-    block-size: 4px;
-    background: var(--ink);
-    border-radius: 2px;
-}
-
-.dial::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-    inline-size: 14px;
-    block-size: 14px;
-    margin-block-start: -5px;
-    background: var(--panel);
-    border: none;
-    border-radius: 50%;
-    box-shadow:
-        0 0 0 1.5px var(--ink),
-        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
-}
-
-.dial::-moz-range-thumb {
-    inline-size: 14px;
-    block-size: 14px;
-    background: var(--panel);
-    border: none;
-    border-radius: 50%;
-    box-shadow:
-        0 0 0 1.5px var(--ink),
-        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
-}
-
-.dial:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 2px;
-    border-radius: 4px;
-}
-
-.switch {
-    margin: 0;
-    accent-color: var(--accent);
-    cursor: pointer;
-}
-
-.switch:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 2px;
-}
 
 .head {
     display: flex;

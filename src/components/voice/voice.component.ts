@@ -1,3 +1,6 @@
+import { Icon, ListenIcon } from '../../shared/ui/icon.component.ts';
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { mountView, type Rendering } from '../../lib/lit.ts';
@@ -36,13 +39,6 @@ const GLYPHS: Readonly<Record<Shape, string>> = {
     square: 'M2 17 V7 H12 V17 H22 V7',
 };
 
-const glyph = (path: string) =>
-    html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ifDefined(path)}></path></svg>`;
-
-const SPEAKER = 'M4 9 H8 L13 5 V19 L8 15 H4 Z';
-const SOUNDING = 'M16 9 Q18 12 16 15 M18.5 6.5 Q22 12 18.5 17.5';
-const SILENT = 'M17 9.5 L22 14.5 M22 9.5 L17 14.5';
-
 const ROOT_NOTES = Array.from(
     { length: ROOTS.high - ROOTS.low + 1 },
     (_, index) => ROOTS.low + index,
@@ -51,35 +47,38 @@ const ROOT_NOTES = Array.from(
 const TEMPLATE = () =>
     html`<div class="bar">
             <button
-                class="listen"
+                class="ui-listen listen"
                 type="button"
                 aria-pressed="false"
                 title="Listen: the voice plays while its clock does"
             >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path class="speaker" d=${ifDefined(SPEAKER)}></path>
-                    <path class="on" d=${ifDefined(SOUNDING)}></path>
-                    <path class="off" d=${ifDefined(SILENT)}></path></svg
-                ><span>Listen</span>
+                ${ListenIcon()}<span>Listen</span>
             </button>
-            <div class="shapes" role="radiogroup" aria-label="shape" data-synth>
+            <div class="ui-choices shapes" role="radiogroup" aria-label="shape" data-synth>
                 ${SHAPES.map(
                     shape =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-shape=${ifDefined(shape)}
                             aria-label=${ifDefined(shape)}
                             title=${ifDefined(shape)}
                         >
-                            ${glyph(GLYPHS[shape])}
+                            ${Icon(GLYPHS[shape])}
                         </button>`,
                 )}
             </div>
-            <div class="articulations" role="radiogroup" aria-label="articulation" data-synth>
+            <div
+                class="ui-choices articulations"
+                role="radiogroup"
+                aria-label="articulation"
+                data-synth
+            >
                 ${ARTICULATIONS.map(
                     articulation =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-articulation=${ifDefined(articulation)}
@@ -94,10 +93,11 @@ const TEMPLATE = () =>
                 )}
             </div>
         </div>
-        <div class="instruments" role="radiogroup" aria-label="instrument">
+        <div class="ui-choices instruments" role="radiogroup" aria-label="instrument">
             ${VOICE_INSTRUMENTS.map(
                 instrument =>
                     html`<button
+                        class="ui-choice"
                         type="button"
                         role="radio"
                         data-instrument=${ifDefined(instrument)}
@@ -110,23 +110,28 @@ const TEMPLATE = () =>
             <canvas width="600" height="240"></canvas><span class="cursor"></span
             ><span class="now"></span>
         </div>
-        <p class="hint">
+        <p class="ui-hint hint">
             Plug a signal into <b>pitch</b> in the state menu or in state mode: its value is octaves
             above the root, snapped to the scale. A steps signal plays a melody.
         </p>
         <div class="settings">
             <label class="field"
                 ><span>root</span
-                ><hks-select data-root
+                ><hks-select class="ui-field" data-root
                     >${ROOT_NOTES.map(
                         note => html`<option .value=${note}>${noteName(note)}</option>`,
                     )}</hks-select
                 ></label
             >
-            <div class="scales" role="radiogroup" aria-label="scale">
+            <div class="ui-choices scales" role="radiogroup" aria-label="scale">
                 ${SCALES.map(
                     scale =>
-                        html`<button type="button" role="radio" data-scale=${ifDefined(scale)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-scale=${ifDefined(scale)}
+                        >
                             ${scale}
                         </button>`,
                 )}
@@ -138,6 +143,7 @@ const TEMPLATE = () =>
                 title="how long a struck note takes to fade"
                 ><span>decay</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-dial="decay"
                     min=${ifDefined(DECAY.low)}
@@ -146,6 +152,7 @@ const TEMPLATE = () =>
             ><label class="dial" data-synth title="how long the pitch takes to slide to a new note"
                 ><span>glide</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-dial="glide"
                     min=${ifDefined(GLIDE.low)}
@@ -154,6 +161,7 @@ const TEMPLATE = () =>
             ><label class="dial" title="how loud; a volume signal swells it"
                 ><span>volume</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-dial="volume"
                     min="0"
@@ -220,7 +228,7 @@ export class HksVoice extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         // From the host, as what was really clicked: inside a shadow root the event is retargeted to it.
@@ -368,6 +376,7 @@ export class HksVoice extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             merge(connectSelects$(this.shadow), controls$, roll$, moment$, listened$).pipe(
                 map(() => undefined),
             ),

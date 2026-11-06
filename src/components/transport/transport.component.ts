@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { mountView, type Rendering } from '../../lib/lit.ts';
@@ -29,7 +30,7 @@ const TEMPLATE = () =>
             </svg></button
         ><span class="clock"></span><span class="of">/</span
         ><input
-            class="duration"
+            class="ui-field duration"
             type="number"
             min="0.1"
             max="600"
@@ -53,7 +54,7 @@ export class HksTransport extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.toggle = requireChild(shadow, '.toggle');

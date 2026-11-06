@@ -1,15 +1,14 @@
-import { html } from 'lit-html';
-import { ifDefined } from 'lit-html/directives/if-defined.js';
+import { Icon } from '../../shared/ui/icon.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
+import { html, svg } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
-import { withValue } from '../../lib/lit.ts';
 import { styleMap } from 'lit-html/directives/style-map.js';
 
 import { renderView, type RenderView } from '../../lib/lit.ts';
-import { EMPTY, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, mergeMap, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import type { Rect } from '../../shared/camera.ts';
 import {
     isZoomCommand,
     MINIMAP,
@@ -28,138 +27,147 @@ export type Undoable = {
     readonly redo: boolean;
 };
 
-const glyph = (d: string) =>
-    html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ifDefined(d)}></path></svg>`;
-
 const TEMPLATE = (map: MiniMap) =>
-    html`<div class="map" aria-hidden="true">
+    html` <nav class="navigator" aria-label="Workspace controls">
+        <div class="launcher"><slot name="launcher"></slot></div>
+        <div class="map" id="navigation-map">
+            <svg
+                class="miniature"
+                viewBox=${`0 0 ${MINIMAP.width} ${MINIMAP.height}`}
+                aria-hidden="true"
+                focusable="false"
+            >
+                ${repeat(
+                    map.sections,
+                    section => section.id,
+                    section =>
+                        svg`<rect class="section-outline" x=${section.rect.x} y=${section.rect.y} width=${section.rect.width} height=${section.rect.height} rx="4"></rect>`,
+                )}
+                <g class="windows">
+                    ${repeat(
+                        map.windows,
+                        (_rect, index) => index,
+                        rect =>
+                            svg`<rect class="window" x=${rect.x} y=${rect.y} width=${rect.width} height=${rect.height} rx="3"></rect>`,
+                    )}
+                </g>
+                <rect
+                    class="viewport"
+                    x=${map.view.x}
+                    y=${map.view.y}
+                    width=${map.view.width}
+                    height=${map.view.height}
+                    rx="5"
+                ></rect>
+            </svg>
             <div class="sections">
                 ${repeat(
-                    map.sections.map(section => section.id),
-                    item => item,
-                    id =>
-                        withValue(
-                            map.sections.find(section => section.id === id),
-                            section =>
-                                html`<span
-                                    style=${styleMap({
-                                        transform: `translate(${section.rect.x}px, ${section.rect.y}px)`,
-                                        width: `${section.rect.width}px`,
-                                        height: `${section.rect.height}px`,
-                                    })}
-                                    >${section.name}</span
-                                >`,
-                        ),
-                )}
-            </div>
-            <div class="windows">
-                ${repeat(
-                    map.windows,
-                    (_item, index) => index,
-                    rect =>
-                        html`<span
-                            style=${styleMap({
-                                transform: `translate(${rect.x}px, ${rect.y}px)`,
-                                width: `${rect.width}px`,
-                                height: `${rect.height}px`,
-                            })}
-                        ></span>`,
-                )}
-            </div>
-            <div class="view"></div>
-        </div>
-        <div class="places" aria-label="sections">
-            <div class="list">
-                ${repeat(
-                    map.sections.map(section => section.id),
-                    item => item,
-                    id =>
+                    map.sections,
+                    section => section.id,
+                    section =>
                         html`<button
                             type="button"
                             class="jump"
-                            data-jump=${ifDefined(id)}
-                            title=${ifDefined(`fly to ${map.sections.find(section => section.id === id)?.name}`)}
+                            data-jump=${section.id}
+                            title=${`Fly to ${section.name}`}
+                            aria-label=${`Fly to ${section.name}`}
+                            style=${styleMap({ left: `${(section.rect.x / MINIMAP.width) * 100}%`, top: `${(section.rect.y / MINIMAP.height) * 100}%`, width: `${(section.rect.width / MINIMAP.width) * 100}%`, height: `${(section.rect.height / MINIMAP.height) * 100}%` })}
                         >
-                            ${map.sections.find(section => section.id === id)?.name}
+                            <span>${section.name}</span>
                         </button>`,
                 )}
             </div>
-            <button class="add" type="button" data-add title="new section around the view">
-                + section
-            </button>
         </div>
-        <div class="row">
-            <button
-                class="key state-mode"
-                type="button"
-                aria-label="state mode"
-                aria-pressed="false"
-                title="State mode (hold W)"
+        <button
+            class="ui-button state-mode"
+            type="button"
+            aria-label="state mode"
+            aria-pressed="false"
+            title="State mode (hold W)"
+        >
+            ${Icon('M3 7a2 2 0 1 0 4 0a2 2 0 1 0-4 0M17 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7 7C13 7 11 17 17 17')}<span
+                >State</span
             >
-                ${glyph(
-                    'M3 7 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M17 17 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 M7 7 C13 7 11 17 17 17',
-                )}<span>State</span></button
-            ><button
-                class="key edit"
+        </button>
+        <div class="history expanded-control" role="group" aria-label="History">
+            <button
+                class="ui-icon key"
                 type="button"
                 data-edit="undo"
                 aria-label="undo"
-                title="undo (⌘Z)"
+                title="Undo (⌘Z)"
                 disabled
             >
-                ${glyph('M9 14 L4 9 L9 4 M4 9 H15 A5 5 0 0 1 15 19 H11')}</button
-            ><button
-                class="key edit"
+                ${Icon('M9 14L4 9L9 4M4 9H15A5 5 0 0 1 15 19H11')}
+            </button>
+            <button
+                class="ui-icon key"
                 type="button"
                 data-edit="redo"
                 aria-label="redo"
-                title="redo (⇧⌘Z)"
+                title="Redo (⇧⌘Z)"
                 disabled
             >
-                ${glyph('M15 14 L20 9 L15 4 M20 9 H9 A5 5 0 0 0 9 19 H13')}</button
-            ><span class="divider" aria-hidden="true"></span
-            ><button
-                class="key"
+                ${Icon('M15 14L20 9L15 4M20 9H9A5 5 0 0 0 9 19H13')}
+            </button>
+        </div>
+        <button
+            class="ui-icon add expanded-control"
+            type="button"
+            aria-label="new section around the view"
+            title="New section around the view"
+        >
+            ${Icon('M12 5v14M5 12h14')}
+        </button>
+        <div class="zoom-controls" role="group" aria-label="Zoom">
+            <button
+                class="ui-icon key expanded-control"
                 type="button"
                 data-zoom="out"
                 aria-label="zoom out"
-                title="zoom out"
+                title="Zoom out"
             >
-                ${glyph('M7 12 H17')}</button
-            ><button
-                class="readout"
+                ${Icon('M7 12H17')}
+            </button>
+            <button
+                class="ui-button readout"
                 type="button"
                 data-zoom="reset"
                 aria-label="reset zoom"
-                title="reset zoom"
+                title="Reset zoom"
             >
-                100%</button
-            ><button class="key" type="button" data-zoom="in" aria-label="zoom in" title="zoom in">
-                ${glyph('M7 12 H17 M12 7 V17')}</button
-            ><button
-                class="key"
+                100%
+            </button>
+            <button
+                class="ui-icon key expanded-control"
+                type="button"
+                data-zoom="in"
+                aria-label="zoom in"
+                title="Zoom in"
+            >
+                ${Icon('M7 12H17M12 7v10')}
+            </button>
+            <button
+                class="ui-icon key expanded-control"
                 type="button"
                 data-zoom="fit"
                 aria-label="fit everything"
-                title="fit everything"
+                title="Fit everything"
             >
-                ${glyph('M5 9 V5 H9 M15 5 H19 V9 M19 15 V19 H15 M9 19 H5 V15')}</button
-            ><button
-                class="key toggle"
-                type="button"
-                aria-label="show map"
-                title="show map"
-                aria-pressed="false"
-            >
-                ${glyph('M4 7 L9 5 L15 7 L20 5 V17 L15 19 L9 17 L4 19 Z M9 5 V17 M15 7 V19')}
+                ${Icon('M5 9V5H9M15 5H19V9M19 15V19H15M9 19H5V15')}
             </button>
-        </div>`;
-
-const place = (element: HTMLElement, { x, y, width, height }: Rect): void => {
-    element.style.transform = `translate(${x}px, ${y}px)`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
-};
+        </div>
+        <button
+            class="ui-icon toggle"
+            type="button"
+            aria-label="expand navigation"
+            title="Expand navigation"
+            aria-expanded="false"
+            aria-controls="navigation-map"
+        >
+            ${Icon('M7 10l5 5 5-5')}
+        </button>
+    </nav>`;
 
 export class HksNavigator extends HTMLElement {
     readonly modes$: Observable<void>;
@@ -169,8 +177,6 @@ export class HksNavigator extends HTMLElement {
     readonly adds$: Observable<void>;
     readonly edits$: Observable<Edit>;
 
-    private readonly list: HTMLElement;
-    private readonly view: HTMLElement;
     private readonly readout: HTMLElement;
     private readonly toggle: HTMLElement;
     private readonly shadow: ShadowRoot;
@@ -181,18 +187,17 @@ export class HksNavigator extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<MiniMap>(
             shadow,
             { windows: [], sections: [], view: { x: 0, y: 0, width: 0, height: 0 } },
             TEMPLATE,
         );
-        // From the constant the map is laid out in, so the map and the rows around it cannot drift apart.
-        this.style.setProperty('--map-width', `${MINIMAP.width}px`);
-        this.style.setProperty('--map-height', `${MINIMAP.height}px`);
+        // Section hit targets must keep the same aspect ratio as the SVG viewBox.
+        this.style.setProperty('--map-aspect', String(MINIMAP.width / MINIMAP.height));
 
-        this.list = requireChild(shadow, '.list');
-        this.jumps$ = fromElementEvent$(this.list, 'click').pipe(
+        const frame = requireChild(shadow, '.navigator');
+        this.jumps$ = fromElementEvent$(frame, 'click').pipe(
             mergeMap(event => {
                 const button =
                     event.target instanceof Element ? event.target.closest('[data-jump]') : null;
@@ -204,11 +209,10 @@ export class HksNavigator extends HTMLElement {
         this.adds$ = fromElementEvent$(requireChild(shadow, '.add'), 'click').pipe(
             map(() => undefined),
         );
-        this.view = requireChild(shadow, '.view');
         this.readout = requireChild(shadow, '.readout');
         this.toggle = requireChild(shadow, '.toggle');
 
-        this.zooms$ = fromElementEvent$(requireChild(shadow, '.row'), 'click').pipe(
+        this.zooms$ = fromElementEvent$(frame, 'click').pipe(
             mergeMap(event => {
                 const button =
                     event.target instanceof Element ? event.target.closest('[data-zoom]') : null;
@@ -219,7 +223,7 @@ export class HksNavigator extends HTMLElement {
         );
 
         this.toggles$ = fromElementEvent$(this.toggle, 'click').pipe(map(() => undefined));
-        this.edits$ = fromElementEvent$(requireChild(shadow, '.row'), 'click').pipe(
+        this.edits$ = fromElementEvent$(frame, 'click').pipe(
             mergeMap((event): Observable<Edit> => {
                 const button =
                     event.target instanceof Element ? event.target.closest('[data-edit]') : null;
@@ -241,11 +245,21 @@ export class HksNavigator extends HTMLElement {
         history$: Observable<Undoable>,
         mode$: Observable<boolean>,
     ): Observable<void> {
+        const launcher = requireElement(this.shadow, 'slot[name="launcher"]', HTMLSlotElement);
         const undo = requireElement(this.shadow, '[data-edit="undo"]', HTMLButtonElement);
         const redo = requireElement(this.shadow, '[data-edit="redo"]', HTMLButtonElement);
 
         return merge(
             this.rendering.lifetime$,
+            fromEvent(launcher, 'slotchange').pipe(
+                startWith(undefined),
+                map(() => launcher.assignedElements().length > 0),
+                distinctUntilChanged(),
+                tap(present => {
+                    this.toggleAttribute('data-launcher', present);
+                }),
+                map(() => undefined),
+            ),
             merge(
                 mode$.pipe(
                     distinctUntilChanged(),
@@ -266,7 +280,6 @@ export class HksNavigator extends HTMLElement {
                     distinctUntilChanged(sameMiniMap),
                     tap(map => {
                         this.rendering.update(map);
-                        place(this.view, map.view);
                     }),
                 ),
                 zoom$.pipe(
@@ -278,10 +291,30 @@ export class HksNavigator extends HTMLElement {
                 open$.pipe(
                     distinctUntilChanged(),
                     tap(open => {
+                        const focused = this.shadow.activeElement;
+                        const expandingFromToggle = open && focused === this.toggle;
+                        const hidingFocused =
+                            !open &&
+                            focused instanceof HTMLElement &&
+                            (focused.matches('.jump') ||
+                                focused.closest('.expanded-control') !== null);
                         this.toggleAttribute('data-open', open);
-                        this.toggle.setAttribute('aria-pressed', String(open));
-                        this.toggle.setAttribute('aria-label', open ? 'hide map' : 'show map');
-                        this.toggle.title = open ? 'hide map' : 'show map';
+                        this.toggle.setAttribute('aria-expanded', String(open));
+                        this.toggle.setAttribute(
+                            'aria-label',
+                            open ? 'collapse navigation' : 'expand navigation',
+                        );
+                        this.toggle.title = open ? 'Collapse navigation' : 'Expand navigation';
+                        if (expandingFromToggle) {
+                            const first = this.shadow.querySelector(
+                                '.jump, .expanded-control button:not(:disabled), button.expanded-control:not(:disabled)',
+                            );
+                            if (first instanceof HTMLElement) {
+                                first.focus();
+                            }
+                        } else if (hidingFocused) {
+                            this.toggle.focus();
+                        }
                     }),
                 ),
             ).pipe(map(() => undefined)),

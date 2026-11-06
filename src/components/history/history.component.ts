@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -97,7 +98,7 @@ export class HksHistory extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<readonly HistoryEntry[]>(shadow, [], TEMPLATE);
 
         this.takeBacks$ = fromElementEvent$(requireChild(shadow, '.steps'), 'click').pipe(

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { mountView, type Rendering } from '../../lib/lit.ts';
 import { merge, type Observable } from 'rxjs';
@@ -24,7 +25,7 @@ export class HksProgressBar extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.bar = requireChild(shadow, '.bar');

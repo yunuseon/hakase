@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -41,7 +42,7 @@ export class HksSections extends HTMLElement {
         super();
 
         const root = this.attachShadow({ mode: 'open' });
-        root.adoptedStyleSheets = [sheet];
+        root.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<readonly SectionView[]>(
             root,
             [],
@@ -66,7 +67,7 @@ export class HksSections extends HTMLElement {
                                     >
                                         <legend class="label" data-move=${ifDefined(id)}>
                                             <input
-                                                class="name"
+                                                class="ui-field name"
                                                 readonly
                                                 spellcheck=${ifDefined(false)}
                                                 data-rename=${ifDefined(id)}

@@ -1,3 +1,5 @@
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { svg, html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -104,10 +106,15 @@ const TEMPLATE = (view: PlotRender) =>
                         </li>`,
                 )}
             </ul>
-            <div class="layouts" role="radiogroup" aria-label="layout">
+            <div class="ui-choices layouts" role="radiogroup" aria-label="layout">
                 ${LAYOUTS.map(
                     layout =>
-                        html`<button type="button" role="radio" data-layout=${ifDefined(layout)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-layout=${ifDefined(layout)}
+                        >
                             ${layout}
                         </button>`,
                 )}
@@ -131,7 +138,7 @@ export class HksPlot extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<PlotRender>(shadow, { lanes: [], layout: 'overlay' }, TEMPLATE);
 
         const plot = requireChild(shadow, '.plot');
@@ -213,6 +220,7 @@ export class HksPlot extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             merge(plotted$, moment$, chosen$).pipe(map(() => undefined)),
         );
     }

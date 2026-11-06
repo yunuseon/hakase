@@ -131,3 +131,17 @@ describe('captures', () => {
         });
     });
 });
+
+describe('unified workspace launcher', () => {
+    it('does not offer obsolete toolbar positioning commands', () => {
+        const workspace = defaultWorkspace(viewport, inputsFor);
+        expect(commandsOf([], workspace).some(command => command.id.startsWith('toolbar:'))).toBe(
+            false,
+        );
+        expect(pickedOf('toolbar:left', null)).toBe(null);
+        expect(pickedOf('workspace:minimap', null)).toEqual({
+            kind: 'workspace',
+            action: 'minimap',
+        });
+    });
+});

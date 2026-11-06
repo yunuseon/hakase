@@ -36,7 +36,7 @@ export default tseslint.config(
     },
     // The flat config itself is plain JS and lives outside the tsconfig project.
     {
-        files: ['**/*.js'],
+        files: ['**/*.js', '**/*.mjs'],
         extends: [tseslint.configs.disableTypeChecked],
     },
     // Barrels cannot be written in the first place: any index module is an error

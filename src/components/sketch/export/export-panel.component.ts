@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { mountView, type Rendering } from '../../../lib/lit.ts';
@@ -20,7 +21,10 @@ const sheet = styleSheet(css);
 const select = (field: string, label: string, options: readonly (readonly [string, string])[]) =>
     html`<label class="item" data-video=${ifDefined(field === 'quality' ? '' : undefined)}
         ><span class="key">${label}</span
-        ><hks-select class="pick" data-field=${ifDefined(field)} aria-label=${ifDefined(label)}
+        ><hks-select
+            class="ui-field pick"
+            data-field=${ifDefined(field)}
+            aria-label=${ifDefined(label)}
             >${options.map(
                 ([value, text]) => html`<option .value=${value}>${text}</option>`,
             )}</hks-select
@@ -48,14 +52,14 @@ const TEMPLATE = () =>
         </div>
         <div class="row actions">
             <span class="summary"></span><span class="status" role="status"></span
-            ><button class="button cancel" type="button" hidden>Cancel</button
+            ><button class="ui-button button cancel" type="button" hidden>Cancel</button
             ><button
-                class="button still"
+                class="ui-button button still"
                 type="button"
                 title="save the frame under the playhead as a PNG"
             >
                 Save frame</button
-            ><button class="button primary start" type="button">Export</button>
+            ><button class="ui-button button primary start" type="button">Export</button>
         </div>`;
 
 export type SavedFile = {
@@ -90,7 +94,7 @@ export class HksExportPanel extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.start = requireElement(shadow, '.start', HTMLButtonElement);

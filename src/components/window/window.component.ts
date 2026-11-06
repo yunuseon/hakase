@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -56,7 +57,7 @@ const TEMPLATE = () =>
             ></button
             ><button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
                 <span class="dot"></span><span class="store-name"></span></button
-            ><button class="close" type="button" aria-label="quit">
+            ><button class="ui-icon close" type="button" aria-label="quit">
                 <svg viewBox="0 0 12 12" aria-hidden="true">
                     <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"></path>
                 </svg>
@@ -70,7 +71,7 @@ const TEMPLATE = () =>
             >
                 <span class="direction" aria-hidden="true">→</span><span>Output</span
                 ><button
-                    class="add connections"
+                    class="ui-button add connections"
                     type="button"
                     title="Show every connection on the canvas (state mode, or hold W)"
                     aria-label="show connections"
@@ -81,7 +82,7 @@ const TEMPLATE = () =>
                         ></path>
                     </svg></button
                 ><button
-                    class="add"
+                    class="ui-button add"
                     type="button"
                     data-copy="false"
                     title="New empty state"
@@ -91,7 +92,7 @@ const TEMPLATE = () =>
                         <path d="M12 5 V19 M5 12 H19"></path>
                     </svg></button
                 ><button
-                    class="add"
+                    class="ui-button add"
                     type="button"
                     data-copy="true"
                     title="Fork: continue on a copy of this state"
@@ -111,7 +112,7 @@ const TEMPLATE = () =>
         <div class="switcher" role="dialog" aria-label="change program" hidden>
             <header class="stores-head">
                 <button
-                    class="back"
+                    class="ui-icon back"
                     type="button"
                     aria-label="back to programs"
                     title="back to programs"
@@ -122,7 +123,7 @@ const TEMPLATE = () =>
                     </svg></button
                 ><span class="switch-title">Program</span
                 ><button
-                    class="add switch-new"
+                    class="ui-button add switch-new"
                     type="button"
                     title="New empty state"
                     aria-label="new empty state"
@@ -198,7 +199,7 @@ const StoreOptions = (options: readonly StoreOption[]) =>
                                         style=${styleMap({ '--store': option.colour })}
                                     ></span
                                     ><input
-                                        class="option-name"
+                                        class="ui-field option-name"
                                         data-rename=${ifDefined(id)}
                                         autocomplete="off"
                                         title="rename"
@@ -373,7 +374,7 @@ export class HksWindow extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.shadow = shadow;

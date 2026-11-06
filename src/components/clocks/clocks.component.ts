@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -61,11 +62,11 @@ const TEMPLATE = (view: ClockRender) =>
                     ),
             )}
         </ul>
-        <p class="empty" ?hidden=${view.rows.length > 0}>No clocks yet.</p>
+        <p class="ui-empty empty" ?hidden=${view.rows.length > 0}>No clocks yet.</p>
         <form class="add">
             <hks-select
                 editable=""
-                class="draft"
+                class="ui-field draft"
                 placeholder="Add a city or time zone"
                 aria-label="time zone"
                 >${repeat(
@@ -73,7 +74,7 @@ const TEMPLATE = (view: ClockRender) =>
                     item => item,
                     zone => html`<option .value=${zone}>${zone.replaceAll('_', ' ')}</option>`,
                 )}</hks-select
-            ><button class="submit" type="submit">Add</button>
+            ><button class="ui-button submit" type="submit">Add</button>
         </form>`;
 
 export class HksClocks extends HTMLElement {
@@ -89,7 +90,7 @@ export class HksClocks extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<ClockRender>(shadow, { rows: [], choices: [] }, TEMPLATE);
 
         const form = requireElement(shadow, '.add', HTMLFormElement);

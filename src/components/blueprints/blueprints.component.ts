@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { svg, html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -50,7 +51,7 @@ const TEMPLATE = (cards: readonly BlueprintCard[]) =>
                                 </svg>
                                 <div class="text">
                                     <input
-                                        class="name"
+                                        class="ui-field name"
                                         spellcheck=${ifDefined(false)}
                                         data-rename=${ifDefined(id)}
                                         aria-label="blueprint name"
@@ -83,7 +84,7 @@ const TEMPLATE = (cards: readonly BlueprintCard[]) =>
                     ),
             )}
         </ul>
-        <p class="empty" ?hidden=${cards.some(card => card.summary === null)}>
+        <p class="ui-empty empty" ?hidden=${cards.some(card => card.summary === null)}>
             Your own blueprints join these: hover a section's label and choose${' '}<b
                 >Save as blueprint</b
             >, and its windows, their states and their wiring are kept here, ready to place again.
@@ -107,7 +108,7 @@ export class HksBlueprints extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<readonly BlueprintCard[]>(shadow, [], TEMPLATE);
 
         const clicks$ = fromElementEvent$(this, 'click').pipe(

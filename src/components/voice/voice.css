@@ -16,57 +16,12 @@
     align-items: center;
 }
 
-.shapes,
-.articulations,
-.scales,
-.instruments {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
-}
-
 button {
-    font: inherit;
     color: inherit;
-    cursor: pointer;
-}
-
-.shapes button,
-.articulations button,
-.scales button,
-.instruments button {
-    display: grid;
-    place-items: center;
-    min-inline-size: 26px;
-    block-size: 26px;
-    padding: 0 7px;
-    font: 500 11px var(--font-ui);
-    color: var(--label);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
 }
 
 .shapes button {
     padding: 0 4px;
-}
-
-.shapes button:hover,
-.articulations button:hover,
-.scales button:hover,
-.instruments button:hover {
-    color: var(--ink);
-}
-
-.shapes button[aria-checked='true'],
-.articulations button[aria-checked='true'],
-.scales button[aria-checked='true'],
-.instruments button[aria-checked='true'] {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
 }
 
 svg {
@@ -77,37 +32,6 @@ svg {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-
-.listen {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    block-size: 30px;
-    padding: 0 10px 0 8px;
-    font-weight: 500;
-    color: var(--label);
-    background: var(--well);
-    border: none;
-    border-radius: 9px;
-}
-
-.listen:hover {
-    color: var(--ink);
-}
-
-.listen[aria-pressed='true'] {
-    color: var(--panel);
-    background: var(--accent);
-}
-
-.listen .speaker {
-    fill: currentColor;
-}
-
-.listen[aria-pressed='true'] .off,
-.listen[aria-pressed='false'] .on {
-    display: none;
 }
 
 .roll {
@@ -140,11 +64,6 @@ svg {
     inset-inline-end: 8px;
     font: 600 13px var(--font-mono);
     color: var(--ink);
-}
-
-.hint {
-    margin: 0;
-    color: var(--muted);
 }
 
 .hint b {
@@ -192,10 +111,4 @@ svg {
 .instruments {
     flex-wrap: wrap;
     align-self: flex-start;
-}
-
-button:focus-visible,
-hks-select:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }

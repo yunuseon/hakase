@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
@@ -43,7 +44,7 @@ const TEMPLATE = (view: TaskRender) =>
                                     </svg></button
                                 ><button
                                     type="button"
-                                    class="close"
+                                    class="ui-icon close"
                                     data-close=${ifDefined(id)}
                                     title=${ifDefined(`close ${row.label}`)}
                                     aria-label=${ifDefined(`close ${row.label}`)}
@@ -56,10 +57,10 @@ const TEMPLATE = (view: TaskRender) =>
                     ),
             )}
         </div>
-        <p class="empty" ?hidden=${view.rows.length > 0}>Nothing is open.</p>
+        <p class="ui-empty empty" ?hidden=${view.rows.length > 0}>Nothing is open.</p>
         <footer class="foot">
             <span class="count">${view.closable} other window${view.closable === 1 ? '' : 's'}</span
-            ><button class="close-all" ?disabled=${view.closable === 0} type="button">
+            ><button class="ui-button close-all" ?disabled=${view.closable === 0} type="button">
                 Close all
             </button>
         </footer>`;
@@ -93,7 +94,7 @@ export class HksTaskManager extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<TaskRender>(shadow, { rows: [], closable: 0 }, TEMPLATE);
 
         this.rows = requireChild(shadow, '.rows');

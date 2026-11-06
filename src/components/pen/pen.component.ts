@@ -1,3 +1,5 @@
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -28,10 +30,11 @@ const SHEET = 768;
 
 const TEMPLATE = () =>
     html`<div class="bar">
-            <div class="modes" role="radiogroup" aria-label="mode">
+            <div class="ui-choices modes" role="radiogroup" aria-label="mode">
                 ${MODES.map(
                     mode =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-mode=${ifDefined(mode)}
@@ -48,16 +51,18 @@ const TEMPLATE = () =>
             <label class="dial" title="how thick the line is; a size signal swells it"
                 ><span>weight</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-weight
                     min=${ifDefined(MIN_WEIGHT)}
                     max=${ifDefined(MAX_WEIGHT)}
                     step="0.25" /><output></output
             ></label>
-            <div class="symmetries" role="radiogroup" aria-label="symmetry">
+            <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
                 ${SYMMETRIES.map(
                     symmetry =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-symmetry=${ifDefined(symmetry)}
@@ -83,7 +88,7 @@ const TEMPLATE = () =>
             </div>
         </div>
         <div class="foot">
-            <p class="hint">
+            <p class="ui-hint hint">
                 Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the
                 pen follows them. Unplugged, it goes round in a circle.
             </p>
@@ -124,7 +129,7 @@ export class HksPen extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.guideView = renderView<readonly string[]>(
             requireElement(shadow, '.guides', SVGSVGElement),
@@ -241,6 +246,7 @@ export class HksPen extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             this.guideView.lifetime$,
             merge(controls$, figure$, now$, tip$).pipe(map(() => undefined)),
         );

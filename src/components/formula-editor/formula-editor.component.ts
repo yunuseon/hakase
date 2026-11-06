@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 
@@ -26,7 +27,7 @@ const TEMPLATE = () =>
             <pre class="highlight" aria-hidden="true"><code></code></pre>
             <pre class="gutter" aria-hidden="true"></pre>
             <textarea
-                class="source"
+                class="ui-field source"
                 spellcheck="false"
                 autocomplete="off"
                 autocapitalize="off"
@@ -40,7 +41,7 @@ const TEMPLATE = () =>
                     <path d="M5 12.5 L10 17 L19 7"></path></svg
                 ><span>Compiled</span>
             </div>
-            <hks-select class="preset" aria-label="formula preset"></hks-select>
+            <hks-select class="ui-field preset" aria-label="formula preset"></hks-select>
             <details class="more">
                 <summary class="toggle" aria-label="formula actions" title="save, share or delete">
                     ⋯
@@ -48,15 +49,17 @@ const TEMPLATE = () =>
                 <div class="menu">
                     <form class="save">
                         <input
-                            class="name"
+                            class="ui-field name"
                             type="text"
                             placeholder="Name"
                             aria-label="name for the copy"
                             autocomplete="off"
-                        /><button class="action" type="submit">Save as new</button>
+                        /><button class="ui-button action" type="submit">Save as new</button>
                     </form>
-                    <button class="action share" type="button">Copy share link</button
-                    ><button class="action delete" type="button">Delete this formula</button>
+                    <button class="ui-button action share" type="button">Copy share link</button
+                    ><button class="ui-button action delete" type="button">
+                        Delete this formula
+                    </button>
                 </div>
             </details>
         </div>`;
@@ -129,7 +132,7 @@ export class HksFormulaEditor extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.source = requireElement(shadow, '.source', HTMLTextAreaElement);

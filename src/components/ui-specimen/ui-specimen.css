@@ -1,0 +1,90 @@
+:host {
+    display: block;
+    color: var(--ink);
+    font: 12px/1.5 var(--font-ui);
+}
+
+.frame {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.fields {
+    display: grid;
+    gap: 14px;
+    inline-size: min(100%, 360px);
+}
+
+label {
+    color: var(--label);
+}
+
+.fields label {
+    display: grid;
+    gap: 5px;
+}
+
+h3,
+p {
+    margin: 0;
+}
+
+h3 {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+small {
+    color: var(--accent);
+}
+
+code {
+    font: 11px var(--font-mono);
+}
+
+.colour-bar {
+    max-inline-size: 120px;
+}
+
+.tag-remove {
+    inline-size: 20px;
+    block-size: 20px;
+}
+
+.tag-remove svg {
+    inline-size: 12px;
+    block-size: 12px;
+}
+
+.icons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 24px;
+    inline-size: 100%;
+}
+
+.icons > div {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    color: var(--label);
+}
+
+.symmetry svg {
+    inline-size: 32px;
+    block-size: 32px;
+}
+
+.ui-empty {
+    align-self: center;
+    padding-block: 20px;
+}

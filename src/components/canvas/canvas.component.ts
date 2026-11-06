@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { mountView, type Rendering } from '../../lib/lit.ts';
 import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
@@ -46,7 +47,7 @@ export class HksCanvas extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.stateHolds$ = merge(

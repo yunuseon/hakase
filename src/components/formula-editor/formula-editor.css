@@ -16,10 +16,7 @@
 
 .preset {
     margin-inline-start: auto;
-    font: inherit;
     padding: 3px 6px;
-    color: var(--ink);
-    background: var(--well);
     border: 1px solid var(--edge);
     border-radius: 6px;
     cursor: pointer;
@@ -265,10 +262,6 @@
 
 .name {
     padding: 5px 8px;
-    font: inherit;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
     border-radius: 6px;
 }
 

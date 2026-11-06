@@ -1,3 +1,4 @@
+import { storybookProgram } from './programs/storybook.program.ts';
 import type { Program, ProgramId } from './program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
@@ -49,4 +50,5 @@ export const programs = {
     bookmarks: bookmarksProgram,
     history: historyProgram,
     state: stateProgram,
+    storybook: storybookProgram,
 } satisfies { readonly [K in ProgramId]: Program<K> };

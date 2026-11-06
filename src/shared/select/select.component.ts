@@ -1,3 +1,4 @@
+import { controlsSheet } from '../ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
@@ -49,7 +50,7 @@ export class HksSelect extends HTMLElement {
     constructor() {
         super();
         this.root = this.attachShadow({ mode: 'open' });
-        this.root.adoptedStyleSheets = [sheet];
+        this.root.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<SelectRender>(
             this.root,
             {
@@ -88,7 +89,7 @@ export class HksSelect extends HTMLElement {
                             <path d="m2 4 4 4 4-4"></path>
                         </svg></button
                     ><input
-                        class="editor"
+                        class="ui-field editor"
                         role="combobox"
                         aria-autocomplete="list"
                         aria-controls="choices"
@@ -120,7 +121,7 @@ export class HksSelect extends HTMLElement {
                         })}
                     >
                         <input
-                            class="search"
+                            class="ui-field search"
                             type="search"
                             autocomplete="off"
                             ?hidden=${!view.searching}

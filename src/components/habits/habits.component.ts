@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -44,7 +45,7 @@ const TEMPLATE = (view: HabitsView) =>
                             row =>
                                 html`<div class="row" data-row=${ifDefined(id)}>
                                     <input
-                                        class="name"
+                                        class="ui-field name"
                                         data-name=${ifDefined(id)}
                                         autocomplete="off"
                                         aria-label="habit name"
@@ -92,15 +93,15 @@ const TEMPLATE = (view: HabitsView) =>
                 )}
             </div>
         </div>
-        <p class="empty">No habits yet.</p>
+        <p class="ui-empty empty">No habits yet.</p>
         <form class="add">
             <input
-                class="draft"
+                class="ui-field draft"
                 type="text"
                 placeholder="New habit"
                 aria-label="new habit"
                 autocomplete="off"
-            /><button class="submit" type="submit">Add</button>
+            /><button class="ui-button submit" type="submit">Add</button>
         </form>`;
 
 type Arming = {
@@ -129,7 +130,7 @@ export class HksHabits extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<HabitsView>(shadow, { columns: [], rows: [] }, TEMPLATE);
 
         const grid = requireChild(shadow, '.grid');

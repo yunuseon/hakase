@@ -1,3 +1,5 @@
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -74,10 +76,11 @@ const TEMPLATE = () =>
             ><span class="bound max"></span><span class="bound min"></span><span class="dot"></span>
         </div>
         <div class="row">
-            <div class="shapes" role="radiogroup" aria-label="shape">
+            <div class="ui-choices shapes" role="radiogroup" aria-label="shape">
                 ${SHAPES.map(
                     shape =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-shape=${ifDefined(shape)}
@@ -91,14 +94,19 @@ const TEMPLATE = () =>
                 )}
             </div>
             <div
-                class="rates"
+                class="ui-choices rates"
                 role="radiogroup"
                 aria-label="cycles per loop"
                 title="cycles per loop"
             >
                 ${RATES.map(
                     rate =>
-                        html`<button type="button" role="radio" data-rate=${ifDefined(rate)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-rate=${ifDefined(rate)}
+                        >
                             ${rate}
                         </button>`,
                 )}
@@ -106,10 +114,20 @@ const TEMPLATE = () =>
         </div>
         <div class="steps" data-only="steps">
             <div class="bars" title="draw the steps"></div>
-            <div class="counts" role="radiogroup" aria-label="steps" title="steps per cycle">
+            <div
+                class="ui-choices counts"
+                role="radiogroup"
+                aria-label="steps"
+                title="steps per cycle"
+            >
                 ${STEP_COUNTS.map(
                     count =>
-                        html`<button type="button" role="radio" data-count=${ifDefined(count)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-count=${ifDefined(count)}
+                        >
                             ${count}
                         </button>`,
                 )}
@@ -124,7 +142,7 @@ const TEMPLATE = () =>
                         data-only=${ifDefined(param === 'glide' ? 'steps' : undefined)}
                         ><span class="key">${param}</span
                         ><input
-                            class="num"
+                            class="ui-field num"
                             data-param=${ifDefined(param)}
                             type="text"
                             inputmode="decimal"
@@ -176,7 +194,7 @@ export class HksSignal extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.barView = renderView<{
             readonly steps: readonly number[];
@@ -478,6 +496,7 @@ export class HksSignal extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             this.barView.lifetime$,
             merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
                 map(() => undefined),

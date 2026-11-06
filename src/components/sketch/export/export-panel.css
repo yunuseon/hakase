@@ -32,10 +32,7 @@
 .pick {
     font: 500 12px var(--font-ui);
     padding: 4px 6px;
-    color: var(--ink);
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
     cursor: pointer;
 }
 

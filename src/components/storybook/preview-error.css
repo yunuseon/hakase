@@ -1,0 +1,15 @@
+:host {
+    display: block;
+    color: var(--label);
+    font: 12px/1.5 var(--font-ui);
+}
+
+h2 {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+p {
+    overflow-wrap: anywhere;
+}

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { mountView, type Rendering } from '../../lib/lit.ts';
@@ -32,24 +33,36 @@ const TEMPLATE = () =>
         </div>
         <div class="controls">
             <button
-                class="reset"
+                class="ui-button reset"
                 type="button"
                 aria-label="reset"
                 title="back to the first session"
             >
                 ↺</button
             ><button class="toggle" type="button"></button
-            ><button class="skip" type="button" aria-label="skip" title="skip to the next phase">
+            ><button
+                class="ui-icon skip"
+                type="button"
+                aria-label="skip"
+                title="skip to the next phase"
+            >
                 ⏭
             </button>
         </div>
         <details class="lengths">
             <summary>Lengths</summary>
-            <label>Focus <input type="number" min="1" max="180" data-phase="work" /> min</label
+            <label
+                >Focus
+                <input class="ui-field" type="number" min="1" max="180" data-phase="work" />
+                min</label
             ><label
-                >Short break <input type="number" min="1" max="180" data-phase="short" /> min</label
+                >Short break
+                <input class="ui-field" type="number" min="1" max="180" data-phase="short" />
+                min</label
             ><label
-                >Long break <input type="number" min="1" max="180" data-phase="long" /> min</label
+                >Long break
+                <input class="ui-field" type="number" min="1" max="180" data-phase="long" />
+                min</label
             >
         </details>`;
 
@@ -65,7 +78,7 @@ export class HksFocus extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         const lengths = requireChild(shadow, '.lengths');

@@ -1,3 +1,5 @@
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -54,6 +56,7 @@ const dial = (field: string, label: string, min: number, max: number, step: numb
     html`<label class="dial" title=${ifDefined(label)}
         ><span>${label}</span
         ><input
+            class="ui-range"
             type="range"
             data-brush=${ifDefined(field)}
             min=${ifDefined(min)}
@@ -63,10 +66,11 @@ const dial = (field: string, label: string, min: number, max: number, step: numb
 
 const TEMPLATE = () =>
     html`<div class="bar">
-            <div class="tools" role="radiogroup" aria-label="tool">
+            <div class="ui-choices tools" role="radiogroup" aria-label="tool">
                 ${TOOLS.map(
                     tool =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-tool=${ifDefined(tool)}
@@ -80,10 +84,11 @@ const TEMPLATE = () =>
                 )}
             </div>
             ${dial('size', 'size', 1, MAX_BRUSH, 1)}${dial('hardness', 'edge', 0, 1, 0.05)}${dial('flow', 'flow', 0.05, 1, 0.05)}
-            <div class="symmetries" role="radiogroup" aria-label="symmetry">
+            <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
                 ${SYMMETRIES.map(
                     symmetry =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-symmetry=${ifDefined(symmetry)}
@@ -149,10 +154,11 @@ const TEMPLATE = () =>
             </button>
         </div>
         <div class="foot">
-            <div class="sides" role="radiogroup" aria-label="resolution">
+            <div class="ui-choices sides" role="radiogroup" aria-label="resolution">
                 ${SIZES.map(
                     size =>
                         html`<button
+                            class="ui-choice"
                             type="button"
                             role="radio"
                             data-side=${ifDefined(size)}
@@ -218,7 +224,7 @@ export class HksPaint extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.guideView = renderView<readonly string[]>(
             requireElement(shadow, '.guides', SVGSVGElement),
@@ -509,6 +515,7 @@ export class HksPaint extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             this.guideView.lifetime$,
             this.thumbView.lifetime$,
             merge(sheet$, thumbs$, marks$, controls$, cursor$).pipe(map(() => undefined)),

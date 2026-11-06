@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { mountView, type Rendering } from '../../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
@@ -39,7 +40,7 @@ export class HksCircularSlider extends HTMLElement implements Slider {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.track = requireChild(shadow, '.track');

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -65,7 +66,7 @@ export class HksFrameStrip extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         this.scroller = requireChild(shadow, '.scroller');

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -16,19 +17,20 @@ const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
     html`<div class="head">
-            <span class="key">theme</span><hks-select class="pick" aria-label="theme"></hks-select>
+            <span class="key">theme</span
+            ><hks-select class="ui-field pick" aria-label="theme"></hks-select>
         </div>
         <div class="bar"></div>
         <div class="body">
             <label class="row"
                 ><span class="key">blend</span
-                ><hks-select class="blend" aria-label="blend"
+                ><hks-select class="ui-field blend" aria-label="blend"
                     ><option value="smooth">smooth</option>
                     <option value="steps">steps</option></hks-select
                 ></label
             >
             <div class="stops"></div>
-            <button class="add" type="button" data-command="add">add stop</button>
+            <button class="ui-button add" type="button" data-command="add">add stop</button>
         </div>`;
 
 export type PresetOption = {
@@ -59,7 +61,7 @@ export class HksThemeEditor extends HTMLElement {
         super();
 
         this.shadow = this.attachShadow({ mode: 'open' });
-        this.shadow.adoptedStyleSheets = [sheet];
+        this.shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(this.shadow, () => TEMPLATE());
 
         this.stops = requireChild(this.shadow, '.stops');
@@ -71,7 +73,8 @@ export class HksThemeEditor extends HTMLElement {
                 (stop, index) =>
                     html`<div class="row stop">
                         <input
-                            class="at"
+                            class="ui-range at"
+                            data-variant="precision"
                             type="range"
                             min="0"
                             max="1"
@@ -79,12 +82,13 @@ export class HksThemeEditor extends HTMLElement {
                             .value=${stop.at}
                             aria-label=${ifDefined(`stop ${index + 1} position`)}
                         /><input
-                            class="hue"
+                            class="ui-colour hue"
+                            data-variant="rect"
                             type="color"
                             .value=${stop.color}
                             aria-label=${ifDefined(`stop ${index + 1} colour`)}
                         /><button
-                            class="drop"
+                            class="ui-icon drop"
                             type="button"
                             data-command=${ifDefined(index)}
                             aria-label=${ifDefined(`remove stop ${index + 1}`)}

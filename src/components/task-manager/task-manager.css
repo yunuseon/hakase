@@ -17,7 +17,6 @@
 
 .empty {
     margin: auto;
-    color: var(--muted);
 }
 
 .rows:not(:empty) + .empty {
@@ -39,17 +38,10 @@ button {
     display: flex;
     align-items: center;
     padding: 0;
-    font: inherit;
     color: inherit;
     background: transparent;
     border: none;
     border-radius: 9px;
-    cursor: pointer;
-}
-
-button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: -2px;
 }
 
 .jump {

@@ -1,0 +1,346 @@
+:where(button) {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+:where(button, input, textarea, summary, hks-select):focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 2px;
+}
+:where(button:disabled, input:disabled, textarea:disabled) {
+    cursor: default;
+}
+:where(.ui-button, .ui-icon) {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    min-block-size: 28px;
+    padding: 4px 10px;
+    font: 500 12px var(--font-ui);
+    color: var(--label);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+}
+:where(.ui-button, .ui-icon):hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--well);
+}
+:where(.ui-button, .ui-icon):disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+:where(.ui-icon) {
+    min-block-size: 0;
+    inline-size: 28px;
+    block-size: 28px;
+    padding: 0;
+    border-radius: 50%;
+}
+:where(.ui-button[data-tone='accent'], .ui-icon[data-tone='accent']) {
+    color: var(--accent);
+}
+:where(.ui-button[data-tone='danger'], .ui-icon[data-tone='danger']):hover:not(:disabled) {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+:where(.ui-button[data-variant='well']) {
+    background: var(--well);
+}
+:where(.ui-glyph) {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+    flex: none;
+}
+:where(.ui-field) {
+    box-sizing: border-box;
+    min-inline-size: 0;
+    inline-size: 100%;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--well);
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+:where(.ui-field)::placeholder {
+    color: var(--muted);
+}
+:where(.ui-field):disabled {
+    opacity: 0.5;
+}
+:where(textarea.ui-field) {
+    resize: vertical;
+}
+:where(.ui-field[aria-invalid='true']) {
+    border-color: var(--accent);
+}
+:where(.ui-check) {
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+:where(.ui-choices) {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--well);
+    border-radius: 9px;
+}
+:where(.ui-choice) {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-inline-size: 26px;
+    block-size: 26px;
+    padding: 0 7px;
+    font: 500 11px var(--font-ui);
+    color: var(--label);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+}
+:where(.ui-choice):hover:not(:disabled) {
+    color: var(--ink);
+}
+:where(.ui-choice[aria-checked='true']) {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+:where(.ui-choice):disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+:where(.ui-segment) {
+    position: relative;
+    display: flex;
+    cursor: pointer;
+}
+:where(.ui-segment input) {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+:where(.ui-segment span) {
+    display: flex;
+    align-items: center;
+    block-size: 26px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-weight: 500;
+    text-transform: capitalize;
+    color: var(--label);
+}
+:where(.ui-segment input:checked + span) {
+    color: var(--ink);
+    background: var(--panel);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+}
+:where(.ui-segment input:focus-visible + span) {
+    outline: 2px solid var(--highlight);
+    outline-offset: 1px;
+}
+:where(.ui-segment:has(input:disabled)) {
+    opacity: 0.4;
+    cursor: default;
+}
+:where(.ui-range) {
+    appearance: none;
+    inline-size: 88px;
+    block-size: 16px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+:where(.ui-range)::-webkit-slider-runnable-track {
+    block-size: 4px;
+    background: var(--edge);
+    border-radius: 2px;
+}
+:where(.ui-range)::-moz-range-track {
+    block-size: 4px;
+    background: var(--edge);
+    border-radius: 2px;
+}
+:where(.ui-range)::-moz-range-progress {
+    block-size: 4px;
+    background: var(--ink);
+    border-radius: 2px;
+}
+:where(.ui-range)::-webkit-slider-thumb {
+    appearance: none;
+    inline-size: 14px;
+    block-size: 14px;
+    margin-block-start: -5px;
+    background: var(--panel);
+    border: none;
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 1.5px var(--ink),
+        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+}
+:where(.ui-range)::-moz-range-thumb {
+    inline-size: 14px;
+    block-size: 14px;
+    background: var(--panel);
+    border: none;
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 1.5px var(--ink),
+        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+}
+:where(.ui-range):disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+:where(.ui-range[data-variant='precision']) {
+    block-size: 11px;
+}
+:where(.ui-range[data-variant='precision'])::-webkit-slider-runnable-track {
+    block-size: 1px;
+    background: var(--rule);
+}
+:where(.ui-range[data-variant='precision'])::-moz-range-track {
+    block-size: 1px;
+    background: var(--rule);
+}
+:where(.ui-range[data-variant='precision'])::-webkit-slider-thumb {
+    inline-size: 9px;
+    block-size: 9px;
+    margin-block-start: -4px;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    box-shadow: none;
+}
+:where(.ui-range[data-variant='precision'])::-moz-range-thumb {
+    inline-size: 7px;
+    block-size: 7px;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    box-shadow: none;
+}
+:where(.ui-colour) {
+    appearance: none;
+    box-sizing: border-box;
+    inline-size: 18px;
+    block-size: 18px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+:where(.ui-colour)::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+:where(.ui-colour)::-webkit-color-swatch {
+    border: 1px solid var(--edge);
+    border-radius: 50%;
+}
+:where(.ui-colour)::-moz-color-swatch {
+    border: 1px solid var(--edge);
+    border-radius: 50%;
+}
+:where(.ui-colour[data-variant='rect']) {
+    inline-size: 100%;
+    block-size: 12px;
+    border: 1px solid var(--edge);
+}
+:where(.ui-colour[data-variant='rect'])::-webkit-color-swatch {
+    border: none;
+    border-radius: 0;
+}
+:where(.ui-colour[data-variant='rect'])::-moz-color-swatch {
+    border: none;
+    border-radius: 0;
+}
+:where(.ui-listen) {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    block-size: 30px;
+    padding: 0 10px 0 8px;
+    font-weight: 500;
+    color: var(--label);
+    background: var(--well);
+    border: none;
+    border-radius: 9px;
+}
+:where(.ui-listen):hover:not(:disabled) {
+    color: var(--ink);
+}
+:where(.ui-listen[aria-pressed='true']) {
+    color: var(--panel);
+    background: var(--accent);
+}
+:where(.ui-listen .speaker) {
+    fill: currentColor;
+}
+:where(.ui-listen[aria-pressed='true'] .off, .ui-listen[aria-pressed='false'] .on) {
+    display: none;
+}
+:where(.ui-badge) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-inline-size: 100%;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    overflow-wrap: anywhere;
+    text-align: start;
+}
+:where(button.ui-badge):hover {
+    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+}
+:where(.ui-empty) {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+:where(.ui-hint) {
+    margin: 0;
+    color: var(--muted);
+}
+:where([hidden]) {
+    display: none !important;
+}
+
+:where(.ui-symmetry-icon) {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 7;
+    stroke-linecap: round;
+}
+:where(.ui-symmetry-icon .rim) {
+    stroke-width: 5;
+    opacity: 0.35;
+}
+:where(.ui-symmetry-icon circle:not(.rim)) {
+    fill: currentColor;
+    stroke: none;
+}
+
+:where(.ui-colour:disabled, .ui-listen:disabled, button.ui-badge:disabled) {
+    opacity: 0.4;
+    cursor: default;
+}

@@ -143,37 +143,8 @@
     color: var(--ink);
 }
 
-.layouts {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: var(--well);
-    border-radius: 9px;
-}
-
 .layouts button {
     block-size: 22px;
     padding: 0 8px;
-    font: 500 11px var(--font-ui);
     text-transform: capitalize;
-    color: var(--label);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-}
-
-.layouts button:hover {
-    color: var(--ink);
-}
-
-.layouts button[aria-checked='true'] {
-    color: var(--ink);
-    background: var(--panel);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
-}
-
-.layouts button:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
 }

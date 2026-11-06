@@ -17,13 +17,9 @@
 
 .pick {
     flex: 1;
-    min-inline-size: 0;
     padding: 4px 8px;
     font: 500 12px var(--font-ui);
-    color: var(--ink);
-    background: var(--well);
     border: none;
-    border-radius: 8px;
 }
 
 .new,
@@ -67,10 +63,6 @@
     min-block-size: 0;
     margin: 0;
     padding: 10px 12px;
-    font: inherit;
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
     border-radius: 10px;
     resize: none;
 }
@@ -91,7 +83,6 @@
     gap: 8px;
     align-items: center;
     justify-content: center;
-    color: var(--muted);
 }
 
 .empty p {

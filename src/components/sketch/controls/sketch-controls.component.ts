@@ -1,3 +1,6 @@
+import { Icon } from '../../../shared/ui/icon.component.ts';
+import { ICONS } from '../../../shared/ui/icons.ts';
+import { controlsSheet } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { renderOptions, type SelectChoice } from '../../../shared/select/options.component.ts';
@@ -45,11 +48,6 @@ const DRIVEN_FIELDS = [
     ['trails', 'trails'],
 ] as const;
 
-const RESET_ICON = () =>
-    html`<svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 12 a8 8 0 1 0 2.4 -5.7 M4 4 V8.5 H8.5"></path>
-    </svg>`;
-
 const slider = (
     key: string,
     label: string,
@@ -63,7 +61,7 @@ const slider = (
     html`<label class="row" data-only=${ifDefined(only ?? undefined)} title=${ifDefined(hint)}
         ><span class="key">${label}</span
         ><input
-            class="dial"
+            class="ui-range dial"
             data-field=${ifDefined(key)}
             type="range"
             min=${ifDefined(min)}
@@ -77,7 +75,7 @@ const knobRow = (knob: Knob) =>
         <label class="row"
             ><span class="key" data-label=${ifDefined(knob)}>${knob}</span
             ><input
-                class="dial"
+                class="ui-range dial"
                 data-field=${ifDefined(knob)}
                 type="range"
                 min="0"
@@ -92,7 +90,7 @@ const knobRow = (knob: Knob) =>
             title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand"
             >follows</span
         ><hks-select
-            class="pick motion"
+            class="ui-field pick motion"
             data-cycles=${ifDefined(knob)}
             aria-label=${ifDefined(`${knob} motion`)}
             title="let it swing from 0 to its value and back, a whole number of times per loop"
@@ -108,10 +106,10 @@ const knobRow = (knob: Knob) =>
 const segments = (name: string, label: string, values: readonly string[], hint: string) =>
     html`<div class="row" title=${ifDefined(hint)}>
         <span class="key">${label}</span>
-        <div class="segments" role="radiogroup" aria-label=${ifDefined(label)}>
+        <div class="ui-choices segments" role="radiogroup" aria-label=${ifDefined(label)}>
             ${values.map(
                 value =>
-                    html`<label class="segment"
+                    html`<label class="ui-segment segment"
                         ><input type="radio" name=${ifDefined(name)} .value=${value} /><span
                             >${value}</span
                         ></label
@@ -123,7 +121,10 @@ const segments = (name: string, label: string, values: readonly string[], hint: 
 const option = (key: string, label: string, values: readonly string[], hint: string) =>
     html`<label class="row" title=${ifDefined(hint)}
         ><span class="key">${label}</span
-        ><hks-select class="pick" data-pick=${ifDefined(key)} aria-label=${ifDefined(label)}
+        ><hks-select
+            class="ui-field pick"
+            data-pick=${ifDefined(key)}
+            aria-label=${ifDefined(label)}
             >${values.map(value => html`<option .value=${value}>${value}</option>`)}</hks-select
         ></label
     >`;
@@ -131,14 +132,14 @@ const option = (key: string, label: string, values: readonly string[], hint: str
 const flag = (key: string, label: string, hint: string) =>
     html`<label class="row" title=${ifDefined(hint)}
         ><span class="key">${label}</span
-        ><input class="switch" data-flag=${ifDefined(key)} type="checkbox"
+        ><input class="ui-check switch" data-flag=${ifDefined(key)} type="checkbox"
     /></label>`;
 
 const choice = (key: string, label: string) =>
     html`<label class="item"
         ><span class="key">${label}</span
         ><hks-select
-            class="pick"
+            class="ui-field pick"
             data-pick=${ifDefined(key)}
             aria-label=${ifDefined(label)}
         ></hks-select
@@ -146,14 +147,14 @@ const choice = (key: string, label: string) =>
 
 const reset = (group: Group, what: string) =>
     html`<button
-        class="reset"
+        class="ui-button reset"
         type="button"
         data-reset=${ifDefined(group)}
         title=${ifDefined(`reset ${what}`)}
         aria-label=${ifDefined(`reset ${what}`)}
         disabled
     >
-        ${RESET_ICON()}
+        ${Icon(ICONS.reset)}
     </button>`;
 
 const group = (name: Group, title: string, rows: unknown) =>
@@ -168,7 +169,7 @@ const group = (name: Group, title: string, rows: unknown) =>
 const tabs = () =>
     TABS.map(
         tab =>
-            html`<label class="segment"
+            html`<label class="ui-segment segment"
                 ><input
                     type="radio"
                     name="tab"
@@ -189,8 +190,13 @@ const TEMPLATE = () =>
             <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
                 <header class="group-head">
                     <h3>Parameters</h3>
-                    <button class="reset labelled" type="button" data-reset="parameters" disabled>
-                        ${RESET_ICON()}<span>reset parameters</span>
+                    <button
+                        class="ui-button reset labelled"
+                        type="button"
+                        data-reset="parameters"
+                        disabled
+                    >
+                        ${Icon(ICONS.reset)}<span>reset parameters</span>
                     </button>
                 </header>
                 <div class="knobs">${KNOBS.map(knobRow)}</div>
@@ -275,12 +281,12 @@ const TEMPLATE = () =>
                         <div class="row">
                             <span class="key">view</span
                             ><button
-                                class="view"
+                                class="ui-button view"
                                 type="button"
                                 title="undo your own turning and zooming of the camera"
                                 disabled
                             >
-                                ${RESET_ICON()}<span>reset view</span>
+                                ${Icon(ICONS.reset)}<span>reset view</span>
                             </button>
                         </div>`,
                 )}
@@ -317,7 +323,7 @@ export class HksSketchControls extends HTMLElement {
         super();
 
         this.shadow = this.attachShadow({ mode: 'open' });
-        this.shadow.adoptedStyleSheets = [sheet];
+        this.shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(this.shadow, () => TEMPLATE());
 
         this.themeOptions = renderOptions(this.pick('theme'));

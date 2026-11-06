@@ -1,3 +1,6 @@
+import { Icon } from '../../shared/ui/icon.component.ts';
+import { ICONS } from '../../shared/ui/icons.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { ref } from 'lit-html/directives/ref.js';
@@ -46,13 +49,6 @@ import css from './tickets.css?inline';
 
 const sheet = styleSheet(css);
 
-const PLUS = () =>
-    html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>`;
-const TRASH = () =>
-    html`<svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"></path>
-    </svg>`;
-
 const PRIORITY_LABELS: Readonly<Record<(typeof PRIORITIES)[number], string>> = {
     none: 'No priority',
     low: 'Low',
@@ -93,7 +89,7 @@ const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | und
         ></button
         ><input
             type="checkbox"
-            class="check"
+            class="ui-check check"
             data-toggle=${ifDefined(props.ticket.id)}
             .checked=${props.facts?.done === true}
             aria-label=${ifDefined(`${props.ticket.title} done`)}
@@ -105,7 +101,7 @@ const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | und
         >
             #${props.ticket.number}</button
         ><textarea
-            class="text"
+            class="ui-field text"
             data-edit=${ifDefined(props.ticket.id)}
             rows="1"
             aria-label="ticket title"
@@ -130,7 +126,7 @@ const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | und
                 tag =>
                     html`<button
                         type="button"
-                        class="tag"
+                        class="ui-badge tag"
                         data-filter-tag=${ifDefined(tag)}
                         aria-label=${ifDefined(`filter by tag ${tag}`)}
                     >
@@ -152,52 +148,50 @@ const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | und
 const TEMPLATE = (view: TicketRender) =>
     html`<div class="frame">
         <header class="bar">
-            <div class="views" role="radiogroup" aria-label="view">
-                <label class="view"
+            <div class="ui-choices views" role="radiogroup" aria-label="view">
+                <label class="ui-segment view"
                     ><input
                         type="radio"
                         name="view"
                         value="list"
                         .checked=${view.mode === 'list'}
-                    />${' '}List</label
-                ><label class="view"
+                    /><span>List</span></label
+                ><label class="ui-segment view"
                     ><input
                         type="radio"
                         name="view"
                         value="board"
                         .checked=${view.mode === 'board'}
-                    />${' '}Board</label
+                    /><span>Board</span></label
                 >
             </div>
             <div class="bar-actions">
                 <button
-                    class="add-status icon-action"
+                    class="ui-icon add-status icon-action"
                     type="button"
                     aria-label="add status"
                     title="Add a status before Done"
                 >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M3 5h11v14H3zM8.5 5v14M19 9v10M14 14h10"></path>
-                    </svg></button
+                    ${Icon('M3 5h11v14H3zM8.5 5v14M19 9v10M14 14h10')}</button
                 ><button
-                    class="new-ticket icon-action"
+                    class="ui-icon new-ticket icon-action"
                     type="button"
                     data-create=""
                     aria-label="new ticket"
                     title="New ticket"
                 >
-                    ${PLUS()}
+                    ${Icon(ICONS.add)}
                 </button>
             </div>
         </header>
         <input
-            class="ticket-search"
+            class="ui-field ticket-search"
             type="search"
             aria-label="search tickets"
             placeholder="Search tickets by title, #number, or tag"
         /><label class="tag-filter"
             >Tags${' '}<hks-select
-                class="filter-tags"
+                class="ui-field filter-tags"
                 aria-label="filter by tag"
                 .value=${view.screen?.filter ?? ''}
                 ><option value="">All tags</option>
@@ -231,7 +225,7 @@ const TEMPLATE = (view: TicketRender) =>
                                             title="drag, or focus and press the arrow keys, to move the status"
                                         ></button
                                         ><input
-                                            class="title"
+                                            class="ui-field title"
                                             data-title=${ifDefined(id)}
                                             autocomplete="off"
                                             aria-label="status name"
@@ -241,7 +235,7 @@ const TEMPLATE = (view: TicketRender) =>
                                                 }
                                             })}
                                         /><hks-select
-                                            class="stage"
+                                            class="ui-field stage"
                                             data-stage=${ifDefined(id)}
                                             aria-label="what this status means"
                                             .value=${status.stage}
@@ -288,12 +282,12 @@ const TEMPLATE = (view: TicketRender) =>
                                     <div class="add-here">
                                         <button
                                             type="button"
-                                            class="new-ticket icon-action"
+                                            class="ui-icon new-ticket icon-action"
                                             data-create=${ifDefined(id)}
                                             aria-label="new ticket with details in this status"
                                             title="New ticket in this status"
                                         >
-                                            ${PLUS()}
+                                            ${Icon(ICONS.add)}
                                         </button>
                                     </div>
                                 </section>`,
@@ -305,14 +299,12 @@ const TEMPLATE = (view: TicketRender) =>
             <span class="left">${view.left}</span
             ><button
                 ?hidden=${view.screen?.filter != null || (view.screen?.query.trim() ?? '') !== ''}
-                class="clear-done icon-action"
+                class="ui-icon clear-done icon-action"
                 type="button"
                 aria-label="clear completed tickets"
                 title="Clear completed tickets"
             >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m4 7 3 3 6-6M15 7h5M4 14h16M4 19h11"></path>
-                </svg>
+                ${Icon('m4 7 3 3 6-6M15 7h5M4 14h16M4 19h11')}
             </button>
         </footer>
         <aside
@@ -323,10 +315,12 @@ const TEMPLATE = (view: TicketRender) =>
         >
             <header class="detail-head">
                 <span class="detail-number">#${view.selected?.number}</span
-                ><button class="close-detail" type="button" aria-label="close ticket">×</button>
+                ><button class="ui-icon close-detail" type="button" aria-label="close ticket">
+                    ×
+                </button>
             </header>
             <input
-                class="detail-title"
+                class="ui-field detail-title"
                 ${ref(element => {
                     if (element instanceof HTMLInputElement) {
                         displayValue(element, view.selected?.title ?? '');
@@ -337,7 +331,9 @@ const TEMPLATE = (view: TicketRender) =>
             />
             <div class="fields">
                 <label
-                    >Status${' '}<hks-select class="detail-status" .value=${selectedStatus(view)}
+                    >Status${' '}<hks-select
+                        class="ui-field detail-status"
+                        .value=${selectedStatus(view)}
                         >${repeat(
                             view.screen?.tickets.statuses.map(status => status.id) ?? [],
                             item => item,
@@ -353,7 +349,7 @@ const TEMPLATE = (view: TicketRender) =>
                     ></label
                 ><label
                     >Priority${' '}<hks-select
-                        class="detail-priority"
+                        class="ui-field detail-priority"
                         .value=${view.selected?.priority ?? 'none'}
                         >${PRIORITIES.map(
                             priority =>
@@ -372,10 +368,10 @@ const TEMPLATE = (view: TicketRender) =>
                         view.selected?.tags ?? [],
                         item => item,
                         tag =>
-                            html`<li class="tag">
+                            html`<li class="ui-badge tag">
                                 ${tag}<button
                                     type="button"
-                                    class="remove-tag"
+                                    class="ui-icon remove-tag"
                                     data-untag=${ifDefined(tag)}
                                     aria-label=${ifDefined(`remove tag ${tag}`)}
                                 >
@@ -387,7 +383,7 @@ const TEMPLATE = (view: TicketRender) =>
                 <form class="add-tag">
                     <hks-select
                         editable=""
-                        class="tag-draft"
+                        class="ui-field tag-draft"
                         placeholder="Add tags, separated by commas"
                         aria-label="new tags"
                         >${repeat(
@@ -396,12 +392,12 @@ const TEMPLATE = (view: TicketRender) =>
                             tag => html`<option .value=${tag}>${tag}</option>`,
                         )}</hks-select
                     ><button
-                        class="submit-tag icon-action"
+                        class="ui-icon submit-tag icon-action"
                         type="submit"
                         aria-label="add tags"
                         title="Add tags"
                     >
-                        ${PLUS()}
+                        ${Icon(ICONS.add)}
                     </button>
                 </form>
             </section>
@@ -427,7 +423,7 @@ const TEMPLATE = (view: TicketRender) =>
                                             ${labelOf(blocker)}</button
                                         ><button
                                             type="button"
-                                            class="unblock"
+                                            class="ui-icon unblock"
                                             data-unblock=${ifDefined(id)}
                                             aria-label=${ifDefined(`no longer blocked by #${blocker.number}`)}
                                         >
@@ -443,13 +439,13 @@ const TEMPLATE = (view: TicketRender) =>
                 <div class="group-head">
                     <h3>Sub-tickets</h3>
                     <button
-                        class="new-ticket new-child icon-action"
+                        class="ui-icon new-ticket new-child icon-action"
                         type="button"
                         data-create=""
                         aria-label="new sub-ticket"
                         title="New sub-ticket"
                     >
-                        ${PLUS()}
+                        ${Icon(ICONS.add)}
                     </button>
                 </div>
                 <ul class="child-list">
@@ -479,7 +475,7 @@ const TEMPLATE = (view: TicketRender) =>
                 </ul>
             </section>
             <textarea
-                class="detail-description"
+                class="ui-field detail-description"
                 ${ref(element => {
                     if (element instanceof HTMLTextAreaElement) {
                         displayValue(element, view.selected?.description ?? '');
@@ -490,12 +486,12 @@ const TEMPLATE = (view: TicketRender) =>
                 aria-label="description"
             ></textarea
             ><button
-                class="delete-ticket icon-action"
+                class="ui-icon delete-ticket icon-action"
                 type="button"
                 aria-label="delete ticket"
                 title="Delete ticket"
             >
-                ${TRASH()}
+                ${Icon(ICONS.remove)}
             </button>
         </aside>
         <slot name="creator"></slot>
@@ -587,7 +583,7 @@ export class HksTickets extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<TicketRender>(
             shadow,
             {

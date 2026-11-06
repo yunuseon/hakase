@@ -1,3 +1,6 @@
+import { ListenIcon } from '../../shared/ui/icon.component.ts';
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -39,52 +42,58 @@ import css from './drums.css?inline';
 
 const sheet = styleSheet(css);
 
-const SPEAKER = 'M4 9 H8 L13 5 V19 L8 15 H4 Z';
-const SOUNDING = 'M16 9 Q18 12 16 15 M18.5 6.5 Q22 12 18.5 17.5';
-const SILENT = 'M17 9.5 L22 14.5 M22 9.5 L17 14.5';
-
 const TEMPLATE = () =>
     html`<div class="bar">
             <button
-                class="listen"
+                class="ui-listen listen"
                 type="button"
                 aria-pressed="false"
                 title="Listen: the drums play while their clock does"
             >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path class="speaker" d=${ifDefined(SPEAKER)}></path>
-                    <path class="on" d=${ifDefined(SOUNDING)}></path>
-                    <path class="off" d=${ifDefined(SILENT)}></path></svg
-                ><span>Listen</span>
+                ${ListenIcon()}<span>Listen</span>
             </button>
-            <div class="presets" aria-label="patterns">
+            <div class="ui-choices presets" aria-label="patterns">
                 ${PRESET_NAMES.map(
                     preset =>
-                        html`<button type="button" data-preset=${ifDefined(preset)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            data-preset=${ifDefined(preset)}
+                        >
                             ${preset}
                         </button>`,
-                )}<button type="button" data-clear>clear</button>
+                )}<button class="ui-choice" type="button" data-clear>clear</button>
             </div>
         </div>
         <div class="grid" role="grid" aria-label="pattern"></div>
         <div class="settings">
-            <div class="steps" role="radiogroup" aria-label="steps">
+            <div class="ui-choices steps" role="radiogroup" aria-label="steps">
                 ${STEP_COUNTS.map(
                     steps =>
-                        html`<button type="button" role="radio" data-steps=${ifDefined(steps)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-steps=${ifDefined(steps)}
+                        >
                             ${steps}
                         </button>`,
                 )}
             </div>
             <div
-                class="repeats"
+                class="ui-choices repeats"
                 role="radiogroup"
                 aria-label="times per loop"
                 title="how many times the pattern plays per loop"
             >
                 ${REPEATS.map(
                     repeat =>
-                        html`<button type="button" role="radio" data-repeat=${ifDefined(repeat)}>
+                        html`<button
+                            class="ui-choice"
+                            type="button"
+                            role="radio"
+                            data-repeat=${ifDefined(repeat)}
+                        >
                             ×${repeat}
                         </button>`,
                 )}
@@ -92,6 +101,7 @@ const TEMPLATE = () =>
             <label class="dial" title="holds back every second step, for a shuffle"
                 ><span>swing</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-dial="swing"
                     min="0"
@@ -100,6 +110,7 @@ const TEMPLATE = () =>
             ><label class="dial" title="how loud; a volume signal swells it"
                 ><span>volume</span
                 ><input
+                    class="ui-range"
                     type="range"
                     data-dial="volume"
                     min="0"
@@ -140,7 +151,7 @@ export class HksDrums extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.gridView = renderView(requireChild(shadow, '.grid'), 0, steps =>
             repeat(
@@ -342,6 +353,7 @@ export class HksDrums extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
+            connectChoices$(this.shadow),
             this.gridView.lifetime$,
             merge(built$, marked$, now$, listened$).pipe(map(() => undefined)),
         );

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -38,9 +39,9 @@ const NEW_LENGTH = 60;
 
 const TEMPLATE = () =>
     html`<header class="bar">
-            <button class="prev" type="button" aria-label="previous day">‹</button
-            ><button class="today" type="button">Today</button
-            ><button class="next" type="button" aria-label="next day">›</button
+            <button class="ui-icon prev" type="button" aria-label="previous day">‹</button
+            ><button class="ui-button today" type="button">Today</button
+            ><button class="ui-icon next" type="button" aria-label="next day">›</button
             ><span class="date"></span>
         </header>
         <div class="scroll">
@@ -111,7 +112,7 @@ export class HksAgenda extends HTMLElement {
 
         const shadow = this.attachShadow({ mode: 'open' });
         this.shadow = shadow;
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
         this.blockView = renderView<readonly Placed[]>(
             requireChild(shadow, '.blocks'),
@@ -140,7 +141,7 @@ export class HksAgenda extends HTMLElement {
                                     <span class="time"
                                         >${`${timeOf(block.start)}–${timeOf(block.end)}`}</span
                                     ><input
-                                        class="title"
+                                        class="ui-field title"
                                         data-title=${ifDefined(id)}
                                         aria-label="block title"
                                         placeholder="Untitled"

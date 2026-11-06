@@ -1,3 +1,6 @@
+import { ICONS } from '../../shared/ui/icons.ts';
+import { Icon } from '../../shared/ui/icon.component.ts';
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -29,7 +32,7 @@ export class HksSearchPicker extends HTMLElement {
     constructor() {
         super();
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<PickerRender>(
             shadow,
             {
@@ -48,22 +51,21 @@ export class HksSearchPicker extends HTMLElement {
                         <div class="panel">
                             <div class="search">
                                 <input
+                                    class="ui-field"
                                     type="search"
                                     aria-label=${ifDefined(`search ${state.view.title.toLowerCase()}`)}
                                     .value=${state.query}
                                     placeholder="Search…"
                                     autocomplete="off"
                                 /><button
-                                    class="clear"
+                                    class="ui-icon clear"
                                     type="button"
                                     data-pick=""
                                     aria-label="clear selection"
                                     title="Clear selection"
                                     ?hidden=${state.view.selected.length === 0 || state.view.multiple}
                                 >
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="m6 6 12 12M18 6 6 18"></path>
-                                    </svg>
+                                    ${Icon(ICONS.close)}
                                 </button>
                             </div>
                             <div class="results">
