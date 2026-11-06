@@ -1,5 +1,15 @@
 import { merge, of } from 'rxjs';
-import { map, scan, share, shareReplay, startWith, tap } from 'rxjs/operators';
+import {
+    filter,
+    map,
+    scan,
+    share,
+    shareReplay,
+    startWith,
+    switchMap,
+    take,
+    tap,
+} from 'rxjs/operators';
 import { HksCanvas } from '../components/canvas/canvas.component.ts';
 import { HksWindow } from '../components/window/window.component.ts';
 import { moved, resized, type Frame } from '../components/window/frame.ts';
@@ -117,7 +127,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Workspace chrome',
         group: 'Workspace',
         description:
-            'The real canvas, window frame, section outline, attachment seam, toolbar and navigator. Drag and resize the sample window; all actions stay here.',
+            'The real canvas, window frame, section outline, attachment seam, toolbar and navigator. Windows fade and rise on mount, then fade downward on close, respecting reduced motion. Close the sample window to preview its exit; reset to replay its entrance. All actions stay here.',
         elements: [
             'hks-canvas',
             'hks-window',
@@ -181,6 +191,12 @@ export const chromeStories: readonly Story[] = [
             return {
                 element,
                 run$: merge(
+                    gestures$.pipe(
+                        filter(event => event.kind === 'quit'),
+                        take(1),
+                        switchMap(() => window.disappear$()),
+                        tap(() => window.remove()),
+                    ),
                     element.connect$(camera$, of(new Map()), of(variant === 'state')),
                     window.connect$(
                         frame$.pipe(map(frame => ({ kind: 'floating', frame, focused: true }))),

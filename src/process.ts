@@ -1,4 +1,4 @@
-import { defer, merge, type Observable } from 'rxjs';
+import { defer, EMPTY, merge, type Observable } from 'rxjs';
 import {
     filter,
     finalize,
@@ -8,6 +8,9 @@ import {
     startWith,
     distinctUntilChanged,
     shareReplay,
+    take,
+    takeUntil,
+    switchMap,
 } from 'rxjs/operators';
 import type {
     FollowGroup,
@@ -46,12 +49,14 @@ export const liveProcess$ = (
     programs$: Observable<readonly SwitchGroup[]>,
     follows$: Observable<readonly FollowGroup[] | null>,
     manage$: Observable<boolean>,
+    closing$: Observable<unknown> = EMPTY,
 ): Observable<ProcessSignal> =>
     defer(() => {
         const view = program.launch();
         const element = new HksWindow().label(program.title, program.icon);
         element.append(view.element);
         host.append(element);
+        const removed$ = closing$.pipe(take(1), shareReplay({ bufferSize: 1, refCount: true }));
 
         const menu$ = merge(manage$, element.menus$).pipe(
             startWith(false),
@@ -67,7 +72,7 @@ export const liveProcess$ = (
             map(({ frame, focused }): WindowView => ({ kind: 'floating', frame, focused })),
         );
 
-        return merge(
+        const signals$ = merge(
             element.gestures$.pipe(
                 withLatestFrom(self.store$, self.clock$),
                 map(([gesture, store, clock]): ProcessSignal => {
@@ -104,8 +109,22 @@ export const liveProcess$ = (
                     input,
                 })),
             ),
+        ).pipe(
+            withLatestFrom(
+                removed$.pipe(
+                    map(() => true),
+                    startWith(false),
+                ),
+            ),
+            filter(([, removed]) => !removed),
+            map(([signal]) => signal),
+        );
+
+        return merge(
+            signals$,
             element.connect$(view$, stores$, programs$, follows$, menu$).pipe(ignoreElements()),
         ).pipe(
+            takeUntil(removed$.pipe(switchMap(() => element.disappear$()))),
             finalize(() => {
                 element.remove();
             }),

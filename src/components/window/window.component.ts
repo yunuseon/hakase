@@ -14,7 +14,7 @@ import {
     type RenderView,
     type Rendering,
 } from '../../lib/lit.ts';
-import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
+import { combineLatest, defer, EMPTY, merge, of, race, timer, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -26,6 +26,7 @@ import {
     startWith,
     switchMap,
     take,
+    finalize,
     tap,
 } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
@@ -655,6 +656,36 @@ export class HksWindow extends HTMLElement {
         this.glyphView.update(icon);
 
         return this;
+    }
+
+    // The owner keeps the window mounted until this completes, then tears it down.
+    disappear$(): Observable<void> {
+        return defer(() => {
+            this.inert = true;
+            this.toggleAttribute('data-closing', true);
+
+            return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? of(undefined)
+                : race(
+                      fromElementEvent$(this, 'animationend').pipe(
+                          filter(
+                              event =>
+                                  event.target === this &&
+                                  event.animationName === 'program-disappear',
+                          ),
+                      ),
+                      // A detached/hidden surface may never dispatch animationend.
+                      timer(200),
+                  ).pipe(
+                      take(1),
+                      map(() => undefined),
+                  );
+        }).pipe(
+            finalize(() => {
+                this.inert = false;
+                this.removeAttribute('data-closing');
+            }),
+        );
     }
 
     connect$(

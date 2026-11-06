@@ -690,7 +690,8 @@ const bootstrap = () => {
                                   : EMPTY,
                           ),
                       ),
-                  ).pipe(takeUntil(ids$.pipe(filter(ids => !ids.includes(process.id)))));
+                      ids$.pipe(filter(ids => !ids.includes(process.id))),
+                  );
         }),
         share(),
     );
