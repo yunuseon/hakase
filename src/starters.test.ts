@@ -6,6 +6,7 @@ import { emptyLibrary } from './library.ts';
 import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
 import { blueprintIn, STARTERS } from './starters.ts';
 import { defaultWorkspace } from './workspace.ts';
+import { notesOf, soundingOf } from './components/voice/voice.ts';
 
 const tickets = parseTickets({ items: [{ id: 'todo-1', text: 'Mine', done: false }], made: 1 });
 
@@ -131,5 +132,31 @@ describe('starter blueprints', () => {
         expect(blueprintIn(blueprints, 'starter-today')?.name).toBe('Today');
         expect(blueprintIn(blueprints, 'blueprint-3')?.name).toBe('Mine');
         expect(blueprintIn(blueprints, 'nope')).toBeUndefined();
+    });
+
+    it('plays the Canon: the ground, its arpeggio, and two violins a turn apart', () => {
+        const { held } = starter('starter-canon');
+        const signals = new Map(held.signals);
+        const voices = new Map(held.voices);
+        const played = (id: string) => {
+            const voice = voices.get(id);
+
+            return voice === undefined
+                ? []
+                : notesOf(soundingOf(voice, signals)).map(
+                      ({ semitones }) => voice.root + semitones,
+                  );
+        };
+        const ground = [50, 45, 47, 42, 43, 38, 43, 45];
+        const line = [78, 76, 74, 73, 71, 69, 71, 73, 74, 73, 71, 69, 67, 66, 67, 64];
+
+        expect(played('bass')).toEqual([...ground, ...ground]);
+        expect(played('violin-1')).toEqual(line);
+        expect(played('violin-2')).toEqual(
+            [...line.slice(8), ...line.slice(0, 8)].map(n => n - 12),
+        );
+        expect(played('harp')).toEqual(
+            [...ground, ...ground].flatMap(root => [0, 7, 12, 7].map(n => root + 12 + n)),
+        );
     });
 });
