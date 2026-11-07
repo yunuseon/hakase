@@ -37,7 +37,7 @@ Linux. If you add a top-level file the build needs, add it to the mount list in
 
 ### With a local Node
 
-Requires Node **20.19+** (or 22+). The repo ships an `.nvmrc`:
+The repo uses Node **24 LTS**, selected by `.nvmrc`:
 
 ```bash
 nvm use && npm install && npm run dev

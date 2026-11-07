@@ -2768,7 +2768,7 @@ to the preview stage; they never change the app's selected look.
 
 ## Tooling
 
-- Node **20.19+**. Do not assume the host has it — `nvm use` reads `.nvmrc`, and
+- Node **24 LTS**. Do not assume the host has it — `nvm use` reads `.nvmrc`, and
   Docker is the fallback that needs no local Node at all.
 - `docker compose up dev --build` for the dev server; `npm run docker:build`
   exports `dist/` via a BuildKit `--output` stage.

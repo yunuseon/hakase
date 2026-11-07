@@ -2,7 +2,7 @@
 
 # Debian slim rather than Alpine: Vite 8 pulls in Rolldown, whose native binaries
 # are far better tested against glibc than musl.
-ARG NODE_VERSION=22-bookworm-slim
+ARG NODE_VERSION=24-bookworm-slim
 
 # --- base -------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS base
@@ -38,6 +38,6 @@ COPY --from=build /app/dist /
 
 # --- runtime ----------------------------------------------------------------
 # Static output only; nothing from Node ends up in the served image.
-FROM nginx:1.29-alpine AS runtime
+FROM nginx:1.30.6-alpine AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
