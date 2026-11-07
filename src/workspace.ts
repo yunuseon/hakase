@@ -143,6 +143,7 @@ export type WorkspaceAction =
       }
     | { readonly kind: 'remove-section'; readonly id: string }
     | { readonly kind: 'close-others'; readonly keep: ProcessId }
+    | { readonly kind: 'close-selection'; readonly ids: readonly ProcessId[] }
     // What signals follow, so a store that only feeds another signal survives the prune.
     | { readonly kind: 'prune-stores'; readonly followed: ReadonlyMap<StoreId, Linked> }
     // Back (negative) or forward through the history by that many steps.
@@ -951,6 +952,14 @@ const step = (
                 ...workspace,
                 processes: workspace.processes.filter(({ id }) => id === action.keep),
             };
+        case 'close-selection': {
+            const ids = new Set(action.ids);
+            const processes = workspace.processes.filter(({ id }) => !ids.has(id));
+
+            return processes.length === workspace.processes.length
+                ? workspace
+                : { ...workspace, processes };
+        }
         case 'toggle-link':
             return { ...workspace, links: toggledLink(workspace, action.a, action.b) };
         case 'measure':
@@ -1459,6 +1468,7 @@ export const stepOf = (action: WorkspaceAction): Step | null => {
         case 'launch':
         case 'quit':
         case 'close-others':
+        case 'close-selection':
         case 'toggle-link':
         case 'bind-store':
         case 'add-store':
@@ -1496,6 +1506,8 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
             return `Closed ${programOf(before, action.id)}`;
         case 'close-others':
             return 'Closed all other windows';
+        case 'close-selection':
+            return 'Deleted selected programs';
         case 'toggle-link':
             return before.links.some(link => sameLink(link, action.a, action.b))
                 ? 'Detached windows'

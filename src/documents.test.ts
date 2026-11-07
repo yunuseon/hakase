@@ -59,6 +59,25 @@ const launch = (program: 'bookmarks' | 'sketch' | 'tickets') =>
 const labels = (history: History) => entriesOf(history).map(({ label }) => label);
 
 describe('one log for every document', () => {
+    it('deletes only selected programs and restores them in one undo step', () => {
+        const start = run(fresh(), [launch('tickets'), launch('bookmarks')]);
+        const { processes, stores } = start.present.workspace;
+        const ids = processes.slice(-2).map(({ id }) => id);
+        const deletion = act({ kind: 'close-selection', ids: [...ids, 'already-closed'] });
+        const removed = reduce(start, deletion);
+
+        expect(removed.present.workspace.processes).toEqual(processes.slice(0, -2));
+        expect(removed.present.workspace.stores).toEqual(stores);
+        expect(removed.steps).toHaveLength(start.steps.length + 1);
+        expect(reduce(removed, deletion)).toBe(removed);
+
+        const restored = reduce(removed, act({ kind: 'undo' }));
+        expect(restored.present.workspace.processes).toEqual(processes);
+        expect(reduce(restored, act({ kind: 'redo' })).present.workspace.processes).toEqual(
+            processes.slice(0, -2),
+        );
+    });
+
     it('makes one drag one step, and two drags two, split by the raise that starts each', () => {
         const start = fresh();
         const before = frameOf(start, 'sketch-2');

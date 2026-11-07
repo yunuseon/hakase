@@ -468,6 +468,11 @@ const bootstrap = () => {
         canvas.gestures$,
         merge(canvas.edits$, navigator.edits$).pipe(map((kind): WorkspaceAction => ({ kind }))),
         toolbarActions$,
+        selectionCommands$.pipe(
+            filter(command => command === 'delete'),
+            withLatestFrom(selectedIds$),
+            map(([, ids]): WorkspaceAction => ({ kind: 'close-selection', ids })),
+        ),
         defer(() => signals$).pipe(
             mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
             withLatestFrom(selectedIds$),

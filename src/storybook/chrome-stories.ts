@@ -387,7 +387,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Program selection',
         group: 'Workspace',
         description:
-            'Selection highlights and actions. In the app, dragging a selected title bar raises and moves the selection together with one snap offset and one undo step. This fixture previews the action bar; the Workspace chrome story previews the outline. Copy keeps a temporary snapshot; Paste places a copy without saving a blueprint. Save as blueprint is a separate action. All requests stay in this fixture.',
+            'Selection highlights and actions. In the app, dragging a selected title bar raises and moves the selection together with one snap offset and one undo step. This fixture previews the action bar; the Workspace chrome story previews the outline. Copy keeps a temporary snapshot; Paste places a copy without saving a blueprint. Save as blueprint is a separate action. Delete closes selected programs in one undoable step. All requests stay in this fixture.',
         elements: ['hks-selection'],
         variants: [
             { id: 'selected', title: 'Programs selected' },
@@ -398,7 +398,7 @@ export const chromeStories: readonly Story[] = [
         defaults,
         height: 380,
         action: null,
-        code: 'const selection = new HksSelection();\nconst lifetime$ = selection.connect$(view$);\n// Fold selection.changes$ into copy, paste, save and clear requests.',
+        code: 'const selection = new HksSelection();\nconst lifetime$ = selection.connect$(view$);\n// Fold selection.changes$ into copy, paste, save, delete and clear requests.',
         create: ({ variant }) => {
             const element = new HksSelection();
             const events$ = element.changes$.pipe(share());
@@ -409,7 +409,7 @@ export const chromeStories: readonly Story[] = [
             const view$ = events$.pipe(
                 scan(
                     (view, command) =>
-                        command === 'clear'
+                        command === 'clear' || command === 'delete'
                             ? { ...view, count: 0 }
                             : command === 'copy'
                               ? { ...view, copied: true }

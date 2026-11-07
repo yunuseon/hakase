@@ -18,13 +18,16 @@ it('exposes selection actions and removes their listeners and toolbar on teardow
     const copy = requireElement(root, '[data-command="copy"]', HTMLButtonElement);
     const paste = requireElement(root, '[data-command="paste"]', HTMLButtonElement);
     const save = requireElement(root, '[data-command="save"]', HTMLButtonElement);
+    const remove = requireElement(root, '[data-command="delete"]', HTMLButtonElement);
     expect(copy.disabled).toBe(false);
+    expect(remove.disabled).toBe(false);
     expect(paste.disabled).toBe(true);
     copy.click();
     save.click();
-    expect(commands).toEqual(['copy', 'save']);
+    remove.click();
+    expect(commands).toEqual(['copy', 'save', 'delete']);
     running.unsubscribe();
     copy.click();
-    expect(commands).toHaveLength(2);
+    expect(commands).toHaveLength(3);
     expect(root.querySelector('.actions')).toBe(null);
 });

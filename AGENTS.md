@@ -968,7 +968,9 @@ the selection together, including each member's attached windows; all members
 share one snap offset. The selected ids travel with the move action so undo
 replay does not depend on the current selection. Dragging an unselected window
 still moves only its attached group. The selection bar offers Copy, Paste, Save as
-blueprint and Clear. Cmd/Ctrl+C copies; Cmd/Ctrl+V enters placement, both left to
+blueprint, Delete and Clear. Delete closes just the selected programs in one undo
+step, keeping their stores like a normal window close. Cmd/Ctrl+C copies;
+Cmd/Ctrl+V enters placement, both left to
 native controls while editing. Copying nothing leaves the previous copy intact.
 The clipboard is local to the running app and is not a saved blueprint.
 

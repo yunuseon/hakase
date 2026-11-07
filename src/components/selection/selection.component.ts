@@ -46,6 +46,15 @@ export class HksSelection extends HTMLElement {
                         Save as blueprint
                     </button>
                     <button
+                        class="ui-button"
+                        data-tone="danger"
+                        data-command="delete"
+                        ?disabled=${view.count === 0}
+                        title="Delete selected programs (undoable)"
+                    >
+                        Delete
+                    </button>
+                    <button
                         class="ui-icon"
                         data-command="clear"
                         aria-label="clear selection"
