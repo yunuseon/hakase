@@ -1777,6 +1777,19 @@ lookup, so placing, the ghost and the history label all find them. Like the
 formula registry they are never seeded into the document, so a starter changed
 in code reaches every user.
 
+**Canon in D is the starter that makes music**, and the worked example of an
+arrangement built from the pieces above. Pachelbel's ground is a steps signal
+(`GROUND`, semitones from D3) at rate 2; the harp's arpeggio is a four-step
+shape at rate 16 whose **offset follows the ground**, so one table of root,
+fifth, octave, fifth plays every chord; and the two violins are one line
+(`LINE`) in two signals, the second at phase 0.5, which is the canon itself: the
+same tune a turn of the ground later, in tenths below the first. `tune` turns a
+table of semitones into a signal whose value is octaves above the voice's root.
+Every voice is in D major, so the pitch snaps to the key. Its sketch is the
+`canon` formula, a Chladni plate whose figure the melody picks, shaken by the
+harp and bass levels and the drum kit. `starters.test.ts` checks the notes each
+voice actually plays, through `notesOf`.
+
 **A starter may work on the main stores instead of copies.** A window on a
 store the blueprint does not list keeps that id when placed, so Today shows
 your todo list rather than an empty one; only what should start fresh (the
@@ -1871,7 +1884,7 @@ in `src/state-graph.ts` derives the graph from the workspace and `inputsFor`,
 window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
 reducer's checks, undo and labels all apply.
 
-**A store can have jacks of its own**: a signal's phase, low and high. A store
+**A store can have jacks of its own**: a signal's phase, offset and depth. A store
 sits one column right of the deepest store it follows, and windows right of
 every store column, so a chain reads left to right (`depthsOf`). A wire into a
 store's jack is a `source` wire; focusing a store lights both what follows it
@@ -2013,7 +2026,7 @@ says so.** The program table is a record keyed by id (`src/programs.ts`,
 with `import type`: one member per program, whose `follows` is a record keyed by
 input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding, k1?:
 SignalBinding, … }`, the dial's `{ progress: PlaybackBinding }`,
-a todo's and a timeline's have no keys at all, so a focus binding on a sketch
+a ticket list's and a timeline's have no keys at all, so a focus binding on a sketch
 does not type-check. An input whose `initial` is `null` is **optional**: a new
 window starts without it, its key is optional in the type, `fits` does not
 require it, and the popover offers **None** above its stores, which emits
@@ -2417,8 +2430,8 @@ string keys, and it silently keeps comparing after someone adds a field. Prefer
 deduplicating on the value you actually apply: both sliders `map` to the finished
 CSS string and then use a bare `distinctUntilChanged()`, so `===` on a string
 matches precisely when the DOM write would be identical. Where a record genuinely
-must be compared, write a named comparator next to it that names every field —
-`sameGeometry` in `components/sketch/sketch.component.ts` is the only one.
+must be compared, write a named comparator next to it that names every field, as
+`samePanel`, `sameOrbit`, `sameWiring` and `sameGraph` do.
 
 ## Conventions
 
@@ -2491,7 +2504,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and eighty-five of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and seventy-four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

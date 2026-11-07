@@ -1,4 +1,9 @@
 import { defaultTickets } from './shared/tickets.ts';
+import { defaultSignal, type Signal } from './shared/signal.ts';
+import { defaultVoice, type Voice } from './components/voice/voice.ts';
+import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.ts';
+import { defaultPanel } from './components/sketch/params.ts';
+import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
 import type { Bindings } from './inputs.ts';
 import type { Blueprint, BlueprintWindow, Blueprints } from './blueprints.ts';
@@ -47,6 +52,42 @@ const own = (id: StoreId, program: ProgramId, name: string): StoreEntry => ({
     copy: null,
     clock: null,
 });
+
+// Pitch is octaves above the voice's root and a steps signal swings offset ± depth, so a table spanning low..high semitones is this.
+const tune = (
+    semitones: readonly number[],
+    rate: Signal['rate'],
+    rest: Partial<Signal> = {},
+): Signal => {
+    const low = Math.min(...semitones);
+    const high = Math.max(...semitones);
+
+    return {
+        ...defaultSignal,
+        shape: 'steps',
+        rate,
+        offset: (low + high) / 24,
+        depth: (high - low) / 24,
+        steps: semitones.map(note => (note - low) / (high - low)),
+        ...rest,
+    };
+};
+
+const hits = (marks: string) =>
+    [...marks].map(mark => (mark === 'X' ? ACCENT : mark === 'x' ? NORMAL : 0));
+
+const voice = (rest: Partial<Voice>): Voice => ({ ...defaultVoice, scale: 'major', ...rest });
+
+const sources = (rest: Partial<Voice['sources']>): Voice['sources'] => ({
+    ...defaultVoice.sources,
+    ...rest,
+});
+
+const GROUND = [0, -5, -3, -8, -7, -12, -7, -5];
+
+const LINE = [4, 2, 0, -1, -3, -5, -3, -1, 0, -1, -3, -5, -7, -8, -7, -10];
+
+const SONG = { playback: { kind: 'playback', store: 'song' } } as const;
 
 const REVIEW = `Daily review
 
@@ -156,6 +197,173 @@ export const STARTERS: readonly Starter[] = [
         held: {
             ...held,
             notes: [['review', { items: [{ id: 'note-1', text: REVIEW }], made: 1 }]],
+        },
+        formulas: [],
+        links: [],
+    },
+    {
+        id: 'starter-canon',
+        name: 'Canon in D',
+        summary:
+            "Pachelbel's Canon on a loop: the ground bass, a harp arpeggio that follows it, two violins a turn apart, drums, and a sketch that plays along. Press play, then Listen on each instrument.",
+        size: { width: 1832, height: 984 },
+        windows: [
+            opened('timeline', 'timeline', 'song', { x: 24, y: 48, width: 520, height: 120 }),
+            opened(
+                'sketch',
+                'sketch',
+                'canon',
+                { x: 24, y: 184, width: 520, height: 776 },
+                {
+                    ...SONG,
+                    k1: { kind: 'voice', store: 'bass' },
+                    k2: { kind: 'voice', store: 'harp' },
+                    k3: { kind: 'signal', store: 'line-1' },
+                    k4: { kind: 'drums', store: 'beat' },
+                },
+                {
+                    ...defaultSketch,
+                    formula: 'canon',
+                    theme: 'ember',
+                    panel: { ...defaultPanel, dimension: 72, baseSize: 5, trails: 0.25 },
+                },
+            ),
+            opened('bass', 'voice', 'bass', { x: 560, y: 48, width: 300, height: 320 }, SONG),
+            opened('harp', 'voice', 'harp', { x: 876, y: 48, width: 300, height: 320 }, SONG),
+            opened(
+                'violin-1',
+                'voice',
+                'violin-1',
+                { x: 1192, y: 48, width: 300, height: 320 },
+                SONG,
+            ),
+            opened(
+                'violin-2',
+                'voice',
+                'violin-2',
+                { x: 1508, y: 48, width: 300, height: 320 },
+                SONG,
+            ),
+            opened('ground', 'signal', 'ground', { x: 560, y: 384, width: 300, height: 260 }, SONG),
+            opened('arp', 'signal', 'arp', { x: 876, y: 384, width: 300, height: 260 }, SONG),
+            opened(
+                'line-1',
+                'signal',
+                'line-1',
+                { x: 1192, y: 384, width: 300, height: 260 },
+                SONG,
+            ),
+            opened(
+                'line-2',
+                'signal',
+                'line-2',
+                { x: 1508, y: 384, width: 300, height: 260 },
+                SONG,
+            ),
+            opened('beat', 'drums', 'beat', { x: 560, y: 660, width: 440, height: 300 }, SONG),
+            opened('sway', 'signal', 'sway', { x: 1016, y: 660, width: 220, height: 300 }, SONG),
+            opened(
+                'plot',
+                'plot',
+                'plot',
+                { x: 1252, y: 660, width: 556, height: 300 },
+                {
+                    ...SONG,
+                    a: { kind: 'signal', store: 'ground' },
+                    b: { kind: 'signal', store: 'arp' },
+                    c: { kind: 'signal', store: 'line-1' },
+                    d: { kind: 'signal', store: 'line-2' },
+                },
+                { ...defaultPlot, layout: 'lanes' },
+            ),
+        ],
+        stores: [
+            { ...own('song', 'timeline', 'Canon'), clock: { duration: 12, looping: true } },
+            own('canon', 'sketch', 'Canon'),
+            own('bass', 'voice', 'Bass'),
+            own('harp', 'voice', 'Harp'),
+            own('violin-1', 'voice', 'Violin I'),
+            own('violin-2', 'voice', 'Violin II'),
+            own('ground', 'signal', 'Ground'),
+            own('arp', 'signal', 'Arpeggio'),
+            own('line-1', 'signal', 'Violin I line'),
+            own('line-2', 'signal', 'Violin II line'),
+            own('sway', 'signal', 'Sway'),
+            own('beat', 'drums', 'Beat'),
+        ],
+        held: {
+            ...held,
+            signals: [
+                ['ground', tune(GROUND, 2)],
+                [
+                    'arp',
+                    // The ground replaces offset, so depth must stay 1 for a step of (n + 12) / 24 to sit n semitones above it.
+                    {
+                        ...defaultSignal,
+                        shape: 'steps',
+                        rate: 16,
+                        offset: 0,
+                        depth: 1,
+                        steps: [0, 7, 12, 7].map(note => (note + 12) / 24),
+                        sources: { ...defaultSignal.sources, offset: 'ground' },
+                    },
+                ],
+                ['line-1', tune(LINE, 1)],
+                ['line-2', tune(LINE, 1, { phase: 0.5 })],
+                ['sway', { ...defaultSignal, shape: 'sine', rate: 1, offset: 0, depth: 0.6 }],
+            ],
+            voices: [
+                [
+                    'bass',
+                    voice({
+                        instrument: 'bass',
+                        root: 50,
+                        volume: 0.7,
+                        sources: sources({ pitch: 'ground' }),
+                    }),
+                ],
+                [
+                    'harp',
+                    voice({
+                        instrument: 'harp',
+                        root: 62,
+                        volume: 0.45,
+                        sources: sources({ pitch: 'arp', pan: 'sway' }),
+                    }),
+                ],
+                [
+                    'violin-1',
+                    voice({
+                        instrument: 'flute',
+                        root: 74,
+                        volume: 0.5,
+                        sources: sources({ pitch: 'line-1' }),
+                    }),
+                ],
+                [
+                    'violin-2',
+                    voice({
+                        instrument: 'pad',
+                        root: 62,
+                        volume: 0.4,
+                        sources: sources({ pitch: 'line-2' }),
+                    }),
+                ],
+            ],
+            drums: [
+                [
+                    'beat',
+                    {
+                        ...defaultDrums,
+                        repeat: 4,
+                        volume: 0.5,
+                        pattern: {
+                            ...PRESETS.backbeat,
+                            open: hits('..............x.'),
+                        },
+                    },
+                ],
+            ],
         },
         formulas: [],
         links: [],

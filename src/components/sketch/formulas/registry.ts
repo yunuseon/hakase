@@ -24,6 +24,7 @@ import { weave } from './weave.ts';
 import { relief } from './relief.ts';
 import { stencil } from './stencil.ts';
 import { drift } from './drift.ts';
+import { canon } from './canon.ts';
 
 export const formulas = {
     ripple,
@@ -51,6 +52,7 @@ export const formulas = {
     relief,
     stencil,
     drift,
+    canon,
 } satisfies Record<string, Formula>;
 
 export type FormulaName = keyof typeof formulas;
