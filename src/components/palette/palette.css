@@ -19,26 +19,42 @@
 
 .panel {
     position: absolute;
-    inset-block-start: 14vh;
-    inset-inline-start: 50%;
+    inset-block-start: calc(
+        var(--viewport-top, 0px) + var(--viewport-height, 100dvh) * 0.08 +
+            env(safe-area-inset-top, 0px)
+    );
+    inset-inline-start: calc(
+        var(--viewport-left, 0px) + min(100%, var(--viewport-width, 100%)) / 2
+    );
     translate: -50% 0;
     display: flex;
     flex-direction: column;
-    inline-size: min(560px, calc(100vw - 32px));
-    max-block-size: 60vh;
+    box-sizing: border-box;
+    inline-size: min(
+        var(--spacing) * 140,
+        calc(
+            var(--viewport-width, 100vw) - var(--space-8) - env(safe-area-inset-left, 0px) -
+                env(safe-area-inset-right, 0px)
+        )
+    );
+    max-block-size: calc(
+        var(--viewport-height, 100dvh) * 0.84 - env(safe-area-inset-top, 0px) -
+            env(safe-area-inset-bottom, 0px)
+    );
     overflow: hidden;
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 16px;
+    border-radius: var(--radius-4xl);
     box-shadow:
         0 2px 6px color-mix(in srgb, var(--shadow) 10%, transparent),
         0 24px 64px color-mix(in srgb, var(--shadow) 28%, transparent);
 }
 
 .query {
+    min-inline-size: 0;
     flex: none;
-    padding: 16px 18px;
-    font: 500 16px var(--font-ui);
+    padding: var(--space-4) calc(var(--spacing) * 4.5);
+    font: 500 var(--text-xl) var(--font-ui);
     background: transparent;
     border: none;
     border-block-end: 1px solid var(--edge);
@@ -51,7 +67,7 @@
 
 .results {
     margin: 0;
-    padding: 6px;
+    padding: var(--space-1-5);
     overflow: auto;
     list-style: none;
 }
@@ -62,7 +78,7 @@
 
 .empty {
     margin: 0;
-    padding: 18px;
+    padding: calc(var(--spacing) * 4.5);
 }
 
 .results:not(:empty) + .empty {
@@ -73,11 +89,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 9px 12px;
-    font-size: 14px;
+    gap: var(--space-3);
+    padding: calc(var(--spacing) * 2.25) var(--space-3);
+    font-size: var(--text-base);
     color: var(--label);
-    border-radius: 10px;
+    border-radius: var(--radius-xl);
     cursor: pointer;
 }
 
@@ -88,6 +104,6 @@
 }
 
 .hint {
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--muted);
 }

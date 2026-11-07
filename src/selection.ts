@@ -8,21 +8,10 @@ export const selectedIn = (workspace: Workspace, rect: Rect): readonly ProcessId
     workspace.processes.filter(process => overlaps(boxOf(process), rect)).map(p => p.id);
 
 export const selectionView = (
-    workspace: Workspace,
+    live: readonly ProcessId[],
     ids: readonly ProcessId[],
     copied: boolean,
 ): SelectionView => ({
     copied,
-    boxes: workspace.processes
-        .filter(p => ids.includes(p.id))
-        .map(process => {
-            const rect = boxOf(process),
-                camera = workspace.camera;
-            return {
-                x: rect.x * camera.zoom + camera.x,
-                y: rect.y * camera.zoom + camera.y,
-                width: rect.width * camera.zoom,
-                height: rect.height * camera.zoom,
-            };
-        }),
+    count: live.filter(id => ids.includes(id)).length,
 });

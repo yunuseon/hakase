@@ -10,8 +10,8 @@
 
 /* The button is the hit area; the pill drawn inside it is much smaller. */
 .seam {
-    --along: 44px;
-    --across: 16px;
+    --along: var(--space-11);
+    --across: var(--space-4);
 
     position: absolute;
     inset-block-start: calc(var(--across) / -2);
@@ -36,9 +36,9 @@
 
 .seam::before {
     content: '';
-    inline-size: 28px;
-    block-size: 4px;
-    border-radius: 2px;
+    inline-size: var(--space-7);
+    block-size: var(--space-1);
+    border-radius: var(--radius-xs);
     background: var(--muted);
     opacity: 0.35;
     transition:
@@ -49,8 +49,8 @@
 }
 
 .seam[data-vertical]::before {
-    inline-size: 4px;
-    block-size: 28px;
+    inline-size: var(--space-1);
+    block-size: var(--space-7);
 }
 
 .seam:hover::before {
@@ -58,14 +58,14 @@
 }
 
 .seam[data-linked]::before {
-    inline-size: 36px;
+    inline-size: var(--space-9);
     background: var(--ink);
     opacity: 0.6;
 }
 
 .seam[data-linked][data-vertical]::before {
-    inline-size: 4px;
-    block-size: 36px;
+    inline-size: var(--space-1);
+    block-size: var(--space-9);
 }
 
 .seam[data-linked]:hover::before {
@@ -75,5 +75,5 @@
 .seam:focus-visible {
     outline: 2px solid var(--highlight);
     outline-offset: 0;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
 }

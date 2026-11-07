@@ -110,7 +110,7 @@ import { routePlayback$ } from './playback-routing.ts';
 import { chime$ } from './chime.ts';
 import { themes, type ThemeName } from './components/sketch/themes/registry.ts';
 import { viewportSize } from './lib/dom.ts';
-import { viewport$, wallClock$ } from './lib/rx.ts';
+import { coarsePointer$, remScale$, viewport$, visibleViewport$, wallClock$ } from './lib/rx.ts';
 import type {
     FollowGroup,
     StoreOption,
@@ -295,7 +295,7 @@ const bootstrap = () => {
 
             return program === undefined ? EMPTY : of(program);
         }),
-        withLatestFrom(viewport$),
+        withLatestFrom(visibleViewport$),
         map(([program, viewport]): WorkspaceAction => ({
             kind: 'launch',
             program: program.id,
@@ -342,6 +342,16 @@ const bootstrap = () => {
     ).pipe(share());
     const drawing$ = merge(
         toolRequests$,
+        canvas.selects$.pipe(
+            mergeMap(({ phase, event }): DrawingAction[] => {
+                if (event.type === 'pointercancel') return [{ kind: 'cancel' }];
+                const action: DrawingAction = {
+                    kind: phase,
+                    at: { x: event.clientX, y: event.clientY },
+                };
+                return phase === 'grab' ? [{ kind: 'start', tool: 'select' }, action] : [action];
+            }),
+        ),
         sectionDrawing.changes$,
         merge(canvas.escapes$, canvas.blurs$).pipe(map((): DrawingAction => ({ kind: 'cancel' }))),
         selectionCommands$.pipe(
@@ -361,14 +371,31 @@ const bootstrap = () => {
                 drawing.mode === 'done' && drawing.tool === 'select' ? [drawing] : [],
             ),
             withLatestFrom(defer(() => workspace$)),
-            map(([drawing, workspace]) =>
-                selectedIn(workspace, worldRectangle(drawing.rect, workspace.camera)),
-            ),
+            map(([drawing, workspace]) => ({
+                kind: 'replace' as const,
+                ids: selectedIn(workspace, worldRectangle(drawing.rect, workspace.camera)),
+            })),
         ),
         merge(canvas.escapes$, selectionCommands$.pipe(filter(c => c === 'clear'))).pipe(
-            map((): readonly ProcessId[] => []),
+            map(() => ({ kind: 'replace' as const, ids: noSelection })),
         ),
-    ).pipe(startWith(noSelection), shareReplay({ bufferSize: 1, refCount: true }));
+        defer(() => signals$).pipe(
+            mergeMap(signal =>
+                signal.to === 'toggle-selection'
+                    ? [{ kind: 'toggle' as const, id: signal.id }]
+                    : [],
+            ),
+        ),
+    ).pipe(
+        scan((ids: readonly ProcessId[], action) => {
+            if (action.kind === 'replace') return action.ids;
+            return ids.includes(action.id)
+                ? ids.filter(id => id !== action.id)
+                : [...ids, action.id];
+        }, noSelection),
+        startWith(noSelection),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
 
     const toolbarActions$ = merge(
         seams.toggles$.pipe(map(({ a, b }): WorkspaceAction => ({ kind: 'toggle-link', a, b }))),
@@ -443,6 +470,12 @@ const bootstrap = () => {
         toolbarActions$,
         defer(() => signals$).pipe(
             mergeMap(signal => (signal.to === 'workspace' ? of(signal.action) : EMPTY)),
+            withLatestFrom(selectedIds$),
+            map(([action, selected]): WorkspaceAction =>
+                action.kind === 'move' || action.kind === 'raise'
+                    ? { ...action, selected }
+                    : action,
+            ),
         ),
         defer(() => inputs$).pipe(
             mergeMap(({ input }) => (input.kind === 'task' ? of(input) : EMPTY)),
@@ -785,6 +818,10 @@ const bootstrap = () => {
                                   : EMPTY,
                           ),
                       ),
+                      selectedIds$.pipe(
+                          map(ids => ids.includes(process.id)),
+                          distinctUntilChanged(),
+                      ),
                       ids$.pipe(filter(ids => !ids.includes(process.id))),
                   );
         }),
@@ -830,8 +867,12 @@ const bootstrap = () => {
         workspace$,
         defer(() => linked$),
         session$,
+        remScale$,
+        coarsePointer$,
     ]).pipe(
-        map(([workspace, signals, session]) => wiringOf(workspace, signals, inputsFor, session)),
+        map(([workspace, signals, session, unit, touch]) =>
+            wiringOf(workspace, signals, inputsFor, session, unit, touch),
+        ),
         distinctUntilChanged(sameWiring),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
@@ -1576,8 +1617,8 @@ const bootstrap = () => {
         toolbar.connect$(),
         sectionDrawing.connect$(drawing$),
         selection.connect$(
-            combineLatest([selectedIds$, workspace$, clipboard$]).pipe(
-                map(([ids, workspace, copied]) => selectionView(workspace, ids, copied !== null)),
+            combineLatest([selectedIds$, ids$, clipboard$]).pipe(
+                map(([selected, live, copied]) => selectionView(live, selected, copied !== null)),
             ),
         ),
         seams.connect$(workspace$.pipe(map(seamsOf))),

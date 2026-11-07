@@ -205,14 +205,18 @@ export const controlStories: readonly Story[] = [
         description:
             'Instrument controls and a piano roll. Audio requests are logged; this visual fixture is silent.',
         elements: ['hks-voice'],
-        variants: normal,
+        variants: [...normal, { id: 'compact', title: 'Compact (240px)' }],
         controls: ['value'],
         defaults,
         height: 420,
         action: null,
         code: 'const voice = new HksVoice();\nconst lifetime$ = voice.connect$(heard$, position$, listening$);\nconst requests$ = voice.changes$;',
-        create: ({ args$ }) => {
+        create: ({ args$, variant }) => {
             const element = new HksVoice();
+            if (variant === 'compact') {
+                element.style.inlineSize = 'min(100%, 240px)';
+                element.style.blockSize = '300px';
+            }
             const events$ = element.changes$.pipe(share());
             const heard$ = events$.pipe(
                 scan(
@@ -240,16 +244,20 @@ export const controlStories: readonly Story[] = [
         title: 'Drum sequencer',
         group: 'Creative tools',
         description:
-            'Pattern cells, presets, accents and step counts. Audio requests are logged; this visual fixture is silent.',
+            'Pattern cells, presets, accents and step counts. Swipe the row labels to scroll a wide pattern; drag cells to paint. Audio requests are logged; this visual fixture is silent.',
         elements: ['hks-drums'],
-        variants: normal,
+        variants: [...normal, { id: 'compact', title: 'Compact (240px)' }],
         controls: ['value'],
         defaults,
         height: 420,
         action: null,
         code: 'const drums = new HksDrums();\nconst lifetime$ = drums.connect$(pattern$, position$, listening$);\nconst requests$ = drums.changes$;',
-        create: ({ args$ }) => {
+        create: ({ args$, variant }) => {
             const element = new HksDrums();
+            if (variant === 'compact') {
+                element.style.inlineSize = 'min(100%, 240px)';
+                element.style.blockSize = '300px';
+            }
             const events$ = element.changes$.pipe(share());
             const pattern$ = events$.pipe(
                 scan(

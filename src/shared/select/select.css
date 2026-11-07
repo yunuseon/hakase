@@ -9,10 +9,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     inline-size: 100%;
     min-inline-size: 0;
-    min-block-size: 18px;
+    min-block-size: calc(var(--spacing) * 4.5);
     padding: 0;
     color: inherit;
     background: transparent;
@@ -28,8 +28,8 @@
 }
 .chevron {
     flex: none;
-    inline-size: 10px;
-    block-size: 10px;
+    inline-size: var(--space-2-5);
+    block-size: var(--space-2-5);
     fill: none;
     stroke: var(--muted);
     stroke-width: 1.4;
@@ -54,7 +54,7 @@
 :host(:focus-within) .editor {
     outline: 2px solid var(--highlight);
     outline-offset: 3px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 :host([disabled]) {
     opacity: 0.5;
@@ -67,29 +67,29 @@
     inset: auto;
     box-sizing: border-box;
     margin: 0;
-    padding: 6px;
+    padding: var(--space-1-5);
     overflow: hidden;
     color: var(--ink);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 10px;
+    border-radius: var(--radius-xl);
     box-shadow: 0 4px 16px color-mix(in srgb, var(--shadow) 16%, transparent);
-    font: 12px/1.4 var(--font-ui);
+    font: var(--text-sm)/1.4 var(--font-ui);
 }
 .panel:popover-open {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: calc(var(--spacing) * 1.25);
 }
 .search {
     box-sizing: border-box;
     flex: none;
     inline-size: 100%;
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     color: var(--ink);
     background: var(--well);
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font: inherit;
     outline: none;
 }
@@ -102,15 +102,15 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
     box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 28px;
-    padding: 5px 8px;
+    min-block-size: var(--space-7);
+    padding: calc(var(--spacing) * 1.25) var(--space-2);
     color: var(--ink);
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font: inherit;
     text-align: start;
     cursor: pointer;
@@ -125,16 +125,24 @@
 .option[aria-selected='true']::after {
     content: '✓';
     flex: none;
-    font-size: 11px;
+    font-size: var(--text-xs);
 }
 .option:disabled {
     opacity: 0.4;
     cursor: default;
 }
 .empty {
-    margin: 5px 8px;
+    margin: calc(var(--spacing) * 1.25) var(--space-2);
     color: var(--muted);
 }
 [hidden] {
     display: none !important;
+}
+
+@media (any-pointer: coarse) {
+    .trigger,
+    .editor,
+    .option {
+        min-block-size: var(--control-xl);
+    }
 }

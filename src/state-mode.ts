@@ -104,7 +104,6 @@ export const modeOf = ({ pinned, held, locks }: ModeSession) => ({
     active: pinned.active || held || locks.length > 0,
 });
 
-const SOCKET_HEIGHT = 30;
 const SOCKET_WIDTH = 180;
 const INDENT = 14;
 
@@ -117,11 +116,14 @@ type Row =
           readonly members: readonly string[];
       };
 
-const menuFor = (top: number, height: number, y: number) => {
-    const below = top + height - 8 - (y + 28);
-    const above = y - (top + 36);
+const menuFor = (top: number, height: number, y: number, unit: number, rowHeight: number) => {
+    const below = top + height - 8 * unit - (y + rowHeight);
+    const above = y - (top + 36 * unit);
 
-    return { above: above > below, height: Math.max(24, Math.min(160, Math.max(above, below))) };
+    return {
+        above: above > below,
+        height: Math.max(24 * unit, Math.min(160 * unit, Math.max(above, below))),
+    };
 };
 
 const openGroupIn = ({ open, sprung }: ModeSession, window: string) =>
@@ -134,6 +136,8 @@ export const wiringOf = (
     signals: ReadonlyMap<string, Linked>,
     inputsFor: InputsFor,
     session: ModeSession,
+    unit: number,
+    touch = false,
 ): WiringView | null => {
     const mode = modeOf(session);
 
@@ -142,11 +146,13 @@ export const wiringOf = (
     }
 
     const { processes, stores } = workspace;
+    const rowHeight = (touch ? 44 : 28) * unit;
     const laid = processes.map(process => {
         const frame = boxOf(process);
         const inputs = inputsFor(process.program);
-        const width = Math.min(SOCKET_WIDTH, frame.width - 16);
-        const rowAt = (row: number) => frame.y + 40 + row * SOCKET_HEIGHT;
+        const width = Math.min(SOCKET_WIDTH * unit, frame.width - 16 * unit);
+        const rowAt = (row: number) =>
+            frame.y + (touch ? 56 : 40) * unit + row * (rowHeight + 2 * unit);
         const output: Socket[] =
             HOLDING[process.program] === null
                 ? []
@@ -154,10 +160,10 @@ export const wiringOf = (
                       {
                           key: `${process.id}:output`,
                           window: process.id,
-                          x: frame.x + frame.width - width - 8,
+                          x: frame.x + frame.width - width - 8 * unit,
                           y: rowAt(0),
                           width,
-                          menu: menuFor(frame.y, frame.height, rowAt(0)),
+                          menu: menuFor(frame.y, frame.height, rowAt(0), unit, rowHeight),
                           title: 'Output',
                           colour: colourOf(process.store),
                           end: {
@@ -226,7 +232,7 @@ export const wiringOf = (
             const current = options
                 .flatMap(choice => choice.options)
                 .find(option => option.current);
-            const indent = group === null ? 0 : INDENT;
+            const indent = group === null ? 0 : INDENT * unit;
 
             return {
                 key: `${process.id}:input:${name}`,
@@ -234,7 +240,7 @@ export const wiringOf = (
                 x: at.x + indent,
                 y: at.y,
                 width: width - indent,
-                menu: menuFor(frame.y, frame.height, at.y),
+                menu: menuFor(frame.y, frame.height, at.y, unit, rowHeight),
                 title: options[0]?.label ?? name,
                 colour: current?.colour ?? 'var(--muted)',
                 end: {
@@ -261,7 +267,7 @@ export const wiringOf = (
         };
 
         const placed = rows.map((row, index) => {
-            const at = { x: frame.x + 8, y: rowAt(rowOf(index)) };
+            const at = { x: frame.x + 8 * unit, y: rowAt(rowOf(index)) };
 
             if (row.kind === 'input') {
                 return { sockets: [socketOf(row.name, row.group, at)], groups: [] };
@@ -308,5 +314,11 @@ export const wiringOf = (
     });
     const sockets = laid.flatMap(entry => entry.sockets);
 
-    return { sockets, groups: laid.flatMap(entry => entry.groups), wires: wiresOf(sockets) };
+    return {
+        unit,
+        rowHeight,
+        sockets,
+        groups: laid.flatMap(entry => entry.groups),
+        wires: wiresOf(sockets, unit, rowHeight),
+    };
 };

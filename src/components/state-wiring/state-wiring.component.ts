@@ -210,8 +210,8 @@ export class HksStateWiring extends HTMLElement {
                                                 html`<div
                                                     class="rail"
                                                     style=${styleMap({
-                                                        left: `${group.x + 10}px`,
-                                                        top: `${group.y + 14}px`,
+                                                        left: `${group.x + 10 * (state.view?.unit ?? 1)}px`,
+                                                        top: `${group.y + (state.view?.rowHeight ?? 28) / 2}px`,
                                                         height: `${
                                                             (state.view?.sockets
                                                                 .filter(socket =>
@@ -375,6 +375,7 @@ export class HksStateWiring extends HTMLElement {
         const drawn$ = view$.pipe(
             tap(view => {
                 this.hidden = view === null;
+                this.style.setProperty('--socket-height', `${view?.rowHeight ?? 28}px`);
 
                 const focused = focusedIn(shadow);
                 const sockets = view?.sockets ?? [];
@@ -413,7 +414,9 @@ export class HksStateWiring extends HTMLElement {
                 const live = drag.phase !== 'release' && from !== undefined;
 
                 return {
-                    path: live ? wirePath(anchorOf(from), drag.at) : '',
+                    path: live
+                        ? wirePath(anchorOf(from, view?.unit ?? 1, view?.rowHeight), drag.at)
+                        : '',
                     groups: view?.groups ?? [],
                     live,
                     over: drag.over,

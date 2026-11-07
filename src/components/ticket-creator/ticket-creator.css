@@ -1,17 +1,32 @@
 :host {
-    font: 13px/1.4 var(--font-ui);
+    font: var(--text-md)/1.4 var(--font-ui);
     color: var(--ink);
 }
 
 dialog {
+    position: fixed;
+    inset: auto;
+    inset-block-start: calc(var(--viewport-top, 0px) + var(--viewport-height, 100dvh) / 2);
+    inset-inline-start: calc(var(--viewport-left, 0px) + var(--viewport-width, 100vw) / 2);
+    translate: -50% -50%;
+    margin: 0;
     box-sizing: border-box;
-    inline-size: min(460px, calc(100vw - 24px));
-    max-block-size: calc(100dvh - 32px);
+    inline-size: min(
+        var(--spacing) * 115,
+        calc(
+            var(--viewport-width, 100vw) - var(--space-6) - env(safe-area-inset-left, 0px) -
+                env(safe-area-inset-right, 0px)
+        )
+    );
+    max-block-size: calc(
+        var(--viewport-height, 100dvh) - var(--space-8) - env(safe-area-inset-top, 0px) -
+            env(safe-area-inset-bottom, 0px)
+    );
     padding: 0;
     color: var(--ink);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 16px;
+    border-radius: var(--radius-4xl);
     box-shadow: 0 20px 80px color-mix(in srgb, var(--shadow) 35%, transparent);
 }
 
@@ -22,25 +37,28 @@ dialog::backdrop {
 form {
     display: flex;
     flex-direction: column;
-    max-block-size: calc(100dvh - 34px);
+    max-block-size: calc(
+        var(--viewport-height, 100dvh) - var(--spacing) * 8.5 - env(safe-area-inset-top, 0px) -
+            env(safe-area-inset-bottom, 0px)
+    );
 }
 
 header,
 footer {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 16px 20px;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
 }
 
 header {
     justify-content: space-between;
-    padding-block-end: 10px;
+    padding-block-end: var(--space-2-5);
 }
 
 h2 {
-    margin: 2px 0 0;
-    font-size: 20px;
+    margin: var(--space-0-5) 0 0;
+    font-size: var(--text-3xl);
     font-weight: 600;
     outline: none;
 }
@@ -48,7 +66,7 @@ h2 {
 .eyebrow {
     margin: 0;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.07em;
 }
@@ -56,11 +74,11 @@ h2 {
 .steps {
     display: flex;
     justify-content: space-between;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
-    padding: 0 20px 12px;
+    padding: 0 var(--space-5) var(--space-3);
     list-style: none;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--muted);
     border-block-end: 1px solid var(--edge);
 }
@@ -73,26 +91,26 @@ h2 {
 .body {
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 16px 20px;
+    padding: var(--space-4) var(--space-5);
     min-block-size: 0;
 }
 
 section {
     display: grid;
-    gap: 13px;
+    gap: calc(var(--spacing) * 3.25);
 }
 
 label {
     display: grid;
-    gap: 5px;
-    font-size: 12px;
+    gap: calc(var(--spacing) * 1.25);
+    font-size: var(--text-sm);
     color: var(--muted);
 }
 
 input,
 hks-select,
 textarea {
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-2-5);
 }
 
 textarea {
@@ -100,17 +118,17 @@ textarea {
 }
 
 .title {
-    font-size: 14px;
+    font-size: var(--text-base);
 }
 
 .pair {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    gap: var(--space-2-5);
 }
 
 .hint {
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 
 footer {
@@ -135,14 +153,14 @@ footer span {
 
 .review {
     display: grid;
-    grid-template-columns: 85px minmax(0, 1fr);
-    gap: 10px 12px;
+    grid-template-columns: calc(var(--spacing) * 21.25) minmax(0, 1fr);
+    gap: var(--space-2-5) var(--space-3);
     margin: 0;
 }
 
 dt {
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 
 dd {
@@ -153,7 +171,7 @@ dd {
 
 .error {
     color: var(--accent);
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 
 [hidden] {
@@ -167,4 +185,10 @@ dd {
 
 :host {
     display: contents;
+}
+
+header,
+footer,
+.steps {
+    flex-wrap: wrap;
 }

@@ -350,10 +350,14 @@ const SwitchOptions = (state: SwitchRender) =>
     );
 
 const sameView = (a: WindowView, b: WindowView): boolean =>
-    a.kind === b.kind && a.frame === b.frame && a.focused === b.focused;
+    a.kind === b.kind &&
+    a.frame === b.frame &&
+    a.focused === b.focused &&
+    a.selected === b.selected;
 
 export class HksWindow extends HTMLElement {
     readonly gestures$: Observable<WindowGesture>;
+    readonly selectionToggles$: Observable<void>;
 
     private readonly name: HTMLElement;
     private readonly glyph: HTMLElement;
@@ -487,6 +491,7 @@ export class HksWindow extends HTMLElement {
         this.switching$ = merge(
             merge(
                 fromElementEvent$(name, 'pointerdown').pipe(
+                    filter(event => !event.shiftKey),
                     switchMap(down =>
                         // On the title, not the name: the drag captures the pointer there, and the click follows it.
                         fromElementEvent$(requireChild(shadow, '.title'), 'click').pipe(
@@ -531,17 +536,41 @@ export class HksWindow extends HTMLElement {
             ),
         ).pipe(share());
 
+        this.selectionToggles$ = fromElementEvent$(this, 'pointerdown', { capture: true }).pipe(
+            switchMap(down =>
+                down.isPrimary && down.button === 0 && down.shiftKey
+                    ? fromElementEvent$(this, 'click', { capture: true }).pipe(
+                          take(1),
+                          filter(
+                              click =>
+                                  click.detail > 0 &&
+                                  Math.hypot(
+                                      click.clientX - down.clientX,
+                                      click.clientY - down.clientY,
+                                  ) < CLICK_SLOP,
+                          ),
+                      )
+                    : EMPTY,
+            ),
+            tap(event => {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }),
+            map(() => undefined),
+        );
+
         const resize = (edge: ResizeEdge) =>
-            pointerDelta$(requireChild(shadow, `.handle--${edge}`)).pipe(
+            pointerDelta$(requireChild(shadow, `.handle--${edge}`), event => !event.shiftKey).pipe(
                 map(({ dx, dy }): WindowGesture => ({ kind: 'resize', edge, dx, dy })),
             );
 
         this.gestures$ = merge(
-            pointerDelta$(requireChild(shadow, '.title')).pipe(
+            pointerDelta$(requireChild(shadow, '.title'), event => !event.shiftKey).pipe(
                 map(({ dx, dy }): WindowGesture => ({ kind: 'move', dx, dy })),
             ),
             ...RESIZE_EDGES.map(resize),
             fromElementEvent$(this, 'pointerdown').pipe(
+                filter(event => !event.shiftKey),
                 map((): WindowGesture => ({ kind: 'raise' })),
             ),
             // The button sits inside the drag handle; its press must not also drag.
@@ -847,8 +876,9 @@ export class HksWindow extends HTMLElement {
                 ),
                 view$.pipe(
                     distinctUntilChanged(sameView),
-                    tap(({ kind, frame, focused }) => {
+                    tap(({ kind, frame, focused, selected = false }) => {
                         this.toggleAttribute('data-focused', focused);
+                        this.toggleAttribute('data-selected', selected);
                         this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
                         this.style.zIndex = frame.z.toFixed(0);
 

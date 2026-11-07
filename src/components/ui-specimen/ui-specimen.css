@@ -1,27 +1,27 @@
 :host {
     display: block;
     color: var(--ink);
-    font: 12px/1.5 var(--font-ui);
+    font: var(--text-sm)/1.5 var(--font-ui);
 }
 
 .frame {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 20px;
+    gap: var(--space-5);
 }
 
 .row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2-5);
     flex-wrap: wrap;
 }
 
 .fields {
     display: grid;
-    gap: 14px;
-    inline-size: min(100%, 360px);
+    gap: var(--space-3-5);
+    inline-size: min(100%, var(--spacing) * 90);
 }
 
 label {
@@ -30,7 +30,7 @@ label {
 
 .fields label {
     display: grid;
-    gap: 5px;
+    gap: calc(var(--spacing) * 1.25);
 }
 
 h3,
@@ -39,7 +39,7 @@ p {
 }
 
 h3 {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 500;
 }
 
@@ -48,43 +48,43 @@ small {
 }
 
 code {
-    font: 11px var(--font-mono);
+    font: var(--text-xs) var(--font-mono);
 }
 
 .colour-bar {
-    max-inline-size: 120px;
+    max-inline-size: calc(var(--spacing) * 30);
 }
 
 .tag-remove {
-    inline-size: 20px;
-    block-size: 20px;
+    inline-size: var(--space-5);
+    block-size: var(--space-5);
 }
 
 .tag-remove svg {
-    inline-size: 12px;
-    block-size: 12px;
+    inline-size: var(--space-3);
+    block-size: var(--space-3);
 }
 
 .icons {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(calc(var(--spacing) * 22.5), 1fr));
+    gap: var(--space-6);
     inline-size: 100%;
 }
 
 .icons > div {
     display: grid;
     justify-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     color: var(--label);
 }
 
 .symmetry svg {
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--space-8);
+    block-size: var(--space-8);
 }
 
 .ui-empty {
     align-self: center;
-    padding-block: 20px;
+    padding-block: var(--space-5);
 }

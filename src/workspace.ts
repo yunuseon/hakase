@@ -117,9 +117,8 @@ export type WorkspaceAction =
           readonly kind: 'launch';
           readonly program: ProgramId;
           readonly size: Size;
-          readonly viewport: Extent;
+          readonly viewport: Extent & { readonly left?: number; readonly top?: number };
           readonly camera?: Camera;
-          readonly order?: number;
       }
     | { readonly kind: 'pan'; readonly dx: number; readonly dy: number }
     | { readonly kind: 'zoom'; readonly factor: number; readonly at: Point }
@@ -151,9 +150,14 @@ export type WorkspaceAction =
     | { readonly kind: 'toggle-link'; readonly a: ProcessId; readonly b: ProcessId }
     | { readonly kind: 'reveal'; readonly id: ProcessId; readonly viewport: Extent }
     | { readonly kind: 'toolbar-window'; readonly gesture: WindowGesture }
-    | (Exclude<WindowGesture, { readonly kind: 'resize' }> & {
+    | (Exclude<WindowGesture, { readonly kind: 'resize' | 'move' | 'raise' }> & {
           readonly id: ProcessId;
           readonly camera?: Camera;
+      })
+    | (Extract<WindowGesture, { readonly kind: 'move' | 'raise' }> & {
+          readonly id: ProcessId;
+          readonly camera?: Camera;
+          readonly selected?: readonly ProcessId[];
       })
     // Carries the smallest size its program can lay out in; the workspace never learns programs.
     | (Extract<WindowGesture, { readonly kind: 'resize' }> & {
@@ -162,7 +166,6 @@ export type WorkspaceAction =
           readonly camera?: Camera;
       });
 
-const CASCADE = 26;
 const FLOATING_AT = 96;
 
 export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor): Workspace => {
@@ -419,8 +422,19 @@ const toggledLink = (workspace: Workspace, a: ProcessId, b: ProcessId): readonly
         ? workspace.links.filter(link => !sameLink(link, a, b))
         : [...workspace.links, { a, b }];
 
-const raisedGroup = (workspace: Workspace, id: ProcessId): readonly Process[] => {
-    const group = groupOf(workspace.links, id);
+const dragGroup = (workspace: Workspace, id: ProcessId, selected: readonly ProcessId[]) =>
+    new Set(
+        (selected.includes(id) ? selected : [id]).flatMap(member => [
+            ...groupOf(workspace.links, member),
+        ]),
+    );
+
+const raisedGroup = (
+    workspace: Workspace,
+    id: ProcessId,
+    selected: readonly ProcessId[],
+): readonly Process[] => {
+    const group = dragGroup(workspace, id, selected);
     const raised = workspace.processes.filter(process => group.has(process.id));
 
     return [
@@ -430,8 +444,14 @@ const raisedGroup = (workspace: Workspace, id: ProcessId): readonly Process[] =>
     ];
 };
 
-const movedGroup = (workspace: Workspace, id: ProcessId, dx: number, dy: number): Workspace => {
-    const group = groupOf(workspace.links, id);
+const movedGroup = (
+    workspace: Workspace,
+    id: ProcessId,
+    dx: number,
+    dy: number,
+    selected: readonly ProcessId[],
+): Workspace => {
+    const group = dragGroup(workspace, id, selected);
     const drift = workspace.drift?.id === id ? workspace.drift : { x: 0, y: 0 };
     const x = dx + drift.x;
     const y = dy + drift.y;
@@ -627,8 +647,21 @@ const step = (
     switch (action.kind) {
         case 'launch': {
             const launched = workspace.launched + 1;
-            const step = (((action.order ?? launched) % 8) - 4) * CASCADE;
-            const centre = worldAt(workspace.camera, centreOf(action.viewport));
+            const { width, height, left = 0, top = 0 } = action.viewport;
+            const size = {
+                width: Math.min(action.size.width, Math.max(1, width - 40)),
+                height: Math.min(action.size.height, Math.max(1, height - 40)),
+            };
+            const origin = worldAt(workspace.camera, {
+                x: left + (width - size.width) / 2,
+                y: top + (height - size.height) / 2,
+            });
+            const frame = {
+                ...origin,
+                width: size.width / workspace.camera.zoom,
+                height: size.height / workspace.camera.zoom,
+                z: 0,
+            };
             const own = HOLDING[action.program]?.sharing === 'private';
             const store: StoreEntry = own
                 ? {
@@ -645,13 +678,8 @@ const step = (
                 program: action.program,
                 store: store.id,
                 follows: initialFollows(inputsFor(action.program)),
-                measured: action.size,
-                frame: {
-                    ...action.size,
-                    x: Math.round(centre.x - action.size.width / 2 + step),
-                    y: Math.round(centre.y - action.size.height / 2 + step),
-                    z: 0,
-                },
+                measured: { width: frame.width, height: frame.height },
+                frame,
             };
 
             return ownsInputs(inputsFor)(process)
@@ -953,13 +981,23 @@ const step = (
         // A drag starts with a raise, so the last drag's drift never carries into this one.
         case 'raise':
             return workspace.processes.some(({ id }) => id === action.id)
-                ? { ...workspace, drift: null, processes: raisedGroup(workspace, action.id) }
+                ? {
+                      ...workspace,
+                      drift: null,
+                      processes: raisedGroup(workspace, action.id, action.selected ?? []),
+                  }
                 : workspace;
         // Deltas arrive in screen pixels; the frame is in world units.
         case 'move': {
             const { zoom } = workspace.camera;
 
-            return movedGroup(workspace, action.id, action.dx / zoom, action.dy / zoom);
+            return movedGroup(
+                workspace,
+                action.id,
+                action.dx / zoom,
+                action.dy / zoom,
+                action.selected ?? [],
+            );
         }
         case 'resize': {
             const { zoom } = workspace.camera;
@@ -1510,7 +1548,7 @@ export const keepingView = (restored: Workspace, current: Workspace): Workspace 
 export const settledAction = (workspace: Workspace, action: WorkspaceAction): WorkspaceAction => {
     switch (action.kind) {
         case 'launch':
-            return { ...action, camera: workspace.camera, order: workspace.launched + 1 };
+            return { ...action, camera: workspace.camera };
         case 'add-section':
         case 'move':
         case 'resize':

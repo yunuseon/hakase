@@ -1,6 +1,6 @@
-import { concat, defer, fromEvent, Observable, of, timer } from 'rxjs';
-import { viewportSize, type Viewport } from './dom.ts';
-import { map, shareReplay, startWith, switchMap, take } from 'rxjs/operators';
+import { concat, defer, fromEvent, merge, Observable, of, timer } from 'rxjs';
+import { remScale, viewportSize, visibleViewport, type Viewport } from './dom.ts';
+import { distinctUntilChanged, map, shareReplay, startWith, switchMap, take } from 'rxjs/operators';
 
 export const fromElementEvent$ = <K extends keyof HTMLElementEventMap>(
     element: HTMLElement,
@@ -73,3 +73,42 @@ export const wallClock$: Observable<number> = timer(0, 1000).pipe(
     map(() => Date.now()),
     shareReplay({ bufferSize: 1, refCount: true }),
 );
+
+export const visibleViewport$ = defer(() => {
+    const viewport = window.visualViewport;
+    const resize$ = fromEvent(window, 'resize');
+
+    return (
+        viewport === null || viewport === undefined
+            ? resize$
+            : merge(resize$, fromEvent(viewport, 'resize'), fromEvent(viewport, 'scroll'))
+    ).pipe(startWith(undefined), map(visibleViewport));
+}).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+export const coarsePointer$ = defer(() => {
+    const query = window.matchMedia('(any-pointer: coarse)');
+
+    return fromEvent(query, 'change').pipe(
+        startWith(undefined),
+        map(() => query.matches),
+        distinctUntilChanged(),
+    );
+}).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+
+// A 1rem probe, since nothing fires when the root font size changes; measured at once, because a hidden pane delivers no resizes.
+export const remScale$: Observable<number> = new Observable<number>(subscriber => {
+    const probe = document.createElement('div');
+    probe.style.cssText =
+        'position: absolute; visibility: hidden; pointer-events: none; inline-size: 1rem; block-size: 0;';
+    document.body.append(probe);
+    const observer = new ResizeObserver(() => {
+        subscriber.next(remScale());
+    });
+    subscriber.next(remScale());
+    observer.observe(probe);
+
+    return () => {
+        observer.disconnect();
+        probe.remove();
+    };
+}).pipe(distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));

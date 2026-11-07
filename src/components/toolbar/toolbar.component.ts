@@ -7,8 +7,8 @@ import { repeat } from 'lit-html/directives/repeat.js';
 import { renderView, type RenderView } from '../../lib/lit.ts';
 import { fromEvent, merge, EMPTY, of, type Observable } from 'rxjs';
 import { filter, finalize, map, mergeMap, share, tap } from 'rxjs/operators';
-import { requireChild, styleSheet, viewportSize } from '../../lib/dom.ts';
-import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
+import { requireChild, styleSheet, visibleViewport } from '../../lib/dom.ts';
+import { fromDocumentEvent$, fromElementEvent$, visibleViewport$ } from '../../lib/rx.ts';
 import css from './toolbar.css?inline';
 
 const sheet = styleSheet(css);
@@ -103,7 +103,11 @@ export class HksToolbar extends HTMLElement {
             closeAll(menu);
             const panel = requireChild(menu, '.places');
             const trigger = requireChild(menu, 'summary');
-            const placement = popupPlacement(trigger.getBoundingClientRect(), viewportSize(), true);
+            const placement = popupPlacement(
+                trigger.getBoundingClientRect(),
+                visibleViewport(),
+                true,
+            );
             panel.style.left = `${placement.left}px`;
             panel.style.top = placement.top === null ? 'auto' : `${placement.top}px`;
             panel.style.bottom = placement.bottom === null ? 'auto' : `${placement.bottom}px`;
@@ -121,6 +125,15 @@ export class HksToolbar extends HTMLElement {
         };
         return merge(
             this.rendering.lifetime$,
+            visibleViewport$.pipe(
+                tap(() => {
+                    for (const menu of menusOf(root)) {
+                        if (menu.open) {
+                            open(menu);
+                        }
+                    }
+                }),
+            ),
             fromElementEvent$(programs, 'toggle', { capture: true }).pipe(
                 tap(({ target }) => {
                     if (target instanceof HTMLDetailsElement) {

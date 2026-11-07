@@ -1,25 +1,28 @@
 :host {
     display: block;
-    inline-size: max-content;
+    inline-size: fit-content;
+    max-inline-size: 100%;
     font-family: var(--font-ui);
     color: var(--label);
 }
 .programs {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
 }
 .category {
+    flex: none;
     position: relative;
 }
 .key {
     display: grid;
     place-items: center;
     box-sizing: border-box;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: var(--control-lg);
+    block-size: var(--control-lg);
     padding: 0;
-    border-radius: 7px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
     list-style: none;
 }
@@ -32,8 +35,8 @@
     background: var(--well);
 }
 .key svg {
-    inline-size: 17px;
-    block-size: 17px;
+    inline-size: calc(var(--spacing) * 4.25);
+    block-size: calc(var(--spacing) * 4.25);
 }
 .places {
     position: fixed;
@@ -42,11 +45,11 @@
     box-sizing: border-box;
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 6px;
+    padding: var(--space-1-5);
     color: var(--label);
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 12px;
+    border-radius: var(--radius-2xl);
     box-shadow:
         0 2px 6px color-mix(in srgb, var(--shadow) 10%, transparent),
         0 14px 32px color-mix(in srgb, var(--shadow) 18%, transparent);
@@ -54,24 +57,24 @@
 .places:popover-open {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
 }
 .choice {
     flex: none;
     justify-content: flex-start;
     inline-size: 100%;
-    min-block-size: 34px;
-    gap: 9px;
-    padding: 0 9px;
+    min-block-size: max(var(--control-lg), var(--spacing) * 8.5);
+    gap: calc(var(--spacing) * 2.25);
+    padding: 0 calc(var(--spacing) * 2.25);
     text-align: start;
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 .choice span {
     text-transform: capitalize;
 }
 .places-title {
-    margin: 3px 9px 5px;
-    font: 600 10px var(--font-ui);
+    margin: calc(var(--spacing) * 0.75) calc(var(--spacing) * 2.25) calc(var(--spacing) * 1.25);
+    font: 600 var(--text-2xs) var(--font-ui);
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;

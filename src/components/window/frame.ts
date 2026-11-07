@@ -22,6 +22,7 @@ export type WindowView = {
     readonly kind: 'floating' | 'fitted';
     readonly frame: Frame;
     readonly focused: boolean;
+    readonly selected?: boolean;
 };
 
 export type StoreOption = {

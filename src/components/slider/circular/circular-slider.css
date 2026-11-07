@@ -24,8 +24,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    block-size: 16px;
-    inline-size: 16px;
+    block-size: var(--space-4);
+    inline-size: var(--space-4);
     box-sizing: border-box;
     background: var(--panel);
     border: 3px solid var(--accent);

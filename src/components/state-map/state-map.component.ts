@@ -28,9 +28,9 @@ import {
     tap,
     withLatestFrom,
 } from 'rxjs/operators';
-import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
-import { pointerGesture$, type Phase } from '../../shared/drag.ts';
+import { remScale, requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
+import { fromElementEvent$, observeResize$, remScale$ } from '../../lib/rx.ts';
+import { notTouch, pointerGesture$, touchGesture$, type Phase } from '../../shared/drag.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import {
     closesLoop,
@@ -493,10 +493,10 @@ export class HksStateMap extends HTMLElement {
             share(),
         );
 
-        // In the viewport's own units: the canvas zoom shrinks its rect but not its layout.
+        // In the camera's units: the canvas zoom shrinks the rect but not the layout, and the board is drawn rem-scaled.
         const viewport = (clientX: number, clientY: number): Point => {
             const rect = graph.getBoundingClientRect();
-            const scale = rect.width === 0 ? 1 : graph.offsetWidth / rect.width;
+            const scale = (rect.width === 0 ? 1 : graph.offsetWidth / rect.width) / remScale();
 
             return { x: (clientX - rect.left) * scale, y: (clientY - rect.top) * scale };
         };
@@ -542,7 +542,10 @@ export class HksStateMap extends HTMLElement {
         );
 
         this.views$ = merge(
-            pointerGesture$(graph, ({ target }) => free(target) && nodeOf(target) === null).pipe(
+            pointerGesture$(
+                graph,
+                event => notTouch(event) && free(event.target) && nodeOf(event.target) === null,
+            ).pipe(
                 scan(
                     (held: Held, { phase, event }): Held => {
                         const at = viewport(event.clientX, event.clientY);
@@ -556,6 +559,12 @@ export class HksStateMap extends HTMLElement {
                 mergeMap(({ by }): ViewGesture[] =>
                     by === null ? [] : [{ kind: 'pan', dx: by.x, dy: by.y }],
                 ),
+            ),
+            touchGesture$(
+                graph,
+                ({ target }) => free(target) && nodeOf(target) === null,
+                event => viewport(event.clientX, event.clientY),
+                true,
             ),
             fromElementEvent$(graph, 'wheel', { passive: false }).pipe(
                 mergeMap(event => {
@@ -582,11 +591,17 @@ export class HksStateMap extends HTMLElement {
             fromElementEvent$(requireChild(shadow, `[data-tool="${name}"]`), 'click');
 
         this.fits$ = tool('fit').pipe(
-            map(() => ({ width: graph.clientWidth, height: graph.clientHeight })),
+            map(() => ({
+                width: graph.clientWidth / remScale(),
+                height: graph.clientHeight / remScale(),
+            })),
         );
         this.tidies$ = tool('tidy').pipe(map(() => undefined));
         this.sizes$ = observeResize$(graph).pipe(
-            map(() => ({ width: graph.clientWidth, height: graph.clientHeight })),
+            map(() => ({
+                width: graph.clientWidth / remScale(),
+                height: graph.clientHeight / remScale(),
+            })),
         );
 
         this.commands$ = merge(
@@ -685,8 +700,10 @@ export class HksStateMap extends HTMLElement {
             }),
         );
 
-        const viewed$ = camera$.pipe(
-            map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),
+        const viewed$ = combineLatest([camera$, remScale$]).pipe(
+            map(
+                ([{ x, y, zoom }, rem]) => `scale(${rem}) translate(${x}px, ${y}px) scale(${zoom})`,
+            ),
             distinctUntilChanged(),
             tap(transform => {
                 board.style.transform = transform;

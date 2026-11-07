@@ -1,17 +1,21 @@
 :host {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     block-size: 100%;
     min-block-size: 0;
-    font: 12px/1.3 var(--font-ui);
+    font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
+    min-inline-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    container-type: inline-size;
 }
 
 .bar {
     display: flex;
     flex: none;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
 }
 
@@ -30,12 +34,12 @@
 
 .tool {
     flex: none;
-    padding: 5px 10px;
-    font: 500 11px var(--font-ui);
+    padding: calc(var(--spacing) * 1.25) var(--space-2-5);
+    font: 500 var(--text-xs) var(--font-ui);
     color: var(--ink);
     background: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
 }
 
@@ -50,12 +54,12 @@
 
 .prune {
     flex: none;
-    padding: 5px 10px;
-    font: 500 11px var(--font-ui);
+    padding: calc(var(--spacing) * 1.25) var(--space-2-5);
+    font: 500 var(--text-xs) var(--font-ui);
     color: var(--ink);
     background: var(--well);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
 }
 
@@ -80,13 +84,13 @@
 .graph {
     position: relative;
     flex: 1 1 60%;
-    min-block-size: 80px;
+    min-block-size: var(--space-20);
     overflow: hidden;
     touch-action: none;
     user-select: none;
     cursor: grab;
     background: var(--well);
-    border-radius: 10px;
+    border-radius: var(--radius-xl);
 }
 
 .graph:active {
@@ -97,12 +101,12 @@
     display: none;
     flex: 1 1 40%;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
     min-block-size: 0;
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-2-5);
     overflow: auto;
     background: var(--well);
-    border-radius: 10px;
+    border-radius: var(--radius-xl);
 }
 
 :host([data-inspecting]) .inspect {
@@ -111,9 +115,9 @@
 
 .section-head {
     display: flex;
-    gap: 7px;
+    gap: calc(var(--spacing) * 1.75);
     align-items: center;
-    margin-block-end: 2px;
+    margin-block-end: var(--space-0-5);
 }
 
 .section-title {
@@ -128,26 +132,26 @@
 
 .copy {
     flex: none;
-    padding: 3px 8px;
-    font: 500 11px var(--font-ui);
+    padding: calc(var(--spacing) * 0.75) var(--space-2);
+    font: 500 var(--text-xs) var(--font-ui);
     color: var(--ink);
     background: var(--panel);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
 }
 
 .tree {
-    font: 11.5px/1.6 var(--font-mono);
+    font: var(--text-sm)/1.6 var(--font-mono);
 }
 
 .tree-row {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     align-items: baseline;
-    padding-inline-start: calc(var(--depth) * 14px);
+    padding-inline-start: calc(var(--depth) * var(--space-3-5));
     white-space: nowrap;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 
 .tree-row[data-kind='object'],
@@ -161,7 +165,7 @@
 
 .toggle {
     flex: none;
-    inline-size: 14px;
+    inline-size: var(--space-3-5);
     padding: 0;
     color: var(--muted);
     background: transparent;
@@ -493,4 +497,21 @@
 
 .jack {
     cursor: crosshair;
+}
+
+.bar {
+    flex-wrap: wrap;
+}
+@container (max-width: 24rem) {
+    .hint {
+        flex-basis: 100%;
+    }
+}
+.graph {
+    flex-shrink: 0;
+}
+@media (any-pointer: coarse) {
+    .jack::after {
+        inset: -10px;
+    }
 }

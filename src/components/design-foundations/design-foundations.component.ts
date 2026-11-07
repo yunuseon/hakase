@@ -40,16 +40,25 @@ const template = (view: FoundationView) =>
                 read.
             </p>
             <p class="caption">Labels and supporting information</p>
+            <div class="scale">
+                ${['3xs', '2xs', 'xs', 'sm', 'md', 'base', 'lg', 'xl', '2xl', '3xl'].map(size => html`<span style=${styleMap({ 'font-size': `var(--text-${size})` })}>--text-${size}</span>`)}
+            </div>
             <code class="mono">const view$ = state$.pipe(map(render));</code>
         </section>
         <section ?hidden=${view.kind !== 'space'}>
             <h2>Space & shape</h2>
-            <p>Compact controls, soft corners and fine borders.</p>
+            <p>
+                Compact controls, soft corners and fine borders, all in rem so the root size scales
+                them.
+            </p>
             <div class="spaces">
-                ${[4, 8, 12, 16, 24, 32].map(size => html`<div><i style=${styleMap({ 'inline-size': `${size}px` })}></i><code>${size}px</code></div>`)}
+                ${['1', '2', '3', '4', '6', '8'].map(step => html`<div><i style=${styleMap({ 'inline-size': `var(--space-${step})` })}></i><code>--space-${step}</code></div>`)}
             </div>
             <div class="shapes">
-                ${[4, 8, 12].map(radius => html`<div style=${styleMap({ 'border-radius': `${radius}px` })}>${radius}px</div>`)}
+                ${['sm', 'lg', '2xl'].map(radius => html`<div style=${styleMap({ 'border-radius': `var(--radius-${radius})` })}>--radius-${radius}</div>`)}
+            </div>
+            <div class="sizes">
+                ${['xs', 'sm', 'md', 'lg', 'xl'].map(size => html`<div><i style=${styleMap({ 'inline-size': `var(--control-${size})`, 'block-size': `var(--control-${size})` })}></i><code>--control-${size}</code></div>`)}
             </div>
         </section>
         <section ?hidden=${view.kind !== 'icons'}>

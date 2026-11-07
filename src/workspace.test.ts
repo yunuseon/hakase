@@ -4,6 +4,7 @@ import {
     labelOf,
     parseWorkspace,
     reduceWorkspace,
+    settledAction,
     usedStores,
     type Workspace,
     type WorkspaceAction,
@@ -23,6 +24,138 @@ const run = (history: History, actions: readonly WorkspaceAction[]): History => 
 });
 
 const fresh = (): History => ({ present: defaultWorkspace(viewport, inputsFor) });
+
+describe('launch placement', () => {
+    const launch = {
+        kind: 'launch',
+        program: 'bookmarks',
+        size: { width: 300, height: 300 },
+        viewport,
+    } as const satisfies WorkspaceAction;
+
+    it.each([0.1, 0.5, 1, 2, 4])('centres every launch at zoom %s after panning', zoom => {
+        const camera = { x: -800, y: 420, zoom };
+        const workspace = { ...fresh().present, camera };
+        const process = reduceWorkspace(workspace, launch, inputsFor).processes.at(-1);
+
+        expect(process).toBeDefined();
+        if (process === undefined) return;
+        expect(process.frame.x * zoom + camera.x).toBeCloseTo(550);
+        expect(process.frame.y * zoom + camera.y).toBeCloseTo(300);
+        expect(process.frame.width * zoom).toBeCloseTo(300);
+        expect(process.frame.height * zoom).toBeCloseTo(300);
+        expect(process.measured).toEqual({
+            width: process.frame.width,
+            height: process.frame.height,
+        });
+        const next = reduceWorkspace(workspace, launch, inputsFor);
+        expect(reduceWorkspace(next, launch, inputsFor).processes.at(-1)?.frame).toEqual(
+            process.frame,
+        );
+    });
+
+    it('fits a large program inside the visible viewport, including its offset', () => {
+        const camera = { x: 200, y: -80, zoom: 2 };
+        const workspace = { ...fresh().present, camera };
+        const process = reduceWorkspace(
+            workspace,
+            {
+                ...launch,
+                size: { width: 920, height: 640 },
+                viewport: { width: 360, height: 300, left: 50, top: 120 },
+            },
+            inputsFor,
+        ).processes.at(-1);
+
+        expect(process?.frame).toEqual({ x: -65, y: 110, width: 160, height: 130, z: 0 });
+    });
+
+    it('replays a launch in its captured view while preserving the current camera', () => {
+        const workspace = { ...fresh().present, camera: { x: -800, y: 420, zoom: 0.5 } };
+        const action = settledAction(workspace, launch);
+        const expected = reduceWorkspace(workspace, action, inputsFor).processes.at(-1);
+        const replayed = reduceWorkspace(fresh().present, action, inputsFor);
+
+        expect(replayed.processes.at(-1)?.frame).toEqual(expected?.frame);
+        expect(replayed.camera).toEqual(fresh().present.camera);
+    });
+});
+
+describe('moving a selection', () => {
+    const initial = defaultWorkspace(viewport, inputsFor);
+    const workspace = {
+        ...initial,
+        camera: { x: 50, y: -20, zoom: 0.5 },
+        links: [],
+        processes: initial.processes.map((process, i) => ({
+            ...process,
+            frame: { x: i * 400, y: 0, z: 0, width: 200, height: 200 },
+            measured: { width: 200, height: 200 },
+        })),
+    };
+    const ids = workspace.processes.map(p => p.id);
+    const first = ids[0] ?? '';
+    const second = ids[1] ?? '';
+    const third = ids[2] ?? '';
+    const selected = [first, second];
+    const move: WorkspaceAction = { kind: 'move', id: first, dx: 50, dy: 30, selected };
+    const frames = (state: Workspace) =>
+        Object.fromEntries(state.processes.map(p => [p.id, p.frame]));
+
+    it('moves selected windows by the same world delta and leaves others in place', () => {
+        const next = frames(reduceWorkspace(workspace, move, inputsFor));
+        workspace.processes.forEach(process => {
+            expect(next[process.id]).toEqual(
+                selected.includes(process.id)
+                    ? { ...process.frame, x: process.frame.x + 100, y: 60 }
+                    : process.frame,
+            );
+        });
+    });
+
+    it('raises the selection together with the grabbed window on top', () => {
+        const next = reduceWorkspace(workspace, { kind: 'raise', id: first, selected }, inputsFor);
+        expect(next.processes.map(p => p.id)).toEqual([...ids.slice(2), second, first]);
+    });
+
+    it('moves an unselected window independently', () => {
+        const next = frames(reduceWorkspace(workspace, { ...move, id: third }, inputsFor));
+        expect(next[first]).toEqual(frames(workspace)[first]);
+        expect(next[second]).toEqual(frames(workspace)[second]);
+        expect(next[third]?.x).toBe(900);
+    });
+
+    it('snaps the whole selection by one offset, keeping its spacing', () => {
+        const next = frames(reduceWorkspace(workspace, { ...move, dx: 97, dy: 0 }, inputsFor));
+        expect(next[first]?.x).toBe(200);
+        expect(next[second]?.x).toBe(600);
+        expect((next[second]?.x ?? 0) - (next[first]?.x ?? 0)).toBe(400);
+    });
+
+    it('carries attached members without moving a member twice', () => {
+        const attached = {
+            ...workspace,
+            processes: workspace.processes.map((p, i) =>
+                i === 1 ? { ...p, frame: { ...p.frame, x: 200 } } : p,
+            ),
+            links: [{ a: first, b: second }],
+        };
+        const next = frames(reduceWorkspace(attached, move, inputsFor));
+        expect(next[first]?.x).toBe(100);
+        expect(next[second]?.x).toBe(300);
+    });
+
+    it('replays the captured group and zoom after the view changes', () => {
+        const action = settledAction(workspace, move);
+        const next = reduceWorkspace(
+            { ...workspace, camera: { x: 0, y: 0, zoom: 2 } },
+            action,
+            inputsFor,
+        );
+        expect(frames(next)).toEqual(frames(reduceWorkspace(workspace, move, inputsFor)));
+        expect(next.camera.zoom).toBe(2);
+    });
+});
 
 describe('parseWorkspace', () => {
     const saved = (program: string) => {

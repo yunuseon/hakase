@@ -26,10 +26,23 @@ export type Viewport = {
     readonly height: number;
 };
 
+export const remScale = (): number =>
+    parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1;
+
+export const MINIMUM_VIEWPORT = { width: 360, height: 640 } as const satisfies Viewport;
+
 // `innerWidth` reads 0 in an embedded frame before layout; only that is replaced, not a small screen.
 export const viewportSize = (): Viewport => ({
     width: window.innerWidth > 0 ? window.innerWidth : 960,
     height: window.innerHeight > 0 ? window.innerHeight : 600,
+});
+
+export const visibleViewport = () => ({
+    left: window.visualViewport?.offsetLeft ?? 0,
+    top: window.visualViewport?.offsetTop ?? 0,
+    width: window.visualViewport?.width || viewportSize().width,
+    height: window.visualViewport?.height || viewportSize().height,
+    layoutHeight: viewportSize().height,
 });
 
 // A download the user asked for: an object URL clicked through a detached link, then released.
