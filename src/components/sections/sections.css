@@ -26,28 +26,28 @@
     position: absolute;
     z-index: 99999;
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     align-items: center;
-    padding: 0 6px;
-    border-radius: 6px;
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-md);
     color: color-mix(in srgb, var(--accent) 80%, var(--ink));
     pointer-events: auto;
 }
 .name {
     field-sizing: content;
     min-width: 1ch;
-    padding: 2px 0;
+    padding: var(--space-0-5) 0;
     border: none;
     background: transparent;
     color: inherit;
-    font: 600 15px var(--font-ui);
+    font: 600 var(--text-lg) var(--font-ui);
 }
 .name:not([readonly]) {
     border-bottom: 1px dashed currentColor;
 }
 .remove {
-    width: 22px;
-    height: 22px;
+    width: var(--control-xs);
+    height: var(--control-xs);
     min-height: 0;
     padding: 0;
     color: inherit;

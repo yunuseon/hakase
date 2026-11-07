@@ -1,5 +1,5 @@
-import { merge, of } from 'rxjs';
-import { fromDocumentEvent$ } from '../lib/rx.ts';
+import { combineLatest, merge, of } from 'rxjs';
+import { coarsePointer$, fromDocumentEvent$, remScale$ } from '../lib/rx.ts';
 import {
     filter,
     map,
@@ -27,6 +27,7 @@ import {
 } from '../components/section-drawing/section-drawing.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
+import { wiresOf, type WiringView } from '../components/state-wiring/wiring.ts';
 import { categoriesOf } from '../program-categories.ts';
 import { programs } from '../programs.ts';
 import { defaults, recorded, type Story } from './story.ts';
@@ -134,7 +135,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Workspace chrome',
         group: 'Workspace',
         description:
-            'The real canvas, window frame, merged workspace area, attachment seam, toolbar and navigator. Areas are navigation landmarks and never move or own programs. Windows fade and rise on mount, then fade downward on close, respecting reduced motion. Close the sample window to preview its exit; reset to replay its entrance. All actions stay here.',
+            'The real canvas, window frame, merged workspace area, attachment seam, toolbar and navigator. Hold Shift over the background to see the selection crosshair before dragging. Shift-click the example window to toggle its outline. Areas are navigation landmarks and never move or own programs. Windows fade and rise on mount, then fade downward on close, respecting reduced motion. Close the sample window to preview its exit; reset to replay its entrance. All actions stay here.',
         elements: [
             'hks-canvas',
             'hks-window',
@@ -145,6 +146,8 @@ export const chromeStories: readonly Story[] = [
         ],
         variants: [
             { id: 'default', title: 'Workspace' },
+            { id: 'selected', title: 'Selected window' },
+            { id: 'narrow', title: 'Narrow window' },
             { id: 'state', title: 'State mode' },
         ],
         controls: ['label'],
@@ -164,6 +167,13 @@ export const chromeStories: readonly Story[] = [
             navigator.slot = 'chrome';
             element.append(sections, window, seams, navigator);
             const gestures$ = window.gestures$.pipe(share());
+            const frame = {
+                x: 30,
+                y: 90,
+                z: 1,
+                width: variant === 'narrow' ? 180 : 250,
+                height: 230,
+            };
             const frame$ = gestures$.pipe(
                 scan(
                     (frame: Frame, event) =>
@@ -172,9 +182,9 @@ export const chromeStories: readonly Story[] = [
                             : event.kind === 'resize'
                               ? resized(frame, event.edge, event.dx, event.dy)
                               : frame,
-                    { x: 30, y: 90, z: 1, width: 250, height: 230 },
+                    frame,
                 ),
-                startWith({ x: 30, y: 90, z: 1, width: 250, height: 230 }),
+                startWith(frame),
             );
             const camera$ = element.gestures$.pipe(
                 scan(
@@ -206,7 +216,20 @@ export const chromeStories: readonly Story[] = [
                     ),
                     element.connect$(camera$, of(new Map()), of(variant === 'state')),
                     window.connect$(
-                        frame$.pipe(map(frame => ({ kind: 'floating', frame, focused: true }))),
+                        combineLatest([
+                            frame$,
+                            window.selectionToggles$.pipe(
+                                scan(selected => !selected, variant === 'selected'),
+                                startWith(variant === 'selected'),
+                            ),
+                        ]).pipe(
+                            map(([frame, selected]) => ({
+                                kind: 'floating',
+                                frame,
+                                focused: true,
+                                selected,
+                            })),
+                        ),
                         of([
                             {
                                 id: 'example',
@@ -258,6 +281,11 @@ export const chromeStories: readonly Story[] = [
                     ),
                 ),
                 events$: merge(
+                    element.selects$.pipe(
+                        map(({ phase, event }) =>
+                            recorded('select', { phase, x: event.clientX, y: event.clientY }),
+                        ),
+                    ),
                     gestures$.pipe(map(event => recorded('window', event))),
                     sections.gestures$.pipe(map(event => recorded('section', event))),
                     seams.toggles$.pipe(map(event => recorded('seam', event))),
@@ -359,7 +387,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Program selection',
         group: 'Workspace',
         description:
-            'Independent selection highlights and actions. Copy keeps a temporary snapshot; Paste places a copy without saving a blueprint. Save as blueprint is a separate action. All requests stay in this fixture.',
+            'Selection highlights and actions. In the app, dragging a selected title bar raises and moves the selection together with one snap offset and one undo step. This fixture previews the action bar; the Workspace chrome story previews the outline. Copy keeps a temporary snapshot; Paste places a copy without saving a blueprint. Save as blueprint is a separate action. All requests stay in this fixture.',
         elements: ['hks-selection'],
         variants: [
             { id: 'selected', title: 'Programs selected' },
@@ -375,20 +403,14 @@ export const chromeStories: readonly Story[] = [
             const element = new HksSelection();
             const events$ = element.changes$.pipe(share());
             const seed = {
-                boxes:
-                    variant === 'empty'
-                        ? []
-                        : [
-                              { x: 24, y: 100, width: 140, height: 180 },
-                              { x: 184, y: 100, width: 140, height: 180 },
-                          ],
+                count: variant === 'empty' ? 0 : 2,
                 copied: variant === 'copied',
             };
             const view$ = events$.pipe(
                 scan(
                     (view, command) =>
                         command === 'clear'
-                            ? { ...view, boxes: [] }
+                            ? { ...view, count: 0 }
                             : command === 'copy'
                               ? { ...view, copied: true }
                               : view,
@@ -444,7 +466,7 @@ export const chromeStories: readonly Story[] = [
         title: 'State sockets & wires',
         group: 'Workspace',
         description:
-            'State-mode jacks and compact store selection in their distinct wiring appearance. Hover or focus a jack to inspect its choices.',
+            'State-mode jacks and compact store selection in their distinct wiring appearance. Touch keeps selectors visible and uses taller rows; geometry follows the root font size.',
         elements: ['hks-state-wiring'],
         variants: normal,
         controls: [],
@@ -457,78 +479,102 @@ export const chromeStories: readonly Story[] = [
             return {
                 element,
                 run$: element.connect$(
-                    of({
-                        groups: [],
-                        sockets: [
-                            {
-                                key: 'output',
-                                window: 'source',
-                                x: 20,
-                                y: 50,
-                                width: 150,
-                                menu: { above: false, height: 90 },
-                                title: 'Signal',
-                                colour: 'var(--accent)',
-                                end: {
-                                    kind: 'store',
-                                    id: 'signal-example',
-                                    program: 'signal',
-                                    feeds: 'signal',
-                                },
-                                receiver: null,
-                                current: 'signal-example',
-                                optional: false,
-                                options: [
-                                    {
+                    combineLatest([
+                        of({
+                            unit: 1,
+                            rowHeight: 28,
+                            groups: [],
+                            sockets: [
+                                {
+                                    key: 'output',
+                                    window: 'source',
+                                    x: 20,
+                                    y: 50,
+                                    width: 150,
+                                    menu: { above: false, height: 90 },
+                                    title: 'Signal',
+                                    colour: 'var(--accent)',
+                                    end: {
+                                        kind: 'store',
                                         id: 'signal-example',
-                                        name: 'Sine',
-                                        colour: 'var(--accent)',
-                                        source: 'signal',
+                                        program: 'signal',
+                                        feeds: 'signal',
                                     },
-                                ],
-                                group: null,
-                                hidden: false,
-                            },
-                            {
-                                key: 'input',
-                                window: 'sink',
-                                x: 250,
-                                y: 140,
-                                width: 150,
-                                menu: { above: false, height: 90 },
-                                title: 'Knob 1',
-                                colour: 'var(--accent)',
-                                end: {
-                                    kind: 'port',
-                                    owner: 'window',
-                                    sink: 'sketch-example',
-                                    input: 'k1',
-                                    accepts: ['signal'],
-                                    cuttable: true,
+                                    receiver: null,
+                                    current: 'signal-example',
+                                    optional: false,
+                                    options: [
+                                        {
+                                            id: 'signal-example',
+                                            name: 'Sine',
+                                            colour: 'var(--accent)',
+                                            source: 'signal',
+                                        },
+                                    ],
+                                    group: null,
+                                    hidden: false,
                                 },
-                                receiver: null,
-                                current: 'signal-example',
-                                optional: true,
-                                options: [
-                                    {
-                                        id: 'signal-example',
-                                        name: 'Sine',
-                                        colour: 'var(--accent)',
-                                        source: 'signal',
+                                {
+                                    key: 'input',
+                                    window: 'sink',
+                                    x: 250,
+                                    y: 140,
+                                    width: 150,
+                                    menu: { above: false, height: 90 },
+                                    title: 'Knob 1',
+                                    colour: 'var(--accent)',
+                                    end: {
+                                        kind: 'port',
+                                        owner: 'window',
+                                        sink: 'sketch-example',
+                                        input: 'k1',
+                                        accepts: ['signal'],
+                                        cuttable: true,
                                     },
-                                ],
-                                group: null,
-                                hidden: false,
-                            },
-                        ],
-                        wires: [
-                            {
-                                path: 'M160 64 C210 64 210 154 260 154',
-                                colour: 'var(--accent)',
-                                shared: false,
-                            },
-                        ],
-                    }),
+                                    receiver: null,
+                                    current: 'signal-example',
+                                    optional: true,
+                                    options: [
+                                        {
+                                            id: 'signal-example',
+                                            name: 'Sine',
+                                            colour: 'var(--accent)',
+                                            source: 'signal',
+                                        },
+                                    ],
+                                    group: null,
+                                    hidden: false,
+                                },
+                            ],
+                            wires: [
+                                {
+                                    path: 'M160 64 C210 64 210 154 260 154',
+                                    colour: 'var(--accent)',
+                                    shared: false,
+                                },
+                            ],
+                        } satisfies WiringView),
+                        remScale$,
+                        coarsePointer$,
+                    ]).pipe(
+                        map(([view, unit, touch]) => {
+                            const rowHeight = (touch ? 44 : 28) * unit;
+                            const sockets = view.sockets.map(socket => ({
+                                ...socket,
+                                x: socket.x * unit,
+                                y: socket.y * unit,
+                                width: socket.width * unit,
+                                menu: { ...socket.menu, height: socket.menu.height * unit },
+                            }));
+                            return {
+                                unit,
+                                rowHeight,
+                                groups: [],
+                                sockets,
+                                wires: wiresOf(sockets, unit, rowHeight),
+                            };
+                        }),
+                    ),
                 ),
                 events$: element.changes$.pipe(map(event => recorded(event.kind, event))),
             };

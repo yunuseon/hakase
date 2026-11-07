@@ -5,7 +5,7 @@ import { styleMap } from 'lit-html/directives/style-map.js';
 import { repeat } from 'lit-html/directives/repeat.js';
 
 import { renderView, type RenderView } from '../../lib/lit.ts';
-import { fromEvent, merge, Observable } from 'rxjs';
+import { combineLatest, fromEvent, merge, Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -19,8 +19,8 @@ import {
     takeUntil,
     tap,
 } from 'rxjs/operators';
-import { requireChild, requireElement, styleSheet, viewportSize } from '../../lib/dom.ts';
-import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
+import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
+import { fromDocumentEvent$, fromElementEvent$, visibleViewport$ } from '../../lib/rx.ts';
 import {
     emptySelect,
     matchingOptions,
@@ -312,10 +312,10 @@ export class HksSelect extends HTMLElement {
             this.rendering.lifetime$,
             merge(
                 fromElementEvent$(list, 'pointerdown').pipe(tap(event => event.preventDefault())),
-                session$.pipe(
-                    map(session => ({
+                combineLatest([session$, visibleViewport$]).pipe(
+                    map(([session, viewport]) => ({
                         session,
-                        placement: popupPlacement(this.getBoundingClientRect(), viewportSize()),
+                        placement: popupPlacement(this.getBoundingClientRect(), viewport),
                         found: matchingOptions(session.config, session.query),
                     })),
                     tap(({ session, placement, found }) => {

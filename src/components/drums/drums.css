@@ -1,18 +1,22 @@
 :host {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     block-size: 100%;
     min-block-size: 0;
-    font: 12px/1.3 var(--font-ui);
+    font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
+    min-inline-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    container-type: inline-size;
 }
 
 .bar,
 .settings {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 10px;
+    gap: var(--space-1-5) var(--space-2-5);
     align-items: center;
 }
 
@@ -29,7 +33,7 @@ button {
 .presets button,
 .steps button,
 .repeats button {
-    block-size: 24px;
+    block-size: var(--control-sm);
 }
 
 .presets button:hover {
@@ -37,8 +41,8 @@ button {
 }
 
 svg {
-    inline-size: 16px;
-    block-size: 16px;
+    inline-size: var(--space-4);
+    block-size: var(--space-4);
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -50,36 +54,41 @@ svg {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 3px;
+    gap: calc(var(--spacing) * 0.75);
     min-block-size: 0;
-    padding: 8px;
+    padding: var(--space-2);
     overflow: auto;
     background: var(--well);
-    border-radius: 10px;
-    touch-action: none;
+    border-radius: var(--radius-xl);
+    touch-action: pan-x pan-y;
 }
 
 .row {
+    min-inline-size: max-content;
     display: grid;
     flex: 1;
-    grid-template-columns: 58px repeat(var(--steps, 16), minmax(10px, 1fr));
-    gap: 3px;
-    min-block-size: 18px;
+    grid-template-columns: calc(var(--spacing) * 14.5) repeat(
+            var(--steps, 16),
+            minmax(max(var(--space-2-5), var(--drum-step, 0px)), 1fr)
+        );
+    gap: calc(var(--spacing) * 0.75);
+    min-block-size: max(var(--control-xs), var(--spacing) * 4.5);
 }
 
 .drum {
     align-self: center;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--muted);
     white-space: nowrap;
 }
 
 .cell {
+    touch-action: none;
     min-inline-size: 0;
     padding: 0;
     background: color-mix(in srgb, var(--panel) 80%, var(--well));
     border: 1px solid var(--edge);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 
 .cell[data-beat='odd'] {
@@ -106,18 +115,46 @@ svg {
 
 .dial {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     align-items: center;
     color: var(--muted);
 }
 
 .dial input {
-    inline-size: 64px;
+    inline-size: var(--space-16);
     accent-color: var(--accent);
 }
 
 .dial output {
     min-inline-size: 4ch;
-    font: 500 11px var(--font-mono);
+    font: 500 var(--text-xs) var(--font-mono);
     color: var(--ink);
+}
+
+.bar,
+.settings {
+    flex: none;
+}
+.grid {
+    min-block-size: 6rem;
+}
+.dial {
+    flex-wrap: wrap;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+}
+@media (any-pointer: coarse) {
+    :host {
+        --drum-step: var(--control-xs);
+    }
+}
+
+.drum {
+    position: sticky;
+    inset-inline-start: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    background: var(--well);
+    z-index: 1;
 }

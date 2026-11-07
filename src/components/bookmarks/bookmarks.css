@@ -1,17 +1,21 @@
 :host {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     block-size: 100%;
     min-block-size: 0;
-    font: 13px/1.3 var(--font-ui);
+    font: var(--text-md)/1.3 var(--font-ui);
     color: var(--ink);
+    min-inline-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 .scroll {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     min-block-size: 0;
     overflow: hidden auto;
     overscroll-behavior: contain;
@@ -20,14 +24,14 @@
 .groups {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 .group {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    border-radius: 10px;
+    gap: var(--space-0-5);
+    border-radius: var(--radius-xl);
 }
 
 .group[data-dragging] {
@@ -48,20 +52,20 @@
 
 .head {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     align-items: center;
-    min-block-size: 28px;
+    min-block-size: var(--space-7);
 }
 
 .toggle {
     flex: none;
-    inline-size: 20px;
-    block-size: 20px;
+    inline-size: var(--space-5);
+    block-size: var(--space-5);
     padding: 0;
     color: var(--muted);
     background: transparent;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     cursor: pointer;
 }
 
@@ -82,10 +86,10 @@
 
 .group-name {
     flex: 1;
-    padding: 2px 4px;
-    font: 600 12px var(--font-ui);
+    padding: var(--space-0-5) var(--space-1);
+    font: 600 var(--text-sm) var(--font-ui);
     background: transparent;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 
 .group-name:focus-visible {
@@ -96,7 +100,7 @@
 
 .count {
     flex: none;
-    font: 11px var(--font-mono);
+    font: var(--text-xs) var(--font-mono);
     color: var(--muted);
 }
 
@@ -111,11 +115,11 @@
 
 .bookmark {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
-    min-block-size: 34px;
-    padding: 0 4px 0 6px;
-    border-radius: 9px;
+    min-block-size: calc(var(--spacing) * 8.5);
+    padding: 0 var(--space-1) 0 var(--space-1-5);
+    border-radius: var(--radius-xl);
 }
 
 .bookmark:hover {
@@ -140,11 +144,11 @@
     padding: 0;
     background-color: transparent;
     border: none;
-    border-radius: 3px;
-    inline-size: 10px;
-    block-size: 16px;
+    border-radius: var(--radius-sm);
+    inline-size: var(--space-2-5);
+    block-size: var(--space-4);
     background-image: radial-gradient(circle, var(--muted) 1.2px, transparent 1.6px);
-    background-size: 5px 5px;
+    background-size: calc(var(--spacing) * 1.25) calc(var(--spacing) * 1.25);
     opacity: 0.5;
     cursor: grab;
     touch-action: none;
@@ -159,13 +163,13 @@
     display: grid;
     flex: none;
     place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
+    inline-size: calc(var(--spacing) * 5.5);
+    block-size: calc(var(--spacing) * 5.5);
     overflow: hidden;
-    font: 600 11px var(--font-ui);
+    font: 600 var(--text-xs) var(--font-ui);
     color: var(--panel);
     background: var(--accent);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 
 .letter,
@@ -175,8 +179,8 @@
 
 .icon {
     display: none;
-    inline-size: 16px;
-    block-size: 16px;
+    inline-size: var(--space-4);
+    block-size: var(--space-4);
     object-fit: contain;
 }
 
@@ -199,7 +203,7 @@
     min-inline-size: 0;
     color: inherit;
     text-decoration: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 
 .link:hover .name {
@@ -218,7 +222,7 @@
 }
 
 .host {
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--muted);
 }
 
@@ -230,9 +234,9 @@
     display: none;
     flex: 1;
     flex-direction: column;
-    gap: 3px;
+    gap: calc(var(--spacing) * 0.75);
     min-inline-size: 0;
-    padding-block: 4px;
+    padding-block: var(--space-1);
 }
 
 .bookmark[data-editing] .link {
@@ -246,13 +250,13 @@
 .editor input,
 .add input {
     min-inline-size: 0;
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--ink);
     background: var(--well);
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: var(--radius-lg);
 }
 
 .editor input {
@@ -278,15 +282,15 @@
 .remove,
 .remove-group {
     flex: none;
-    inline-size: 24px;
-    block-size: 24px;
+    inline-size: var(--control-sm);
+    block-size: var(--control-sm);
     padding: 0;
-    font-size: 13px;
+    font-size: var(--text-md);
     line-height: 1;
     color: var(--muted);
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     opacity: 0;
 }
@@ -313,8 +317,8 @@
 
 .add {
     display: flex;
-    gap: 4px;
-    margin: 2px 0 0 26px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) 0 0 calc(var(--spacing) * 6.5);
 }
 
 .new-name {
@@ -328,18 +332,18 @@
 .submit,
 .add-group {
     flex: none;
-    padding: 0 10px;
-    font: 500 12px var(--font-ui);
+    padding: 0 var(--space-2-5);
+    font: 500 var(--text-sm) var(--font-ui);
     color: var(--ink);
     background: var(--well);
     border: none;
-    border-radius: 7px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
 }
 
 .add-group {
     align-self: flex-start;
-    block-size: 28px;
+    block-size: var(--control-lg);
     color: var(--muted);
     background: transparent;
     border: 1px dashed var(--rule);
@@ -361,4 +365,31 @@
     opacity: 1;
     outline: 2px solid var(--highlight);
     outline-offset: 1px;
+}
+
+@media (any-pointer: coarse) {
+    .edit,
+    .remove,
+    .remove-group:not(:disabled) {
+        opacity: 1;
+    }
+}
+
+.add {
+    flex-wrap: wrap;
+}
+@container (max-width: 18rem) {
+    .add {
+        margin-inline-start: 0;
+    }
+    .add input {
+        flex-basis: 100%;
+    }
+    .bookmark {
+        flex-wrap: wrap;
+    }
+    .link,
+    .editor {
+        flex-basis: calc(100% - var(--space-12));
+    }
 }

@@ -1,6 +1,5 @@
-import type { Rect } from '../../shared/camera.ts';
 export type SelectionView = {
-    readonly boxes: readonly Rect[];
+    readonly count: number;
     readonly copied: boolean;
 };
 export const SELECTION_COMMANDS = ['copy', 'paste', 'save', 'clear'] as const;

@@ -2,7 +2,9 @@ import { concat, merge, type Observable, of } from 'rxjs';
 import {
     filter,
     map,
+    mergeMap,
     pairwise,
+    scan,
     shareReplay,
     switchMap,
     take,
@@ -10,6 +12,9 @@ import {
     tap,
 } from 'rxjs/operators';
 import { fromDocumentEvent$, fromElementEvent$ } from '../lib/rx.ts';
+import type { Point } from './camera.ts';
+import { NO_TOUCHES, reduceTouches, type TouchInput } from './pinch.ts';
+import type { ViewGesture } from './wheel.ts';
 
 const always = (): boolean => true;
 
@@ -95,4 +100,55 @@ export const pointerDelta$ = (
                 })),
             ),
         ),
+    );
+
+export const notTouch = (event: PointerEvent): boolean => event.pointerType !== 'touch';
+
+const isTouch = (event: PointerEvent): boolean => event.pointerType === 'touch';
+
+// starts: null leaves the touch alone, false lets it pinch but not pan; claims stops an outer view taking it too.
+export const touchGesture$ = (
+    element: HTMLElement,
+    starts: (event: PointerEvent) => boolean | null,
+    at: (event: PointerEvent) => Point,
+    claims: boolean,
+): Observable<ViewGesture> =>
+    merge(
+        fromElementEvent$(element, 'pointerdown').pipe(
+            filter(event => isTouch(event) && !event.defaultPrevented),
+            mergeMap(event => {
+                const pans = starts(event);
+
+                return pans === null
+                    ? []
+                    : [
+                          {
+                              event,
+                              input: {
+                                  kind: 'down' as const,
+                                  id: event.pointerId,
+                                  at: at(event),
+                                  pans,
+                              },
+                          },
+                      ];
+            }),
+            tap(({ event }) => {
+                if (claims) {
+                    event.preventDefault();
+                }
+            }),
+            map(({ input }): TouchInput => input),
+        ),
+        fromDocumentEvent$('pointermove').pipe(
+            filter(isTouch),
+            map((event): TouchInput => ({ kind: 'move', id: event.pointerId, at: at(event) })),
+        ),
+        merge(fromDocumentEvent$('pointerup'), fromDocumentEvent$('pointercancel')).pipe(
+            filter(isTouch),
+            map((event): TouchInput => ({ kind: 'up', id: event.pointerId })),
+        ),
+    ).pipe(
+        scan(reduceTouches, NO_TOUCHES),
+        mergeMap(state => state.gestures),
     );

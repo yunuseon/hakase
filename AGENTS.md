@@ -409,9 +409,11 @@ reaches the renderer, or every orbit drag would rebuild the theme ramp.
 
 **Launching is one action.** The toolbar emits a program id; `main.ts` turns it
 into a `launch` action carrying that program's default `size` and the current
-viewport, and the reducer centres the window on whatever part of the canvas is in
-view, cascading by `launched % 8` so instance two does not land exactly on
-instance one. Quitting is
+visible viewport, including its offset, and the reducer places the window in screen
+coordinates before converting its position and size through the current camera.
+Every new window is centred in the visible viewport, with no cascade offset.
+The default size stays the same on screen at every zoom and is capped to the
+visible viewport with a 20px margin. Quitting is
 the window's own close button — ordinary chrome on every window, not a
 per-program affordance.
 
@@ -522,6 +524,14 @@ expanded card keeps those icons in its upper-left corner and adds history, map
 section targets and navigation controls. Narrow cards wrap the compact view into
 two rows. There is no separate edge toolbar, hide tab or position menu.
 
+**The compact card is a grid; the expanded card is placed by hand.** The
+compact row's areas (launcher, State, thumbnail, zoom) let a larger control push
+its neighbours along, and the thumbnail and its toggle share one cell. The
+expanded card still pins its groups to corners, so every offset there that clears
+a control is written from `--control-lg` (`calc(var(--control-lg) * 3 +
+var(--space-5))` for State beside the launcher's three keys), never a literal:
+a literal was what put State on top of the launcher once touch sizes grew it.
+
 Category menus use native details with a manual top-layer popover. They prefer
 the space above the card, clamp to the viewport and scroll when necessary;
 `popupPlacement` is shared with custom selects. Only one category opens at a
@@ -553,7 +563,7 @@ emit the workspace actions that produce their own frames: `signals$` carries
   subscribes to `workspace$` while mounting reads the seed rather than hanging.
 
 The tool is drawn as **paper-like windows**: one panel colour with no header band,
-a hairline `--edge`, a 14px radius and a soft `--shadow`, a transparent title strip
+a hairline `--edge`, a `--radius-3xl` corner and a soft `--shadow`, a transparent title strip
 holding the program's icon and its name, and a close button that only shows on
 hover or focus. The frontmost window is **focused**, which the window marks with
 `data-focused` but deliberately does not style — a ring around it was tried and
@@ -671,6 +681,93 @@ move between results, Enter selects, and Escape closes the picker before the
 creation dialog. Ticket-list search intersects the tag filter and searches key,
 title, description and tags. Filtered moves use the visible listing under either
 kind of filter, while details still read the complete document.
+
+### Sizes: a rem scale, and the smallest screen
+
+**Every size in a stylesheet comes from a token in `src/styles.css`**, rem-based
+the way Tailwind's are, so the root font size scales the whole interface at
+once. `--spacing` is 0.25rem and `--space-N` is N of it, with half steps
+(`--space-1-5`) up to 4 and the usual larger ones after; `--text-*` is the type
+scale (`--text-sm` is the 12px most interiors read at), `--radius-*` the
+corners and `--control-*` the heights of buttons, icons and choices. A value
+off the scale is written as Tailwind writes it, `calc(var(--spacing) * 1.25)`,
+so it stays exact and stands out as a candidate to snap to a step; a new rule
+should reach for a named step first. Inside `min()`, `max()`, `clamp()` or
+`calc()` the bare product is enough. Container queries cannot read custom
+properties, so their breakpoints are rem literals, which keeps them in step
+with the content they guard.
+
+**Pixels stay where they are deliberate or where JavaScript owns the
+geometry.** Borders, outlines, outline offsets, box shadows, strokes and
+anything under 2px are hairlines and stay px, and so do the windows' resize
+handles. On a coarse pointer their `--band` and `--corner` grow inversely with the canvas zoom, keeping a usable screen hit area without changing frame maths.
+Frames, the camera, snapping and the minimap are world units, never rem, so a
+larger root grows a window's contents, not its frame.
+
+**Geometry that script lays out scales by `remScale$`**, the root font size
+over 16, from `lib/rx.ts`. Nothing fires when the root size changes, so it
+watches a hidden 1rem probe with a `ResizeObserver`, and it measures once on
+subscribe because a hidden pane delivers no resizes. Its two readers take it
+in the way each layout allows:
+
+- **The state map scales its board, not its layout.** The transform is
+  `scale(rem) translate(camera) scale(zoom)`, so the nodes, wires and their px
+  constants (`NODE_WIDTH`, `HEADER`, `PORT_HEIGHT`) grow together while the
+  camera and the hand-placed `positions` stay in map units, and saved maps
+  need no migration. Everything that turns screen pixels into camera units
+  (`viewport()`, the sizes for **Fit** and the first fit) divides by
+  `remScale()`; node drags read the board's own scale from its box, which
+  already includes it. The node CSS therefore stays px: it is in map units.
+- **The state-mode sockets take it as a `unit`.** They sit in world space beside
+  frames that do not scale, so the board trick is not available: `wiringOf`
+  multiplies every offset (`SOCKET_HEIGHT`, `SOCKET_WIDTH`, `INDENT`, the title
+  clearance, the menu clamps) by the unit, `anchorOf` and the group rail do the
+  same for the jack centres, the view carries `unit` so `sameWiring` sees it
+  change, and `state-wiring.css` is on the tokens, so the jacks the CSS draws
+  and the wire ends the script computes grow together. `coarsePointer$` selects 44-unit rows instead of 28; row spacing, menu placement, anchors and the group rail all read that same `rowHeight`. The larger jack hit areas fit between those rows. Touch keeps the store selectors visible.
+
+**The smallest supported screen is 360 x 640 CSS pixels, portrait**
+(`MINIMUM_VIEWPORT` in `lib/dom.ts`, also Storybook's Phone width): the narrow
+end of current Android phones and comfortably inside every iPhone since the
+SE's 375. Program windows live on the infinite canvas and need not fit it,
+but every piece of fixed chrome must: the navigator card compact and expanded,
+its category menus, the command palette, the selection bar and the
+section-drawing and placement hints. Banners centred at the top are
+`inline-size: max-content` capped to the viewport less `--space-6`, and wrap
+rather than run off, which is why the placement hint is no longer `nowrap`.
+Check a chrome change at that size in every appearance before calling it done.
+
+**Touch gets bigger controls from one media query.** Under
+`@media (any-pointer: coarse)` in `src/styles.css` the `--control-*` tokens grow
+to 2.75rem, including on hybrid devices. Shared control faces keep that minimum
+hit height. Windows and lists keep their actions visible without hover. Only what a token cannot express is overridden per
+component: the navigator's State button drops its label on touch, and its
+expanded card stacks its tools above the zoom row, as the narrow container query
+does, because the 320px a phone leaves the card is not narrow enough to trigger
+it. The browser pane's mobile preset matches `pointer: coarse`, so that is where
+to check it.
+
+**Each program reflows its own contents.** Components own wrapping toolbars,
+shrinkable form columns and their scroll regions; the window body is only a
+last scroll fallback. Compact card/detail layouts use container queries in rem,
+so increasing the root size activates them even without resizing the frame.
+Spatial editors keep local scrolling rather than squeezing cells into tiny
+controls: habits retain their date grid; drums keep wide steps and sticky row
+labels which can be swiped to scroll while dragging a cell still paints. The
+sketch and note retain useful minimum drawing/editing areas when controls grow.
+Program stories include a Compact (240px) variant, including the silent Voice
+and Drums fixtures. Check those, minimum window heights, open detail/guide/error
+states and roots of 16, 24 and 32px, in all appearances.
+
+**Visible viewport and workspace camera stay separate.** `viewport$` remains the
+layout viewport used by world geometry. `visibleViewport$` follows the browser's
+visual viewport resize and scroll events with teardown; the canvas passes its
+bounds to fixed chrome as CSS properties. The navigator, palette, selection and
+placement hints, and ticket dialog account for those bounds and safe-area
+insets. Dropdowns and launcher popovers clamp to the visible bounds and reposition
+when the software keyboard changes them, without changing saved frames or the
+workspace camera. Actual iPhone keyboard, scrolling and gesture behaviour still
+requires device verification.
 
 ### Shared UI primitives
 
@@ -859,11 +956,18 @@ Its host must create no stacking context or its labels become trapped under
 program windows. The navigator renders the same area geometry. Legacy sections
 saved as `rect` migrate to `rects`; overlapping old rectangles merge on restore.
 
-**Selection is independent of areas.** Drag the selection tool over intersecting
-programs to highlight them. `selectedIn` and `selectionView` in `selection.ts`
-derive ids and screen-space highlights; the transient selection and copied
+**Selection is independent of areas.** Hold Shift and drag the canvas background
+to select in one gesture, or use the navigator's selection tool and then drag over intersecting
+programs to highlight them. The background cursor becomes a crosshair while Shift
+is held. Shift-click a window to add it to the selection or remove it if selected.
+`selectedIn` and `selectionView` in `selection.ts`
+derive ids and the selection count; the transient selection and copied
 snapshot live in streams, outside documents and history. Closing a selected
-program removes its highlight. The selection bar offers Copy, Paste, Save as
+program removes its highlight. Dragging a selected window's title bar raises and moves
+the selection together, including each member's attached windows; all members
+share one snap offset. The selected ids travel with the move action so undo
+replay does not depend on the current selection. Dragging an unselected window
+still moves only its attached group. The selection bar offers Copy, Paste, Save as
 blueprint and Clear. Cmd/Ctrl+C copies; Cmd/Ctrl+V enters placement, both left to
 native controls while editing. Copying nothing leaves the previous copy intact.
 The clipboard is local to the running app and is not a saved blueprint.
@@ -873,7 +977,7 @@ Capture uses the selected programs' measured bounds and carries their states,
 follow chains, settings, formulas and connections between selected programs.
 Paste logs the captured snapshot itself, so replay never depends on a changed
 clipboard, and makes one undoable placement with fresh ids. Neither paste nor
-blueprint placement creates an area. `hks-selection` only displays highlights
+blueprint placement creates an area. `hks-window` draws its own selection outline at its normal depth. `hks-selection` displays the count
 and emits action intents; it has no document or program knowledge.
 
 **Jumping to a section flies the camera there.** The navigator, with its map
@@ -937,8 +1041,30 @@ properties reach them, and a frame is in world units. Drag the background or
 wheel over it to pan, ctrl/cmd+wheel (a trackpad pinch sends the same) to zoom
 around the pointer, ctrl/cmd `=` `-` `0` from the keyboard, and the navigator has
 zoom, reset and fit. A plain wheel over a window is left alone, so textareas
-still scroll. The dot grid is a CSS gradient whose size and offset follow the
+still scroll.
+
+**Touch pans and pinches from one fold.** `touchGesture$` in `shared/drag.ts`
+folds every touch pointer with `reduceTouches` (`shared/pinch.ts`): one finger
+pans, but only if it went down on the ground; two fingers pan by their midpoint
+and zoom by their spread about it, wherever they went down, so a pinch over a
+window still zooms the canvas; a third finger waits until one of the first two
+lifts. A two-finger move is emitted as a pan **then** a zoom about the new
+midpoint, which is what keeps the world point under each finger exactly under
+it. The mouse pan takes `notTouch`, or the first finger would pan twice.
+**A touch something already took is not the canvas's**: the adapter skips any
+`pointerdown` that is `defaultPrevented`, which every drag gesture (a title bar,
+a slider, a paint stroke) already does, and a view with a camera of its own
+claims its touches (`claims`), as the state map does, so a pinch over the map
+zooms the map, not the canvas. The canvas host is `touch-action: none`, so the
+browser never pinch-zooms the page under it. That does not stop a finger
+scrolling a window's text areas and lists: Blink allows panning again at every
+scroll container, whatever its ancestors say, which real touch events through
+the DevTools protocol confirmed (the formula editor's text area scrolled, the
+canvas stayed put). Safari has not been checked on a device. The dot grid is a CSS gradient whose size and offset follow the
 camera, coarsened in powers of two as you zoom out — there is no grid DOM.
+The canvas clips overflow with `clip`, not `hidden`: a hidden overflow box is
+still a scroll container, so browser focus can scroll it and displace the world
+without changing the camera. Program contents own their own scroll containers.
 
 **Window deltas are divided by zoom in the reducer**, not in the window: the
 pointer moves in screen pixels and the frame is in world units, and doing it in
@@ -1121,13 +1247,13 @@ and both are about an action carrying what it depends on:
   reducer names what it makes from it (`sketch-41`, `card-57`), not from a
   counter in its state, which a replay without an earlier step would number
   differently, and every later action naming that id would miss. Counters stay
-  for names and the cascade, and are the fallback when a reducer is called
+  for names, and are the fallback when a reducer is called
   outside the log (the tests). The document reducers take the sequence as
   `{ seq }`, never a bare number: handed to `Array.prototype.reduce`, a number
   parameter takes the index. The sequence is saved; an older save starts above
   every counter it holds (`seqFloor`), so no new id meets an old one.
 - **What an action reads is settled when it happens** (`settledAction`): a
-  launch carries the camera and cascade it was opened under, a move or resize
+  launch carries the camera it was opened under, a move or resize
   the camera its pixels were measured in, a new section its view. The reducer
   looks at those actions through the camera they carry.
 
@@ -2642,7 +2768,7 @@ to the preview stage; they never change the app's selected look.
 
 ## Tooling
 
-- Node **20.19+**. Do not assume the host has it — `nvm use` reads `.nvmrc`, and
+- Node **24 LTS**. Do not assume the host has it — `nvm use` reads `.nvmrc`, and
   Docker is the fallback that needs no local Node at all.
 - `docker compose up dev --build` for the dev server; `npm run docker:build`
   exports `dist/` via a BuildKit `--output` stage.

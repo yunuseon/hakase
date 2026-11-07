@@ -2,15 +2,19 @@
     display: block;
     block-size: 100%;
     min-block-size: 0;
-    font: 13px/1.35 var(--font-ui);
+    font: var(--text-md)/1.35 var(--font-ui);
     color: var(--ink);
+    min-inline-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    container-type: inline-size;
 }
 
 .frame {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     block-size: 100%;
     min-block-size: 0;
 }
@@ -20,14 +24,14 @@
     flex: none;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 button {
     color: var(--muted);
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 
 button:hover {
@@ -35,8 +39,8 @@ button:hover {
 }
 
 .add-status {
-    padding: 2px 8px;
-    font-size: 12px;
+    padding: var(--space-0-5) var(--space-2);
+    font-size: var(--text-sm);
 }
 
 :host([data-view='list']) .add-status {
@@ -59,12 +63,12 @@ hks-select:focus-visible {
 
 .statuses {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 :host([data-view='list']) .statuses {
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
 :host([data-view='board']) .statuses {
@@ -75,16 +79,16 @@ hks-select:focus-visible {
 .status {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     min-block-size: 0;
 }
 
 :host([data-view='board']) .status {
     flex: none;
-    inline-size: 220px;
-    padding: 6px;
+    inline-size: calc(var(--spacing) * 55);
+    padding: var(--space-1-5);
     background: var(--well);
-    border-radius: 11px;
+    border-radius: var(--radius-2xl);
 }
 
 .status[data-dragging] {
@@ -108,31 +112,31 @@ hks-select:focus-visible {
 }
 
 .status[data-drop-into] .tickets {
-    min-block-size: 24px;
+    min-block-size: var(--space-6);
     box-shadow: inset 0 0 0 2px var(--accent);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
 }
 
 .head {
     display: flex;
     align-items: center;
-    gap: 4px;
-    min-block-size: 24px;
+    gap: var(--space-1);
+    min-block-size: var(--space-6);
 }
 
 .title {
     flex: 1;
-    padding: 2px 4px;
-    font: 600 12px var(--font-ui);
+    padding: var(--space-0-5) var(--space-1);
+    font: 600 var(--text-sm) var(--font-ui);
     background: transparent;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 }
 
 :host([data-view='list']) .title {
     color: var(--label);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    font-size: 11px;
+    font-size: var(--text-xs);
 }
 
 .title:focus-visible {
@@ -144,16 +148,16 @@ hks-select:focus-visible {
 .stage {
     flex: none;
     inline-size: auto;
-    padding: 1px 4px;
-    font-size: 11px;
+    padding: 1px var(--space-1);
+    font-size: var(--text-xs);
     color: var(--muted);
     background: transparent;
 }
 
 .count {
     flex: none;
-    min-inline-size: 18px;
-    font: 11px var(--font-mono);
+    min-inline-size: calc(var(--spacing) * 4.5);
+    font: var(--text-xs) var(--font-mono);
     color: var(--muted);
     text-align: center;
 }
@@ -161,12 +165,13 @@ hks-select:focus-visible {
 .status-grip,
 .grip {
     flex: none;
-    inline-size: 14px;
-    block-size: 22px;
+    inline-size: var(--space-3-5);
+    block-size: calc(var(--spacing) * 5.5);
     padding: 0;
     cursor: grab;
     opacity: 0;
-    background: radial-gradient(circle, var(--muted) 1px, transparent 1.4px) 0 0 / 5px 5px;
+    background: radial-gradient(circle, var(--muted) 1px, transparent 1.4px) 0 0 /
+        calc(var(--spacing) * 1.25) calc(var(--spacing) * 1.25);
 }
 
 .head:hover .status-grip,
@@ -179,10 +184,10 @@ hks-select:focus-visible {
 .remove,
 .remove-status {
     flex: none;
-    inline-size: 22px;
-    block-size: 22px;
+    inline-size: var(--control-xs);
+    block-size: var(--control-xs);
     padding: 0;
-    font-size: 15px;
+    font-size: var(--text-lg);
     opacity: 0;
 }
 
@@ -200,8 +205,8 @@ hks-select:focus-visible {
 .tickets {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    min-block-size: 4px;
+    gap: calc(var(--spacing) * 0.75);
+    min-block-size: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -211,10 +216,10 @@ hks-select:focus-visible {
     display: grid;
     grid-template-columns: auto auto auto 1fr auto;
     align-items: center;
-    gap: 2px 6px;
-    padding: 4px 4px 4px 2px;
+    gap: var(--space-0-5) var(--space-1-5);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-0-5);
     background: var(--panel);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
 }
 
 :host([data-view='list']) .ticket {
@@ -247,8 +252,8 @@ hks-select:focus-visible {
 }
 
 .number {
-    padding: 0 2px;
-    font: 11px var(--font-mono);
+    padding: 0 var(--space-0-5);
+    font: var(--text-xs) var(--font-mono);
     color: var(--muted);
 }
 
@@ -257,9 +262,9 @@ hks-select:focus-visible {
 }
 
 .text {
-    padding: 2px 4px;
+    padding: var(--space-0-5) var(--space-1);
     background: transparent;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     resize: none;
     field-sizing: content;
 }
@@ -279,8 +284,8 @@ hks-select:focus-visible {
     display: flex;
     flex-wrap: wrap;
     grid-column: 3 / -1;
-    gap: 2px 8px;
-    font-size: 11px;
+    gap: var(--space-0-5) var(--space-2);
+    font-size: var(--text-xs);
     color: var(--muted);
 }
 
@@ -318,13 +323,13 @@ hks-select:focus-visible {
     flex: none;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--muted);
 }
 
 .clear-done {
-    padding: 2px 8px;
-    font-size: 12px;
+    padding: var(--space-0-5) var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .detail {
@@ -334,14 +339,14 @@ hks-select:focus-visible {
     z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
     box-sizing: border-box;
-    inline-size: min(300px, 100%);
-    padding: 10px;
+    inline-size: min(var(--spacing) * 75, 100%);
+    padding: var(--space-2-5);
     overflow: auto;
     background: var(--panel);
     border: 1px solid var(--edge);
-    border-radius: 12px;
+    border-radius: var(--radius-2xl);
     box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 25%, transparent);
 }
 
@@ -356,14 +361,14 @@ hks-select:focus-visible {
 }
 
 .detail-number {
-    font: 600 12px var(--font-mono);
+    font: 600 var(--text-sm) var(--font-mono);
     color: var(--muted);
 }
 
 .close-detail {
-    inline-size: 24px;
-    block-size: 24px;
-    font-size: 16px;
+    inline-size: var(--control-sm);
+    block-size: var(--control-sm);
+    font-size: var(--text-xl);
 }
 
 .detail-title {
@@ -372,20 +377,20 @@ hks-select:focus-visible {
 
 .fields {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
 .fields label {
     display: grid;
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: var(--space-16) 1fr;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--muted);
 }
 
 .group h3 {
-    margin: 0 0 4px;
-    font-size: 11px;
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--label);
     text-transform: uppercase;
@@ -395,8 +400,8 @@ hks-select:focus-visible {
 .group ul {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin: 0 0 6px;
+    gap: var(--space-0-5);
+    margin: 0 0 var(--space-1-5);
     padding: 0;
     list-style: none;
 }
@@ -413,7 +418,7 @@ hks-select:focus-visible {
 }
 
 .link {
-    padding: 2px 4px;
+    padding: var(--space-0-5) var(--space-1);
     color: var(--ink);
     text-align: start;
 }
@@ -423,19 +428,19 @@ hks-select:focus-visible {
 }
 
 .unblock {
-    inline-size: 22px;
-    font-size: 14px;
+    inline-size: calc(var(--spacing) * 5.5);
+    font-size: var(--text-base);
 }
 
 .detail-description {
     resize: vertical;
-    min-block-size: 70px;
+    min-block-size: calc(var(--spacing) * 17.5);
 }
 
 .delete-ticket {
     align-self: flex-start;
-    padding: 4px 8px;
-    font-size: 12px;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .delete-ticket:hover {
@@ -446,35 +451,35 @@ hks-select:focus-visible {
     display: flex;
     flex: none;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
     color: var(--muted);
 }
 
 .filter-tags {
-    padding-block: 4px;
+    padding-block: var(--space-1);
 }
 
 .group .ticket-tags {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .remove-tag {
     flex: none;
-    padding: 0 2px;
-    font-size: 14px;
+    padding: 0 var(--space-0-5);
+    font-size: var(--text-base);
     line-height: 1;
 }
 
 .add-tag {
     display: flex;
-    gap: 5px;
+    gap: calc(var(--spacing) * 1.25);
 }
 
 .tag-draft {
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 
 .tag-draft:focus-visible {
@@ -483,12 +488,12 @@ hks-select:focus-visible {
 }
 
 .submit-tag {
-    padding: 4px 8px;
-    font-size: 12px;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
 }
 
 .ticket-search {
-    font-size: 12px;
+    font-size: var(--text-sm);
 }
 
 .ticket-search:focus-visible {
@@ -513,12 +518,12 @@ hks-select:focus-visible {
 }
 
 .tag-draft {
-    padding-inline-end: 36px;
+    padding-inline-end: var(--space-9);
 }
 
 .submit-tag {
     position: absolute;
-    inset-inline-end: 2px;
+    inset-inline-end: var(--space-0-5);
     inset-block-start: 50%;
     transform: translateY(-50%);
 }
@@ -547,7 +552,7 @@ hks-select:focus-visible {
     display: flex;
     flex: none;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .group-head {
@@ -560,4 +565,58 @@ hks-select:focus-visible {
 
 .add-here {
     justify-content: flex-end;
+}
+
+.bar,
+.foot,
+.tag-filter,
+.head {
+    flex-wrap: wrap;
+}
+.title,
+.text,
+.ticket-search {
+    min-inline-size: 0;
+}
+.ticket {
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+}
+.fields label {
+    grid-template-columns: var(--space-16) minmax(0, 1fr);
+}
+@container (max-width: 18rem) {
+    .fields label {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .ticket .text {
+        grid-column: 1 / -2;
+        grid-row: 2;
+    }
+    .ticket .remove {
+        grid-column: -2;
+        grid-row: 2;
+    }
+    .meta {
+        grid-column: 1 / -1;
+    }
+    :host([data-view='board']) .status {
+        inline-size: min(13.75rem, 100cqi);
+        box-sizing: border-box;
+    }
+}
+@media (any-pointer: coarse) {
+    .grip,
+    .status-grip {
+        opacity: 0.8;
+    }
+    .remove,
+    .remove-status:not(:disabled) {
+        opacity: 1;
+    }
+}
+
+.bar-actions,
+.group-head {
+    flex-wrap: wrap;
+    min-inline-size: 0;
 }

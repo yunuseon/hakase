@@ -8,6 +8,7 @@ import {
     modeOf,
 } from './state-mode.ts';
 import {
+    anchorOf,
     commandFor,
     connectionOf,
     groupKey,
@@ -35,6 +36,23 @@ const launch: WorkspaceAction = {
 };
 
 describe('state mode', () => {
+    it.each([1, 1.25, 2])('keeps touch rows separated and anchors centred at scale %s', unit => {
+        const workspace = run([launch]);
+        const view = wiringOf(workspace, new Map(), inputsFor, on, unit, true);
+        if (view === null) throw new Error('Missing wiring view');
+
+        expect(view.rowHeight).toBe(44 * unit);
+        for (const socket of view.sockets) {
+            expect(anchorOf(socket, unit, view.rowHeight).y).toBe(socket.y + 22 * unit);
+            const following = view.sockets.find(
+                other => other.window === socket.window && other.y > socket.y,
+            );
+            if (following !== undefined) {
+                expect(following.y - socket.y).toBeGreaterThanOrEqual(view.rowHeight);
+            }
+        }
+        expect(sameWiring(view, { ...view, rowHeight: view.rowHeight + 1 })).toBe(false);
+    });
     it('holds temporary mode until every active interaction finishes', () => {
         const held = reduceSession(defaultSession, { kind: 'hold', held: true });
         expect(modeOf(held).active).toBe(true);
@@ -70,7 +88,7 @@ describe('state mode', () => {
 
     it('keeps collapsed and expanded sockets inside their owning windows', () => {
         const workspace = run([launch]);
-        const view = wiringOf(workspace, new Map(), inputsFor, on);
+        const view = wiringOf(workspace, new Map(), inputsFor, on, 1);
         expect(view).not.toBeNull();
         view?.sockets.forEach(socket => {
             const frame = workspace.processes.find(process => process.id === socket.window)?.frame;
@@ -91,27 +109,34 @@ describe('state mode', () => {
     });
 
     it('draws no ports when closed and keeps the mode independent of window focus', () => {
-        expect(wiringOf(run(), new Map(), inputsFor, defaultSession)).toBeNull();
-        const before = wiringOf(run(), new Map(), inputsFor, on);
-        const after = wiringOf(run([{ kind: 'raise', id: 'formula-1' }]), new Map(), inputsFor, on);
+        expect(wiringOf(run(), new Map(), inputsFor, defaultSession, 1)).toBeNull();
+        const before = wiringOf(run(), new Map(), inputsFor, on, 1);
+        const after = wiringOf(
+            run([{ kind: 'raise', id: 'formula-1' }]),
+            new Map(),
+            inputsFor,
+            on,
+            1,
+        );
         expect(after?.sockets.length).toBe(before?.sockets.length);
     });
 
     it('draws one clock wire to each follower and no duplicate shared-state wire', () => {
-        const view = wiringOf(run(), new Map(), inputsFor, on);
+        const view = wiringOf(run(), new Map(), inputsFor, on, 1);
         expect(view?.wires).toHaveLength(2);
-        const shared = wiringOf(run([launch, launch]), new Map(), inputsFor, on);
+        const shared = wiringOf(run([launch, launch]), new Map(), inputsFor, on, 1);
         expect(shared?.wires.filter(wire => wire.shared)).toHaveLength(1);
     });
 
     it('keeps selectors intact while signal values change, and updates them when wiring changes', () => {
         const workspace = run([launch]);
-        const before = wiringOf(workspace, new Map(), inputsFor, on);
+        const before = wiringOf(workspace, new Map(), inputsFor, on, 1);
         const edited = wiringOf(
             workspace,
             new Map([['signal', { ...defaultSignal, depth: 2 }]]),
             inputsFor,
             on,
+            1,
         );
         expect(sameWiring(before, edited)).toBe(true);
         const renamed = reduceWorkspace(
@@ -119,7 +144,7 @@ describe('state mode', () => {
             { kind: 'rename-store', id: 'signal-5', store: 'signal', name: 'Wave' },
             inputsFor,
         );
-        expect(sameWiring(before, wiringOf(renamed, new Map(), inputsFor, on))).toBe(false);
+        expect(sameWiring(before, wiringOf(renamed, new Map(), inputsFor, on, 1))).toBe(false);
     });
 
     it('keeps signal connections on the document and excludes sources that would loop', () => {
@@ -130,7 +155,7 @@ describe('state mode', () => {
                 { ...defaultSignal, sources: { phase: null, offset: null, depth: 'store-1' } },
             ],
         ]);
-        const view = wiringOf(workspace, signals, inputsFor, on);
+        const view = wiringOf(workspace, signals, inputsFor, on, 1);
         const depth = view?.sockets.find(socket => socket.key === 'signal-5:input:depth');
         const source = view?.sockets.find(socket => socket.key === 'signal-6:output');
         const reverse = view?.sockets.find(socket => socket.key === 'signal-6:input:phase');
@@ -172,6 +197,7 @@ describe('state mode', () => {
             new Map(),
             inputsFor,
             on,
+            1,
         );
         const playback = view?.sockets.find(socket => socket.key === 'sketch-2:input:playback');
         const output = view?.sockets.find(socket => socket.key === 'timeline-3:output');
@@ -202,6 +228,7 @@ describe('state mode', () => {
             new Map(),
             inputsFor,
             on,
+            1,
         );
         const first = view?.sockets.find(socket => socket.key === 'signal-5:output');
         const second = view?.sockets.find(socket => socket.key === 'signal-6:output');
@@ -243,7 +270,7 @@ describe('input groups', () => {
                 ...on,
                 open: group === null ? [] : [groupKey(sketch.id, group)],
             };
-            const view = wiringOf(workspace, signals, inputsFor, session);
+            const view = wiringOf(workspace, signals, inputsFor, session, 1);
             const rows = [
                 ...(view?.sockets ?? []).filter(
                     socket => socket.window === sketch.id && !socket.hidden,
@@ -272,7 +299,7 @@ describe('input groups', () => {
             },
         ]);
         const sketch = sketchIn(workspace);
-        const view = wiringOf(workspace, signals, inputsFor, on);
+        const view = wiringOf(workspace, signals, inputsFor, on, 1);
         const knobs = view?.groups.find(row => row.key === groupKey(sketch.id, 'Knobs'));
         const k2 = view?.sockets.find(socket => socket.key === `${sketch.id}:input:k2`);
 
@@ -303,7 +330,7 @@ describe('input groups', () => {
         ]);
 
         const sprung = reduceSession(session, { kind: 'spring', key: knobs });
-        const view = wiringOf(run(), signals, inputsFor, sprung);
+        const view = wiringOf(run(), signals, inputsFor, sprung, 1);
 
         expect(view?.groups.find(row => row.key === knobs)?.open).toBe(true);
         expect(view?.groups.find(row => row.key === camera)?.open).toBe(false);
@@ -316,7 +343,7 @@ describe('input groups', () => {
 
     it('springs a group open only for a wire it can take, and keeps it open where the wire landed', () => {
         const workspace = run([launch]);
-        const view = wiringOf(workspace, signals, inputsFor, on);
+        const view = wiringOf(workspace, signals, inputsFor, on, 1);
         const knobs = groupKey('sketch-2', 'Knobs');
         const signalOut = 'signal-5:output';
         const clockOut = 'timeline-3:output';
@@ -353,7 +380,7 @@ describe('input groups', () => {
     });
 
     it('leaves a program with no groups as plain rows', () => {
-        const view = wiringOf(run([launch]), signals, inputsFor, on);
+        const view = wiringOf(run([launch]), signals, inputsFor, on, 1);
 
         expect(view?.groups.filter(row => row.window === 'signal-5')).toEqual([]);
         expect(windowOfGroup(groupKey('signal-5', 'Knobs'))).toBe('signal-5');

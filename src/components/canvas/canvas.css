@@ -1,7 +1,8 @@
 :host {
     position: fixed;
     inset: 0;
-    overflow: hidden;
+    /* A scroll container lets browser focus shift the world outside the camera fold. */
+    overflow: clip;
     background: var(--canvas);
     touch-action: none;
 }
@@ -15,6 +16,10 @@
 
 .ground:active {
     cursor: grabbing;
+}
+
+.ground[data-select-ready] {
+    cursor: crosshair;
 }
 
 /* Zero-sized, so only its windows take pointer events and the ground stays grabbable. */

@@ -1,19 +1,23 @@
 :host {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
     block-size: 100%;
     min-block-size: 0;
-    font: 12px/1.3 var(--font-ui);
+    font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
+    min-inline-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    container-type: inline-size;
 }
 
 .scope {
     position: relative;
     flex: 1;
-    min-block-size: 72px;
+    min-block-size: calc(var(--spacing) * 18);
     background: var(--well);
-    border-radius: 10px;
+    border-radius: var(--radius-xl);
     cursor: grab;
     touch-action: none;
     user-select: none;
@@ -25,9 +29,9 @@
 
 .scope > svg {
     position: absolute;
-    inset: 16px 10px;
-    inline-size: calc(100% - 20px);
-    block-size: calc(100% - 32px);
+    inset: var(--space-4) var(--space-2-5);
+    inline-size: calc(100% - var(--space-5));
+    block-size: calc(100% - var(--space-8));
     overflow: visible;
     pointer-events: none;
 }
@@ -55,29 +59,29 @@
 
 .bound {
     position: absolute;
-    inset-inline-start: 10px;
-    font: 500 10px var(--font-mono);
+    inset-inline-start: var(--space-2-5);
+    font: 500 var(--text-2xs) var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--muted);
     pointer-events: none;
 }
 
 .max {
-    inset-block-start: 2px;
+    inset-block-start: var(--space-0-5);
 }
 
 .min {
-    inset-block-end: 2px;
+    inset-block-end: var(--space-0-5);
 }
 
 /* Drawn outside the stretched svg, or the wave's aspect would squash it into an ellipse. */
 .dot {
     position: absolute;
-    inset-inline-start: calc(10px + var(--x, 0) * (100% - 20px));
-    inset-block-start: calc(16px + var(--y, 1) * (100% - 32px));
-    inline-size: 8px;
-    block-size: 8px;
-    margin: -4px 0 0 -4px;
+    inset-inline-start: calc(var(--space-2-5) + var(--x, 0) * (100% - var(--space-5)));
+    inset-block-start: calc(var(--space-4) + var(--y, 1) * (100% - var(--space-8)));
+    inline-size: var(--space-2);
+    block-size: var(--space-2);
+    margin: calc(var(--spacing) * -1) 0 0 calc(var(--spacing) * -1);
     background: var(--accent);
     border-radius: 50%;
     pointer-events: none;
@@ -86,7 +90,7 @@
 .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-1-5);
     align-items: center;
     justify-content: space-between;
 }
@@ -94,14 +98,14 @@
 .shapes button,
 .rates button,
 .counts button {
-    block-size: 24px;
-    padding: 0 5px;
-    font: 500 11px var(--font-mono);
+    block-size: var(--control-sm);
+    padding: 0 calc(var(--spacing) * 1.25);
+    font: 500 var(--text-xs) var(--font-mono);
 }
 
 .shapes svg {
-    inline-size: 22px;
-    block-size: 11px;
+    inline-size: calc(var(--spacing) * 5.5);
+    block-size: calc(var(--spacing) * 2.75);
     overflow: visible;
 }
 
@@ -117,7 +121,7 @@
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
 /* The rows below set their own display, which would otherwise win over the hidden attribute. */
@@ -128,20 +132,20 @@
 
 .steps {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     align-items: stretch;
 }
 
 .bars {
     flex: 1;
     display: flex;
-    gap: 2px;
+    gap: var(--space-0-5);
     align-items: flex-end;
     min-inline-size: 0;
-    block-size: 56px;
+    block-size: var(--space-14);
     overflow: hidden;
     background: var(--well);
-    border-radius: 9px;
+    border-radius: var(--radius-xl);
     cursor: crosshair;
     touch-action: none;
     user-select: none;
@@ -150,9 +154,9 @@
 .bar {
     flex: 1;
     block-size: calc(var(--value, 0.5) * 100%);
-    min-block-size: 2px;
+    min-block-size: var(--space-0-5);
     background: var(--ink);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     pointer-events: none;
 }
 
@@ -163,27 +167,27 @@
 .counts {
     flex-direction: column;
     flex-wrap: wrap;
-    block-size: 56px;
+    block-size: var(--space-14);
     box-sizing: border-box;
 }
 
 .counts button {
-    min-inline-size: 22px;
-    block-size: 16px;
-    font-size: 10px;
+    min-inline-size: var(--control-xs);
+    block-size: var(--space-4);
+    font-size: var(--text-2xs);
 }
 
 .param {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 5px 8px 6px;
+    gap: var(--space-0-5);
+    padding: calc(var(--spacing) * 1.25) var(--space-2) var(--space-1-5);
     background: var(--well);
-    border-radius: 9px;
+    border-radius: var(--radius-xl);
 }
 
 .key {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     color: var(--muted);
 }
 
@@ -191,7 +195,7 @@
 .num {
     inline-size: 100%;
     padding: 0;
-    font: 500 14px var(--font-mono);
+    font: 500 var(--text-base) var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--ink);
     background: transparent;
@@ -211,4 +215,34 @@
 .param[data-driven] .num {
     color: var(--accent);
     cursor: default;
+}
+
+.shapes,
+.rates {
+    flex-wrap: wrap;
+}
+@container (max-width: 16rem) {
+    .params {
+        grid-auto-flow: row;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .steps {
+        flex-wrap: wrap;
+    }
+    .counts {
+        flex-direction: row;
+        block-size: auto;
+    }
+}
+@media (any-pointer: coarse) {
+    .counts {
+        flex-direction: row;
+        block-size: auto;
+    }
+    .steps {
+        flex-wrap: wrap;
+    }
+    .bars {
+        flex-basis: 100%;
+    }
 }

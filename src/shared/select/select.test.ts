@@ -125,6 +125,28 @@ describe('custom select', () => {
 });
 
 describe('popup placement', () => {
+    it('clamps to an offset visual viewport and anchors above the keyboard', () => {
+        expect(
+            popupPlacement(
+                { left: 490, top: 350, bottom: 390, width: 200 },
+                { left: 100, top: 120, width: 360, height: 300, layoutHeight: 800 },
+            ),
+        ).toEqual({ left: 252, top: null, bottom: 454, width: 200, height: 218 });
+    });
+    it('keeps a popup for an obscured trigger inside the visible area', () => {
+        expect(
+            popupPlacement(
+                { left: 20, top: 700, bottom: 730, width: 200 },
+                { left: 0, top: 0, width: 360, height: 300, layoutHeight: 800 },
+            ),
+        ).toMatchObject({ top: null, bottom: 504, height: 288 });
+    });
+    it('does not force a minimum height beyond the available space', () => {
+        expect(
+            popupPlacement({ left: 0, top: 15, bottom: 35, width: 200 }, { width: 360, height: 60 })
+                .height,
+        ).toBe(13);
+    });
     it('stays inside the viewport horizontally', () => {
         expect(
             popupPlacement(

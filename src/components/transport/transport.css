@@ -1,15 +1,17 @@
 :host {
+    flex-wrap: wrap;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .key {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     justify-content: center;
-    inline-size: 36px;
-    block-size: 36px;
+    inline-size: max(var(--space-9), var(--control-lg));
+    block-size: max(var(--space-9), var(--control-lg));
     padding: 0;
     color: var(--label);
     background: transparent;
@@ -35,8 +37,8 @@
 }
 
 .key.loop {
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: var(--control-lg);
+    block-size: var(--control-lg);
     color: var(--muted);
     border-color: transparent;
 }
@@ -58,7 +60,7 @@
 .of,
 .unit {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
     color: var(--label);
     user-select: none;
@@ -66,19 +68,19 @@
 
 .clock {
     margin-inline-start: auto;
-    font-size: 13px;
+    font-size: var(--text-md);
     color: var(--ink);
 }
 
 .duration {
     inline-size: 5ch;
-    padding: 1px 3px;
+    padding: 1px calc(var(--spacing) * 0.75);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
     background: transparent;
     border: 1px solid var(--edge);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     appearance: textfield;
 }
 
@@ -94,8 +96,8 @@
 }
 
 svg {
-    inline-size: 12px;
-    block-size: 12px;
+    inline-size: var(--space-3);
+    block-size: var(--space-3);
     fill: currentColor;
 }
 

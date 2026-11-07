@@ -50,6 +50,8 @@ export const groupKey = (window: string, group: string) => `${window}${GROUP}${g
 export const windowOfGroup = (key: string) => key.slice(0, Math.max(0, key.indexOf(GROUP)));
 
 export type WiringView = {
+    readonly unit: number;
+    readonly rowHeight: number;
     readonly sockets: readonly Socket[];
     readonly groups: readonly GroupRow[];
     readonly wires: readonly {
@@ -75,9 +77,9 @@ export type WiringEvent =
     | { readonly kind: 'hover'; readonly group: string; readonly from: string }
     | { readonly kind: 'land'; readonly to: string | null };
 
-export const anchorOf = (socket: Socket) => ({
-    x: socket.x + (socket.end.kind === 'store' ? socket.width - 10 : 10),
-    y: socket.y + 14,
+export const anchorOf = (socket: Socket, unit: number, rowHeight = 28 * unit) => ({
+    x: socket.x + (socket.end.kind === 'store' ? socket.width - 10 * unit : 10 * unit),
+    y: socket.y + rowHeight / 2,
 });
 
 export const connectionOf = (from: Socket, to: Socket) => {
@@ -167,7 +169,11 @@ export const commandFor = (view: WiringView | null, event: WiringEvent): WiringC
     return command === null ? null : { kind: 'wire', command };
 };
 
-export const wiresOf = (sockets: readonly Socket[]): WiringView['wires'] =>
+export const wiresOf = (
+    sockets: readonly Socket[],
+    unit: number,
+    rowHeight = 28 * unit,
+): WiringView['wires'] =>
     sockets.flatMap(target => {
         const showing = (socket: Socket) =>
             socket.end.kind === 'store' && socket.end.id === target.current;
@@ -179,7 +185,14 @@ export const wiresOf = (sockets: readonly Socket[]): WiringView['wires'] =>
         }
 
         return [
-            { path: wirePath(anchorOf(source), anchorOf(target)), colour: source.colour, shared },
+            {
+                path: wirePath(
+                    anchorOf(source, unit, rowHeight),
+                    anchorOf(target, unit, rowHeight),
+                ),
+                colour: source.colour,
+                shared,
+            },
         ];
     });
 
@@ -230,7 +243,9 @@ const sameGroup = (a: GroupRow, b: GroupRow) =>
 export const sameWiring = (a: WiringView | null, b: WiringView | null) =>
     a === null || b === null
         ? a === b
-        : a.sockets.length === b.sockets.length &&
+        : a.unit === b.unit &&
+          a.rowHeight === b.rowHeight &&
+          a.sockets.length === b.sockets.length &&
           a.sockets.every((socket, index) => {
               const other = b.sockets[index];
 

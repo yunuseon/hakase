@@ -1,7 +1,7 @@
 :host {
     display: block;
     color: var(--ink);
-    font: 13px/1.6 var(--font-ui);
+    font: var(--text-md)/1.6 var(--font-ui);
 }
 
 * {
@@ -9,24 +9,24 @@
 }
 
 h2 {
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: 550;
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
 }
 
 p {
     color: var(--muted);
-    margin: 0 0 20px;
+    margin: 0 0 var(--space-5);
 }
 
 code {
-    font: 11px/1.5 var(--font-mono);
+    font: var(--text-xs)/1.5 var(--font-mono);
 }
 
 .swatches {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(calc(var(--spacing) * 22.5), 1fr));
+    gap: var(--space-3);
 }
 
 .swatch {
@@ -35,19 +35,19 @@ code {
 
 .swatch i {
     display: block;
-    block-size: 45px;
+    block-size: calc(var(--spacing) * 11.25);
     border: 1px solid var(--edge);
-    border-radius: 8px;
-    margin-block-end: 5px;
+    border-radius: var(--radius-lg);
+    margin-block-end: calc(var(--spacing) * 1.25);
 }
 
 .swatch code {
     color: var(--label);
-    font-size: 10px;
+    font-size: var(--text-2xs);
 }
 
 .display {
-    font-size: 32px;
+    font-size: var(--text-5xl);
     line-height: 1.2;
     letter-spacing: -0.04em;
     font-weight: 550;
@@ -55,7 +55,7 @@ code {
 }
 
 .heading {
-    font-size: 20px;
+    font-size: var(--text-3xl);
     font-weight: 500;
     color: var(--ink);
 }
@@ -66,62 +66,64 @@ code {
 }
 
 .caption {
-    font-size: 11px;
+    font-size: var(--text-xs);
 }
 
 .mono {
     display: block;
-    padding: 12px;
+    padding: var(--space-3);
     background: var(--well);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow-wrap: anywhere;
 }
 
 .spaces,
-.shapes {
+.shapes,
+.sizes {
     display: flex;
-    gap: 16px;
+    gap: var(--space-4);
     align-items: end;
     flex-wrap: wrap;
-    margin-block: 28px;
+    margin-block: var(--space-7);
 }
 
-.spaces div {
+.spaces div,
+.sizes div {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .spaces i {
-    block-size: 40px;
+    block-size: var(--space-10);
     background: var(--accent);
     display: block;
 }
 
 .shapes div {
-    padding: 20px;
+    padding: var(--space-5);
     background: var(--well);
     border: 1px solid var(--rule);
 }
 
 .icons {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(var(--space-20), 1fr));
+    gap: var(--space-5);
 }
 
 .icons div {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--label);
-    font-size: 10px;
+    font-size: var(--text-2xs);
 }
 
 svg {
-    inline-size: 24px;
-    block-size: 24px;
+    inline-size: var(--space-6);
+    block-size: var(--space-6);
     fill: none;
     stroke: currentColor;
     stroke-width: 1.4;
@@ -131,4 +133,20 @@ svg {
 
 [hidden] {
     display: none;
+}
+
+.sizes i {
+    display: block;
+    background: var(--well);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+}
+
+.scale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-4);
+    margin-block: var(--space-4);
+    color: var(--label);
 }

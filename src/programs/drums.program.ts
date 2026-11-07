@@ -28,7 +28,7 @@ export const drumsProgram = {
     category: 'make',
     icon: 'M4 9 A8 3 0 0 1 20 9 V15 A8 3 0 0 1 4 15 Z M4 9 A8 3 0 0 0 20 9 M7 4 L11 8 M17 4 L13 8',
     size: { width: 560, height: 400 },
-    minimum: { width: 420, height: 300 },
+    minimum: { width: 260, height: 300 },
     launch: () => {
         const drums = new HksDrums();
 

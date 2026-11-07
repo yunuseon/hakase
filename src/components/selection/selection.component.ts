@@ -1,6 +1,4 @@
 import { html } from 'lit-html';
-import { repeat } from 'lit-html/directives/repeat.js';
-import { styleMap } from 'lit-html/directives/style-map.js';
 import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
 import { renderView } from '../../lib/lit.ts';
@@ -19,56 +17,43 @@ export class HksSelection extends HTMLElement {
         root.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<SelectionView>(
             root,
-            { boxes: [], copied: false },
+            { count: 0, copied: false },
             view =>
-                html` ${repeat(
-                        view.boxes,
-                        (_, i) => i,
-                        box =>
-                            html`<div
-                                class="selected"
-                                style=${styleMap({ left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` })}
-                            ></div>`,
-                    )}
-                    <div
-                        class="actions"
-                        role="toolbar"
-                        aria-label="Selected programs"
-                        ?hidden=${view.boxes.length === 0}
+                html`<div
+                    class="actions"
+                    role="toolbar"
+                    aria-label="Selected programs"
+                    ?hidden=${view.count === 0}
+                >
+                    <span role="status">${view.count} selected</span>
+                    <button
+                        class="ui-button"
+                        data-command="copy"
+                        ?disabled=${view.count === 0}
+                        title="Copy programs (⌘C)"
                     >
-                        <span role="status">${view.boxes.length} selected</span>
-                        <button
-                            class="ui-button"
-                            data-command="copy"
-                            ?disabled=${view.boxes.length === 0}
-                            title="Copy programs (⌘C)"
-                        >
-                            Copy
-                        </button>
-                        <button
-                            class="ui-button"
-                            data-command="paste"
-                            ?disabled=${!view.copied}
-                            title="Place a copy (⌘V)"
-                        >
-                            Paste
-                        </button>
-                        <button
-                            class="ui-button"
-                            data-command="save"
-                            ?disabled=${view.boxes.length === 0}
-                        >
-                            Save as blueprint
-                        </button>
-                        <button
-                            class="ui-icon"
-                            data-command="clear"
-                            aria-label="clear selection"
-                            title="Clear selection"
-                        >
-                            ×
-                        </button>
-                    </div>`,
+                        Copy
+                    </button>
+                    <button
+                        class="ui-button"
+                        data-command="paste"
+                        ?disabled=${!view.copied}
+                        title="Place a copy (⌘V)"
+                    >
+                        Paste
+                    </button>
+                    <button class="ui-button" data-command="save" ?disabled=${view.count === 0}>
+                        Save as blueprint
+                    </button>
+                    <button
+                        class="ui-icon"
+                        data-command="clear"
+                        aria-label="clear selection"
+                        title="Clear selection"
+                    >
+                        ×
+                    </button>
+                </div>`,
         );
         this.changes$ = fromElementEvent$(this, 'click').pipe(
             mergeMap(event => {

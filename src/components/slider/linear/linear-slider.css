@@ -1,9 +1,11 @@
 :host {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
     block-size: 100%;
     min-block-size: 0;
+    min-inline-size: 0;
+    overflow: auto;
 }
 
 ::slotted(hks-transport) {
@@ -13,7 +15,7 @@
 .track {
     position: relative;
     flex: 1;
-    min-block-size: 0;
+    min-block-size: 2rem;
     cursor: pointer;
     touch-action: none;
     user-select: none;
@@ -25,10 +27,10 @@
     position: absolute;
     inset-inline: 0;
     inset-block: 0;
-    block-size: 4px;
+    block-size: var(--space-1);
     margin-block: auto;
     background-color: var(--edge);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 /* Ticks at every eighth: a scale to read the loop against, not a snap. */
@@ -37,7 +39,7 @@
     position: absolute;
     inset-inline: 0;
     inset-block-start: 0;
-    block-size: calc(50% - 6px);
+    block-size: calc(50% - var(--space-1-5));
     background: linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 12.5% 100% repeat-x;
     border-inline-end: 1px solid var(--rule);
 }
@@ -54,19 +56,19 @@
     content: '';
     position: absolute;
     inset: 0;
-    block-size: 4px;
+    block-size: var(--space-1);
     margin-block: auto;
     background-color: var(--accent);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 .indicator::after {
     content: '';
     position: absolute;
     inset-block: 0;
-    inset-inline-end: -7px;
-    inline-size: 14px;
-    block-size: 14px;
+    inset-inline-end: calc(var(--spacing) * -1.75);
+    inline-size: var(--space-3-5);
+    block-size: var(--space-3-5);
     margin-block: auto;
     background-color: var(--panel);
     border-radius: 50%;

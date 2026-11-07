@@ -5,8 +5,14 @@ import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
-import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import { pointerDelta$ } from '../../shared/drag.ts';
+import { fromDocumentEvent$, fromElementEvent$, visibleViewport$ } from '../../lib/rx.ts';
+import {
+    notTouch,
+    pointerDelta$,
+    pointerGesture$,
+    touchGesture$,
+    type PointerPhase,
+} from '../../shared/drag.ts';
 import type { Camera } from '../../shared/camera.ts';
 import {
     gridOf,
@@ -38,6 +44,7 @@ export class HksCanvas extends HTMLElement {
     readonly edits$: Observable<KeyEdit>;
     readonly clipboard$: Observable<'copy' | 'paste'>;
     readonly steps$: Observable<KeyStep>;
+    readonly selects$: Observable<PointerPhase>;
 
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
@@ -79,10 +86,25 @@ export class HksCanvas extends HTMLElement {
         );
         this.ground = requireChild(shadow, '.ground');
         this.world = requireChild(shadow, '.world');
+        this.selects$ = pointerGesture$(this.ground, event => notTouch(event) && event.shiftKey);
 
         this.gestures$ = merge(
-            pointerDelta$(this.ground).pipe(
+            pointerDelta$(this.ground, event => notTouch(event) && !event.shiftKey).pipe(
                 map(({ dx, dy }): ViewGesture => ({ kind: 'pan', dx, dy })),
+            ),
+            touchGesture$(
+                this,
+                event => {
+                    const path = event.composedPath();
+
+                    return path[0] === this.ground
+                        ? true
+                        : path.includes(this.world)
+                          ? false
+                          : null;
+                },
+                event => ({ x: event.clientX, y: event.clientY }),
+                false,
             ),
             fromElementEvent$(this, 'wheel').pipe(
                 mergeMap(event => {
@@ -185,6 +207,26 @@ export class HksCanvas extends HTMLElement {
         return merge(
             this.rendering.lifetime$,
             merge(
+                merge(
+                    fromDocumentEvent$('keydown').pipe(map(event => event.shiftKey)),
+                    fromDocumentEvent$('keyup').pipe(map(event => event.shiftKey)),
+                    fromElementEvent$(this.ground, 'pointerenter').pipe(
+                        filter(notTouch),
+                        map(event => event.shiftKey),
+                    ),
+                    this.blurs$.pipe(map(() => false)),
+                ).pipe(
+                    distinctUntilChanged(),
+                    tap(held => this.ground.toggleAttribute('data-select-ready', held)),
+                ),
+                visibleViewport$.pipe(
+                    tap(({ left, top, width, height }) => {
+                        this.style.setProperty('--viewport-left', `${left}px`);
+                        this.style.setProperty('--viewport-top', `${top}px`);
+                        this.style.setProperty('--viewport-width', `${width}px`);
+                        this.style.setProperty('--viewport-height', `${height}px`);
+                    }),
+                ),
                 stateMode$.pipe(
                     distinctUntilChanged(),
                     tap(active => {
@@ -199,6 +241,11 @@ export class HksCanvas extends HTMLElement {
                             this.style.setProperty(name, value);
                         }
                     }),
+                ),
+                camera$.pipe(
+                    map(({ zoom }) => String(zoom)),
+                    distinctUntilChanged(),
+                    tap(zoom => this.style.setProperty('--workspace-zoom', zoom)),
                 ),
                 camera$.pipe(
                     map(({ x, y, zoom }) => `translate(${x}px, ${y}px) scale(${zoom})`),

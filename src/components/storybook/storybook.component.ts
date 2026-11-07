@@ -6,7 +6,7 @@ import { repeat } from 'lit-html/directives/repeat.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
 import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, share, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { MINIMUM_VIEWPORT, requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { renderView, type RenderView } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
@@ -112,7 +112,9 @@ const template = (view: BookView) =>
                         .value=${view.state.width}
                         ><option value="auto">Fill</option>
                         <option value="240">240 px</option>
-                        <option value="360">360 px</option>
+                        <option value=${MINIMUM_VIEWPORT.width}>
+                            Phone · ${MINIMUM_VIEWPORT.width} px
+                        </option>
                         <option value="600">600 px</option></hks-select
                     ></label
                 >

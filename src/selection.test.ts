@@ -20,16 +20,22 @@ describe('program selection', () => {
         ).toEqual(ids);
         expect(selectedIn(workspace, { x: 301, y: 0, width: 98, height: 300 })).toEqual([]);
     });
-    it('draws current program frames through the workspace camera and ignores closed programs', () => {
+    it('counts only selected programs that are still open', () => {
         const first = workspace.processes[0];
         if (first === undefined) throw new Error('Missing fixture');
-        expect(selectionView(workspace, [first.id, 'closed'], true)).toEqual({
+        expect(
+            selectionView(
+                workspace.processes.map(p => p.id),
+                [first.id, 'closed'],
+                true,
+            ),
+        ).toEqual({
             copied: true,
-            boxes: [{ x: 50, y: -20, width: 150, height: 150 }],
+            count: 1,
         });
-        expect(selectionView({ ...workspace, processes: [] }, [first.id], true)).toEqual({
+        expect(selectionView([], [first.id], true)).toEqual({
             copied: true,
-            boxes: [],
+            count: 0,
         });
     });
 });

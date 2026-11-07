@@ -1,4 +1,4 @@
-import { defer, EMPTY, merge, type Observable } from 'rxjs';
+import { combineLatest, defer, EMPTY, merge, type Observable } from 'rxjs';
 import {
     filter,
     finalize,
@@ -27,6 +27,7 @@ import type { WorkspaceAction } from './workspace.ts';
 export type ProcessSignal =
     | { readonly to: 'workspace'; readonly action: WorkspaceAction }
     | { readonly to: 'state-mode'; readonly id: ProcessId }
+    | { readonly to: 'toggle-selection'; readonly id: ProcessId }
     | { readonly to: 'state-busy'; readonly id: ProcessId; readonly busy: boolean }
     // Stamped here so a process can tell its own edits from everyone else's.
     | {
@@ -49,6 +50,7 @@ export const liveProcess$ = (
     programs$: Observable<readonly SwitchGroup[]>,
     follows$: Observable<readonly FollowGroup[] | null>,
     manage$: Observable<boolean>,
+    selected$: Observable<boolean>,
     closing$: Observable<unknown> = EMPTY,
 ): Observable<ProcessSignal> =>
     defer(() => {
@@ -68,8 +70,13 @@ export const liveProcess$ = (
             startWith(false),
             distinctUntilChanged(),
         );
-        const view$ = self.slot$.pipe(
-            map(({ frame, focused }): WindowView => ({ kind: 'floating', frame, focused })),
+        const view$ = combineLatest([self.slot$, selected$]).pipe(
+            map(([{ frame, focused }, selected]): WindowView => ({
+                kind: 'floating',
+                frame,
+                focused,
+                selected,
+            })),
         );
 
         const signals$ = merge(
@@ -98,6 +105,9 @@ export const liveProcess$ = (
             ),
             held$.pipe(map((busy): ProcessSignal => ({ to: 'state-busy', id: self.id, busy }))),
             element.stateModes$.pipe(map((): ProcessSignal => ({ to: 'state-mode', id: self.id }))),
+            element.selectionToggles$.pipe(
+                map((): ProcessSignal => ({ to: 'toggle-selection', id: self.id })),
+            ),
             view.run$(state, self).pipe(
                 withLatestFrom(self.store$, self.clock$),
                 map(([input, store, clock]): ProcessSignal => ({

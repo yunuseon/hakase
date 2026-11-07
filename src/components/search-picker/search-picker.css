@@ -1,7 +1,7 @@
 :host {
     display: block;
     min-inline-size: 0;
-    font: 12px/1.4 var(--font-ui);
+    font: var(--text-sm)/1.4 var(--font-ui);
     color: var(--ink);
 }
 
@@ -9,11 +9,11 @@ summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 7px 9px;
+    gap: var(--space-2);
+    padding: calc(var(--spacing) * 1.75) calc(var(--spacing) * 2.25);
     cursor: pointer;
     background: var(--well);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
 }
 
 summary::after {
@@ -35,33 +35,33 @@ summary::after {
 }
 
 .panel {
-    padding: 7px 0;
+    padding: calc(var(--spacing) * 1.75) 0;
 }
 
 input {
-    padding: 7px 9px;
+    padding: calc(var(--spacing) * 1.75) calc(var(--spacing) * 2.25);
     border: 1px solid var(--rule);
-    border-radius: 7px;
+    border-radius: var(--radius-lg);
 }
 
 .results {
     display: grid;
-    gap: 3px;
-    max-block-size: 150px;
+    gap: calc(var(--spacing) * 0.75);
+    max-block-size: calc(var(--spacing) * 37.5);
     overflow: auto;
     overscroll-behavior: contain;
-    margin-block-start: 5px;
+    margin-block-start: calc(var(--spacing) * 1.25);
 }
 
 button {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 7px 9px;
+    gap: var(--space-0-5);
+    padding: calc(var(--spacing) * 1.75) calc(var(--spacing) * 2.25);
     color: var(--ink);
     text-align: start;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--radius-lg);
     background: transparent;
     overflow-wrap: anywhere;
 }
@@ -74,7 +74,7 @@ button[aria-pressed='true'] {
 small,
 .empty {
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
 }
 
 .search {
@@ -82,18 +82,18 @@ small,
 }
 
 .search input {
-    padding-inline-end: 32px;
+    padding-inline-end: var(--space-8);
 }
 
 .clear {
     position: absolute;
-    inset-inline-end: 3px;
+    inset-inline-end: calc(var(--spacing) * 0.75);
     inset-block-start: 50%;
     transform: translateY(-50%);
     align-items: center;
     justify-content: center;
-    inline-size: 26px;
-    block-size: 26px;
+    inline-size: calc(var(--spacing) * 6.5);
+    block-size: calc(var(--spacing) * 6.5);
     padding: 0;
     color: var(--muted);
     border-radius: 50%;

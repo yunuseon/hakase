@@ -273,9 +273,9 @@ export const programStories: readonly Story[] = specs.map(spec => ({
             : spec.program.category === 'make'
               ? 'Creative tools'
               : 'System',
-    description: spec.description,
+    description: `${spec.description} Compact previews use a 240px content width; controls reflow while spatial editors keep their own scroll area.`,
     elements: spec.elements,
-    variants: spec.variants,
+    variants: [...spec.variants, { id: 'compact', title: 'Compact (240px)' }],
     controls: [],
     defaults,
     height: Math.min(780, Math.max(220, spec.program.size.height)),
@@ -283,6 +283,11 @@ export const programStories: readonly Story[] = specs.map(spec => ({
     action: null,
     create: ({ variant }) => {
         const selected = spec.variants.find(item => item.id === variant);
-        return programDemo(spec.program, selected?.settings, selected?.empty);
+        const demo = programDemo(spec.program, selected?.settings, selected?.empty);
+        if (variant === 'compact') {
+            demo.element.style.inlineSize = 'min(100%, 240px)';
+            demo.element.style.blockSize = `${spec.program.minimum.height}px`;
+        }
+        return demo;
     },
 }));
