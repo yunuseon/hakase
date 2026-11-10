@@ -1,3 +1,4 @@
+import type { Image } from './image.ts';
 import type { Observable } from 'rxjs';
 import type { Phase } from './shared/drag.ts';
 import type { Appearance } from './appearance.ts';
@@ -45,6 +46,7 @@ export const PROGRAM_IDS = [
     'pen',
     'voice',
     'drums',
+    'output',
     'blueprints',
     'tasks',
     'tickets',
@@ -158,6 +160,8 @@ export type AppState = {
     // What a store input of the window's own store follows: the store's link, not the window's.
     readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
     readonly linkedDriver$: (param: string) => Observable<Driver | null>;
+    // A cable is a recipe, never pixels: the engine cooks it at this window's own moment.
+    readonly followedImage$: (input: string) => Observable<Image>;
     // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
     readonly bookmarks$: Observable<Bookmarks>;

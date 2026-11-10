@@ -19,6 +19,7 @@ import { drumsProgram } from './programs/drums.program.ts';
 import { blueprintsProgram } from './programs/blueprints.program.ts';
 import { progressProgram } from './programs/progress.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
+import { outputProgram } from './programs/output.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
@@ -39,6 +40,7 @@ export const programs = {
     pen: penProgram,
     voice: voiceProgram,
     drums: drumsProgram,
+    output: outputProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,
     tickets: ticketsProgram,

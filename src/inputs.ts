@@ -18,6 +18,7 @@ export type PaintBinding = { readonly kind: 'paint'; readonly store: StoreId };
 export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
 export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
 export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
+export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
@@ -27,7 +28,8 @@ export type Follow =
     | PaintBinding
     | PenBinding
     | VoiceBinding
-    | DrumsBinding;
+    | DrumsBinding
+    | SketchBinding;
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
@@ -110,6 +112,19 @@ const drumsSource = {
     access: 'read',
 } as const;
 
+const sketchSource = {
+    kind: 'sketch',
+    program: 'sketch',
+    title: 'Sketch',
+    access: 'read',
+} as const;
+
+// Every program whose store makes a picture: an image cable takes any of them.
+export const IMAGE_SOURCES = [sketchSource] as const;
+
+export const isImageKind = (kind: string): boolean =>
+    IMAGE_SOURCES.some(source => source.kind === kind);
+
 export const SOURCES = [
     playbackSource,
     focusSource,
@@ -120,6 +135,7 @@ export const SOURCES = [
     penSource,
     voiceSource,
     drumsSource,
+    ...IMAGE_SOURCES,
 ] as const;
 
 type Source = (typeof SOURCES)[number];
@@ -269,6 +285,15 @@ export const plotInputs = {
     d: signalInput('d', 'Signals'),
 };
 
+export const imageInput = (title: string) =>
+    ({
+        title,
+        from: 'followed',
+        group: null,
+        sources: IMAGE_SOURCES,
+        initial: null,
+    }) as const satisfies FollowedInput;
+
 export const ownPlaybackInput = {
     title: 'Playback',
     from: 'own',
@@ -359,6 +384,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return voiceSource.program;
         case 'drums':
             return drumsSource.program;
+        case 'sketch':
+            return sketchSource.program;
     }
 };
 
@@ -384,6 +411,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'voice':
             return { kind, store };
         case 'drums':
+            return { kind, store };
+        case 'sketch':
             return { kind, store };
         default:
             return null;

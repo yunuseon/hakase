@@ -41,6 +41,11 @@ import { defaultSignal, sameWave, waveOf } from '../shared/signal.ts';
 import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
+import { isImageKind } from '../inputs.ts';
+import { NONE, sameImage, type Image } from '../image.ts';
+import { asSketch } from '../settings.ts';
+import { samePanel, type Drive } from '../components/sketch/params.ts';
+import { sameOrbit } from '../components/sketch/space.ts';
 import { entriesOf } from '../timeline.ts';
 import { listed } from '../workspace.ts';
 import type { Projections } from './projections.graph.ts';
@@ -68,6 +73,7 @@ type StoreKey =
     | 'followedSignal$'
     | 'picture$'
     | 'linkedPicture$'
+    | 'followedImage$'
     | 'drawing$'
     | 'sounding$'
     | 'kit$';
@@ -283,6 +289,110 @@ export const scopedOf = ({
         now$: wallClock$,
     };
 
+    // A store input of a store, read as the binding a window's own follow would be.
+    const linkIn = (store: StoreId, param: string) =>
+        combineLatest([linked$, workspace$]).pipe(
+            map(([linked, workspace]) => {
+                const source = sourceIn(linked, store, param);
+                const owner = source === null ? null : ownerOf(workspace, source);
+                const kind = SOURCES.find(({ program }) => program === owner)?.kind;
+
+                return source === null || kind === undefined ? null : progressBinding(kind, source);
+            }),
+            distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
+        );
+
+    // A voice's envelope is in seconds, so its curve is sampled over the follower's own loop.
+    const driverIn = (store: StoreId, param: string, seconds$: Observable<number>) =>
+        linkIn(store, param).pipe(
+            switchMap((binding): Observable<Driver | null> =>
+                binding?.kind === 'signal'
+                    ? waveIn(binding.store)
+                    : binding?.kind === 'voice'
+                      ? combineLatest([soundingIn(binding.store), seconds$]).pipe(
+                            map(([sounding, seconds]) => voiceCurve(sounding, seconds)),
+                        )
+                      : binding?.kind === 'drums'
+                        ? combineLatest([kitIn(binding.store), seconds$]).pipe(
+                              map(([kit, seconds]) => kitCurve(kit, seconds)),
+                          )
+                        : of(null),
+            ),
+        );
+
+    const sheetIn = (store: StoreId, param: string) =>
+        linkIn(store, param).pipe(
+            switchMap(binding =>
+                binding?.kind === 'paint'
+                    ? pictureIn(binding.store)
+                    : binding?.kind === 'pen'
+                      ? drawingIn(binding.store).pipe(map(strokeOf))
+                      : of(null),
+            ),
+        );
+
+    // Everything a sketch's picture depends on, read from its store alone, so it draws with no window open.
+    const pointsIn = (store: StoreId, seconds$: Observable<number>): Observable<Image> => {
+        const sketch$ = settings$.pipe(
+            map(all => asSketch(all.get(store))),
+            distinctUntilChanged(),
+        );
+        const drive = (param: Drive) => driverIn(store, param, seconds$);
+
+        return combineLatest({
+            source: sketch$.pipe(
+                map(({ formula }) => formula),
+                distinctUntilChanged(),
+                switchMap(formula =>
+                    combineLatest([edits$, library$]).pipe(
+                        map(
+                            ([edits, library]) =>
+                                edits.get(formula)?.value ?? sourceOf(formula, library),
+                        ),
+                    ),
+                ),
+                distinctUntilChanged(),
+            ),
+            panel: sketch$.pipe(
+                map(({ panel }) => panel),
+                distinctUntilChanged(samePanel),
+            ),
+            theme: sketch$.pipe(
+                map(({ theme }) => theme),
+                distinctUntilChanged(),
+                switchMap(name => palettes$.pipe(map(all => all.get(name)?.value ?? themes[name]))),
+                distinctUntilChanged(),
+            ),
+            orbit: sketch$.pipe(
+                map(({ orbit }) => orbit),
+                distinctUntilChanged(sameOrbit),
+            ),
+            drivers: combineLatest({
+                k1: drive('k1'),
+                k2: drive('k2'),
+                k3: drive('k3'),
+                k4: drive('k4'),
+                turn: drive('turn'),
+                pitch: drive('pitch'),
+                distance: drive('distance'),
+                focus: drive('focus'),
+                colour: drive('colour'),
+                size: drive('size'),
+                depth: drive('depth'),
+                trails: drive('trails'),
+            }),
+            sheet: sheetIn(store, 'paint'),
+        }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
+    };
+
+    const imageIn = (store: StoreId, seconds$: Observable<number>): Observable<Image> =>
+        workspace$.pipe(
+            map(workspace => ownerOf(workspace, store)),
+            distinctUntilChanged(),
+            switchMap(owner => (owner === 'sketch' ? pointsIn(store, seconds$) : of(NONE))),
+            distinctUntilChanged(sameImage),
+        );
+
     return (
         store$: Observable<StoreId>,
         clock$: Observable<PlaybackBinding | null>,
@@ -295,26 +405,6 @@ export const scopedOf = ({
             );
         const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
             store$.pipe(switchMap(select));
-        // A store input of this window's store, read as the binding a window's own follow would be.
-        const linkedBy$ = (param: string) =>
-            store$.pipe(
-                switchMap(store =>
-                    combineLatest([linked$, workspace$]).pipe(
-                        map(([linked, workspace]) => {
-                            const source = sourceIn(linked, store, param);
-                            const owner = source === null ? null : ownerOf(workspace, source);
-                            const kind = SOURCES.find(({ program }) => program === owner)?.kind;
-
-                            return source === null || kind === undefined
-                                ? null
-                                : progressBinding(kind, source);
-                        }),
-                        distinctUntilChanged(
-                            (a, b) => a?.kind === b?.kind && a?.store === b?.store,
-                        ),
-                    ),
-                ),
-            );
         const clock = clock$.pipe(
             switchMap(binding => (binding === null ? EMPTY : playbackIn(binding.store))),
             shareReplay({ bufferSize: 1, refCount: true }),
@@ -364,33 +454,18 @@ export const scopedOf = ({
             signal$: narrowed(signalIn),
             wave$: narrowed(waveIn),
             linkedDriver$: param =>
-                linkedBy$(param).pipe(
-                    switchMap((binding): Observable<Driver | null> =>
-                        binding?.kind === 'signal'
-                            ? waveIn(binding.store)
-                            : binding?.kind === 'voice'
-                              ? combineLatest([soundingIn(binding.store), seconds$]).pipe(
-                                    map(([sounding, seconds]) => voiceCurve(sounding, seconds)),
-                                )
-                              : binding?.kind === 'drums'
-                                ? combineLatest([kitIn(binding.store), seconds$]).pipe(
-                                      map(([kit, seconds]) => kitCurve(kit, seconds)),
-                                  )
-                                : of(null),
-                    ),
-                ),
+                store$.pipe(switchMap(store => driverIn(store, param, seconds$))),
             picture$: narrowed(pictureIn),
             drawing$: narrowed(drawingIn),
             sounding$: narrowed(soundingIn),
             kit$: narrowed(kitIn),
-            linkedPicture$: param =>
-                linkedBy$(param).pipe(
+            linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param))),
+            followedImage$: input =>
+                followed$(input).pipe(
                     switchMap(binding =>
-                        binding?.kind === 'paint'
-                            ? pictureIn(binding.store)
-                            : binding?.kind === 'pen'
-                              ? drawingIn(binding.store).pipe(map(strokeOf))
-                              : of(null),
+                        binding !== null && isImageKind(binding.kind)
+                            ? imageIn(binding.store, seconds$)
+                            : of(NONE),
                     ),
                 ),
             followedSignal$: input =>

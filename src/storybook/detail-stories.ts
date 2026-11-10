@@ -1,4 +1,6 @@
-import { EMPTY, merge, of } from 'rxjs';
+import { EMPTY, from, merge, of, type Observable } from 'rxjs';
+import { HksImageView } from '../components/image-view/image-view.component.ts';
+import type { Shown } from '../components/image-view/image-view.ts';
 import { filter, map, scan, share, shareReplay, startWith, withLatestFrom } from 'rxjs/operators';
 import { HksTicketCreator } from '../components/ticket-creator/ticket-creator.component.ts';
 import {
@@ -19,6 +21,21 @@ import { defaultExport, withExportChange } from '../components/sketch/animation.
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { HksPreviewError } from '../components/storybook/preview-error.component.ts';
 import { defaults, recorded, type Story } from './story.ts';
+
+const gradient = () => {
+    const canvas = new OffscreenCanvas(320, 200);
+    const context = canvas.getContext('2d');
+    const fill = context?.createLinearGradient(0, 0, 320, 200);
+    fill?.addColorStop(0, '#2a1d3a');
+    fill?.addColorStop(1, '#e8a25a');
+
+    if (context !== null && fill !== undefined) {
+        context.fillStyle = fill;
+        context.fillRect(0, 0, 320, 200);
+    }
+
+    return canvas;
+};
 
 export const detailStories: readonly Story[] = [
     {
@@ -148,6 +165,40 @@ export const detailStories: readonly Story[] = [
         create: ({ args$ }) => {
             const element = new HksFpsCounter();
             return { element, run$: element.connect$(args$), events$: EMPTY };
+        },
+    },
+    {
+        id: 'image-view',
+        title: 'Image view',
+        group: 'System',
+        description:
+            'Shows what an image cable carries: a bitmap the engine cooked, or a message when nothing is plugged in or the engine failed. Output and every pedal use it.',
+        elements: ['hks-image-view'],
+        variants: [
+            { id: 'frame', title: 'Picture' },
+            { id: 'empty', title: 'Nothing plugged in' },
+            { id: 'failed', title: 'Engine failed' },
+        ],
+        controls: [],
+        defaults,
+        height: 260,
+        action: null,
+        code: 'const view = new HksImageView();\nconst lifetime$ = view.connect$(shown$);\nconst sizes$ = view.sizes$;',
+        create: ({ variant }) => {
+            const element = new HksImageView();
+            const shown$: Observable<Shown> =
+                variant === 'empty'
+                    ? of({
+                          kind: 'message',
+                          text: 'Nothing plugged in. In state mode, wire a sketch into in.',
+                      })
+                    : variant === 'failed'
+                      ? of({ kind: 'message', text: 'This browser does not support WebGL2' })
+                      : from(createImageBitmap(gradient())).pipe(
+                            map((bitmap): Shown => ({ kind: 'frame', bitmap })),
+                        );
+
+            return { element, run$: element.connect$(shown$), events$: EMPTY };
         },
     },
     {

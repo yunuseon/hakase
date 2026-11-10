@@ -16,8 +16,11 @@ type Titles = (program: ProgramId) => { readonly title: string; readonly icon: s
 
 const sourceOf = (program: ProgramId) => SOURCES.find(source => source.program === program);
 
+// What can be followed comes first, in the order of SOURCES, so the clock leads and pictures come last.
 const rank = ({ program, kind }: GraphStore) =>
-    (kind === null ? PROGRAM_IDS.length : 0) + PROGRAM_IDS.findIndex(id => id === program);
+    kind === null
+        ? SOURCES.length + PROGRAM_IDS.findIndex(id => id === program)
+        : SOURCES.findIndex(source => source.kind === kind);
 
 export const graphOf = (
     { stores, processes }: Workspace,

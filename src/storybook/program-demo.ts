@@ -1,3 +1,4 @@
+import { NONE } from '../image.ts';
 import { animationFrames, defer, EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -121,6 +122,7 @@ export const programDemo = (
         kit$: of(kitOf(defaultDrums, new Map())),
         linkedPicture$: () => of(null),
         linkedDriver$: () => of(null),
+        followedImage$: () => of(NONE),
         followedSignal$: input =>
             empty || input !== 'a'
                 ? of(null)

@@ -10,6 +10,7 @@ import {
     sceneInputs,
     ownPlaybackInput,
     playbackInput,
+    imageInput,
     progressInput,
     sourceInput,
     type InputsFor,
@@ -25,16 +26,18 @@ export const inputsFor: InputsFor = program =>
             ? { playback: playbackInput, ...voiceInputs }
             : program === 'drums'
               ? { playback: playbackInput, ...drumsInputs }
-              : program === 'plot'
-                ? { playback: playbackInput, ...plotInputs }
-                : program === 'signal'
-                  ? { playback: playbackInput, ...signalInputs }
-                  : program === 'timeline'
-                    ? { playback: ownPlaybackInput }
-                    : program === 'playhead'
-                      ? { progress: progressInput }
-                      : program === 'progress'
-                        ? { source: sourceInput }
-                        : program === 'focus'
-                          ? { ...focusInputs }
-                          : {};
+              : program === 'output'
+                ? { playback: playbackInput, in: imageInput('in') }
+                : program === 'plot'
+                  ? { playback: playbackInput, ...plotInputs }
+                  : program === 'signal'
+                    ? { playback: playbackInput, ...signalInputs }
+                    : program === 'timeline'
+                      ? { playback: ownPlaybackInput }
+                      : program === 'playhead'
+                        ? { progress: progressInput }
+                        : program === 'progress'
+                          ? { source: sourceInput }
+                          : program === 'focus'
+                            ? { ...focusInputs }
+                            : {};

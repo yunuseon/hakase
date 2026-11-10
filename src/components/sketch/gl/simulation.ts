@@ -14,6 +14,8 @@ export type Simulation = {
 
 const STATE_UNIT = 1;
 
+const NO_FLOAT_TARGETS = 'This browser cannot keep a formula’s state: no float render targets.';
+
 const stateTexture = (gl: WebGL2RenderingContext, side: number): WebGLTexture => {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -33,37 +35,52 @@ const targetOf = (gl: WebGL2RenderingContext, texture: WebGLTexture): WebGLFrame
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     if (!complete) {
-        throw new Error('This browser cannot keep a formula’s state: no float render targets.');
+        throw new Error(NO_FLOAT_TARGETS);
     }
 
     return framebuffer;
 };
 
+export const createSimulation = (gl: WebGL2RenderingContext, side: number): Simulation => {
+    if (gl.getExtension('EXT_color_buffer_float') === null) {
+        throw new Error(NO_FLOAT_TARGETS);
+    }
+
+    // Made on the state's own unit: binding them on the active one would put them where the palette is read.
+    gl.activeTexture(gl.TEXTURE0 + STATE_UNIT);
+    const textures = [stateTexture(gl, side), stateTexture(gl, side)] as const;
+    const framebuffers = [targetOf(gl, textures[0]), targetOf(gl, textures[1])] as const;
+    gl.activeTexture(gl.TEXTURE0);
+
+    return { side, textures, framebuffers };
+};
+
+export const releaseSimulation = (
+    gl: WebGL2RenderingContext,
+    { textures, framebuffers }: Simulation,
+): void => {
+    framebuffers.forEach(framebuffer => {
+        gl.deleteFramebuffer(framebuffer);
+    });
+    textures.forEach(texture => {
+        gl.deleteTexture(texture);
+    });
+};
+
 export const simulation$ = (gl: WebGL2RenderingContext, side: number): Observable<Simulation> =>
     new Observable(subscriber => {
-        if (gl.getExtension('EXT_color_buffer_float') === null) {
-            subscriber.error(
-                new Error('This browser cannot keep a formula’s state: no float render targets.'),
-            );
+        try {
+            const simulation = createSimulation(gl, side);
+            subscriber.next(simulation);
+
+            return () => {
+                releaseSimulation(gl, simulation);
+            };
+        } catch (error) {
+            subscriber.error(error);
 
             return undefined;
         }
-
-        // Made on the state's own unit: binding them on the active one would put them where the palette is read.
-        gl.activeTexture(gl.TEXTURE0 + STATE_UNIT);
-        const textures = [stateTexture(gl, side), stateTexture(gl, side)] as const;
-        const framebuffers = [targetOf(gl, textures[0]), targetOf(gl, textures[1])] as const;
-        gl.activeTexture(gl.TEXTURE0);
-        subscriber.next({ side, textures, framebuffers });
-
-        return () => {
-            framebuffers.forEach(framebuffer => {
-                gl.deleteFramebuffer(framebuffer);
-            });
-            textures.forEach(texture => {
-                gl.deleteTexture(texture);
-            });
-        };
     });
 
 export const bindState = (
