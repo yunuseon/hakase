@@ -1,4 +1,5 @@
 import { storybookProgram } from './programs/storybook.program.ts';
+import type { InputsFor } from './inputs.ts';
 import type { Program, ProgramId } from './program.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
@@ -52,3 +53,11 @@ export const programs = {
     state: stateProgram,
     storybook: storybookProgram,
 } satisfies { readonly [K in ProgramId]: Program<K> };
+
+// In toolbar order: a record keeps its keys in the order they were written.
+export const programList = Object.values(programs);
+
+export const programOf = (id: ProgramId) => programs[id];
+
+// The programs declare what they read from others; the workspace asks through this, never the table itself.
+export const inputsFor: InputsFor = program => programs[program].inputs;

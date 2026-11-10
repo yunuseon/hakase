@@ -40,6 +40,8 @@ export type ProcessSignal =
           readonly input: AppInput;
       };
 
+export type AppSignal = Extract<ProcessSignal, { readonly to: 'app' }>;
+
 // Two subscriptions mean two processes: defer launches and opens, finalize closes.
 export const liveProcess$ = (
     program: Program,

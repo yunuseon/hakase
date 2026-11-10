@@ -562,6 +562,16 @@ emit the workspace actions that produce their own frames: `signals$` carries
   buffer before the source is subscribed and the windows mount. A window that
   subscribes to `workspace$` while mounting reads the seed rather than hanging.
 
+**The cycle closes in one place.** `main.ts` holds the only back edges, four
+`defer`s: the windows' output (`signals$`, `inputs$`) and the two action
+streams folded into `historyOf`. Every `*.graph.ts` module takes those as
+ordinary parameters and never reaches forward itself, so a reader sees the whole
+loop in `main.ts` and nowhere else. The one exception is internal to
+`state-mode.graph.ts`, where the session and the wiring events feed each other.
+A new module that needs a stream built later takes it as a parameter and lets
+`main.ts` defer it; a `defer` inside a module that names another module's stream
+is the old shape creeping back.
+
 The tool is drawn as **paper-like windows**: one panel colour with no header band,
 a hairline `--edge`, a `--radius-3xl` corner and a soft `--shadow`, a transparent title strip
 holding the program's icon and its name, and a close button that only shows on
@@ -992,7 +1002,8 @@ it first was, a short hop was over in a blink and a jump across the canvas was a
 wait; the root gives a hop time to read and keeps a long way brisk. `animationFrames()` drives it through `switchMap`, so a
 second jump replaces the first, and `takeUntil` any pan, zoom or key ends it, so
 the user can always take the camera back. A flight reads the camera from the
-fold it feeds, so it enters through a `defer` like window gestures.
+fold it feeds, so it reaches that fold through the workspace actions `main.ts`
+defers into history, like window gestures.
 
 **Locating a window flies there too.** A jump is a `Jump`, a section or a
 window, and both run through the one `flights$`, so a locate is interrupted by
@@ -1029,8 +1040,8 @@ the workspace fold (`toggle-minimap`), and the component only emits gestures.
 Hidden expanded controls leave the tab order. The direct Navigation card story
 covers compact, expanded and empty states alongside the workspace composition.
 
-Slotted children stay in the light DOM, so `main.ts` still finds them with
-`requireElement` and their own shadow roots are untouched. Everything else is a
+Slotted children stay in the light DOM: `mountChrome` appends them to the
+canvas with a `slot` name, and their own shadow roots are untouched. Everything else is a
 window in its own right — a control that belongs to the sketch conceptually is
 not therefore part of its chrome, and the timeline learned that the hard way.
 
@@ -2051,7 +2062,7 @@ conditional falls back to the constraint and lets every kind through.
   last drag's step even when it changes nothing.
 - **The workspace asks, it does not import.** `reduceWorkspace`,
   `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
-  an `inputsFor(program)`; `main.ts` builds it from the program table, and tests
+  an `inputsFor(program)`; `programs.ts` builds it from the program table, and tests
   use `src/inputs.fixture.ts`, because the program modules pull in the DOM. The
   declarations are plain data, so building the table never evaluates the
   reactive cycle early.
@@ -2317,9 +2328,24 @@ belongs to is read from its name instead of its path:
   `program.ts` beside `Program` and `ProgramId`: splitting it out again brings
   back a type-only import cycle, since `Program.connect$` takes an `AppState` and
   `AppState.frame$` takes a `ProgramId`.
-- **`src/main.ts`** — the graph and nothing else. Build `playhead$`, fold the
-  window actions, hand back an `AppState`, subscribe once. No `tap`, no DOM, no GL
-  imports — `compileFormula$` exists so that the last of those stays true.
+- **`src/main.ts`** — the graph and nothing else: it calls the `*.graph.ts`
+  modules in dependency order, closes the cycle, and subscribes once. It reads
+  as the app's dataflow diagram, and it should stay about a screen long.
+- **`src/graph/*.graph.ts`** — the sub-graphs `main.ts` composes, each a
+  function from the streams it reads to a record of the streams it makes:
+  `chrome` (mounting the fixed chrome, and `connectChrome$`, its one edge),
+  `intents` (what the chrome's controls ask for), `history` and `projections`
+  (the documents fold and its per-document streams), `timekeeping` (playback
+  clocks, focus timers and plans), `selection` (selection, clipboard,
+  placement), `navigation` (jumps and camera flights), `state-mode`, `app-state`
+  (`scopedOf`, the `AppState` each window gets), `windows` (one `liveProcess$`
+  per process), the two action streams, and `persistence`. A module's parameter
+  type is a `Pick` of the records it reads (`Pick<Projections, 'workspace$'>`),
+  so its imports say what it depends on and `main.ts` can pass whole records by
+  spreading them. Its return type is inferred, and `X = ReturnType<typeof xOf>`
+  names it. No `tap` and no GL in any of them; the DOM appears only in
+  `mountChrome`. When this file says something is "folded in `main.ts`", it
+  means one of these modules.
 
 `src/lib/` sits underneath everything: `dom`, `math`, `rx`, `color`, `storage`.
 
@@ -2328,7 +2354,7 @@ The program layer sits at the `src/` root, above the components it composes:
 toolbar, and their reducer), `settings.ts` (what each window remembers),
 `state-store.ts` (the one snapshot), `process.ts` (`liveProcess$`),
 `appearance.ts`, `appearances.ts`,
-`main.ts`.
+`main.ts` and the `graph/` it composes.
 
 ## The prime directive
 
