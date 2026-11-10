@@ -414,7 +414,7 @@ coordinates before converting its position and size through the current camera.
 Every new window is centred in the visible viewport, with no cascade offset.
 The default size stays the same on screen at every zoom and is capped to the
 visible viewport with a 20px margin. Quitting is
-the window's own close button — ordinary chrome on every window, not a
+the window's own close button — ordinary window chrome, not a
 per-program affordance.
 
 Programs live in `src/programs/<name>.program.ts` and nowhere else. A component
@@ -483,7 +483,7 @@ belongs in `shared/`, or the two components want to be one.
 
 **A window is a component that holds one other component.** `hks-window` owns the
 frame — title bar, drag, the eight resize handles — and knows
-nothing about what it contains; the content component owns no chrome and does not
+nothing about what it contains; the content component owns no window chrome and does not
 know it is in a window. Keep that line: the moment a content component reaches
 for its own title bar or placement, the two are welded together again and neither
 can be reused. A window's inputs are a `WindowView`: a frame plus a `kind`, either
@@ -492,7 +492,7 @@ frame but sized by its content). Every program window is `floating`, so
 `Program` has no `kind` at all; content-sized chrome may use a `fitted` frame,
 because its size is its row of tiles.
 
-**Every window is the same window.** There is no per-window chrome, no mode, and
+**Every window is the same window.** No window has chrome of its own, no mode, and
 no window that another one has to be special-cased around. A feature that only
 one window can use — the terminal's docking was one — buys a branch in
 `WindowView`, a branch in `connect$`, a button in the shared title bar, a state
@@ -511,7 +511,18 @@ quitting is therefore just
 the workspace fold holds. Adding a program is one entry in that
 record, in toolbar order; nothing in `main.ts` names it.
 
-**The launcher and navigator are one piece of chrome.** `main.ts` puts one
+**Chrome is the UI that belongs to no program**, and the word comes in two
+kinds. Unqualified, it always means **workspace chrome**: what `mountChrome`
+mounts once and keeps for the app's whole life, either in screen space in the
+canvas's `chrome` slot (the navigator and its launcher, the palette, the
+selection bar, the section-drawing preview, the placement ghost) or in the
+world layer beside the windows (the seams, the state wiring, the section
+areas). **Window chrome** is what `hks-window` draws around every program (the
+title strip, state chip, close button and resize handles) and is always written
+out in full. The two never mix: workspace chrome is not a window, and window
+chrome knows nothing of the workspace.
+
+**The launcher and navigator are one piece of chrome.** `mountChrome` puts one
 `HksToolbar` in `HksNavigator`'s `launcher` slot; only the navigator occupies the
 canvas's chrome slot. The launcher owns the Make, Plan and System category
 menus and emits program ids. The navigator owns their position alongside State,
@@ -577,7 +588,7 @@ a hairline `--edge`, a `--radius-3xl` corner and a soft `--shadow`, a transparen
 holding the program's icon and its name, and a close button that only shows on
 hover or focus. The frontmost window is **focused**, which the window marks with
 `data-focused` but deliberately does not style — a ring around it was tried and
-removed as noise. That chrome lives once in `components/window/window.css`. Interiors
+removed as noise. That window chrome lives once in `components/window/window.css`. Interiors
 follow it — Geist for UI text, Geist Mono for code, readouts and clocks, both as
 `--font-ui` / `--font-mono` from `styles.css` — and nest no frames of their own; a
 well (`--well`, rounded) marks an editable area instead of a border. The design
@@ -1043,7 +1054,7 @@ covers compact, expanded and empty states alongside the workspace composition.
 Slotted children stay in the light DOM: `mountChrome` appends them to the
 canvas with a `slot` name, and their own shadow roots are untouched. Everything else is a
 window in its own right — a control that belongs to the sketch conceptually is
-not therefore part of its chrome, and the timeline learned that the hard way.
+not therefore part of its window chrome, and the timeline learned that the hard way.
 
 ## Windows
 
