@@ -46,6 +46,11 @@ const findings = (
             if (/<button\b[^>]*role="radio"/.test(source) && !source.includes('connectChoices$')) {
                 issues.push(`${name}: connect button-based radio groups with connectChoices$.`);
             }
+            for (const match of source.matchAll(/<\w+\b[^>]*role="radiogroup"[^>]*>/g)) {
+                if (!/class="[^"]*\bui-choices\b/.test(match[0])) {
+                    issues.push(`${name}: give the radiogroup the ui-choices container.`);
+                }
+            }
             for (const match of source.matchAll(/<(input|hks-select)\b[^>]*>/g)) {
                 const tag = match[0];
                 const primitive =
