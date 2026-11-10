@@ -181,7 +181,9 @@ const tabs = () =>
 
 const TEMPLATE = () =>
     html`<div class="head">
-            <div class="segments tabs" role="radiogroup" aria-label="sketch panels">${tabs()}</div>
+            <div class="ui-choices segments tabs" role="radiogroup" aria-label="sketch panels">
+                ${tabs()}
+            </div>
             <div class="document" role="group" aria-label="what the sketch shows">
                 ${choice('formula', 'formula')}${choice('theme', 'theme')}
             </div>
