@@ -260,6 +260,7 @@ export const prepare = (
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, paint);
 
     if (picture !== null && isStroke(picture)) {
+        const bound: unknown = gl.getParameter(gl.FRAMEBUFFER_BINDING);
         gl.texImage3D(
             gl.TEXTURE_2D_ARRAY,
             0,
@@ -274,7 +275,8 @@ export const prepare = (
         );
         gl.bindFramebuffer(gl.FRAMEBUFFER, inkTarget);
         gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, paint, 0, 0);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // Back to whatever was bound, not the canvas: the engine prepares a sketch inside its own target.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bound instanceof WebGLFramebuffer ? bound : null);
         loadStroke(ink, picture);
     } else {
         gl.texImage3D(

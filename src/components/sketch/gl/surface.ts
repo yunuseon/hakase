@@ -1,4 +1,4 @@
-import { createInkPass, type InkPass } from '../../../shared/gl/ink.ts';
+import { createInkPass, releaseInkPass, type InkPass } from '../../../shared/gl/ink.ts';
 import type { Size } from '../../window/frame.ts';
 import { RAMP_SIZE } from '../theme.ts';
 
@@ -37,6 +37,13 @@ const surfaceOn = <C extends HTMLCanvasElement | OffscreenCanvas>(canvas: C): Su
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
+    return { canvas, gl, ...createSketchResources(gl) };
+};
+
+export type SketchResources = Pick<Surface, 'palette' | 'paint' | 'ink' | 'inkTarget'>;
+
+// Apart from the context, so the engine can give every sketch it draws its own palette and paint in one context.
+export const createSketchResources = (gl: WebGL2RenderingContext): SketchResources => {
     const palette = gl.createTexture();
     if (!palette) {
         throw new Error('This browser refused a palette texture');
@@ -75,14 +82,17 @@ const surfaceOn = <C extends HTMLCanvasElement | OffscreenCanvas>(canvas: C): Su
     );
     gl.activeTexture(gl.TEXTURE0);
 
-    return {
-        canvas,
-        gl,
-        palette,
-        paint,
-        ink: createInkPass(gl),
-        inkTarget: gl.createFramebuffer(),
-    };
+    return { palette, paint, ink: createInkPass(gl), inkTarget: gl.createFramebuffer() };
+};
+
+export const releaseSketchResources = (
+    gl: WebGL2RenderingContext,
+    { palette, paint, ink, inkTarget }: SketchResources,
+): void => {
+    gl.deleteTexture(palette);
+    gl.deleteTexture(paint);
+    gl.deleteFramebuffer(inkTarget);
+    releaseInkPass(gl, ink);
 };
 
 export const createSurface = (parent: HTMLElement): Surface<HTMLCanvasElement> => {

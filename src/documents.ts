@@ -44,7 +44,7 @@ import {
     type Voice,
     type VoiceCommand,
 } from './components/voice/voice.ts';
-import { isProgramId } from './program.ts';
+import { isProgramId, type ProgramId } from './program.ts';
 import {
     placed,
     reduceBlueprints,
@@ -62,7 +62,7 @@ import {
     type Tickets,
 } from './shared/tickets.ts';
 import { emptyAgenda } from './components/agenda/agenda.ts';
-import type { InputsFor } from './inputs.ts';
+import { storeInputOf, type InputsFor } from './inputs.ts';
 import { reduceLibrary, type FormulaId, type Library, type LibraryCommand } from './library.ts';
 import type { ProcessId, Written } from './program.ts';
 import { viewOnly, type Settings } from './settings.ts';
@@ -249,6 +249,57 @@ const copiesOf = (before: readonly StoreEntry[], after: readonly StoreEntry[]): 
 
 const written = <K, V>(all: ReadonlyMap<K, Written<V>>, key: K, value: V, from: ProcessId) =>
     new Map(all).set(key, { value, from });
+
+const linked = (
+    inputsFor: InputsFor,
+    documents: Documents,
+    owner: ProgramId,
+    store: StoreId,
+    param: string,
+    source: StoreId | null,
+    seq: number,
+): Documents => {
+    const reduce = reduceDocuments(inputsFor);
+
+    switch (owner) {
+        case 'signal':
+            return isParam(param)
+                ? reduce(
+                      documents,
+                      { kind: 'signals', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
+        case 'pen':
+            return isPenParam(param)
+                ? reduce(
+                      documents,
+                      { kind: 'pens', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
+        case 'voice':
+            return isVoiceParam(param)
+                ? reduce(
+                      documents,
+                      { kind: 'voices', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
+        case 'drums':
+            return param === 'volume'
+                ? reduce(
+                      documents,
+                      { kind: 'drums', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
+        case 'focus':
+            return param === 'agenda' ? linkedFocus(documents, store, source) : documents;
+        default:
+            return documents;
+    }
+};
 
 export const reduceDocuments =
     (inputsFor: InputsFor) =>
@@ -441,38 +492,19 @@ export const reduceDocuments =
             case 'link': {
                 const { store, param, source } = action;
                 const owner = ownerOf(documents.workspace, store);
+                const definition =
+                    owner === null ? undefined : storeInputOf(inputsFor(owner), param);
+                const from = source === null ? null : ownerOf(documents.workspace, source);
 
-                return owner === 'signal' && isParam(param)
-                    ? reduceDocuments(inputsFor)(
-                          documents,
-                          { kind: 'signals', store, command: { kind: 'source', param, source } },
-                          seq,
-                      )
-                    : owner === 'pen' && isPenParam(param)
-                      ? reduceDocuments(inputsFor)(
-                            documents,
-                            { kind: 'pens', store, command: { kind: 'source', param, source } },
-                            seq,
-                        )
-                      : owner === 'voice' && isVoiceParam(param)
-                        ? reduceDocuments(inputsFor)(
-                              documents,
-                              { kind: 'voices', store, command: { kind: 'source', param, source } },
-                              seq,
-                          )
-                        : owner === 'drums' && param === 'volume'
-                          ? reduceDocuments(inputsFor)(
-                                documents,
-                                {
-                                    kind: 'drums',
-                                    store,
-                                    command: { kind: 'source', param, source },
-                                },
-                                seq,
-                            )
-                          : owner === 'focus' && param === 'agenda'
-                            ? linkedFocus(documents, store, source)
-                            : documents;
+                // Refused against the state it would change: an input that is not there, a source it does not take, or one that reaches back.
+                return owner === null ||
+                    definition === undefined ||
+                    (source !== null &&
+                        ((from !== null &&
+                            !definition.sources.some(({ program }) => program === from)) ||
+                            closesLoop(linkedOf(documents), store, source)))
+                    ? documents
+                    : linked(inputsFor, documents, owner, store, param, source, seq);
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);

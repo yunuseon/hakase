@@ -294,6 +294,24 @@ describe('links', () => {
         expect(labels(history).at(-1)).toBe('Set Main depth to follow other');
     });
 
+    it('refuse a source of a kind the input does not take', () => {
+        const before = run(fresh(), [launched('pen'), launched('focus')]);
+        const history = run(before, [{ kind: 'link', store: 'pen', param: 'x', source: 'focus' }]);
+
+        expect(history.present.pens.get('pen')?.sources.x ?? null).toBeNull();
+        expect(history.steps).toHaveLength(before.steps.length);
+    });
+
+    it('refuse a link that would reach back to its own store', () => {
+        const before = run(fresh(), [launched('pen'), launched('signal')]);
+        const history = run(before, [
+            { kind: 'link', store: 'signal', param: 'phase', source: 'signal' },
+        ]);
+
+        expect(history.present.signals.get('signal')?.sources.phase ?? null).toBeNull();
+        expect(history.steps).toHaveLength(before.steps.length);
+    });
+
     it('let a focus timer follow an agenda, and undo it as one step', () => {
         const history = run(fresh(), [
             { kind: 'link', store: 'focus', param: 'agenda', source: 'store-3' },

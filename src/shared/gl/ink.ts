@@ -54,6 +54,12 @@ export const createInkPass = (gl: WebGL2RenderingContext): InkPass => {
     };
 };
 
+export const releaseInkPass = (gl: WebGL2RenderingContext, ink: InkPass): void => {
+    gl.deleteProgram(ink.program);
+    gl.deleteVertexArray(ink.vao);
+    gl.deleteBuffer(ink.buffer);
+};
+
 export const loadStroke = ({ gl, buffer }: InkPass, { dabs }: Stroke): void => {
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, dabs, gl.STATIC_DRAW);

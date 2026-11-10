@@ -138,7 +138,7 @@ export type StoreInput = {
     readonly title: string;
     readonly from: 'store';
     readonly param: string;
-    readonly sources: readonly (typeof signalSource | typeof agendaSource)[];
+    readonly sources: readonly Source[];
     readonly initial: null;
 };
 
@@ -298,6 +298,12 @@ export type Bindings = { readonly [input: string]: Follow };
 // Not inputs[name]: a name read from storage could be "constructor", which every object has.
 export const definitionOf = (inputs: ProgramInputs, name: string) =>
     Object.entries(inputs).find(([key]) => key === name)?.[1];
+
+export const storeInputOf = (inputs: ProgramInputs, param: string) =>
+    Object.values(inputs).find(
+        (definition): definition is StoreInput =>
+            definition.from === 'store' && definition.param === param,
+    );
 
 export const followedBy = (follows: Bindings, name: string) =>
     Object.entries(follows).find(([key]) => key === name)?.[1] ?? null;
