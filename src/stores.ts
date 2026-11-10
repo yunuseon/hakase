@@ -15,6 +15,8 @@ export type Holding = {
 
 const document: Holding = { holds: 'document', sharing: 'shared' };
 const settings: Holding = { holds: 'settings', sharing: 'private' };
+// A pedal is a stage of a chain: two on the canvas are two stages, so each window starts its own.
+const stage: Holding = { holds: 'document', sharing: 'private' };
 
 // null: the program keeps no state of its own, so its windows have nothing to bind.
 export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
@@ -27,6 +29,11 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     signal: document,
     plot: null,
     output: null,
+    colourmap: stage,
+    kaleido: stage,
+    feedback: stage,
+    mix: stage,
+    blur: stage,
     paint: document,
     pen: document,
     voice: document,

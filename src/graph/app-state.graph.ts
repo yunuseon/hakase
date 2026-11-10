@@ -42,6 +42,8 @@ import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind } from '../inputs.ts';
+import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
+import { isThemeName } from '../components/sketch/themes/registry.ts';
 import { NONE, sameImage, type Image } from '../image.ts';
 import { asSketch } from '../settings.ts';
 import { samePanel, type Drive } from '../components/sketch/params.ts';
@@ -50,6 +52,15 @@ import { entriesOf } from '../timeline.ts';
 import { listed } from '../workspace.ts';
 import type { Projections } from './projections.graph.ts';
 import type { Timekeeping } from './timekeeping.graph.ts';
+
+// One object per kind, not one per read: a fresh default each time would look like an edit to every stage.
+const PEDAL_DEFAULTS: Readonly<Record<PedalKind, Pedal>> = {
+    colourmap: defaultPedal('colourmap'),
+    kaleido: defaultPedal('kaleido'),
+    feedback: defaultPedal('feedback'),
+    mix: defaultPedal('mix'),
+    blur: defaultPedal('blur'),
+};
 
 type StoreKey =
     | 'progress$'
@@ -76,7 +87,10 @@ type StoreKey =
     | 'followedImage$'
     | 'drawing$'
     | 'sounding$'
-    | 'kit$';
+    | 'kit$'
+    | 'pedal$'
+    | 'image$'
+    | 'linkedName$';
 
 type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
     Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
@@ -100,6 +114,7 @@ export const scopedOf = ({
     pens$,
     voices$,
     drums$,
+    pedals$,
     linked$,
     library$,
     blueprints$,
@@ -138,6 +153,7 @@ export const scopedOf = ({
         pens$,
         voices$,
         drums$,
+        pedals$,
     ]).pipe(
         map(all => [...new Set(all.flatMap(stores => [...stores.keys()]))].sort().join('\n')),
         distinctUntilChanged(),
@@ -229,6 +245,21 @@ export const scopedOf = ({
             distinctUntilChanged(sameKit),
         );
 
+    const pedalIn = (store: StoreId) =>
+        combineLatest([pedals$, workspace$]).pipe(
+            map(([all, workspace]) => {
+                const owner = ownerOf(workspace, store);
+
+                return (
+                    all.get(store) ??
+                    (owner !== null && isPedalKind(owner)
+                        ? PEDAL_DEFAULTS[owner]
+                        : PEDAL_DEFAULTS.mix)
+                );
+            }),
+            distinctUntilChanged(),
+        );
+
     const documentIn: Readonly<
         Partial<Record<ProgramId, (store: StoreId) => Observable<unknown>>>
     > = {
@@ -244,6 +275,11 @@ export const scopedOf = ({
         pen: drawingIn,
         voice: soundingIn,
         drums: kitIn,
+        colourmap: pedalIn,
+        kaleido: pedalIn,
+        feedback: pedalIn,
+        mix: pedalIn,
+        blur: pedalIn,
         timeline: playbackIn,
     };
 
@@ -385,13 +421,68 @@ export const scopedOf = ({
         }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
     };
 
-    const imageIn = (store: StoreId, seconds$: Observable<number>): Observable<Image> =>
-        workspace$.pipe(
-            map(workspace => ownerOf(workspace, store)),
-            distinctUntilChanged(),
-            switchMap(owner => (owner === 'sketch' ? pointsIn(store, seconds$) : of(NONE))),
-            distinctUntilChanged(sameImage),
-        );
+    // A store already seen down the chain is not followed again: a loop that slipped in through storage stops there.
+    const imageIn = (
+        store: StoreId,
+        seconds$: Observable<number>,
+        seen: ReadonlySet<StoreId> = new Set(),
+    ): Observable<Image> =>
+        seen.has(store)
+            ? of(NONE)
+            : workspace$.pipe(
+                  map(workspace => ownerOf(workspace, store)),
+                  distinctUntilChanged(),
+                  switchMap(owner =>
+                      owner === 'sketch'
+                          ? pointsIn(store, seconds$)
+                          : owner !== null && isPedalKind(owner)
+                            ? stageIn(store, owner, seconds$, new Set([...seen, store]))
+                            : of(NONE),
+                  ),
+                  distinctUntilChanged(sameImage),
+              );
+
+    const stageIn = (
+        store: StoreId,
+        kind: PedalKind,
+        seconds$: Observable<number>,
+        seen: ReadonlySet<StoreId>,
+    ): Observable<Image> => {
+        const pedal$ = pedalIn(store);
+
+        return combineLatest({
+            pedal: pedal$,
+            theme:
+                kind === 'colourmap'
+                    ? pedal$.pipe(
+                          map(({ choice }) => choice),
+                          distinctUntilChanged(),
+                          switchMap(name =>
+                              isThemeName(name)
+                                  ? palettes$.pipe(map(all => all.get(name)?.value ?? themes[name]))
+                                  : of(themes.paper),
+                          ),
+                          distinctUntilChanged(),
+                      )
+                    : of(null),
+            drivers: combineLatest(
+                Object.fromEntries(
+                    PEDALS[kind].knobs.map(({ name }) => [name, driverIn(store, name, seconds$)]),
+                ),
+            ),
+            inputs: combineLatest(
+                PEDALS[kind].inputs.map(input =>
+                    linkIn(store, input).pipe(
+                        switchMap(binding =>
+                            binding !== null && isImageKind(binding.kind)
+                                ? imageIn(binding.store, seconds$, seen)
+                                : of(NONE),
+                        ),
+                    ),
+                ),
+            ),
+        }).pipe(map((parts): Image => ({ kind: 'pedal', store, ...parts })));
+    };
 
     return (
         store$: Observable<StoreId>,
@@ -459,6 +550,24 @@ export const scopedOf = ({
             drawing$: narrowed(drawingIn),
             sounding$: narrowed(soundingIn),
             kit$: narrowed(kitIn),
+            pedal$: narrowed(pedalIn),
+            image$: store$.pipe(switchMap(store => imageIn(store, seconds$))),
+            linkedName$: param =>
+                store$.pipe(
+                    switchMap(store => linkIn(store, param)),
+                    switchMap(binding =>
+                        binding === null
+                            ? of(null)
+                            : workspace$.pipe(
+                                  map(
+                                      workspace =>
+                                          workspace.stores.find(({ id }) => id === binding.store)
+                                              ?.name ?? binding.store,
+                                  ),
+                              ),
+                    ),
+                    distinctUntilChanged(),
+                ),
             linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param))),
             followedImage$: input =>
                 followed$(input).pipe(

@@ -6,6 +6,7 @@ import type { Reading } from './components/progress-bar/progress-bar.ts';
 import type { Tickets } from './shared/tickets.ts';
 import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
+import { PEDALS, type PedalKind } from './pedals.ts';
 import { agendaReading, focusReading, ticketsReading } from './readings.ts';
 import type { StoreId } from './stores.ts';
 
@@ -19,6 +20,7 @@ export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
 export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
 export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId };
+export type PedalBinding = { readonly kind: PedalKind; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
@@ -29,7 +31,8 @@ export type Follow =
     | PenBinding
     | VoiceBinding
     | DrumsBinding
-    | SketchBinding;
+    | SketchBinding
+    | PedalBinding;
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
@@ -119,8 +122,18 @@ const sketchSource = {
     access: 'read',
 } as const;
 
+const pedalSource = <K extends PedalKind>(kind: K) =>
+    ({ kind, program: kind, title: PEDALS[kind].title, access: 'read' }) as const;
+
 // Every program whose store makes a picture: an image cable takes any of them.
-export const IMAGE_SOURCES = [sketchSource] as const;
+export const IMAGE_SOURCES = [
+    sketchSource,
+    pedalSource('colourmap'),
+    pedalSource('kaleido'),
+    pedalSource('feedback'),
+    pedalSource('mix'),
+    pedalSource('blur'),
+] as const;
 
 export const isImageKind = (kind: string): boolean =>
     IMAGE_SOURCES.some(source => source.kind === kind);
@@ -294,6 +307,26 @@ export const imageInput = (title: string) =>
         initial: null,
     }) as const satisfies FollowedInput;
 
+const imageStoreInput = (param: string) =>
+    ({
+        title: param,
+        from: 'store',
+        param,
+        group: null,
+        sources: IMAGE_SOURCES,
+        initial: null,
+    }) satisfies StoreInput;
+
+// A pedal's own inputs are its document's: its cables and its knobs, so a chain survives its windows closing.
+export const pedalInputs = (kind: PedalKind): Readonly<Record<string, StoreInput>> => {
+    const entries: readonly (readonly [string, StoreInput])[] = [
+        ...PEDALS[kind].inputs.map(input => [input, imageStoreInput(input)] as const),
+        ...PEDALS[kind].knobs.map(({ name }) => [name, driveInput(name, name, 'Knobs')] as const),
+    ];
+
+    return Object.fromEntries(entries);
+};
+
 export const ownPlaybackInput = {
     title: 'Playback',
     from: 'own',
@@ -386,6 +419,12 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return drumsSource.program;
         case 'sketch':
             return sketchSource.program;
+        case 'colourmap':
+        case 'kaleido':
+        case 'feedback':
+        case 'mix':
+        case 'blur':
+            return kind;
     }
 };
 
@@ -413,6 +452,12 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'drums':
             return { kind, store };
         case 'sketch':
+            return { kind, store };
+        case 'colourmap':
+        case 'kaleido':
+        case 'feedback':
+        case 'mix':
+        case 'blur':
             return { kind, store };
         default:
             return null;

@@ -26,6 +26,7 @@ const held = {
     pens: [],
     voices: [],
     drums: [],
+    pedals: [],
     sketchLinks: [],
 } satisfies Blueprint['held'];
 

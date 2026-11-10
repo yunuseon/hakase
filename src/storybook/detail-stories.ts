@@ -1,5 +1,8 @@
 import { EMPTY, from, merge, of, type Observable } from 'rxjs';
 import { HksImageView } from '../components/image-view/image-view.component.ts';
+import { HksPedal } from '../components/pedal/pedal.component.ts';
+import type { PedalView } from '../components/pedal/pedal.ts';
+import { defaultPedal, PEDALS, reducePedal, valueOf } from '../pedals.ts';
 import type { Shown } from '../components/image-view/image-view.ts';
 import { filter, map, scan, share, shareReplay, startWith, withLatestFrom } from 'rxjs/operators';
 import { HksTicketCreator } from '../components/ticket-creator/ticket-creator.component.ts';
@@ -165,6 +168,52 @@ export const detailStories: readonly Story[] = [
         create: ({ args$ }) => {
             const element = new HksFpsCounter();
             return { element, run$: element.connect$(args$), events$: EMPTY };
+        },
+    },
+    {
+        id: 'pedal',
+        title: 'Pedal',
+        group: 'Controls',
+        description:
+            'A stage of an image chain: its knobs, a knob a cable drives marked follows, its choice and what each input is plugged into. Each pedal program is this over its row of the PEDALS table.',
+        elements: ['hks-pedal'],
+        variants: [
+            { id: 'kaleido', title: 'Kaleidoscope' },
+            { id: 'mix', title: 'Mix, one input unplugged' },
+        ],
+        controls: [],
+        defaults,
+        height: 300,
+        action: 'changes$',
+        code: 'const pedal = new HksPedal();\nconst lifetime$ = pedal.connect$(view$);\nconst commands$ = pedal.changes$;',
+        create: ({ variant }) => {
+            const element = new HksPedal();
+            const kind = variant === 'mix' ? 'mix' : 'kaleido';
+            const spec = PEDALS[kind];
+            const view$ = element.changes$.pipe(
+                scan(reducePedal, defaultPedal(kind)),
+                startWith(defaultPedal(kind)),
+                map((pedal): PedalView => ({
+                    summary: spec.summary,
+                    knobs: spec.knobs.map((knob, index) => ({
+                        ...knob,
+                        value: valueOf(pedal, knob.name),
+                        driven: kind === 'kaleido' && index === 1,
+                    })),
+                    choices: spec.choices,
+                    choice: pedal.choice,
+                    inputs: spec.inputs.map((name, index) => ({
+                        name,
+                        from: index === 0 ? 'sketch 2' : null,
+                    })),
+                })),
+            );
+
+            return {
+                element,
+                run$: element.connect$(view$),
+                events$: element.changes$.pipe(map(change => recorded(change.kind, change))),
+            };
         },
     },
     {

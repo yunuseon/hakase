@@ -34,6 +34,7 @@ const started = (): Documents => ({
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),
+    pedals: new Map(),
     sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
@@ -277,7 +278,7 @@ describe('one log for every document', () => {
 });
 
 describe('links', () => {
-    const launched = (program: 'pen' | 'signal' | 'focus') =>
+    const launched = (program: 'pen' | 'signal' | 'focus' | 'kaleido' | 'colourmap') =>
         act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 
     it('set a store input on whichever document owns the store, a signal or a pen', () => {
@@ -330,6 +331,36 @@ describe('links', () => {
                 { kind: 'link', store: 'sketch-2', param: 'k2', source: 'sketch-2' },
             ]).present.sketchLinks.get('sketch-2')?.sources.k2,
         ).toBe('signal');
+    });
+
+    it('chain pedals on their stores, and refuse a cable that would come back round', () => {
+        const chained = run(fresh(), [
+            launched('kaleido'),
+            launched('colourmap'),
+            { kind: 'link', store: 'kaleido-5', param: 'in', source: 'sketch-2' },
+            { kind: 'link', store: 'colourmap-6', param: 'in', source: 'kaleido-5' },
+        ]);
+        const looped = run(chained, [
+            { kind: 'link', store: 'kaleido-5', param: 'in', source: 'colourmap-6' },
+        ]);
+
+        expect(chained.present.pedals.get('kaleido-5')?.sources['in']).toBe('sketch-2');
+        expect(chained.present.pedals.get('colourmap-6')?.sources['in']).toBe('kaleido-5');
+        expect(looped.present.pedals.get('kaleido-5')?.sources['in']).toBe('sketch-2');
+        expect(looped.steps).toHaveLength(chained.steps.length);
+        // A store something links to is kept, so closing the sketch's window cannot take it away.
+        expect(chained.present.workspace.stores.find(({ id }) => id === 'sketch-2')?.kept).toBe(
+            true,
+        );
+    });
+
+    it('refuse a pedal command to a store of no pedal', () => {
+        const before = run(fresh(), [launched('kaleido')]);
+        const after = run(before, [
+            { kind: 'pedals', store: 'sketch-2', command: { kind: 'choice', choice: 'turn' } },
+        ]);
+
+        expect(after.present.pedals.has('sketch-2')).toBe(false);
     });
 
     it('let a focus timer follow an agenda, and undo it as one step', () => {

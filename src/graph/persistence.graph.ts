@@ -25,6 +25,7 @@ type Saved = Pick<
     | 'pens$'
     | 'voices$'
     | 'drums$'
+    | 'pedals$'
     | 'focusLinks$'
     | 'sketchLinks$'
     | 'library$'
@@ -51,6 +52,7 @@ export const persisted$ = ({
     pens$,
     voices$,
     drums$,
+    pedals$,
     focusLinks$,
     sketchLinks$,
     library$,
@@ -79,6 +81,7 @@ export const persisted$ = ({
             pens: pens$,
             voices: voices$,
             drums: drums$,
+            pedals: pedals$,
             focusLinks: focusLinks$,
             sketchLinks: sketchLinks$,
             library: library$,

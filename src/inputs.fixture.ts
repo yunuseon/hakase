@@ -1,3 +1,4 @@
+import { isPedalKind } from './pedals.ts';
 import {
     knobInputs,
     paintInput,
@@ -11,6 +12,7 @@ import {
     ownPlaybackInput,
     playbackInput,
     imageInput,
+    pedalInputs,
     progressInput,
     sourceInput,
     type InputsFor,
@@ -26,18 +28,20 @@ export const inputsFor: InputsFor = program =>
             ? { playback: playbackInput, ...voiceInputs }
             : program === 'drums'
               ? { playback: playbackInput, ...drumsInputs }
-              : program === 'output'
-                ? { playback: playbackInput, in: imageInput('in') }
-                : program === 'plot'
-                  ? { playback: playbackInput, ...plotInputs }
-                  : program === 'signal'
-                    ? { playback: playbackInput, ...signalInputs }
-                    : program === 'timeline'
-                      ? { playback: ownPlaybackInput }
-                      : program === 'playhead'
-                        ? { progress: progressInput }
-                        : program === 'progress'
-                          ? { source: sourceInput }
-                          : program === 'focus'
-                            ? { ...focusInputs }
-                            : {};
+              : isPedalKind(program)
+                ? { playback: playbackInput, ...pedalInputs(program) }
+                : program === 'output'
+                  ? { playback: playbackInput, in: imageInput('in') }
+                  : program === 'plot'
+                    ? { playback: playbackInput, ...plotInputs }
+                    : program === 'signal'
+                      ? { playback: playbackInput, ...signalInputs }
+                      : program === 'timeline'
+                        ? { playback: ownPlaybackInput }
+                        : program === 'playhead'
+                          ? { progress: progressInput }
+                          : program === 'progress'
+                            ? { source: sourceInput }
+                            : program === 'focus'
+                              ? { ...focusInputs }
+                              : {};

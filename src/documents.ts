@@ -37,6 +37,7 @@ import {
     type DrumsCommand,
 } from './components/drums/drums.ts';
 import type { FocusLink } from './components/focus/focus.ts';
+import { defaultPedal, isPedalKind, reducePedal, type Pedal, type PedalCommand } from './pedals.ts';
 import {
     isSketchParam,
     isUnlinked,
@@ -120,6 +121,7 @@ export type Documents = {
     readonly pens: ReadonlyMap<StoreId, Pen>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
+    readonly pedals: ReadonlyMap<StoreId, Pedal>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
@@ -142,6 +144,7 @@ type StoreCommands = {
     readonly pens: PenCommand;
     readonly voices: VoiceCommand;
     readonly drums: DrumsCommand;
+    readonly pedals: PedalCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -219,6 +222,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     pens: storeEvent(documents.pens, event),
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
+    pedals: storeEvent(documents.pedals, event),
     focusLinks: storeEvent(documents.focusLinks, event),
     sketchLinks: storeEvent(documents.sketchLinks, event),
 });
@@ -228,14 +232,19 @@ export const linkedOf = ({
     pens,
     voices,
     drums,
+    pedals,
     focusLinks,
     sketchLinks,
-}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums' | 'focusLinks' | 'sketchLinks'>) =>
+}: Pick<
+    Documents,
+    'signals' | 'pens' | 'voices' | 'drums' | 'pedals' | 'focusLinks' | 'sketchLinks'
+>) =>
     new Map<StoreId, Linked>([
         ...signals,
         ...pens,
         ...voices,
         ...drums,
+        ...pedals,
         ...focusLinks,
         ...sketchLinks,
     ]);
@@ -339,9 +348,29 @@ const linked = (
                 ? linkedSketchIn(documents, store, param, source)
                 : documents;
         default:
-            return documents;
+            return isPedalKind(owner)
+                ? reduce(
+                      documents,
+                      { kind: 'pedals', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
     }
 };
+
+// A store something links to is kept, as a named one is: closing its window must not take it out from under the link.
+const keptSource = (documents: Documents, source: StoreId | null): Documents =>
+    source === null || !documents.workspace.stores.some(({ id, kept }) => id === source && !kept)
+        ? documents
+        : {
+              ...documents,
+              workspace: {
+                  ...documents.workspace,
+                  stores: documents.workspace.stores.map(entry =>
+                      entry.id === source ? { ...entry, kept: true } : entry,
+                  ),
+              },
+          };
 
 export const reduceDocuments =
     (inputsFor: InputsFor) =>
@@ -531,6 +560,24 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'pedals': {
+                const owner = ownerOf(documents.workspace, action.store);
+
+                // A stage's kind is its program's, so a command to a store of no pedal has nothing to change.
+                return owner === null || !isPedalKind(owner)
+                    ? documents
+                    : {
+                          ...documents,
+                          pedals: commanded(
+                              documents.pedals,
+                              action.store,
+                              defaultPedal(owner),
+                              reducePedal,
+                              action.command,
+                              seq,
+                          ),
+                      };
+            }
             case 'link': {
                 const { store, param, source } = action;
                 const owner = ownerOf(documents.workspace, store);
@@ -546,7 +593,10 @@ export const reduceDocuments =
                             !definition.sources.some(({ program }) => program === from)) ||
                             closesLoop(linkedOf(documents), store, source)))
                     ? documents
-                    : linked(inputsFor, documents, owner, store, param, source, seq);
+                    : keptSource(
+                          linked(inputsFor, documents, owner, store, param, source, seq),
+                          source,
+                      );
             }
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
@@ -609,7 +659,9 @@ const idOf = (command: object) =>
         ? command.id
         : 'param' in command && typeof command.param === 'string'
           ? command.param
-          : '';
+          : 'name' in command && typeof command.name === 'string'
+            ? command.name
+            : '';
 
 const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     tickets: ['rename', 'describe', 'rename-status'],
@@ -623,6 +675,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     pens: ['weight'],
     voices: ['decay', 'glide', 'volume'],
     drums: ['swing', 'volume'],
+    pedals: ['value'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -692,6 +745,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     pens: 'pen',
     voices: 'voice',
     drums: 'drum machine',
+    pedals: 'pedal',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>

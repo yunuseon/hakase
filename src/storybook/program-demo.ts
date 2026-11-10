@@ -1,3 +1,4 @@
+import { defaultPedal } from '../pedals.ts';
 import { NONE } from '../image.ts';
 import { animationFrames, defer, EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import {
@@ -123,6 +124,9 @@ export const programDemo = (
         linkedPicture$: () => of(null),
         linkedDriver$: () => of(null),
         followedImage$: () => of(NONE),
+        pedal$: of(defaultPedal('mix')),
+        image$: of(NONE),
+        linkedName$: () => of(null),
         followedSignal$: input =>
             empty || input !== 'a'
                 ? of(null)

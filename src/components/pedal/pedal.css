@@ -1,0 +1,76 @@
+:host {
+    display: block;
+    container-type: inline-size;
+}
+
+.pedal {
+    display: grid;
+    gap: var(--space-2);
+    padding-block-start: var(--space-1);
+    font: var(--text-sm) var(--font-ui);
+    color: var(--ink);
+}
+
+.summary {
+    margin: 0;
+    color: var(--muted);
+}
+
+.inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.input {
+    color: var(--muted);
+}
+
+.input b {
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) 3.5rem;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: var(--control-md);
+}
+
+.key {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--label);
+}
+
+.read {
+    font: var(--text-xs) var(--font-mono);
+    text-align: end;
+    color: var(--muted);
+}
+
+.row[data-driven] .read {
+    color: var(--accent);
+}
+
+.choices {
+    flex-wrap: wrap;
+    justify-self: start;
+}
+
+@container (max-width: 14rem) {
+    .row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row .dial {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}

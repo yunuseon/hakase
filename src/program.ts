@@ -22,6 +22,7 @@ import type { PaintCommand } from './components/paint/paint.ts';
 import type { Drawing, PenCommand } from './components/pen/pen.ts';
 import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
 import type { DrumsCommand, Kit } from './components/drums/drums.ts';
+import type { Pedal, PedalCommand } from './pedals.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -47,6 +48,11 @@ export const PROGRAM_IDS = [
     'voice',
     'drums',
     'output',
+    'colourmap',
+    'kaleido',
+    'feedback',
+    'mix',
+    'blur',
     'blueprints',
     'tasks',
     'tickets',
@@ -99,6 +105,7 @@ export type AppInput =
     | { readonly kind: 'pen'; readonly command: PenCommand }
     | { readonly kind: 'voice'; readonly command: VoiceCommand }
     | { readonly kind: 'drums'; readonly command: DrumsCommand }
+    | { readonly kind: 'pedal'; readonly command: PedalCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -157,11 +164,15 @@ export type AppState = {
     readonly drawing$: Observable<Drawing>;
     readonly sounding$: Observable<Sounding>;
     readonly kit$: Observable<Kit>;
+    readonly pedal$: Observable<Pedal>;
     // What a store input of the window's own store follows: the store's link, not the window's.
     readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
     readonly linkedDriver$: (param: string) => Observable<Driver | null>;
     // A cable is a recipe, never pixels: the engine cooks it at this window's own moment.
     readonly followedImage$: (input: string) => Observable<Image>;
+    // What this window's own store draws, for a stage that shows its own output.
+    readonly image$: Observable<Image>;
+    readonly linkedName$: (param: string) => Observable<string | null>;
     // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
     readonly bookmarks$: Observable<Bookmarks>;

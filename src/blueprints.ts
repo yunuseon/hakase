@@ -10,6 +10,7 @@ import { parseTickets } from './shared/tickets.ts';
 import { parseVoice, type Voice } from './components/voice/voice.ts';
 import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
+import { parseStoredPedal, type Pedal } from './pedals.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
 import { isProgramId } from './program.ts';
@@ -60,6 +61,7 @@ type HeldKind =
     | 'pens'
     | 'voices'
     | 'drums'
+    | 'pedals'
     | 'sketchLinks';
 
 type Entries<M> =
@@ -126,8 +128,8 @@ export const reduceBlueprints = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices, drums, sketchLinks }: Documents) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...sketchLinks]);
+const linkedOf = ({ signals, pens, voices, drums, pedals, sketchLinks }: Documents) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...pedals, ...sketchLinks]);
 
 const picked = <V>(map: ReadonlyMap<StoreId, V>, stores: ReadonlySet<StoreId>) =>
     [...map].filter(([id]) => stores.has(id));
@@ -229,6 +231,7 @@ export const blueprintOf = (
             pens: picked(documents.pens, stores),
             voices: picked(documents.voices, stores),
             drums: picked(documents.drums, stores),
+            pedals: picked(documents.pedals, stores),
             sketchLinks: picked(documents.sketchLinks, stores),
         },
         formulas,
@@ -393,6 +396,12 @@ export const placed = (
             ...drums,
             sources: { volume: sourceOf(drums.sources.volume) },
         })),
+        pedals: into(documents.pedals, held.pedals, pedal => ({
+            ...pedal,
+            sources: Object.fromEntries(
+                Object.entries(pedal.sources).map(([param, source]) => [param, sourceOf(source)]),
+            ),
+        })),
         sketchLinks: into(documents.sketchLinks, held.sketchLinks, link =>
             SKETCH_PARAMS.reduce(
                 (relinked, param) => linkedSketch(relinked, param, sourceOf(link.sources[param])),
@@ -493,6 +502,10 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 pens: entriesOf(heldOf('pens'), parsePen),
                 voices: entriesOf(heldOf('voices'), parseVoice),
                 drums: entriesOf(heldOf('drums'), parseDrums),
+                pedals: entriesOf(heldOf('pedals'), parseStoredPedal).flatMap(
+                    ([id, pedal]): (readonly [StoreId, Pedal])[] =>
+                        pedal === null ? [] : [[id, pedal]],
+                ),
                 sketchLinks: formerLinks(
                     entriesOf(heldOf('sketchLinks'), parseSketchLink),
                     Array.isArray(windows)
