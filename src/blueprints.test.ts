@@ -1,3 +1,4 @@
+import { unlinkedSketch } from './components/sketch/links.ts';
 import { describe, expect, it } from 'vitest';
 import { defaultVoice } from './components/voice/voice.ts';
 import { documentsKit, reduceHistory, seqFloor, type Documents } from './documents.ts';
@@ -40,11 +41,7 @@ const windows: readonly Process[] = [
         id: 'sketch-1',
         program: 'sketch',
         store: 'sketch-1',
-        follows: {
-            ...clock,
-            k1: { kind: 'voice', store: 'voice' },
-            k2: { kind: 'signal', store: 'store-a' },
-        },
+        follows: clock,
         frame: frame(100, 420),
         measured,
     },
@@ -120,6 +117,9 @@ const scene = (extra: readonly Process[] = []): Documents => {
         ]),
         drums: new Map(),
         focusLinks: new Map(),
+        sketchLinks: new Map([
+            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'voice', k2: 'store-a' } }],
+        ]),
         library: { items: [{ id: 'custom-1', label: 'Chladni', source: 'vec4 formula' }], made: 1 },
         blueprints: emptyBlueprints,
         formulas: new Map(),
@@ -176,10 +176,10 @@ describe('a blueprint', () => {
         const sketch = after.workspace.processes.find(({ id }) => id === 'sketch-500-3');
 
         expect(after.workspace.processes).toHaveLength(windows.length * 2);
-        expect(sketch?.follows).toEqual({
-            playback: { kind: 'playback', store: 'timeline' },
-            k1: { kind: 'voice', store: ids.get('voice') },
-            k2: { kind: 'signal', store: ids.get('store-a') },
+        expect(sketch?.follows).toEqual({ playback: { kind: 'playback', store: 'timeline' } });
+        expect(after.sketchLinks.get(ids.get('sketch-1') ?? '')?.sources).toMatchObject({
+            k1: ids.get('voice'),
+            k2: ids.get('store-a'),
         });
         expect(sketch?.frame).toMatchObject({ x: 2390, y: 460 });
         expect(after.signals.get(ids.get('store-a') ?? '')?.sources.depth).toBe(ids.get('store-b'));
@@ -389,4 +389,45 @@ it('pastes a temporary snapshot as one undoable step without saving a blueprint 
     expect(reduce(undone, { kind: 'redo' }).present.workspace.processes).toEqual(
         pasted.present.workspace.processes,
     );
+});
+
+describe('blueprints saved before sketch links', () => {
+    it("move what a saved sketch window followed into the blueprint's held links", () => {
+        const parsed = parseBlueprints(
+            {
+                items: [
+                    {
+                        id: 'blueprint-1',
+                        name: 'Old',
+                        size: { width: 400, height: 400 },
+                        windows: [
+                            {
+                                id: 'sketch-1',
+                                program: 'sketch',
+                                store: 'sketch-1',
+                                frame: { x: 0, y: 0, z: 0, width: 400, height: 400 },
+                                follows: {
+                                    playback: { kind: 'playback', store: 'timeline' },
+                                    k1: { kind: 'drums', store: 'beat' },
+                                },
+                            },
+                        ],
+                        stores: [],
+                        held: {},
+                        formulas: [],
+                        links: [],
+                    },
+                ],
+            },
+            inputsFor,
+        );
+        const [blueprint] = parsed.items;
+
+        expect(blueprint?.held.sketchLinks).toEqual([
+            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'beat' } }],
+        ]);
+        expect(blueprint?.windows[0]?.follows).toEqual({
+            playback: { kind: 'playback', store: 'timeline' },
+        });
+    });
 });

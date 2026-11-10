@@ -3,6 +3,7 @@ import { defaultSignal, type Signal } from './shared/signal.ts';
 import { defaultVoice, type Voice } from './components/voice/voice.ts';
 import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.ts';
 import { defaultPanel } from './components/sketch/params.ts';
+import { unlinkedSketch } from './components/sketch/links.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
 import type { Bindings } from './inputs.ts';
@@ -25,6 +26,7 @@ const held = {
     pens: [],
     voices: [],
     drums: [],
+    sketchLinks: [],
 } satisfies Blueprint['held'];
 
 const opened = (
@@ -209,25 +211,12 @@ export const STARTERS: readonly Starter[] = [
         size: { width: 1832, height: 984 },
         windows: [
             opened('timeline', 'timeline', 'song', { x: 24, y: 48, width: 520, height: 120 }),
-            opened(
-                'sketch',
-                'sketch',
-                'canon',
-                { x: 24, y: 184, width: 520, height: 776 },
-                {
-                    ...SONG,
-                    k1: { kind: 'voice', store: 'bass' },
-                    k2: { kind: 'voice', store: 'harp' },
-                    k3: { kind: 'signal', store: 'line-1' },
-                    k4: { kind: 'drums', store: 'beat' },
-                },
-                {
-                    ...defaultSketch,
-                    formula: 'canon',
-                    theme: 'ember',
-                    panel: { ...defaultPanel, dimension: 72, baseSize: 5, trails: 0.25 },
-                },
-            ),
+            opened('sketch', 'sketch', 'canon', { x: 24, y: 184, width: 520, height: 776 }, SONG, {
+                ...defaultSketch,
+                formula: 'canon',
+                theme: 'ember',
+                panel: { ...defaultPanel, dimension: 72, baseSize: 5, trails: 0.25 },
+            }),
             opened('bass', 'voice', 'bass', { x: 560, y: 48, width: 300, height: 320 }, SONG),
             opened('harp', 'voice', 'harp', { x: 876, y: 48, width: 300, height: 320 }, SONG),
             opened(
@@ -293,6 +282,20 @@ export const STARTERS: readonly Starter[] = [
         ],
         held: {
             ...held,
+            sketchLinks: [
+                [
+                    'canon',
+                    {
+                        sources: {
+                            ...unlinkedSketch.sources,
+                            k1: 'bass',
+                            k2: 'harp',
+                            k3: 'line-1',
+                            k4: 'beat',
+                        },
+                    },
+                ],
+            ],
             signals: [
                 ['ground', tune(GROUND, 2)],
                 [

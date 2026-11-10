@@ -29,8 +29,13 @@ describe('graphOf', () => {
             windows
                 .find(({ id }) => id === 'sketch-2')
                 ?.ports.map(({ input, optional, bound }) => [input, optional, bound]),
+        ).toEqual([['playback', false, 'timeline']]);
+        // A sketch's knobs, scene and paint are its store's inputs, so they are the store's jacks.
+        expect(
+            graph()
+                .stores.find(({ id }) => id === 'sketch-2')
+                ?.ports.map(({ input, optional, bound }) => [input, optional, bound]),
         ).toEqual([
-            ['playback', false, 'timeline'],
             ['k1', true, null],
             ['k2', true, null],
             ['k3', true, null],

@@ -19,7 +19,16 @@ import { defaultPen, drawingOf, sameDrawing, strokeOf } from '../components/pen/
 import type { Reading } from '../components/progress-bar/progress-bar.ts';
 import { themes, type ThemeName } from '../components/sketch/themes/registry.ts';
 import { defaultVoice, sameSounding, soundingOf, voiceCurve } from '../components/voice/voice.ts';
-import { followedBy, readingOf, type Bindings, type PlaybackBinding } from '../inputs.ts';
+import {
+    followedBy,
+    progressBinding,
+    readingOf,
+    SOURCES,
+    type Bindings,
+    type PlaybackBinding,
+} from '../inputs.ts';
+import { ownerOf } from '../documents.ts';
+import { sourceIn } from '../input-connections.ts';
 import { parseTarget, type Global } from '../inventory.ts';
 import { wallClock$ } from '../lib/rx.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
@@ -55,15 +64,15 @@ type StoreKey =
     | 'bookmarks$'
     | 'signal$'
     | 'wave$'
-    | 'followedDriver$'
+    | 'linkedDriver$'
     | 'followedSignal$'
     | 'picture$'
-    | 'followedPicture$'
+    | 'linkedPicture$'
     | 'drawing$'
     | 'sounding$'
     | 'kit$';
 
-type Reads = Omit<Projections, 'ids$' | 'focusLinks$'> &
+type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
     Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
         readonly inputs$: Observable<AppSignal>;
     };
@@ -286,6 +295,26 @@ export const scopedOf = ({
             );
         const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
             store$.pipe(switchMap(select));
+        // A store input of this window's store, read as the binding a window's own follow would be.
+        const linkedBy$ = (param: string) =>
+            store$.pipe(
+                switchMap(store =>
+                    combineLatest([linked$, workspace$]).pipe(
+                        map(([linked, workspace]) => {
+                            const source = sourceIn(linked, store, param);
+                            const owner = source === null ? null : ownerOf(workspace, source);
+                            const kind = SOURCES.find(({ program }) => program === owner)?.kind;
+
+                            return source === null || kind === undefined
+                                ? null
+                                : progressBinding(kind, source);
+                        }),
+                        distinctUntilChanged(
+                            (a, b) => a?.kind === b?.kind && a?.store === b?.store,
+                        ),
+                    ),
+                ),
+            );
         const clock = clock$.pipe(
             switchMap(binding => (binding === null ? EMPTY : playbackIn(binding.store))),
             shareReplay({ bufferSize: 1, refCount: true }),
@@ -334,8 +363,8 @@ export const scopedOf = ({
             bookmarks$: narrowed(bookmarksIn),
             signal$: narrowed(signalIn),
             wave$: narrowed(waveIn),
-            followedDriver$: input =>
-                followed$(input).pipe(
+            linkedDriver$: param =>
+                linkedBy$(param).pipe(
                     switchMap((binding): Observable<Driver | null> =>
                         binding?.kind === 'signal'
                             ? waveIn(binding.store)
@@ -354,8 +383,8 @@ export const scopedOf = ({
             drawing$: narrowed(drawingIn),
             sounding$: narrowed(soundingIn),
             kit$: narrowed(kitIn),
-            followedPicture$: input =>
-                followed$(input).pipe(
+            linkedPicture$: param =>
+                linkedBy$(param).pipe(
                     switchMap(binding =>
                         binding?.kind === 'paint'
                             ? pictureIn(binding.store)

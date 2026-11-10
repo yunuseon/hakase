@@ -9,6 +9,7 @@ import {
     followedStores,
     progressBinding,
     sourceProgram,
+    storeInputOf,
     type Bindings,
     type BindingsOf,
     type Follow,
@@ -1153,6 +1154,33 @@ export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null 
                   : program),
         measured: { width: measured.width, height: measured.height },
     };
+};
+
+// Saved while an input still belonged to the window: what it followed now belongs to the window's store.
+export const formerStoreFollows = (
+    value: unknown,
+    inputsFor: InputsFor,
+): readonly (readonly [StoreId, string, StoreId])[] => {
+    const draft = processFrom(value, inputsFor);
+    const saved =
+        typeof value === 'object' && value !== null && 'follows' in value ? value.follows : null;
+
+    if (draft === null || typeof saved !== 'object' || saved === null || Array.isArray(saved)) {
+        return [];
+    }
+
+    const inputs = inputsFor(draft.program);
+
+    return Object.entries(saved).flatMap(([name, entry]) =>
+        followFrom(entry)
+            .filter(
+                binding =>
+                    storeInputOf(inputs, name)?.sources.some(
+                        ({ kind }) => kind === binding.kind,
+                    ) === true,
+            )
+            .map(binding => [draft.store, name, binding.store] as const),
+    );
 };
 
 const followFrom = (value: unknown): Follow[] => {

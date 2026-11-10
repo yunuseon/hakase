@@ -80,13 +80,18 @@ export const projectionsOf = (history$: Observable<History>) => {
                 a.pens === b.pens &&
                 a.voices === b.voices &&
                 a.drums === b.drums &&
-                a.focusLinks === b.focusLinks,
+                a.focusLinks === b.focusLinks &&
+                a.sketchLinks === b.sketchLinks,
         ),
         map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
     const focusLinks$ = documents$.pipe(
         map(({ focusLinks }) => focusLinks),
+        distinctUntilChanged(),
+    );
+    const sketchLinks$ = documents$.pipe(
+        map(({ sketchLinks }) => sketchLinks),
         distinctUntilChanged(),
     );
     const library$ = documents$.pipe(
@@ -138,6 +143,7 @@ export const projectionsOf = (history$: Observable<History>) => {
         drums$,
         linked$,
         focusLinks$,
+        sketchLinks$,
         library$,
         blueprints$,
         edits$,

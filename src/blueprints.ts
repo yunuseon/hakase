@@ -17,6 +17,14 @@ import { parseSettings, type Settings } from './settings.ts';
 import { parsePicture } from './shared/picture.ts';
 import { parseSignal, reachedFrom, type Linked, type Signal } from './shared/signal.ts';
 import {
+    isSketchParam,
+    linkedSketch,
+    parseSketchLink,
+    SKETCH_PARAMS,
+    unlinkedSketch,
+    type SketchLink,
+} from './components/sketch/links.ts';
+import {
     ensured,
     HOLDING,
     MAIN,
@@ -31,6 +39,7 @@ import type { Size } from './components/window/frame.ts';
 import type { Rect } from './shared/camera.ts';
 import {
     boxOf,
+    formerStoreFollows,
     linkFrom,
     ownsInputs,
     processFrom,
@@ -50,7 +59,8 @@ type HeldKind =
     | 'paintings'
     | 'pens'
     | 'voices'
-    | 'drums';
+    | 'drums'
+    | 'sketchLinks';
 
 type Entries<M> =
     M extends ReadonlyMap<StoreId, infer V> ? readonly (readonly [StoreId, V])[] : never;
@@ -116,8 +126,8 @@ export const reduceBlueprints = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices, drums }: Documents) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums]);
+const linkedOf = ({ signals, pens, voices, drums, sketchLinks }: Documents) =>
+    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...sketchLinks]);
 
 const picked = <V>(map: ReadonlyMap<StoreId, V>, stores: ReadonlySet<StoreId>) =>
     [...map].filter(([id]) => stores.has(id));
@@ -219,6 +229,7 @@ export const blueprintOf = (
             pens: picked(documents.pens, stores),
             voices: picked(documents.voices, stores),
             drums: picked(documents.drums, stores),
+            sketchLinks: picked(documents.sketchLinks, stores),
         },
         formulas,
         links: workspace.links.filter(({ a, b }) => ids.has(a) && ids.has(b)),
@@ -382,6 +393,12 @@ export const placed = (
             ...drums,
             sources: { volume: sourceOf(drums.sources.volume) },
         })),
+        sketchLinks: into(documents.sketchLinks, held.sketchLinks, link =>
+            SKETCH_PARAMS.reduce(
+                (relinked, param) => linkedSketch(relinked, param, sourceOf(link.sources[param])),
+                link,
+            ),
+        ),
     };
 };
 
@@ -399,6 +416,23 @@ const entriesOf = <V>(value: unknown, parse: (stored: unknown) => V) =>
 
 const finite = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+
+// Saved before a sketch's inputs were its store's: what its window followed becomes the store's link.
+const formerLinks = (
+    saved: readonly (readonly [StoreId, SketchLink])[],
+    former: readonly (readonly [StoreId, string, StoreId])[],
+): readonly (readonly [StoreId, SketchLink])[] => [
+    ...former
+        .reduce((all, [store, param, source]) => {
+            const link = all.get(store) ?? unlinkedSketch;
+
+            return saved.some(([id]) => id === store) || !isSketchParam(param)
+                ? all
+                : new Map(all).set(store, linkedSketch(link, param, source));
+        }, new Map<StoreId, SketchLink>())
+        .entries(),
+    ...saved,
+];
 
 const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
     if (typeof value !== 'object' || value === null) {
@@ -459,6 +493,14 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 pens: entriesOf(heldOf('pens'), parsePen),
                 voices: entriesOf(heldOf('voices'), parseVoice),
                 drums: entriesOf(heldOf('drums'), parseDrums),
+                sketchLinks: formerLinks(
+                    entriesOf(heldOf('sketchLinks'), parseSketchLink),
+                    Array.isArray(windows)
+                        ? windows.flatMap((stored: unknown) =>
+                              formerStoreFollows(stored, inputsFor),
+                          )
+                        : [],
+                ),
             },
             formulas: Array.isArray(formulas)
                 ? formulas.flatMap((stored: unknown): BlueprintFormula[] => {

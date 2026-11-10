@@ -38,6 +38,14 @@ import {
 } from './components/drums/drums.ts';
 import type { FocusLink } from './components/focus/focus.ts';
 import {
+    isSketchParam,
+    isUnlinked,
+    linkedSketch,
+    unlinkedSketch,
+    type SketchLink,
+    type SketchParam,
+} from './components/sketch/links.ts';
+import {
     defaultVoice,
     isVoiceParam,
     reduceVoice,
@@ -113,6 +121,7 @@ export type Documents = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
+    readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
     readonly blueprints: Blueprints;
     readonly formulas: ReadonlyMap<FormulaId, Written<string>>;
@@ -211,6 +220,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
     focusLinks: storeEvent(documents.focusLinks, event),
+    sketchLinks: storeEvent(documents.sketchLinks, event),
 });
 
 export const linkedOf = ({
@@ -219,8 +229,36 @@ export const linkedOf = ({
     voices,
     drums,
     focusLinks,
-}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums' | 'focusLinks'>) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...focusLinks]);
+    sketchLinks,
+}: Pick<Documents, 'signals' | 'pens' | 'voices' | 'drums' | 'focusLinks' | 'sketchLinks'>) =>
+    new Map<StoreId, Linked>([
+        ...signals,
+        ...pens,
+        ...voices,
+        ...drums,
+        ...focusLinks,
+        ...sketchLinks,
+    ]);
+
+// A sketch keeps its settings; what its inputs follow is a document of its own, beside them, as a timer's is.
+const linkedSketchIn = (
+    documents: Documents,
+    store: StoreId,
+    param: SketchParam,
+    source: StoreId | null,
+): Documents => {
+    const before = documents.sketchLinks.get(store) ?? unlinkedSketch;
+    const after = linkedSketch(before, param, source);
+
+    return after === before
+        ? documents
+        : {
+              ...documents,
+              sketchLinks: isUnlinked(after)
+                  ? new Map([...documents.sketchLinks].filter(([id]) => id !== store))
+                  : new Map(documents.sketchLinks).set(store, after),
+          };
+};
 
 // A timer is not a document, so only what it follows is kept here, beside the documents that link.
 const linkedFocus = (documents: Documents, store: StoreId, agenda: StoreId | null): Documents =>
@@ -234,7 +272,7 @@ const linkedFocus = (documents: Documents, store: StoreId, agenda: StoreId | nul
                       : new Map(documents.focusLinks).set(store, { sources: { agenda } }),
           };
 
-const ownerOf = ({ stores }: Workspace, store: StoreId) =>
+export const ownerOf = ({ stores }: Pick<Workspace, 'stores'>, store: StoreId) =>
     stores.find(({ id }) => id === store)?.program ?? (isProgramId(store) ? store : null);
 
 // A fork's copy belongs to the step that made the fork, so undoing one undoes both.
@@ -296,6 +334,10 @@ const linked = (
                 : documents;
         case 'focus':
             return param === 'agenda' ? linkedFocus(documents, store, source) : documents;
+        case 'sketch':
+            return isSketchParam(param)
+                ? linkedSketchIn(documents, store, param, source)
+                : documents;
         default:
             return documents;
     }

@@ -119,8 +119,8 @@ export const programDemo = (
         drawing$: select(state => drawingOf(state.pen, new Map())),
         sounding$: of(soundingOf(defaultVoice, new Map())),
         kit$: of(kitOf(defaultDrums, new Map())),
-        followedPicture$: () => of(null),
-        followedDriver$: () => of(null),
+        linkedPicture$: () => of(null),
+        linkedDriver$: () => of(null),
         followedSignal$: input =>
             empty || input !== 'a'
                 ? of(null)

@@ -107,3 +107,59 @@ describe('ticket snapshot migration', () => {
         expect(parseSnapshot({ version: 999 }, inputsFor)).toBeNull();
     });
 });
+
+describe('sketch link migration', () => {
+    const sketch = {
+        id: 'sketch-2',
+        program: 'sketch',
+        store: 'sketch-2',
+        frame,
+        follows: {
+            playback: { kind: 'playback', store: 'timeline' },
+            k2: { kind: 'signal', store: 'signal' },
+            colour: { kind: 'voice', store: 'voice' },
+            paint: { kind: 'pen', store: 'pen' },
+            k3: { kind: 'focus', store: 'focus' },
+        },
+    };
+    const before = {
+        version: 1,
+        workspace: {
+            ...base,
+            processes: [sketch],
+            stores: [{ id: 'sketch-2', program: 'sketch', name: 'sketch 2', kept: false }],
+        },
+    };
+
+    it('moves what a sketch window followed onto its store, keeping only the clock on the window', () => {
+        const restored = parseSnapshot(before, inputsFor);
+
+        expect(restored?.sketchLinks.get('sketch-2')?.sources).toMatchObject({
+            k1: null,
+            k2: 'signal',
+            colour: 'voice',
+            paint: 'pen',
+            k3: null,
+        });
+        expect(restored?.workspace?.processes[0]?.follows).toEqual({
+            playback: { kind: 'playback', store: 'timeline' },
+        });
+    });
+
+    it('prefers links saved on the store over a window follow left from before', () => {
+        const restored = parseSnapshot(
+            {
+                ...before,
+                sketchLinks: {
+                    byStore: { 'sketch-2': { sources: { k1: 'store-4', k2: 7 } } },
+                },
+            },
+            inputsFor,
+        );
+
+        expect(restored?.sketchLinks.get('sketch-2')?.sources).toMatchObject({
+            k1: 'store-4',
+            k2: null,
+        });
+    });
+});

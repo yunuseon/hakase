@@ -138,6 +138,7 @@ export type StoreInput = {
     readonly title: string;
     readonly from: 'store';
     readonly param: string;
+    readonly group: string | null;
     readonly sources: readonly Source[];
     readonly initial: null;
 };
@@ -179,20 +180,22 @@ const signalInput = (title: string, group: string) =>
         initial: null,
     }) as const satisfies FollowedInput;
 
-const driveInput = (title: string, group: string) =>
+const driveInput = (title: string, param: string, group: string) =>
     ({
         title,
-        from: 'followed',
+        from: 'store',
+        param,
         group,
         sources: [signalSource, voiceSource, drumsSource],
         initial: null,
-    }) as const satisfies FollowedInput;
+    }) satisfies StoreInput;
 
 const storedSignalInput = (param: string) =>
     ({
         title: param,
         from: 'store',
         param,
+        group: null,
         sources: [signalSource],
         initial: null,
     }) satisfies StoreInput;
@@ -204,30 +207,31 @@ export const signalInputs = {
 };
 
 export const knobInputs = {
-    k1: driveInput('k1', 'Knobs'),
-    k2: driveInput('k2', 'Knobs'),
-    k3: driveInput('k3', 'Knobs'),
-    k4: driveInput('k4', 'Knobs'),
+    k1: driveInput('k1', 'k1', 'Knobs'),
+    k2: driveInput('k2', 'k2', 'Knobs'),
+    k3: driveInput('k3', 'k3', 'Knobs'),
+    k4: driveInput('k4', 'k4', 'Knobs'),
 };
 
 export const sceneInputs = {
-    turn: driveInput('turn', 'Camera'),
-    pitch: driveInput('pitch', 'Camera'),
-    distance: driveInput('distance', 'Camera'),
-    focus: driveInput('focus', 'Look'),
-    colour: driveInput('colour', 'Look'),
-    size: driveInput('dot size', 'Look'),
-    depth: driveInput('depth', 'Look'),
-    trails: driveInput('trails', 'Look'),
+    turn: driveInput('turn', 'turn', 'Camera'),
+    pitch: driveInput('pitch', 'pitch', 'Camera'),
+    distance: driveInput('distance', 'distance', 'Camera'),
+    focus: driveInput('focus', 'focus', 'Look'),
+    colour: driveInput('colour', 'colour', 'Look'),
+    size: driveInput('dot size', 'size', 'Look'),
+    depth: driveInput('depth', 'depth', 'Look'),
+    trails: driveInput('trails', 'trails', 'Look'),
 };
 
 export const paintInput = {
     title: 'paint',
-    from: 'followed',
+    from: 'store',
+    param: 'paint',
     group: null,
     sources: [paintSource, penSource],
     initial: null,
-} as const satisfies FollowedInput;
+} satisfies StoreInput;
 
 export const penInputs = {
     x: storedSignalInput('x'),
@@ -248,6 +252,7 @@ export const focusInputs = {
         title: 'agenda',
         from: 'store',
         param: 'agenda',
+        group: null,
         sources: [agendaSource],
         initial: null,
     } satisfies StoreInput,

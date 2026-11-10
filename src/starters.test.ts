@@ -25,6 +25,7 @@ const scene = (): Documents => ({
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),
+    sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     formulas: new Map(),

@@ -26,6 +26,7 @@ type Saved = Pick<
     | 'voices$'
     | 'drums$'
     | 'focusLinks$'
+    | 'sketchLinks$'
     | 'library$'
     | 'blueprints$'
 > &
@@ -51,6 +52,7 @@ export const persisted$ = ({
     voices$,
     drums$,
     focusLinks$,
+    sketchLinks$,
     library$,
     blueprints$,
     timersRested$,
@@ -78,6 +80,7 @@ export const persisted$ = ({
             voices: voices$,
             drums: drums$,
             focusLinks: focusLinks$,
+            sketchLinks: sketchLinks$,
             library: library$,
             blueprints: blueprints$,
             seq: history$.pipe(

@@ -34,7 +34,14 @@ import { keptStores, renamedStore, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
-import { parseWorkspace, type Workspace } from './workspace.ts';
+import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
+import {
+    isSketchParam,
+    linkedSketch,
+    parseSketchLink,
+    unlinkedSketch,
+    type SketchLink,
+} from './components/sketch/links.ts';
 import { emptyBlueprints, parseBlueprints, type Blueprints } from './blueprints.ts';
 
 const KEY = 'hakase.state';
@@ -65,6 +72,7 @@ export type Snapshot = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
+    readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
     readonly blueprints: Blueprints;
     readonly seq: number;
@@ -160,6 +168,7 @@ const fresh: Restored = {
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),
+    sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     seq: 0,
@@ -229,6 +238,29 @@ const withBoard = (
               ],
           };
 
+// Saved before a sketch's inputs were its store's: what its window followed becomes the store's link.
+const sketchLinksFrom = (
+    stored: unknown,
+    inputsFor: InputsFor,
+): ReadonlyMap<StoreId, SketchLink> => {
+    const saved = byStore(field(stored, 'sketchLinks'), 'sketch', parseSketchLink);
+    const processes = field(field(stored, 'workspace'), 'processes');
+    const former = Array.isArray(processes)
+        ? processes.flatMap((process: unknown) => formerStoreFollows(process, inputsFor))
+        : [];
+
+    return former.reduce(
+        (all, [store, param, source]) =>
+            saved.has(store) || !isSketchParam(param)
+                ? all
+                : new Map(all).set(
+                      store,
+                      linkedSketch(all.get(store) ?? unlinkedSketch, param, source),
+                  ),
+        saved,
+    );
+};
+
 // Takes what programs read from other programs, so a saved follow is kept only where it still fits.
 export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored | null => {
     if (field(stored, 'version') !== VERSION) {
@@ -275,6 +307,7 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
         focusLinks: byStore(field(stored, 'focusLinks'), 'focus', parseFocusLink),
+        sketchLinks: sketchLinksFrom(stored, inputsFor),
         library: parseLibrary(field(stored, 'library')),
         blueprints: parseBlueprints(
             field(stored, 'blueprints') ?? field(stored, 'pieces'),
@@ -319,6 +352,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         voices: saved(snapshot.voices),
         drums: saved(snapshot.drums),
         focusLinks: saved(snapshot.focusLinks),
+        sketchLinks: saved(snapshot.sketchLinks),
         library: snapshot.library,
         blueprints: snapshot.blueprints,
         seq: snapshot.seq,

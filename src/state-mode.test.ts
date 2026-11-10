@@ -1,3 +1,5 @@
+import type { Linked } from './shared/signal.ts';
+import { unlinkedSketch } from './components/sketch/links.ts';
 import { describe, expect, it } from 'vitest';
 import {
     defaultMode,
@@ -288,18 +290,13 @@ describe('input groups', () => {
     });
 
     it('lands a closed group’s wires on its own jack, and counts what is bound', () => {
-        const workspace = run([
-            small,
-            {
-                kind: 'follow',
-                id: 'sketch-5',
-                input: 'k2',
-                source: 'signal',
-                store: 'signal',
-            },
-        ]);
+        const workspace = run([small]);
         const sketch = sketchIn(workspace);
-        const view = wiringOf(workspace, signals, inputsFor, on, 1);
+        const linked = new Map<string, Linked>([
+            ...signals,
+            [sketch.store, { sources: { ...unlinkedSketch.sources, k2: 'signal' } }],
+        ]);
+        const view = wiringOf(workspace, linked, inputsFor, on, 1);
         const knobs = view?.groups.find(row => row.key === groupKey(sketch.id, 'Knobs'));
         const k2 = view?.sockets.find(socket => socket.key === `${sketch.id}:input:k2`);
 

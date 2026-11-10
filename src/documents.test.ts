@@ -34,6 +34,7 @@ const started = (): Documents => ({
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),
+    sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     formulas: new Map(),
@@ -310,6 +311,25 @@ describe('links', () => {
 
         expect(history.present.signals.get('signal')?.sources.phase ?? null).toBeNull();
         expect(history.steps).toHaveLength(before.steps.length);
+    });
+
+    it("link a sketch's knob on its store, undo it, and keep what it follows through a prune", () => {
+        const linked = run(fresh(), [
+            launched('signal'),
+            { kind: 'link', store: 'sketch-2', param: 'k2', source: 'signal' },
+        ]);
+
+        expect(linked.present.sketchLinks.get('sketch-2')?.sources.k2).toBe('signal');
+        expect(run(linked, [{ kind: 'undo' }]).present.sketchLinks.has('sketch-2')).toBe(false);
+        expect(
+            run(linked, [{ kind: 'link', store: 'sketch-2', param: 'k2', source: null }]).present
+                .sketchLinks.size,
+        ).toBe(0);
+        expect(
+            run(linked, [
+                { kind: 'link', store: 'sketch-2', param: 'k2', source: 'sketch-2' },
+            ]).present.sketchLinks.get('sketch-2')?.sources.k2,
+        ).toBe('signal');
     });
 
     it('let a focus timer follow an agenda, and undo it as one step', () => {

@@ -196,7 +196,7 @@ export const wiringOf = (
         const groupOf = (name: string) => {
             const definition = definitionOf(inputs, name);
 
-            return definition?.from === 'followed' ? definition.group : null;
+            return definition === undefined || definition.from === 'own' ? null : definition.group;
         };
         const membersOf = (group: string) => names.filter(name => groupOf(name) === group);
         const open = openGroupIn(session, process.id);

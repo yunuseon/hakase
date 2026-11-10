@@ -155,9 +155,10 @@ export type AppState = {
     readonly drawing$: Observable<Drawing>;
     readonly sounding$: Observable<Sounding>;
     readonly kit$: Observable<Kit>;
-    readonly followedPicture$: (input: string) => Observable<Sheet | null>;
-    readonly followedDriver$: (input: string) => Observable<Driver | null>;
-    // One stream, not followedDriver$ beside a name: a rebind changes both, and two would fire twice.
+    // What a store input of the window's own store follows: the store's link, not the window's.
+    readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
+    readonly linkedDriver$: (param: string) => Observable<Driver | null>;
+    // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.
     readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the state map alone: any store or global, which no other program can see.

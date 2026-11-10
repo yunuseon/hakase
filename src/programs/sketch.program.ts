@@ -134,18 +134,18 @@ export const sketchProgram = {
                 );
 
                 const signals$ = combineLatest({
-                    k1: state.followedDriver$('k1'),
-                    k2: state.followedDriver$('k2'),
-                    k3: state.followedDriver$('k3'),
-                    k4: state.followedDriver$('k4'),
-                    turn: state.followedDriver$('turn'),
-                    pitch: state.followedDriver$('pitch'),
-                    distance: state.followedDriver$('distance'),
-                    focus: state.followedDriver$('focus'),
-                    colour: state.followedDriver$('colour'),
-                    size: state.followedDriver$('size'),
-                    depth: state.followedDriver$('depth'),
-                    trails: state.followedDriver$('trails'),
+                    k1: state.linkedDriver$('k1'),
+                    k2: state.linkedDriver$('k2'),
+                    k3: state.linkedDriver$('k3'),
+                    k4: state.linkedDriver$('k4'),
+                    turn: state.linkedDriver$('turn'),
+                    pitch: state.linkedDriver$('pitch'),
+                    distance: state.linkedDriver$('distance'),
+                    focus: state.linkedDriver$('focus'),
+                    colour: state.linkedDriver$('colour'),
+                    size: state.linkedDriver$('size'),
+                    depth: state.linkedDriver$('depth'),
+                    trails: state.linkedDriver$('trails'),
                 }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
                 const params$ = combineLatest([
@@ -153,7 +153,7 @@ export const sketchProgram = {
                     size$,
                     theme$,
                     signals$,
-                    state.followedPicture$('paint'),
+                    state.linkedPicture$('paint'),
                 ]).pipe(
                     map(([panel, size, theme, signals, picture]): SketchParams => ({
                         ...panelParams(panel, signals, picture),
