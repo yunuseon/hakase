@@ -233,6 +233,17 @@ const driveInput = (title: string, param: string, group: string) =>
         from: 'store',
         param,
         group,
+        sources: [signalSource, voiceSource, drumsSource, ...GATE_SOURCES],
+        initial: null,
+    }) satisfies StoreInput;
+
+// Not a bit: a compare's input is read while the circuit table is made, so a gate there would wait on itself.
+const levelInput = (param: string) =>
+    ({
+        title: param,
+        from: 'store',
+        param,
+        group: null,
         sources: [signalSource, voiceSource, drumsSource],
         initial: null,
     }) satisfies StoreInput;
@@ -357,7 +368,7 @@ const bitInput = (param: string) =>
 export const gateInputs = (kind: GateKind): Readonly<Record<string, StoreInput>> => {
     const entries: readonly (readonly [string, StoreInput])[] = [
         ...GATES[kind].bits.map(param => [param, bitInput(param)] as const),
-        ...GATES[kind].drives.map(param => [param, driveInput(param, param, 'Drives')] as const),
+        ...GATES[kind].drives.map(param => [param, levelInput(param)] as const),
     ];
 
     return Object.fromEntries(entries);

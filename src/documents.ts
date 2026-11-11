@@ -288,7 +288,6 @@ const linkedSketchIn = (
           };
 };
 
-// A timer is not a document, so only what it follows is kept here, beside the documents that link.
 const linkedFocus = (documents: Documents, store: StoreId, agenda: StoreId | null): Documents =>
     (documents.focusLinks.get(store)?.sources.agenda ?? null) === agenda
         ? documents
