@@ -64,7 +64,11 @@ export type StoreEntry = {
     readonly clock: ClockSeed | null;
 };
 
-export type ClockSeed = { readonly duration: number; readonly looping: boolean };
+export type ClockSeed = {
+    readonly duration: number;
+    readonly looping: boolean;
+    readonly ticks?: number;
+};
 
 export const MAIN = 'Main';
 

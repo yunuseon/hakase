@@ -36,17 +36,28 @@ const TEMPLATE = () =>
             max="600"
             step="0.1"
             aria-label="duration in seconds"
-        /><span class="unit">s</span>`;
+        /><span class="unit">s</span
+        ><input
+            class="ui-field ticks"
+            type="number"
+            min="1"
+            max="64"
+            step="1"
+            aria-label="logic ticks per loop"
+            title="logic ticks per loop: how many times a circuit steps in one loop"
+        /><span class="unit">ticks</span>`;
 
 export class HksTransport extends HTMLElement {
     readonly commands$: Observable<TransportCommand>;
     readonly durations$: Observable<number>;
+    readonly ticks$: Observable<number>;
 
     private readonly toggle: HTMLElement;
     private readonly glyph: SVGPathElement;
     private readonly loop: HTMLElement;
     private readonly clock: HTMLElement;
     private readonly duration: HTMLInputElement;
+    private readonly ticks: HTMLInputElement;
 
     private readonly rendering: Rendering;
 
@@ -62,6 +73,7 @@ export class HksTransport extends HTMLElement {
         this.loop = requireChild(shadow, '.loop');
         this.clock = requireChild(shadow, '.clock');
         this.duration = requireElement(shadow, '.duration', HTMLInputElement);
+        this.ticks = requireElement(shadow, '.ticks', HTMLInputElement);
 
         this.commands$ = merge(
             fromElementEvent$(this.toggle, 'click').pipe(map((): TransportCommand => 'toggle')),
@@ -79,6 +91,14 @@ export class HksTransport extends HTMLElement {
                 return seconds === null ? EMPTY : of(seconds);
             }),
         );
+
+        this.ticks$ = fromElementEvent$(this.ticks, 'change').pipe(
+            mergeMap(() => {
+                const count = this.ticks.valueAsNumber;
+
+                return Number.isFinite(count) ? of(count) : EMPTY;
+            }),
+        );
     }
 
     connect$(
@@ -86,6 +106,7 @@ export class HksTransport extends HTMLElement {
         looping$: Observable<boolean>,
         clock$: Observable<string>,
         duration$: Observable<number>,
+        ticks$: Observable<number> = EMPTY,
     ): Observable<void> {
         return merge(
             this.rendering.lifetime$,
@@ -115,6 +136,13 @@ export class HksTransport extends HTMLElement {
                     distinctUntilChanged(),
                     tap(text => {
                         this.duration.value = text;
+                    }),
+                ),
+                ticks$.pipe(
+                    map(count => String(count)),
+                    distinctUntilChanged(),
+                    tap(text => {
+                        this.ticks.value = text;
                     }),
                 ),
             ).pipe(map(() => undefined)),

@@ -70,6 +70,7 @@ type StoreKey =
     | 'playing$'
     | 'looping$'
     | 'duration$'
+    | 'ticks$'
     | 'clock$'
     | 'tickets$'
     | 'notes$'
@@ -535,6 +536,10 @@ export const scopedOf = ({
             clock$: clock,
             duration$: clock.pipe(
                 map(({ duration }) => duration),
+                distinctUntilChanged(),
+            ),
+            ticks$: clock.pipe(
+                map(({ ticks }) => ticks),
                 distinctUntilChanged(),
             ),
             tickets$: narrowed(ticketsIn),

@@ -81,6 +81,7 @@ export type AppInput =
     | { readonly kind: 'scrub'; readonly phase: Phase; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
     | { readonly kind: 'duration'; readonly seconds: number }
+    | { readonly kind: 'ticks'; readonly count: number }
     | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
@@ -141,6 +142,7 @@ export type AppState = {
     readonly playing$: Observable<boolean>;
     readonly looping$: Observable<boolean>;
     readonly duration$: Observable<number>;
+    readonly ticks$: Observable<number>;
     // The window's clock whole: its position and its play state change together, and two projections would fire twice.
     readonly clock$: Observable<Clock>;
     readonly zoom$: Observable<number>;

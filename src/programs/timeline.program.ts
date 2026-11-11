@@ -22,7 +22,7 @@ export const timelineProgram = {
 
         return {
             element: slider,
-            run$: ({ playhead$, playing$, looping$, duration$ }) => {
+            run$: ({ playhead$, playing$, looping$, duration$, ticks$ }) => {
                 const clock$ = combineLatest([playhead$, duration$]).pipe(
                     map(([at, duration]) => elapsedLabel(at, duration)),
                 );
@@ -30,12 +30,13 @@ export const timelineProgram = {
                 return merge(
                     slider.connect$(playhead$).pipe(ignoreElements()),
                     transport
-                        .connect$(playing$, looping$, clock$, duration$)
+                        .connect$(playing$, looping$, clock$, duration$, ticks$)
                         .pipe(ignoreElements()),
                     slider.changes$.pipe(map((scrub): AppInput => ({ kind: 'scrub', ...scrub }))),
                     transport.commands$.pipe(
                         map((command): AppInput => ({ kind: 'transport', command })),
                     ),
+                    transport.ticks$.pipe(map((count): AppInput => ({ kind: 'ticks', count }))),
                     transport.durations$.pipe(
                         map((seconds): AppInput => ({ kind: 'duration', seconds })),
                     ),

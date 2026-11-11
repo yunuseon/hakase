@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    DEFAULT_TICKS,
     initialClock,
     initialTransport,
     parseClock,
@@ -126,5 +127,32 @@ describe('parseClock', () => {
             at: 1,
             looping: false,
         });
+    });
+});
+
+describe('ticks per loop', () => {
+    it('start at the default, clamp a command, read a saved count and seed a placed clock', () => {
+        const set = (count: number) =>
+            reduceClocks(new Map(), {
+                kind: 'clock',
+                store: 'loop',
+                command: { kind: 'ticks', count },
+            }).get('loop')?.ticks;
+
+        expect(initialClock.ticks).toBe(DEFAULT_TICKS);
+        expect(set(200)).toBe(64);
+        expect(set(0)).toBe(1);
+        expect(set(7.6)).toBe(8);
+        expect(parseClock({ ticks: 12 }).ticks).toBe(12);
+        expect(parseClock({ ticks: 'many' }).ticks).toBe(DEFAULT_TICKS);
+        expect(
+            reduceClocks(new Map(), {
+                kind: 'seed',
+                to: 'loop',
+                duration: 4,
+                looping: true,
+                ticks: 8,
+            }).get('loop')?.ticks,
+        ).toBe(8);
     });
 });

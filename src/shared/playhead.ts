@@ -84,16 +84,29 @@ export const reduceTransport = (transport: Transport, action: TransportAction): 
     }
 };
 
+export const MIN_TICKS = 1;
+export const MAX_TICKS = 64;
+export const DEFAULT_TICKS = 16;
+
+export const clampedTicks = (count: number): number =>
+    Math.min(MAX_TICKS, Math.max(MIN_TICKS, Math.round(count)));
+
 export type Clock = Transport & {
     readonly duration: number;
+    readonly ticks: number;
 };
 
-export const initialClock: Clock = { ...initialTransport, duration: defaultDuration };
+export const initialClock: Clock = {
+    ...initialTransport,
+    duration: defaultDuration,
+    ticks: DEFAULT_TICKS,
+};
 
 export type ClockCommand =
     | { readonly kind: 'command'; readonly command: TransportCommand }
     | { readonly kind: 'scrub'; readonly scrub: Scrub }
-    | { readonly kind: 'duration'; readonly seconds: number };
+    | { readonly kind: 'duration'; readonly seconds: number }
+    | { readonly kind: 'ticks'; readonly count: number };
 
 export type Clocks = ReadonlyMap<string, Clock>;
 
@@ -105,6 +118,7 @@ type ClocksAction =
           readonly to: string;
           readonly duration: number;
           readonly looping: boolean;
+          readonly ticks?: number;
       }
     | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> }
     | { readonly kind: 'advance'; readonly ms: number };
@@ -122,6 +136,10 @@ const commanded = (clock: Clock, command: ClockCommand): Clock => {
             return { ...clock, ...reduceTransport(clock, { kind: 'scrub', scrub: command.scrub }) };
         case 'duration':
             return { ...clock, duration: command.seconds };
+        case 'ticks':
+            return Number.isFinite(command.count)
+                ? { ...clock, ticks: clampedTicks(command.count) }
+                : clock;
     }
 };
 
@@ -147,6 +165,7 @@ export const reduceClocks = (clocks: Clocks, action: ClocksAction): Clocks => {
                       ...initialClock,
                       duration: action.duration,
                       looping: action.looping,
+                      ticks: clampedTicks(action.ticks ?? DEFAULT_TICKS),
                   });
         case 'keep': {
             const kept = new Map([...clocks].filter(([store]) => action.stores.has(store)));
@@ -235,7 +254,11 @@ export const restedClocks = (kept: Clocks, now: Clocks): Clocks => {
 };
 
 const sameRest = (a: Clock | undefined, b: Clock): boolean =>
-    a !== undefined && a.at === b.at && a.looping === b.looping && a.duration === b.duration;
+    a !== undefined &&
+    a.at === b.at &&
+    a.looping === b.looping &&
+    a.duration === b.duration &&
+    a.ticks === b.ticks;
 
 const field = (value: object, key: string): unknown =>
     Object.entries(value).find(([name]) => name === key)?.[1];
@@ -247,6 +270,7 @@ export const parseClock = (value: unknown): Clock => {
 
     const at = field(value, 'at');
     const duration = field(value, 'duration');
+    const ticks = field(value, 'ticks');
 
     return {
         ...initialClock,
@@ -256,5 +280,9 @@ export const parseClock = (value: unknown): Clock => {
             typeof duration === 'number' && Number.isFinite(duration) && duration > 0
                 ? Math.min(duration, 600)
                 : defaultDuration,
+        ticks:
+            typeof ticks === 'number' && Number.isFinite(ticks)
+                ? clampedTicks(ticks)
+                : DEFAULT_TICKS,
     };
 };

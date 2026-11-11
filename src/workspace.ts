@@ -1226,7 +1226,15 @@ const clockSeedFrom = (value: unknown): ClockSeed | null =>
     typeof value.duration === 'number' &&
     value.duration > 0 &&
     Number.isFinite(value.duration)
-        ? { duration: value.duration, looping: !('looping' in value) || value.looping !== false }
+        ? {
+              duration: value.duration,
+              looping: !('looping' in value) || value.looping !== false,
+              ...('ticks' in value &&
+              typeof value.ticks === 'number' &&
+              Number.isFinite(value.ticks)
+                  ? { ticks: value.ticks }
+                  : {}),
+          }
         : null;
 
 export const storeFrom = (value: unknown): StoreEntry[] => {

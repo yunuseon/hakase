@@ -191,7 +191,13 @@ export const blueprintOf = (
         const program = entry?.program ?? (isProgramId(id) ? id : undefined);
         const saved = program === 'timeline' ? playback.get(id) : undefined;
         const clock =
-            saved === undefined ? null : { duration: saved.duration, looping: saved.looping };
+            saved === undefined
+                ? null
+                : {
+                      duration: saved.duration,
+                      looping: saved.looping,
+                      ...(saved.ticks === undefined ? {} : { ticks: saved.ticks }),
+                  };
 
         return program === undefined
             ? []

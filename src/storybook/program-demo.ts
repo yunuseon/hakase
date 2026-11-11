@@ -75,6 +75,7 @@ export const programDemo = (
         playing$: clock$.pipe(map(clock => clock.playing)),
         looping$: clock$.pipe(map(clock => clock.looping)),
         duration$: clock$.pipe(map(clock => clock.duration)),
+        ticks$: clock$.pipe(map(clock => clock.ticks)),
         clock$,
         zoom$: of(1),
         source$: id =>

@@ -3,10 +3,6 @@ import { CURVE_SAMPLES, driverAt, type Curve, type Driver } from './shared/curve
 
 export type Table = ReadonlyMap<string, Uint8Array>;
 
-export const MIN_TICKS = 1;
-export const MAX_TICKS = 64;
-export const DEFAULT_TICKS = 16;
-
 const evaluated = (
     gate: Gate,
     tick: number,

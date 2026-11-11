@@ -72,7 +72,8 @@
     color: var(--ink);
 }
 
-.duration {
+.duration,
+.ticks {
     inline-size: 5ch;
     padding: 1px calc(var(--spacing) * 0.75);
     font-family: var(--font-mono);
@@ -85,12 +86,15 @@
 }
 
 .duration::-webkit-inner-spin-button,
-.duration::-webkit-outer-spin-button {
+.duration::-webkit-outer-spin-button,
+.ticks::-webkit-inner-spin-button,
+.ticks::-webkit-outer-spin-button {
     appearance: none;
     margin: 0;
 }
 
-.duration:focus-visible {
+.duration:focus-visible,
+.ticks:focus-visible {
     outline: 1px solid var(--ink);
     outline-offset: 1px;
 }
