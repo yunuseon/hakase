@@ -5,6 +5,8 @@ import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.
 import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
 import { defaultPedal } from './pedals.ts';
+import { GATE_DEFAULTS, type Bit, type Gate, type GateKind } from './gates.ts';
+import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
 import type { Bindings } from './inputs.ts';
@@ -96,6 +98,45 @@ const LINE = [4, 2, 0, -1, -3, -5, -3, -1, 0, -1, -3, -5, -7, -8, -7, -10];
 const SONG = { playback: { kind: 'playback', store: 'song' } } as const;
 
 const LOOP = { playback: { kind: 'playback', store: 'loop' } } as const;
+
+const TICK = { playback: { kind: 'playback', store: 'tick' } } as const;
+
+const gate = (kind: GateKind, sources: Gate['sources'] = {}, rest: Partial<Gate> = {}): Gate => ({
+    ...GATE_DEFAULTS[kind],
+    sources,
+    ...rest,
+});
+
+const GATE_SIZE = { width: 160, height: 176 };
+
+const inner = (id: string, program: GateKind, x: number, y: number) => {
+    const { settings: _, ...draft } = opened(id, program, id, { x, y, ...GATE_SIZE }, TICK);
+
+    return draft;
+};
+
+const A: readonly Bit[] = [0, 1, 0, 1, 0, 1, 0, 1];
+const B: readonly Bit[] = [0, 0, 1, 1, 0, 0, 1, 1];
+
+const ADDER: Box = {
+    name: 'half adder',
+    inner: [
+        inner('pa', 'pin-in', 0, 0),
+        inner('pb', 'pin-in', 0, 192),
+        inner('n1', 'nand', 176, 96),
+        inner('n2', 'nand', 352, 0),
+        inner('n3', 'nand', 352, 192),
+        inner('n4', 'nand', 528, 0),
+        inner('n5', 'nand', 528, 192),
+        inner('sum', 'pin-out', 704, 0),
+        inner('carry', 'pin-out', 704, 192),
+    ],
+    inputs: ['pa', 'pb'],
+    outputs: ['sum', 'carry'],
+    sources: Object.fromEntries(
+        ['pa', 'pb', 'n1', 'n2', 'n3', 'n4', 'n5', 'sum', 'carry'].map(id => [id, id]),
+    ),
+};
 
 const REVIEW = `Daily review
 
@@ -445,6 +486,68 @@ export const STARTERS: readonly Starter[] = [
             { a: 'tint', b: 'out' },
             { a: 'source', b: 'spin' },
         ],
+    },
+    {
+        id: 'starter-logic',
+        name: 'Logic primer',
+        summary:
+            'Two patterns into a half adder built from NAND gates and boxed into a component, and a one-gate counter that flips every tick through a delay. Open the component to see its gates.',
+        size: { width: 640, height: 768 },
+        windows: [
+            opened('tick', 'timeline', 'tick', { x: 24, y: 48, width: 360, height: 120 }),
+            opened('a', 'pattern', 'a', { x: 24, y: 184, ...GATE_SIZE }, TICK),
+            opened('b', 'pattern', 'b', { x: 24, y: 376, ...GATE_SIZE }, TICK),
+            opened('adder', 'box', 'adder', { x: 200, y: 184, width: 240, height: 224 }, TICK),
+            opened('lsum', 'lamp', 'lsum', { x: 456, y: 184, ...GATE_SIZE }, TICK),
+            opened('lcarry', 'lamp', 'lcarry', { x: 456, y: 376, ...GATE_SIZE }, TICK),
+            opened('q', 'delay', 'q', { x: 24, y: 568, ...GATE_SIZE }, TICK),
+            opened('nq', 'nand', 'nq', { x: 200, y: 568, ...GATE_SIZE }, TICK),
+        ],
+        stores: [
+            {
+                ...own('tick', 'timeline', 'Logic'),
+                clock: { duration: 4, looping: true, ticks: 8 },
+            },
+            own('a', 'pattern', 'a'),
+            own('b', 'pattern', 'b'),
+            own('adder', 'box', 'half adder'),
+            own('pa', 'pin-in', 'half adder.a'),
+            own('pb', 'pin-in', 'half adder.b'),
+            own('n1', 'nand', 'a nand b'),
+            own('n2', 'nand', 'n2'),
+            own('n3', 'nand', 'n3'),
+            own('n4', 'nand', 'a xor b'),
+            own('n5', 'nand', 'a and b'),
+            own('sum', 'pin-out', 'half adder.sum'),
+            own('carry', 'pin-out', 'half adder.carry'),
+            own('lsum', 'lamp', 'sum'),
+            own('lcarry', 'lamp', 'carry'),
+            own('q', 'delay', 'count'),
+            own('nq', 'nand', 'not count'),
+        ],
+        held: {
+            ...held,
+            gates: [
+                ['a', gate('pattern', {}, { steps: A })],
+                ['b', gate('pattern', {}, { steps: B })],
+                ['pa', gate('pin-in', { in: 'a' }, { name: 'a' })],
+                ['pb', gate('pin-in', { in: 'b' }, { name: 'b' })],
+                ['n1', gate('nand', { a: 'pa', b: 'pb' })],
+                ['n2', gate('nand', { a: 'pa', b: 'n1' })],
+                ['n3', gate('nand', { a: 'pb', b: 'n1' })],
+                ['n4', gate('nand', { a: 'n2', b: 'n3' })],
+                ['n5', gate('nand', { a: 'n1', b: 'n1' })],
+                ['sum', gate('pin-out', { in: 'n4' }, { name: 'sum' })],
+                ['carry', gate('pin-out', { in: 'n5' }, { name: 'carry' })],
+                ['lsum', gate('lamp', { in: 'sum' })],
+                ['lcarry', gate('lamp', { in: 'carry' })],
+                ['q', gate('delay', { in: 'nq' })],
+                ['nq', gate('nand', { a: 'q', b: 'q' })],
+            ],
+            boxes: [['adder', ADDER]],
+        },
+        formulas: [],
+        links: [],
     },
 ];
 

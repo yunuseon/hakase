@@ -5,6 +5,7 @@ import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
 import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
 import { blueprintIn, STARTERS } from './starters.ts';
+import { circuitTable } from './circuit.ts';
 import { defaultWorkspace } from './workspace.ts';
 import { notesOf, soundingOf } from './components/voice/voice.ts';
 
@@ -181,5 +182,25 @@ describe('starter blueprints', () => {
         expect(after.pedals.get(id('Tint'))?.choice).toBe('ember');
         expect(output?.follows).toMatchObject({ in: { kind: 'colourmap', store: id('Tint') } });
         expect(after.workspace.links).toHaveLength(before.workspace.links.length + 5);
+    });
+
+    it('places a Logic primer whose half adder adds and whose counter counts', () => {
+        const before = scene();
+        const after = placed(before, starter('starter-logic'), view, 300, inputsFor);
+        const id = (name: string) =>
+            after.workspace.stores.find(
+                store => store.name === name && store.id.startsWith('store-300'),
+            )?.id ?? '';
+        const gates = new Map([...after.gates].filter(([store]) => store.startsWith('store-300')));
+        const table = circuitTable(gates, 8);
+        const row = (name: string) => [...(table.get(id(name)) ?? [])];
+        const box = after.boxes.get(id('half adder'));
+
+        expect(row('sum')).toEqual([0, 1, 1, 0, 0, 1, 1, 0]);
+        expect(row('carry')).toEqual([0, 0, 0, 1, 0, 0, 0, 1]);
+        expect(row('count')).toEqual([0, 1, 0, 1, 0, 1, 0, 1]);
+        expect(box?.outputs).toEqual([id('half adder.sum'), id('half adder.carry')]);
+        expect(box?.inner.every(({ store }) => store.startsWith('store-300'))).toBe(true);
+        expect(after.workspace.processes.some(({ store }) => store === id('a nand b'))).toBe(false);
     });
 });

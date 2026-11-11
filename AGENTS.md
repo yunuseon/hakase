@@ -1828,6 +1828,79 @@ a common render size per chain could avoid if it is ever measured to matter. The
 starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
 
+## Logic
+
+Gates are the smallest programs there are: each is a window over a one-bit
+document, wired by store inputs like a pedal, and a selection of them can be
+boxed into a **component** whose gates are hidden but still there.
+
+**A gate is a row of a table.** `GATES` in `src/gates.ts` gives each kind its
+title, its bit inputs (`bits`), its level inputs (`drives`, only compare's
+`in`), its icon and summary: nand, delay, switch, pattern, compare, lamp,
+pin in, pin out and const. `gateProgram(kind)` makes the program and
+`gateInputs(kind)` its store inputs. Holding is `stage`, a private document,
+so two NANDs are two gates. Everything else is built from NANDs, by hand.
+
+**Time is ticks, replayed.** Each clock has `ticks` per loop (1 to 64, 16 by
+default), set in the timeline beside the duration and routed like it. The
+bits are not stepped as the clock runs: `circuitTable(gates, ticks, drivers)`
+replays ticks 0 to n − 1 from nothing and returns every gate's bit at every
+tick, so a scrub, a loop or an export reads a moment exactly, like a signal.
+Within a tick the gates run in topological order; a **delay** reads its input
+one tick before, and is 0 at tick 0.
+
+**A loop must pass through a delay.** A NAND that feeds itself within a tick
+has no answer, so the documents reducer refuses it, but a latch or a counter
+needs a loop. Two things let exactly those through: `loopsOf` is the link
+graph with every delay's input edge cut, and the reducer and the state menus
+(`inputGroups`) check against it; and `readsTickBefore` skips the check
+outright for a link **into** a delay. The state map still checks the plain
+chain, so it does not light a drop that would close a loop through a delay.
+A compare's level input takes a signal, voice or drums (`levelInput`), never a
+gate: the table reads it while it is being made, so a gate there would wait on
+itself.
+
+**One table, shared and memoised.** `circuit$` gathers every registered gate
+store (its document, or the kind's default), and `tableOf(ticks, seconds)`
+keeps one table stream per pace, so a hundred gate windows on one clock share
+one evaluation. Readers get the pace as `pace$` (seconds and ticks together,
+one stream, so a ticks change cannot reach a combine twice). A gate's row is
+also a `Driver`: `bitCurve` turns it into a step curve, so every knob, scene
+input and pedal knob that takes a signal takes a gate.
+
+**A component is a presentation, not an evaluation.** **Make component** in
+the selection bar boxes a selection of gates and components with at least one
+pin out (`canBox`). `boxed` in `src/boxes.ts` closes those windows, keeps
+their stores (`kept: true`, renamed `<component>.<pin>`), and opens one `box`
+window whose document lists them as `inner` drafts, the pins in reading order,
+and `sources` that link every inner store, so the prune and `reachedFrom`
+keep what nothing else reaches. Nothing is rewired: a cable into a pin in was a
+link on that gate and still is, a lamp that read a pin out still reads it, and
+`circuitTable` never learns that components exist. Nesting is therefore free:
+a component in a selection is one more window, and **Open** (`unboxed`) puts
+back one level, with ids from the log's sequence, never the saved ones, so a
+component placed twice opens into two sets of windows. Both are one step.
+
+The window (`hks-box`) shows the name and each pin's bit now and across the
+loop. In state mode a component's pins **are** its jacks: `wiringOf` draws an
+input jack per pin in, which edits that gate's own `in` link, and an output
+jack per pin out, which is that gate's store, under the clock's row and named
+from the gates (`links$.names`). `links$` carries the links, the loop graph,
+the components and those names as one record, because two of them combined
+side by side fired every reader twice per link.
+
+A blueprint carries a component with its hidden gates (the held `boxes`,
+relinked through `storeOf` like a pedal's sources), and a placed copy keeps the
+stores' own `kept`, since a hidden gate has no window to keep it. The **Logic
+primer** starter is the worked example: two patterns into a half adder of five
+NANDs boxed as a component, two lamps, and a counter that is one NAND and one
+delay.
+
+Still open: a voice's or drum machine's inputs take signals only (they are
+resolved through `waveOf`), so a bit cannot gate a sound yet; and a gate window
+is a full window, about 160 units square, because state mode needs room for
+its jacks.
+
 ## Blueprints
 
 A **blueprint** is a creation kept to be placed again: selected programs, saved from the selection bar's **Save as blueprint**, listed in the

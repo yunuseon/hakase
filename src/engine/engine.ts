@@ -53,7 +53,6 @@ export type Moment = {
     readonly width: number;
     readonly height: number;
     readonly pointer: Pointer;
-    // Which run through the loop this is: an export's warm-up and its kept frames meet the same moments.
     readonly pass: number;
 };
 
@@ -106,7 +105,6 @@ export type Engine = {
 };
 
 const REFERENCE_SIDE = 640;
-// Input textures sit above the sketch's own units: palette 0, state 1, paint 2.
 const INPUT_UNIT = 3;
 const PALETTE_UNIT = 5;
 const PREVIOUS_UNIT = 6;

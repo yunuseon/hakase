@@ -94,7 +94,6 @@ export const windowsOf = ({
 
     const slotOf = (entry$: Observable<Entry>): Observable<Slot> =>
         entry$.pipe(
-            // Depth is the position in the list, so raising is a reorder.
             map(({ process, index, last }) => ({
                 frame: { ...process.frame, z: index + 1 },
                 focused: index === last,
