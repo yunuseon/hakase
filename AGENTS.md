@@ -15,6 +15,10 @@ is a bad trade here. Say so and propose the reactive version instead.
 
 ## Rendering
 
+A sketch draws itself in its own window, and the same GL code also draws a
+sketch's store into the shared engine whenever an image cable reads it (see
+"Image cables"). Everything below holds for both.
+
 The sketch renders with **WebGL2**, not canvas2d. A formula is GLSL, the lattice
 loop is the vertex shader, and `gl_VertexID` derives each cell's coordinates —
 there are no vertex buffers at all, just one `drawArrays`. This is worth 40x at
@@ -180,7 +184,10 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     in `prepare`, because a moving knob changes with the playhead rather than with
     its settings.
 
-    **A knob can follow a signal** instead (see "Signals"). `knobValue` picks
+    **A knob can follow a signal** instead (see "Signals"). What it follows
+    is the sketch's **store's** link (`Documents.sketchLinks`, read through
+    `linkedDriver$`), not its window's, so a picture a pedal reads keeps moving
+    with the sketch's window closed (see "Image cables"). `knobValue` picks
     for each knob: a bound signal's value at the playhead, or the slider and its
     motion. The bound signals travel in `PanelParams.signals`, beside the panel
     rather than in it, so the live sketch, the thumbnails and an export all draw
@@ -1421,9 +1428,9 @@ a fourth drag-number, a `Field` but not a `Param`, because it cannot follow
 another signal.
 
 A signal window shows its wave and marks the moment of the clock it follows
-(it takes `playbackInput` like a sketch). A sketch's four knobs are inputs
-(`knobInputs`, optional, accepting `signal`), so one signal can drive knobs in
-several sketches, and a fork drives another set apart. A signal never reads the
+(it takes `playbackInput` like a sketch). A sketch's four knobs are store
+inputs (`knobInputs`, optional, accepting `signal`, `voice` or `drums`), so one
+signal can drive knobs in several sketches, and a fork drives another set apart. A signal never reads the
 clock of the window that shows it: the follower evaluates it at its **own**
 playhead, so a sketch on a second clock plays the same wave on its own time.
 `AppState.followedWave$(input)` hands a program the signal its input is bound
@@ -1734,10 +1741,86 @@ Frame-rate updates mean a pluck can land up to a frame late; scheduling
 ahead of the playhead is the next step if that is ever heard.
 
 **Store inputs are one mechanism for every document that has them.** A
-document with sources is `Linked` (`{ sources }`), a `link` action is routed
-to whichever program owns the store (`ownerOf`), and `reachedFrom`,
-`closesLoop`, the prune and the state map read every linked map alike, so a
-signal feeding a pen or a voice is kept by a prune and a pen cannot be wired into a loop.
+document with sources is `Linked` (`{ sources }`), and a `link` action is
+checked once for every kind before it is routed to whichever program owns the
+store (`ownerOf`): the store's program must declare a store input with that
+param (`storeInputOf`), the source's program must be one it takes, and the link
+must not close a loop over **every** linked map (`closesLoop` on `linkedOf`), so
+a kaleidoscope cannot feed the colour map that feeds it. `reachedFrom`, the
+prune and the state map read every linked map alike. A program whose own state
+is not a linked document keeps its links beside it: a focus timer's in
+`focusLinks`, a sketch's in `sketchLinks`. **A store something links to is
+kept**, as a named one is: the per-action prune drops unkept stores no window
+binds, and without this, closing a sketch's window would take its store out from
+under the pedal reading it. Saved windows and blueprints whose follows now
+belong to a store input are moved onto the store's link when read
+(`formerStoreFollows`).
+
+## Image cables
+
+The render side works like a guitar rig: a sketch makes a picture, the picture
+runs through a chain of **pedals**, and an **Output** shows or exports it. It is
+the app's own idea, visible dataflow, applied to pictures, and four choices
+hold it together.
+
+**A cable carries a recipe, never pixels.** An `Image` (`src/image.ts`) is
+pure data: `points` (a sketch's source text, panel, theme, orbit, drivers and
+sheet), `pedal` (a pedal document, its theme, a driver per knob, and its input
+images), or `none`. It is evaluated at the follower's own moment like a wave,
+so scrubbing, looping and export stay exact. Pixels could not cross windows
+anyway: every context is its own, and contexts share no textures.
+`sameImage` compares by what is drawn, naming every field; `stagesOf` lists the
+stages inputs first, each once however many cables lead to it.
+
+**A stage is a document, not a window.** A chain must keep running with its
+source window closed, so everything a stage follows is a store input:
+`sketchLinks` for a sketch, `Pedal.sources` for a pedal. `imageIn(store)` in
+`app-state.graph.ts` assembles a recipe from the store alone, out of the same
+deduplicated streams the windows read (`driverIn`, `sheetIn`, `pedalIn`),
+recursively through pedal inputs with a `seen` set against a loop from storage.
+It is streams, not one pure `imageOf(documents)`: that would rebuild every
+voice curve (960 samples each) on every window drag. `PEDAL_DEFAULTS` is one
+object per kind for the same reason; a fresh default per read looks like an
+edit and recooks the chain. A window reads a cable as `followedImage$(input)`
+and its own store's picture as `image$`.
+
+**One engine cooks for every window** (`src/engine/`). One offscreen WebGL2
+context, `engine$`, made by the first viewer and released after the last like
+the audio context. `cook(engine, image, moment, now)` draws each stage into a
+target kept per store and size, and skips a stage whose recipe, `t`, `pass` and
+pointer are unchanged, so two windows showing one chain draw it once per frame.
+A points stage runs the sketch's own `prepare`, `evolve` and `drawFrame` with
+its own `SketchResources` into a multisampled target with depth, resolved to a
+texture; `prepare` runs only when the stage's settings change, and otherwise its
+palette and paint are bound back, or trails would never survive a frame. That
+is why `prepare` restores whatever framebuffer was bound rather than binding the
+canvas, and why the engine rebinds its target after `evolve`, which does not.
+Targets unused for three seconds are released. `view$` hands windows bitmaps at
+most once a frame, in order (`concatMap`), and turns a failure into a message
+rather than an error. The cache is a GPU resource inside the one effect, not
+app state.
+
+**A pedal is a row of a table.** `PEDALS` in `src/pedals.ts` gives each kind
+its title, its image inputs, its knobs (range, step, initial) and its choices;
+`pedalProgram(kind)` makes the program, `pedalInputs(kind)` its store inputs,
+and `shaders/<kind>.frag` reads its knobs as `uKnobs[i]` in table order and its
+choice as `uChoice`, the choice's index. A new pedal is one entry and one
+shader. Pedals hold a **private document** (`HOLDING`: document, private), the
+first: two kaleidoscopes are two stages, so each window starts its own store,
+and `withMain` offers no Main for it. A driven knob plays the driver's value as
+it is, kept inside the knob's range (`knobAt`). Feedback keeps its last frame
+and swaps two targets; a new feedback stage takes its first frame from its
+input, or it fades in from black and, paused, never catches up.
+
+**Output** follows a cable (`in`, a window follow, since it is a viewer) and
+exports it through the engine (`engine/export.ts`): an engine of its own per
+export, each frame cooked and drawn at the export size, handed to the sketch's
+WebM and PNG writers. A chain with feedback or trails plays the loop once
+unkept first (`hasHistory`), and the moment's `pass` keeps that warm-up apart
+from the kept frames in the cache, which would otherwise hand back the
+warm-up's pictures. Output has no thumbnail strip yet. The **Pedalboard**
+starter is the worked example: Ripple folded by a kaleidoscope a saw signal
+turns, recoloured Ember, into an Output.
 
 ## Blueprints
 
@@ -2046,8 +2129,9 @@ in step: adding an input is one field on the program.
 says so.** The program table is a record keyed by id (`src/programs.ts`,
 `satisfies { [K in ProgramId]: Program<K> }`), and `Process` is derived from it
 with `import type`: one member per program, whose `follows` is a record keyed by
-input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding, k1?:
-SignalBinding, … }`, the dial's `{ progress: PlaybackBinding }`,
+input name (`BindingsOf`). A sketch's is `{ playback: PlaybackBinding }`, its
+knobs being its store's, an output's `{ playback, in?: SketchBinding | PedalBinding }`,
+the dial's `{ progress: PlaybackBinding }`,
 a ticket list's and a timeline's have no keys at all, so a focus binding on a sketch
 does not type-check. An input whose `initial` is `null` is **optional**: a new
 window starts without it, its key is optional in the type, `fits` does not
@@ -2364,7 +2448,8 @@ The program layer sits at the `src/` root, above the components it composes:
 `program.ts` (identity and contracts), `workspace.ts` (processes, camera and
 toolbar, and their reducer), `settings.ts` (what each window remembers),
 `state-store.ts` (the one snapshot), `process.ts` (`liveProcess$`),
-`appearance.ts`, `appearances.ts`,
+`appearance.ts`, `appearances.ts`, `image.ts` and `pedals.ts` (the cable
+recipe and the pedal table), `engine/` (the one GL effect that cooks recipes),
 `main.ts` and the `graph/` it composes.
 
 ## The prime directive
