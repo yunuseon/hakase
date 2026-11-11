@@ -1818,7 +1818,13 @@ export, each frame cooked and drawn at the export size, handed to the sketch's
 WebM and PNG writers. A chain with feedback or trails plays the loop once
 unkept first (`hasHistory`), and the moment's `pass` keeps that warm-up apart
 from the kept frames in the cache, which would otherwise hand back the
-warm-up's pictures. Output has no thumbnail strip yet. The **Pedalboard**
+warm-up's pictures. Its frame strip is the sketch's own `HksFrameStrip` and
+strip maths, with tiles cooked by the shared engine (`engine/thumbnails.ts`): a
+tile is one more size, drawn at an offset into the engine's canvas and averaged
+down in one `createImageBitmap`, and a tile whose recipe and moment are
+unchanged comes from the cache. Sharing is **per size**: two windows of exactly
+one size share every stage, two of different sizes cook the chain twice, which
+a common render size per chain could avoid if it is ever measured to matter. The **Pedalboard**
 starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
 

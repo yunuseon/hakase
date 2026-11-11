@@ -395,7 +395,7 @@ export const STARTERS: readonly Starter[] = [
                 'out',
                 'output',
                 'output',
-                { x: 984, y: 168, width: 480, height: 452 },
+                { x: 984, y: 168, width: 480, height: 620 },
                 { ...LOOP, in: { kind: 'colourmap', store: 'tint' } },
             ),
             opened('spin', 'signal', 'spin', { x: 24, y: 620, width: 360, height: 236 }, LOOP),

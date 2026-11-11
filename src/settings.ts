@@ -130,9 +130,14 @@ export const asPlot = (settings: Settings | undefined): PlotSettings =>
 export type OutputSettings = {
     readonly kind: 'output';
     readonly export: ExportSettings;
+    readonly stripLevel: number;
 };
 
-export const defaultOutput: OutputSettings = { kind: 'output', export: defaultExport };
+export const defaultOutput: OutputSettings = {
+    kind: 'output',
+    export: defaultExport,
+    stripLevel: 2,
+};
 
 export const asOutput = (settings: Settings | undefined): OutputSettings =>
     settings?.kind === 'output' ? settings : defaultOutput;
@@ -456,7 +461,11 @@ export const parseSettings = (value: unknown): Settings | null => {
             };
         }
         case 'output':
-            return { kind: 'output', export: exportFrom(field(value, 'export')) };
+            return {
+                kind: 'output',
+                export: exportFrom(field(value, 'export')),
+                stripLevel: stripLevelFrom(field(value, 'stripLevel')),
+            };
         case 'plot': {
             const layout = field(value, 'layout');
 

@@ -547,13 +547,14 @@ export const drawn = (
     texture: WebGLTexture | null,
     width: number,
     height: number,
+    x = 0,
 ): void => {
     const { gl } = engine;
     const shader = engine.passes.present;
 
-    grown(engine, width, height);
+    grown(engine, x + width, height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, width, height);
+    gl.viewport(x, 0, width, height);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     gl.useProgram(shader.program);
