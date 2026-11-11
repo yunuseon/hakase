@@ -33,7 +33,7 @@ import {
     type ExportStatus,
     type SavedFile,
 } from '../components/sketch/export/export-panel.component.ts';
-import { export$, still$, type ExportEvent } from '../components/sketch/export/export.ts';
+import { export$, statusOf, still$ } from '../components/sketch/export/export.ts';
 import {
     exportPixels,
     followed,
@@ -64,17 +64,6 @@ import type { Size } from '../components/window/frame.ts';
 const SETTLE_MS = 150;
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
-
-const statusOf = (event: ExportEvent): ExportStatus => {
-    switch (event.kind) {
-        case 'progress':
-            return { kind: 'running', done: event.done };
-        case 'file':
-            return { kind: 'idle' };
-        case 'failed':
-            return { kind: 'failed', message: event.message };
-    }
-};
 
 export const sketchProgram = {
     id: 'sketch',

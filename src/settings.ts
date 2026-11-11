@@ -127,6 +127,16 @@ export const defaultPlot: PlotSettings = { kind: 'plot', layout: 'overlay' };
 export const asPlot = (settings: Settings | undefined): PlotSettings =>
     settings?.kind === 'plot' ? settings : defaultPlot;
 
+export type OutputSettings = {
+    readonly kind: 'output';
+    readonly export: ExportSettings;
+};
+
+export const defaultOutput: OutputSettings = { kind: 'output', export: defaultExport };
+
+export const asOutput = (settings: Settings | undefined): OutputSettings =>
+    settings?.kind === 'output' ? settings : defaultOutput;
+
 export type StateMapSettings = {
     readonly kind: 'state-map';
     readonly positions: Readonly<Record<string, Spot>>;
@@ -147,6 +157,7 @@ export type Settings =
     | AgendaSettings
     | StateMapSettings
     | PlotSettings
+    | OutputSettings
     | PaintSettings
     | TicketsSettings;
 
@@ -444,6 +455,8 @@ export const parseSettings = (value: unknown): Settings | null => {
                 view: typeof view === 'string' && isView(view) ? view : defaultTicketsView.view,
             };
         }
+        case 'output':
+            return { kind: 'output', export: exportFrom(field(value, 'export')) };
         case 'plot': {
             const layout = field(value, 'layout');
 

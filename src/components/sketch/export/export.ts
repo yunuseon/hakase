@@ -15,6 +15,7 @@ import { bindState, evolve, simulation$, type Simulation } from '../gl/simulatio
 import { evolutionsFor, evolutionTo, stepAt } from '../evolution.ts';
 import { offscreen$, prepareStill } from '../gl/still.ts';
 import { muxWebM, type VideoChunk } from './webm.ts';
+import type { ExportStatus } from './export-panel.component.ts';
 import { zip, zipEntry, type ZipEntry } from './zip.ts';
 
 export type ExportRequest = {
@@ -30,7 +31,7 @@ export type ExportEvent =
     | { readonly kind: 'file'; readonly blob: Blob; readonly extension: string }
     | { readonly kind: 'failed'; readonly message: string };
 
-type Writer = {
+export type Writer = {
     readonly add: (canvas: OffscreenCanvas, index: number) => Promise<void>;
     readonly finish: () => Promise<Blob>;
     readonly close: () => void;
@@ -139,7 +140,7 @@ const imageWriter = (): Writer => {
     };
 };
 
-const writer$ = (pixels: Size, settings: ExportSettings): Observable<Writer> =>
+export const writer$ = (pixels: Size, settings: ExportSettings): Observable<Writer> =>
     from(
         settings.format === 'webm' ? videoWriter(pixels, settings) : Promise.resolve(imageWriter()),
     ).pipe(
@@ -162,7 +163,18 @@ const simulationFor$ = (
 ): Observable<Simulation | null> =>
     sketch.evolves ? simulation$(gl, 2 * params.dimension) : of(null);
 
-const messageOf = (error: unknown): string =>
+export const statusOf = (event: ExportEvent): ExportStatus => {
+    switch (event.kind) {
+        case 'progress':
+            return { kind: 'running', done: event.done };
+        case 'file':
+            return { kind: 'idle' };
+        case 'failed':
+            return { kind: 'failed', message: event.message };
+    }
+};
+
+export const messageOf = (error: unknown): string =>
     error instanceof Error ? error.message : 'The export failed.';
 
 export const export$ = ({

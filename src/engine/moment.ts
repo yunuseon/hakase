@@ -39,6 +39,7 @@ export const momentOf$ = (
             seconds: duration,
             ...pixelsOf(size, ratio),
             pointer: centre,
+            pass: 0,
         })),
         distinctUntilChanged(
             (a, b) =>

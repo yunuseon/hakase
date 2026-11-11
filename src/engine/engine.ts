@@ -53,6 +53,8 @@ export type Moment = {
     readonly width: number;
     readonly height: number;
     readonly pointer: Pointer;
+    // Which run through the loop this is: an export's warm-up and its kept frames meet the same moments.
+    readonly pass: number;
 };
 
 type Pass = {
@@ -78,7 +80,12 @@ type Source = {
     evolved: Evolved | null;
 };
 
-type Cooked = { readonly image: Image; readonly t: number; readonly pointer: Pointer };
+type Cooked = {
+    readonly image: Image;
+    readonly t: number;
+    readonly pass: number;
+    readonly pointer: Pointer;
+};
 
 // One stage at one size: its picture, a spare for passes that read their own output, and when it was last asked for.
 type Entry = {
@@ -495,6 +502,7 @@ export const cook = (
         const fresh =
             entry.cooked !== null &&
             entry.cooked.t === moment.t &&
+            entry.cooked.pass === moment.pass &&
             samePointer(entry.cooked.pointer, moment.pointer) &&
             sameImage(entry.cooked.image, stage);
 
@@ -512,7 +520,12 @@ export const cook = (
                     moment,
                 );
             }
-            entry.cooked = { image: stage, t: moment.t, pointer: moment.pointer };
+            entry.cooked = {
+                image: stage,
+                t: moment.t,
+                pass: moment.pass,
+                pointer: moment.pointer,
+            };
         }
 
         entry.used = now;
@@ -535,13 +548,13 @@ const grown = (engine: Engine, width: number, height: number): void => {
     }
 };
 
-export const presented = (
+export const drawn = (
     engine: Engine,
     texture: WebGLTexture | null,
     width: number,
     height: number,
-): Promise<ImageBitmap> => {
-    const { gl, canvas } = engine;
+): void => {
+    const { gl } = engine;
     const shader = engine.passes.present;
 
     grown(engine, width, height);
@@ -556,7 +569,16 @@ export const presented = (
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
     gl.activeTexture(gl.TEXTURE0);
+};
+
+export const presented = (
+    engine: Engine,
+    texture: WebGLTexture | null,
+    width: number,
+    height: number,
+): Promise<ImageBitmap> => {
+    drawn(engine, texture, width, height);
 
     // GL's rows start at the bottom, so what was drawn is the canvas's last rows.
-    return createImageBitmap(canvas, 0, canvas.height - height, width, height);
+    return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
 };
