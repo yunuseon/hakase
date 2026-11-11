@@ -4,6 +4,7 @@ import { defaultVoice, type Voice } from './components/voice/voice.ts';
 import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.ts';
 import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
+import { defaultPedal } from './pedals.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
 import type { Bindings } from './inputs.ts';
@@ -91,6 +92,8 @@ const GROUND = [0, -5, -3, -8, -7, -12, -7, -5];
 const LINE = [4, 2, 0, -1, -3, -5, -3, -1, 0, -1, -3, -5, -7, -8, -7, -10];
 
 const SONG = { playback: { kind: 'playback', store: 'song' } } as const;
+
+const LOOP = { playback: { kind: 'playback', store: 'loop' } } as const;
 
 const REVIEW = `Daily review
 
@@ -371,6 +374,75 @@ export const STARTERS: readonly Starter[] = [
         },
         formulas: [],
         links: [],
+    },
+    {
+        id: 'starter-pedalboard',
+        name: 'Pedalboard',
+        summary:
+            'A sketch run through pedals like a guitar through effects: a kaleidoscope a signal turns, a colour map, and an output to export. Rewire any stage in state mode.',
+        size: { width: 1464, height: 856 },
+        windows: [
+            opened('loop', 'timeline', 'loop', { x: 24, y: 48, width: 360, height: 120 }),
+            opened('source', 'sketch', 'source', { x: 24, y: 168, width: 360, height: 452 }, LOOP, {
+                ...defaultSketch,
+                formula: 'ripple',
+                theme: 'dusk',
+                panel: { ...defaultPanel, dimension: 48 },
+            }),
+            opened('fold', 'kaleido', 'fold', { x: 384, y: 168, width: 300, height: 452 }, LOOP),
+            opened('tint', 'colourmap', 'tint', { x: 684, y: 168, width: 300, height: 452 }, LOOP),
+            opened(
+                'out',
+                'output',
+                'output',
+                { x: 984, y: 168, width: 480, height: 452 },
+                { ...LOOP, in: { kind: 'colourmap', store: 'tint' } },
+            ),
+            opened('spin', 'signal', 'spin', { x: 24, y: 620, width: 360, height: 236 }, LOOP),
+        ],
+        stores: [
+            { ...own('loop', 'timeline', 'Pedalboard'), clock: { duration: 8, looping: true } },
+            own('source', 'sketch', 'Source'),
+            own('fold', 'kaleido', 'Fold'),
+            own('tint', 'colourmap', 'Tint'),
+            own('spin', 'signal', 'Spin'),
+        ],
+        held: {
+            ...held,
+            signals: [
+                ['spin', { ...defaultSignal, shape: 'saw', rate: 1, offset: 0.5, depth: 0.5 }],
+            ],
+            pedals: [
+                [
+                    'fold',
+                    {
+                        ...defaultPedal('kaleido'),
+                        values: { ...defaultPedal('kaleido').values, segments: 8 },
+                        sources: {
+                            ...defaultPedal('kaleido').sources,
+                            in: 'source',
+                            rotate: 'spin',
+                        },
+                    },
+                ],
+                [
+                    'tint',
+                    {
+                        ...defaultPedal('colourmap'),
+                        choice: 'ember',
+                        sources: { ...defaultPedal('colourmap').sources, in: 'fold' },
+                    },
+                ],
+            ],
+        },
+        formulas: [],
+        links: [
+            { a: 'loop', b: 'source' },
+            { a: 'source', b: 'fold' },
+            { a: 'fold', b: 'tint' },
+            { a: 'tint', b: 'out' },
+            { a: 'source', b: 'spin' },
+        ],
     },
 ];
 

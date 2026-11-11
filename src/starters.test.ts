@@ -161,4 +161,23 @@ describe('starter blueprints', () => {
             [...ground, ...ground].flatMap(root => [0, 7, 12, 7].map(n => root + 12 + n)),
         );
     });
+
+    it('places a Pedalboard whose every cable points at the fresh copies', () => {
+        const before = scene();
+        const after = placed(before, starter('starter-pedalboard'), view, 300, inputsFor);
+        const id = (name: string) =>
+            after.workspace.stores.find(
+                store => store.name === name && store.id.startsWith('store-300'),
+            )?.id ?? '';
+        const output = after.workspace.processes.find(({ program }) => program === 'output');
+
+        expect(after.pedals.get(id('Fold'))?.sources).toMatchObject({
+            in: id('Source'),
+            rotate: id('Spin'),
+        });
+        expect(after.pedals.get(id('Tint'))?.sources).toMatchObject({ in: id('Fold') });
+        expect(after.pedals.get(id('Tint'))?.choice).toBe('ember');
+        expect(output?.follows).toMatchObject({ in: { kind: 'colourmap', store: id('Tint') } });
+        expect(after.workspace.links).toHaveLength(before.workspace.links.length + 5);
+    });
 });
