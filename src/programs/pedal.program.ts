@@ -10,7 +10,6 @@ import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
 import type { AppInput, Program } from '../program.ts';
 import { shownOf } from './output.program.ts';
 
-// Every pedal is this program over its row of the PEDALS table: a new pedal is one entry and one shader.
 export const pedalProgram = <K extends PedalKind>(kind: K) => {
     const spec = PEDALS[kind];
 

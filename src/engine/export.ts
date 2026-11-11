@@ -19,7 +19,6 @@ export type ImageExport = {
     readonly settings: ExportSettings;
 };
 
-// Its own context, apart from the live one: an export must not wait on, or disturb, what windows show.
 const ownEngine$ = new Observable<Engine>(subscriber => {
     const engine = createEngine();
     subscriber.next(engine);
@@ -29,7 +28,6 @@ const ownEngine$ = new Observable<Engine>(subscriber => {
     };
 });
 
-// A stage that reads its own past must play the loop once unkept, or the first frame starts from nothing.
 export const hasHistory = (image: Image): boolean =>
     stagesOf(image).some(stage =>
         stage.kind === 'pedal'
@@ -70,7 +68,6 @@ export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
                                 defer(() => {
                                     frameAt(engine, request, pixels, frame.t, step + 1);
 
-                                    // After the draw, never before: the writer reads the canvas as it stands.
                                     return frame.index === null
                                         ? of(undefined)
                                         : from(writer.add(engine.canvas, frame.index));
@@ -93,7 +90,6 @@ export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
                 ),
             ),
         ),
-        // The engine and writer stay open until unsubscribed, so the file or a failure is where an export ends.
         takeWhile(event => event.kind === 'progress', true),
         catchError((error: unknown) => of({ kind: 'failed' as const, message: messageOf(error) })),
     );

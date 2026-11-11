@@ -42,7 +42,6 @@ const surfaceOn = <C extends HTMLCanvasElement | OffscreenCanvas>(canvas: C): Su
 
 export type SketchResources = Pick<Surface, 'palette' | 'paint' | 'ink' | 'inkTarget'>;
 
-// Apart from the context, so the engine can give every sketch it draws its own palette and paint in one context.
 export const createSketchResources = (gl: WebGL2RenderingContext): SketchResources => {
     const palette = gl.createTexture();
     if (!palette) {

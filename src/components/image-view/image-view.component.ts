@@ -35,7 +35,6 @@ export class HksImageView extends HTMLElement {
         this.canvas = requireElement(shadow, 'canvas', HTMLCanvasElement);
         this.message = requireChild(shadow, '.message');
 
-        // client*, not the client rect: the rect includes the canvas zoom, and a size here is in world units.
         this.sizes$ = merge(of(undefined), observeResize$(viewport)).pipe(
             map((): Size => ({ width: viewport.clientWidth, height: viewport.clientHeight })),
             filter(({ width, height }) => width > 0 && height > 0),
@@ -52,7 +51,6 @@ export class HksImageView extends HTMLElement {
                     this.message.hidden = shown.kind === 'frame';
 
                     if (shown.kind === 'frame') {
-                        // Taking the bitmap hands it over: it is the canvas's now, and never needs closing.
                         context?.transferFromImageBitmap(shown.bitmap);
                     } else {
                         this.message.textContent = shown.text;

@@ -5,7 +5,6 @@ export type Target = {
     readonly framebuffer: WebGLFramebuffer;
 };
 
-// A sketch draws with depth and antialiasing the way the canvas gives them for free: into these, then resolved.
 export type Multisampled = Target & {
     readonly samples: WebGLFramebuffer;
     readonly colour: WebGLRenderbuffer;

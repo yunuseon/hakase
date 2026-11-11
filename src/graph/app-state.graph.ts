@@ -325,7 +325,6 @@ export const scopedOf = ({
         now$: wallClock$,
     };
 
-    // A store input of a store, read as the binding a window's own follow would be.
     const linkIn = (store: StoreId, param: string) =>
         combineLatest([linked$, workspace$]).pipe(
             map(([linked, workspace]) => {
@@ -338,7 +337,6 @@ export const scopedOf = ({
             distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
         );
 
-    // A voice's envelope is in seconds, so its curve is sampled over the follower's own loop.
     const driverIn = (store: StoreId, param: string, seconds$: Observable<number>) =>
         linkIn(store, param).pipe(
             switchMap((binding): Observable<Driver | null> =>
@@ -367,7 +365,6 @@ export const scopedOf = ({
             ),
         );
 
-    // Everything a sketch's picture depends on, read from its store alone, so it draws with no window open.
     const pointsIn = (store: StoreId, seconds$: Observable<number>): Observable<Image> => {
         const sketch$ = settings$.pipe(
             map(all => asSketch(all.get(store))),
@@ -421,7 +418,6 @@ export const scopedOf = ({
         }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
     };
 
-    // A store already seen down the chain is not followed again: a loop that slipped in through storage stops there.
     const imageIn = (
         store: StoreId,
         seconds$: Observable<number>,

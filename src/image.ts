@@ -26,7 +26,6 @@ export type PedalImage = {
     readonly inputs: readonly Image[];
 };
 
-// A cable carries this, never pixels: a description the engine cooks at the follower's own moment.
 export type Image = { readonly kind: 'none' } | PointsImage | PedalImage;
 
 export const NONE: Image = { kind: 'none' };
@@ -78,7 +77,6 @@ export const sameImage = (a: Image, b: Image): boolean => {
     }
 };
 
-// Inputs before what reads them, each stage once however many cables lead to it.
 export const stagesOf = (image: Image): readonly (PointsImage | PedalImage)[] => {
     const visit = (
         stages: readonly (PointsImage | PedalImage)[],
@@ -96,7 +94,6 @@ export const stagesOf = (image: Image): readonly (PointsImage | PedalImage)[] =>
     return visit([], image);
 };
 
-// A knob a cable drives plays the driver's value as it is, kept inside the knob's range; otherwise its own setting.
 export const knobAt = (image: PedalImage, name: string, t: number): number => {
     const spec = PEDALS[image.pedal.kind].knobs.find(knob => knob.name === name);
     const driver = image.drivers[name] ?? null;

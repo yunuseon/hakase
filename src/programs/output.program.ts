@@ -72,7 +72,6 @@ export const outputProgram = {
                     map(([image, seconds, size, settings]) => ({ image, seconds, size, settings })),
                 );
 
-                // exhaustMap: a second click while exporting is ignored, not a second export.
                 const exported$ = merge(
                     exporter.starts$.pipe(
                         withLatestFrom(request$),

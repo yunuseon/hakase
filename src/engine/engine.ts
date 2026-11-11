@@ -70,7 +70,6 @@ type Prepared = {
     readonly backdrop: readonly [number, number, number];
 };
 
-// What the engine keeps for one sketch it draws, whatever size it is asked for.
 type Source = {
     readonly resources: SketchResources;
     source: string | null;
@@ -87,7 +86,6 @@ type Cooked = {
     readonly pointer: Pointer;
 };
 
-// One stage at one size: its picture, a spare for passes that read their own output, and when it was last asked for.
 type Entry = {
     output: Target;
     readonly samples: Multisampled | null;
@@ -107,7 +105,6 @@ export type Engine = {
     readonly entries: Map<string, Entry>;
 };
 
-// Dots are sized in a sketch's own pixels, so every view draws as a sketch whose longer side is this, scaled.
 const REFERENCE_SIDE = 640;
 // Input textures sit above the sketch's own units: palette 0, state 1, paint 2.
 const INPUT_UNIT = 3;
@@ -250,7 +247,6 @@ const compiled = (gl: WebGL2RenderingContext, source: Source, text: string): Ske
     source.source = text;
     const result = createSketch(gl, text);
 
-    // A formula that fails keeps the last one that compiled, as the live sketch does.
     if (result.ok) {
         if (source.sketch !== null) {
             gl.deleteProgram(source.sketch.program);
@@ -490,7 +486,6 @@ const forget = (engine: Engine, now: number): void => {
     });
 };
 
-// Every stage once per moment and size: a stage asked for again, unchanged, is not drawn again.
 export const cook = (
     engine: Engine,
     image: Image,
@@ -538,7 +533,6 @@ export const cook = (
     return image.kind === 'none' ? null : (drawn.get(image.store) ?? null);
 };
 
-// Never shrinks: views come and go at every size, and reallocating the canvas each time is the slow part.
 const grown = (engine: Engine, width: number, height: number): void => {
     const { canvas } = engine;
 
@@ -579,6 +573,5 @@ export const presented = (
 ): Promise<ImageBitmap> => {
     drawn(engine, texture, width, height);
 
-    // GL's rows start at the bottom, so what was drawn is the canvas's last rows.
     return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
 };

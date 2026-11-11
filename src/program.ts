@@ -165,12 +165,9 @@ export type AppState = {
     readonly sounding$: Observable<Sounding>;
     readonly kit$: Observable<Kit>;
     readonly pedal$: Observable<Pedal>;
-    // What a store input of the window's own store follows: the store's link, not the window's.
     readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
     readonly linkedDriver$: (param: string) => Observable<Driver | null>;
-    // A cable is a recipe, never pixels: the engine cooks it at this window's own moment.
     readonly followedImage$: (input: string) => Observable<Image>;
-    // What this window's own store draws, for a stage that shows its own output.
     readonly image$: Observable<Image>;
     readonly linkedName$: (param: string) => Observable<string | null>;
     // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.

@@ -241,7 +241,6 @@ const withBoard = (
               ],
           };
 
-// Saved before a sketch's inputs were its store's: what its window followed becomes the store's link.
 const sketchLinksFrom = (
     stored: unknown,
     inputsFor: InputsFor,

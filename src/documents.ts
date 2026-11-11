@@ -249,7 +249,6 @@ export const linkedOf = ({
         ...sketchLinks,
     ]);
 
-// A sketch keeps its settings; what its inputs follow is a document of its own, beside them, as a timer's is.
 const linkedSketchIn = (
     documents: Documents,
     store: StoreId,
@@ -563,7 +562,6 @@ export const reduceDocuments =
             case 'pedals': {
                 const owner = ownerOf(documents.workspace, action.store);
 
-                // A stage's kind is its program's, so a command to a store of no pedal has nothing to change.
                 return owner === null || !isPedalKind(owner)
                     ? documents
                     : {
@@ -585,7 +583,6 @@ export const reduceDocuments =
                     owner === null ? undefined : storeInputOf(inputsFor(owner), param);
                 const from = source === null ? null : ownerOf(documents.workspace, source);
 
-                // Refused against the state it would change: an input that is not there, a source it does not take, or one that reaches back.
                 return owner === null ||
                     definition === undefined ||
                     (source !== null &&

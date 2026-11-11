@@ -125,7 +125,6 @@ const sketchSource = {
 const pedalSource = <K extends PedalKind>(kind: K) =>
     ({ kind, program: kind, title: PEDALS[kind].title, access: 'read' }) as const;
 
-// Every program whose store makes a picture: an image cable takes any of them.
 export const IMAGE_SOURCES = [
     sketchSource,
     pedalSource('colourmap'),
@@ -317,7 +316,6 @@ const imageStoreInput = (param: string) =>
         initial: null,
     }) satisfies StoreInput;
 
-// A pedal's own inputs are its document's: its cables and its knobs, so a chain survives its windows closing.
 export const pedalInputs = (kind: PedalKind): Readonly<Record<string, StoreInput>> => {
     const entries: readonly (readonly [string, StoreInput])[] = [
         ...PEDALS[kind].inputs.map(input => [input, imageStoreInput(input)] as const),

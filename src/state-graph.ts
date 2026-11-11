@@ -16,7 +16,6 @@ type Titles = (program: ProgramId) => { readonly title: string; readonly icon: s
 
 const sourceOf = (program: ProgramId) => SOURCES.find(source => source.program === program);
 
-// What can be followed comes first, in the order of SOURCES, so the clock leads and pictures come last.
 const rank = ({ program, kind }: GraphStore) =>
     kind === null
         ? SOURCES.length + PROGRAM_IDS.findIndex(id => id === program)

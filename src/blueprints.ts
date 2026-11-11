@@ -426,7 +426,6 @@ const entriesOf = <V>(value: unknown, parse: (stored: unknown) => V) =>
 const finite = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
-// Saved before a sketch's inputs were its store's: what its window followed becomes the store's link.
 const formerLinks = (
     saved: readonly (readonly [StoreId, SketchLink])[],
     former: readonly (readonly [StoreId, string, StoreId])[],

@@ -1156,7 +1156,6 @@ export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null 
     };
 };
 
-// Saved while an input still belonged to the window: what it followed now belongs to the window's store.
 export const formerStoreFollows = (
     value: unknown,
     inputsFor: InputsFor,

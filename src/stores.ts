@@ -15,7 +15,6 @@ export type Holding = {
 
 const document: Holding = { holds: 'document', sharing: 'shared' };
 const settings: Holding = { holds: 'settings', sharing: 'private' };
-// A pedal is a stage of a chain: two on the canvas are two stages, so each window starts its own.
 const stage: Holding = { holds: 'document', sharing: 'private' };
 
 // null: the program keeps no state of its own, so its windows have nothing to bind.
@@ -184,7 +183,6 @@ export const withMain = (
 ): readonly StoreEntry[] => {
     const own = stores.filter(store => store.program === program);
 
-    // Only a shared document has a Main to offer: a private one's windows each start their own, as a pedal's do.
     return HOLDING[program]?.holds === 'document' &&
         HOLDING[program]?.sharing === 'shared' &&
         !own.some(({ id }) => id === program)

@@ -21,7 +21,6 @@ export type View =
     | { readonly kind: 'frame'; readonly bitmap: ImageBitmap }
     | { readonly kind: 'failed'; readonly message: string };
 
-// One context cooks for every window that shows a cable, so a stage two windows share is drawn once.
 export const engine$ = new Observable<Engine | Error>(subscriber => {
     try {
         const engine = createEngine();
@@ -54,7 +53,6 @@ const framed = (engine: Engine, image: Image, moment: Moment): ObservableInput<V
     }
 };
 
-// At most once a frame, and in order: a bitmap is handed over whole, never dropped half-made.
 export const view$ = (image$: Observable<Image>, moment$: Observable<Moment>): Observable<View> =>
     engine$.pipe(
         switchMap(engine =>
