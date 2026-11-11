@@ -237,5 +237,7 @@ export const parseGate = (value: unknown): Gate | null => {
     };
 };
 
+export const readsTickBefore = (program: string): boolean => program === 'delay';
+
 export const loopEdges = (gate: Gate): Gate =>
     gate.kind === 'delay' ? { ...gate, sources: {} } : gate;

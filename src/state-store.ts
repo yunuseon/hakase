@@ -36,6 +36,7 @@ import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
 import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
+import { parseGate, type Gate } from './gates.ts';
 import {
     isSketchParam,
     linkedSketch,
@@ -73,6 +74,7 @@ export type Snapshot = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
+    readonly gates: ReadonlyMap<StoreId, Gate>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
@@ -172,6 +174,7 @@ const fresh: Restored = {
     focusLinks: new Map(),
     sketchLinks: new Map(),
     pedals: new Map(),
+    gates: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     seq: 0,
@@ -308,6 +311,11 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
         pens: byStore(field(stored, 'pens'), 'pen', parsePen),
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
+        gates: new Map(
+            [...byStore(field(stored, 'gates'), 'gates', parseGate)].flatMap(
+                ([id, gate]): [StoreId, Gate][] => (gate === null ? [] : [[id, gate]]),
+            ),
+        ),
         pedals: new Map(
             [...byStore(field(stored, 'pedals'), 'pedals', parseStoredPedal)].flatMap(
                 ([id, pedal]): [StoreId, Pedal][] => (pedal === null ? [] : [[id, pedal]]),
@@ -361,6 +369,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         focusLinks: saved(snapshot.focusLinks),
         sketchLinks: saved(snapshot.sketchLinks),
         pedals: saved(snapshot.pedals),
+        gates: saved(snapshot.gates),
         library: snapshot.library,
         blueprints: snapshot.blueprints,
         seq: snapshot.seq,

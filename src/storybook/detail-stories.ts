@@ -1,6 +1,10 @@
 import { EMPTY, from, merge, of, type Observable } from 'rxjs';
 import { HksImageView } from '../components/image-view/image-view.component.ts';
 import { HksPedal } from '../components/pedal/pedal.component.ts';
+import { HksGate } from '../components/gate/gate.component.ts';
+import type { GateView } from '../components/gate/gate.ts';
+import { GATE_DEFAULTS, GATES, reduceGate, type Bit } from '../gates.ts';
+import { circuitTable } from '../circuit.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
 import { defaultPedal, PEDALS, reducePedal, valueOf } from '../pedals.ts';
 import type { Shown } from '../components/image-view/image-view.ts';
@@ -168,6 +172,63 @@ export const detailStories: readonly Story[] = [
         create: ({ args$ }) => {
             const element = new HksFpsCounter();
             return { element, run$: element.connect$(args$), events$: EMPTY };
+        },
+    },
+    {
+        id: 'gate',
+        title: 'Gate',
+        group: 'Controls',
+        description:
+            'A logic gate: its glyph, its bit now, its bits across the loop with the current tick outlined, and what its kind can set by hand (a switch, a pattern of steps, a threshold, a pin name).',
+        elements: ['hks-gate'],
+        variants: [
+            { id: 'pattern', title: 'Pattern' },
+            { id: 'switch', title: 'Switch' },
+            { id: 'compare', title: 'Compare' },
+            { id: 'pin', title: 'Pin out' },
+        ],
+        controls: [],
+        defaults,
+        height: 220,
+        action: 'changes$',
+        code: 'const gate = new HksGate();\nconst lifetime$ = gate.connect$(view$);\nconst commands$ = gate.changes$;',
+        create: ({ variant }) => {
+            const element = new HksGate();
+            const kind =
+                variant === 'switch'
+                    ? 'switch'
+                    : variant === 'compare'
+                      ? 'compare'
+                      : variant === 'pin'
+                        ? 'pin-out'
+                        : 'pattern';
+            const view$ = element.changes$.pipe(
+                scan(reduceGate, GATE_DEFAULTS[kind]),
+                startWith(GATE_DEFAULTS[kind]),
+                map((gate): GateView => {
+                    const row =
+                        circuitTable(new Map([['gate', gate]]), 16).get('gate') ??
+                        new Uint8Array(16);
+
+                    return {
+                        icon: GATES[kind].icon,
+                        summary: GATES[kind].summary,
+                        bit: row[5] === 1 ? 1 : 0,
+                        tick: 5,
+                        row: [...row].map((bit): Bit => (bit === 1 ? 1 : 0)),
+                        toggle: kind === 'switch',
+                        steps: kind === 'pattern' ? gate.steps : null,
+                        threshold: kind === 'compare' ? gate.threshold : null,
+                        name: kind === 'pin-out' ? gate.name : null,
+                    };
+                }),
+            );
+
+            return {
+                element,
+                run$: element.connect$(view$),
+                events$: element.changes$.pipe(map(change => recorded(change.kind, change))),
+            };
         },
     },
     {

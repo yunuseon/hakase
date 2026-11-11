@@ -1,6 +1,7 @@
 import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
 import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
 import { dependentsOf, type Linked } from './shared/signal.ts';
+import { readsTickBefore } from './gates.ts';
 import { colourOf, withMain, type StoreEntry } from './stores.ts';
 import { isProgramId } from './program.ts';
 import type { Process } from './workspace.ts';
@@ -15,8 +16,11 @@ export const inputGroups = (
     processes: readonly Process[],
     stores: readonly StoreEntry[],
     linked: ReadonlyMap<string, Linked>,
+    loops: ReadonlyMap<string, Linked> = linked,
 ): readonly FollowGroup[] => {
-    const looping = dependentsOf(linked, process.store);
+    const looping = readsTickBefore(process.program)
+        ? new Set<string>()
+        : dependentsOf(loops, process.store);
     const users = new Map<string, number>();
 
     processes.forEach(({ store, follows }) => {

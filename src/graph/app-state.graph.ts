@@ -42,6 +42,10 @@ import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind } from '../inputs.ts';
+import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
+import { bitCurve, circuitTable, type Table } from '../circuit.ts';
+
+type Pace = { readonly seconds: number; readonly ticks: number };
 import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
 import { isThemeName } from '../components/sketch/themes/registry.ts';
 import { NONE, sameImage, type Image } from '../image.ts';
@@ -90,6 +94,8 @@ type StoreKey =
     | 'sounding$'
     | 'kit$'
     | 'pedal$'
+    | 'gate$'
+    | 'bits$'
     | 'image$'
     | 'linkedName$';
 
@@ -117,6 +123,7 @@ export const scopedOf = ({
     voices$,
     drums$,
     pedals$,
+    gates$,
     linked$,
     library$,
     blueprints$,
@@ -333,6 +340,83 @@ export const scopedOf = ({
         now$: wallClock$,
     };
 
+    const circuit$ = combineLatest([gates$, stores$]).pipe(
+        map(
+            ([gates, stores]) =>
+                new Map(
+                    stores.flatMap(({ id, program }): [StoreId, Gate][] =>
+                        isGateKind(program) ? [[id, gates.get(id) ?? GATE_DEFAULTS[program]]] : [],
+                    ),
+                ),
+        ),
+        distinctUntilChanged(
+            (a, b) => a.size === b.size && [...a].every(([id, gate]) => b.get(id) === gate),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    const tables = new Map<string, Observable<Table>>();
+    const tableOf = (ticks: number, seconds: number): Observable<Table> => {
+        const key = `${ticks}:${seconds}`;
+        const known = tables.get(key);
+
+        if (known !== undefined) {
+            return known;
+        }
+
+        const pace$ = of({ seconds, ticks });
+        const made = circuit$.pipe(
+            switchMap(gates => {
+                const compares = [...gates].flatMap(([id, gate]) =>
+                    gate.kind === 'compare' ? [id] : [],
+                );
+
+                return (
+                    compares.length === 0
+                        ? of([])
+                        : combineLatest(
+                              compares.map(id =>
+                                  driverIn(id, 'in', pace$).pipe(
+                                      map(driver => [id, driver] as const),
+                                  ),
+                              ),
+                          )
+                ).pipe(
+                    map(drivers =>
+                        circuitTable(
+                            gates,
+                            ticks,
+                            new Map(
+                                drivers.flatMap(([id, driver]): [StoreId, Driver][] =>
+                                    driver === null ? [] : [[id, driver]],
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
+        tables.set(key, made);
+
+        return made;
+    };
+
+    const gateIn = (store: StoreId) =>
+        combineLatest([gates$, stores$]).pipe(
+            map(([all, stores]) => {
+                const owner = ownerOf({ stores }, store);
+
+                return (
+                    all.get(store) ??
+                    (owner !== null && isGateKind(owner)
+                        ? GATE_DEFAULTS[owner]
+                        : GATE_DEFAULTS.lamp)
+                );
+            }),
+            distinctUntilChanged(),
+        );
+
     const linkIn = (store: StoreId, param: string) =>
         combineLatest([linked$, stores$]).pipe(
             map(([linked, stores]) => {
@@ -345,20 +429,27 @@ export const scopedOf = ({
             distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
         );
 
-    const driverIn = (store: StoreId, param: string, seconds$: Observable<number>) =>
+    const driverIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
         linkIn(store, param).pipe(
             switchMap((binding): Observable<Driver | null> =>
                 binding?.kind === 'signal'
                     ? waveIn(binding.store)
                     : binding?.kind === 'voice'
-                      ? combineLatest([soundingIn(binding.store), seconds$]).pipe(
-                            map(([sounding, seconds]) => voiceCurve(sounding, seconds)),
+                      ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+                            map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
                         )
                       : binding?.kind === 'drums'
-                        ? combineLatest([kitIn(binding.store), seconds$]).pipe(
-                              map(([kit, seconds]) => kitCurve(kit, seconds)),
+                        ? combineLatest([kitIn(binding.store), pace$]).pipe(
+                              map(([kit, { seconds }]) => kitCurve(kit, seconds)),
                           )
-                        : of(null),
+                        : binding !== null && isGateKind(binding.kind)
+                          ? pace$.pipe(
+                                switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
+                                map(table => table.get(binding.store) ?? null),
+                                distinctUntilChanged(),
+                                map(row => (row === null ? null : bitCurve(row))),
+                            )
+                          : of(null),
             ),
         );
 
@@ -373,12 +464,12 @@ export const scopedOf = ({
             ),
         );
 
-    const pointsIn = (store: StoreId, seconds$: Observable<number>): Observable<Image> => {
+    const pointsIn = (store: StoreId, pace$: Observable<Pace>): Observable<Image> => {
         const sketch$ = settings$.pipe(
             map(all => asSketch(all.get(store))),
             distinctUntilChanged(),
         );
-        const drive = (param: Drive) => driverIn(store, param, seconds$);
+        const drive = (param: Drive) => driverIn(store, param, pace$);
 
         return combineLatest({
             source: sketch$.pipe(
@@ -428,7 +519,7 @@ export const scopedOf = ({
 
     const imageIn = (
         store: StoreId,
-        seconds$: Observable<number>,
+        pace$: Observable<Pace>,
         seen: ReadonlySet<StoreId> = new Set(),
     ): Observable<Image> =>
         seen.has(store)
@@ -438,9 +529,9 @@ export const scopedOf = ({
                   distinctUntilChanged(),
                   switchMap(owner =>
                       owner === 'sketch'
-                          ? pointsIn(store, seconds$)
+                          ? pointsIn(store, pace$)
                           : owner !== null && isPedalKind(owner)
-                            ? stageIn(store, owner, seconds$, new Set([...seen, store]))
+                            ? stageIn(store, owner, pace$, new Set([...seen, store]))
                             : of(NONE),
                   ),
                   distinctUntilChanged(sameImage),
@@ -449,7 +540,7 @@ export const scopedOf = ({
     const stageIn = (
         store: StoreId,
         kind: PedalKind,
-        seconds$: Observable<number>,
+        pace$: Observable<Pace>,
         seen: ReadonlySet<StoreId>,
     ): Observable<Image> => {
         const pedal$ = pedalIn(store);
@@ -471,7 +562,7 @@ export const scopedOf = ({
                     : of(null),
             drivers: combineLatest(
                 Object.fromEntries(
-                    PEDALS[kind].knobs.map(({ name }) => [name, driverIn(store, name, seconds$)]),
+                    PEDALS[kind].knobs.map(({ name }) => [name, driverIn(store, name, pace$)]),
                 ),
             ),
             inputs: combineLatest(
@@ -479,7 +570,7 @@ export const scopedOf = ({
                     linkIn(store, input).pipe(
                         switchMap(binding =>
                             binding !== null && isImageKind(binding.kind)
-                                ? imageIn(binding.store, seconds$, seen)
+                                ? imageIn(binding.store, pace$, seen)
                                 : of(NONE),
                         ),
                     ),
@@ -506,9 +597,10 @@ export const scopedOf = ({
         );
 
         // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
-        const seconds$ = clock.pipe(
-            map(({ duration }) => duration),
-            distinctUntilChanged(),
+        const pace$ = clock.pipe(
+            map(({ duration, ticks }): Pace => ({ seconds: duration, ticks })),
+            distinctUntilChanged((a, b) => a.seconds === b.seconds && a.ticks === b.ticks),
+            shareReplay({ bufferSize: 1, refCount: true }),
         );
 
         return {
@@ -552,14 +644,22 @@ export const scopedOf = ({
             bookmarks$: narrowed(bookmarksIn),
             signal$: narrowed(signalIn),
             wave$: narrowed(waveIn),
-            linkedDriver$: param =>
-                store$.pipe(switchMap(store => driverIn(store, param, seconds$))),
+            linkedDriver$: param => store$.pipe(switchMap(store => driverIn(store, param, pace$))),
             picture$: narrowed(pictureIn),
             drawing$: narrowed(drawingIn),
             sounding$: narrowed(soundingIn),
             kit$: narrowed(kitIn),
             pedal$: narrowed(pedalIn),
-            image$: store$.pipe(switchMap(store => imageIn(store, seconds$))),
+            gate$: narrowed(gateIn),
+            bits$: combineLatest([store$, pace$]).pipe(
+                switchMap(([store, { ticks, seconds }]) =>
+                    tableOf(ticks, seconds).pipe(
+                        map(table => table.get(store) ?? new Uint8Array(ticks)),
+                    ),
+                ),
+                distinctUntilChanged(),
+            ),
+            image$: store$.pipe(switchMap(store => imageIn(store, pace$))),
             linkedName$: param =>
                 store$.pipe(
                     switchMap(store => linkIn(store, param)),
@@ -581,7 +681,7 @@ export const scopedOf = ({
                 followed$(input).pipe(
                     switchMap(binding =>
                         binding !== null && isImageKind(binding.kind)
-                            ? imageIn(binding.store, seconds$)
+                            ? imageIn(binding.store, pace$)
                             : of(NONE),
                     ),
                 ),

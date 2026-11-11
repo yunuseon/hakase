@@ -35,6 +35,7 @@ const started = (): Documents => ({
     drums: new Map(),
     focusLinks: new Map(),
     pedals: new Map(),
+    gates: new Map(),
     sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
@@ -278,8 +279,9 @@ describe('one log for every document', () => {
 });
 
 describe('links', () => {
-    const launched = (program: 'pen' | 'signal' | 'focus' | 'kaleido' | 'colourmap') =>
-        act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
+    const launched = (
+        program: 'pen' | 'signal' | 'focus' | 'kaleido' | 'colourmap' | 'nand' | 'delay',
+    ) => act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 
     it('set a store input on whichever document owns the store, a signal or a pen', () => {
         const history = run(fresh(), [
@@ -352,6 +354,26 @@ describe('links', () => {
         expect(chained.present.workspace.stores.find(({ id }) => id === 'sketch-2')?.kept).toBe(
             true,
         );
+    });
+
+    it('refuse a loop of gates within a tick, and accept the same loop through a delay', () => {
+        const wired = run(fresh(), [
+            launched('nand'),
+            launched('nand'),
+            launched('delay'),
+            { kind: 'link', store: 'nand-6', param: 'a', source: 'nand-5' },
+        ]);
+        const shorted = run(wired, [
+            { kind: 'link', store: 'nand-5', param: 'a', source: 'nand-6' },
+        ]);
+        const delayed = run(wired, [
+            { kind: 'link', store: 'delay-7', param: 'in', source: 'nand-6' },
+            { kind: 'link', store: 'nand-5', param: 'a', source: 'delay-7' },
+        ]);
+
+        expect(shorted.present.gates.get('nand-5')?.sources['a'] ?? null).toBeNull();
+        expect(delayed.present.gates.get('delay-7')?.sources['in']).toBe('nand-6');
+        expect(delayed.present.gates.get('nand-5')?.sources['a']).toBe('delay-7');
     });
 
     it('refuse a pedal command to a store of no pedal', () => {

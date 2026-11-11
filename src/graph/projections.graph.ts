@@ -2,7 +2,7 @@ import type { Observable } from 'rxjs';
 import { distinctUntilChanged, map, shareReplay } from 'rxjs/operators';
 import type { Appearance } from '../appearance.ts';
 import { appearances, type AppearanceName } from '../appearances.ts';
-import { linkedOf, type History } from '../documents.ts';
+import { linkedOf, loopsOf, type History } from '../documents.ts';
 import type { ProcessId, Written } from '../program.ts';
 import { sameStructure, type Workspace } from '../workspace.ts';
 
@@ -93,11 +93,15 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ pedals }) => pedals),
         distinctUntilChanged(),
     );
+    const gates$ = documents$.pipe(
+        map(({ gates }) => gates),
+        distinctUntilChanged(),
+    );
     const drums$ = documents$.pipe(
         map(({ drums }) => drums),
         distinctUntilChanged(),
     );
-    const linked$ = documents$.pipe(
+    const linking$ = documents$.pipe(
         distinctUntilChanged(
             (a, b) =>
                 a.signals === b.signals &&
@@ -105,12 +109,14 @@ export const projectionsOf = (history$: Observable<History>) => {
                 a.voices === b.voices &&
                 a.drums === b.drums &&
                 a.pedals === b.pedals &&
+                a.gates === b.gates &&
                 a.focusLinks === b.focusLinks &&
                 a.sketchLinks === b.sketchLinks,
         ),
-        map(linkedOf),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
+    const linked$ = linking$.pipe(map(linkedOf), shareReplay({ bufferSize: 1, refCount: true }));
+    const loops$ = linking$.pipe(map(loopsOf), shareReplay({ bufferSize: 1, refCount: true }));
     const focusLinks$ = documents$.pipe(
         map(({ focusLinks }) => focusLinks),
         distinctUntilChanged(),
@@ -170,6 +176,8 @@ export const projectionsOf = (history$: Observable<History>) => {
         voices$,
         drums$,
         pedals$,
+        gates$,
+        loops$,
         linked$,
         focusLinks$,
         sketchLinks$,

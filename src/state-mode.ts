@@ -138,6 +138,7 @@ export const wiringOf = (
     session: ModeSession,
     unit: number,
     touch = false,
+    loops: ReadonlyMap<string, Linked> = signals,
 ): WiringView | null => {
     const mode = modeOf(session);
 
@@ -191,7 +192,7 @@ export const wiringOf = (
                           hidden: false,
                       },
                   ];
-        const choices = inputGroups(process, inputs, processes, stores, signals);
+        const choices = inputGroups(process, inputs, processes, stores, signals, loops);
         const names = [...new Set(choices.map(group => group.input))];
         const groupOf = (name: string) => {
             const definition = definitionOf(inputs, name);

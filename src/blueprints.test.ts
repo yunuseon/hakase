@@ -118,6 +118,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         drums: new Map(),
         focusLinks: new Map(),
         pedals: new Map(),
+        gates: new Map(),
         sketchLinks: new Map([
             ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'voice', k2: 'store-a' } }],
         ]),

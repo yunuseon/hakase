@@ -39,6 +39,15 @@ import {
 import type { FocusLink } from './components/focus/focus.ts';
 import { defaultPedal, isPedalKind, reducePedal, type Pedal, type PedalCommand } from './pedals.ts';
 import {
+    GATE_DEFAULTS,
+    isGateKind,
+    loopEdges,
+    readsTickBefore,
+    reduceGate,
+    type Gate,
+    type GateCommand,
+} from './gates.ts';
+import {
     isSketchParam,
     isUnlinked,
     linkedSketch,
@@ -122,6 +131,7 @@ export type Documents = {
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
+    readonly gates: ReadonlyMap<StoreId, Gate>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
@@ -145,6 +155,7 @@ type StoreCommands = {
     readonly voices: VoiceCommand;
     readonly drums: DrumsCommand;
     readonly pedals: PedalCommand;
+    readonly gates: GateCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -223,6 +234,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
     pedals: storeEvent(documents.pedals, event),
+    gates: storeEvent(documents.gates, event),
     focusLinks: storeEvent(documents.focusLinks, event),
     sketchLinks: storeEvent(documents.sketchLinks, event),
 });
@@ -233,11 +245,12 @@ export const linkedOf = ({
     voices,
     drums,
     pedals,
+    gates,
     focusLinks,
     sketchLinks,
 }: Pick<
     Documents,
-    'signals' | 'pens' | 'voices' | 'drums' | 'pedals' | 'focusLinks' | 'sketchLinks'
+    'signals' | 'pens' | 'voices' | 'drums' | 'pedals' | 'gates' | 'focusLinks' | 'sketchLinks'
 >) =>
     new Map<StoreId, Linked>([
         ...signals,
@@ -245,8 +258,15 @@ export const linkedOf = ({
         ...voices,
         ...drums,
         ...pedals,
+        ...gates,
         ...focusLinks,
         ...sketchLinks,
+    ]);
+
+export const loopsOf = (documents: Parameters<typeof linkedOf>[0]) =>
+    new Map<StoreId, Linked>([
+        ...linkedOf(documents),
+        ...[...documents.gates].map(([id, gate]): [StoreId, Linked] => [id, loopEdges(gate)]),
     ]);
 
 const linkedSketchIn = (
@@ -353,7 +373,13 @@ const linked = (
                       { kind: 'pedals', store, command: { kind: 'source', param, source } },
                       seq,
                   )
-                : documents;
+                : isGateKind(owner)
+                  ? reduce(
+                        documents,
+                        { kind: 'gates', store, command: { kind: 'source', param, source } },
+                        seq,
+                    )
+                  : documents;
     }
 };
 
@@ -559,6 +585,23 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'gates': {
+                const owner = ownerOf(documents.workspace, action.store);
+
+                return owner === null || !isGateKind(owner)
+                    ? documents
+                    : {
+                          ...documents,
+                          gates: commanded(
+                              documents.gates,
+                              action.store,
+                              GATE_DEFAULTS[owner],
+                              reduceGate,
+                              action.command,
+                              seq,
+                          ),
+                      };
+            }
             case 'pedals': {
                 const owner = ownerOf(documents.workspace, action.store);
 
@@ -588,7 +631,8 @@ export const reduceDocuments =
                     (source !== null &&
                         ((from !== null &&
                             !definition.sources.some(({ program }) => program === from)) ||
-                            closesLoop(linkedOf(documents), store, source)))
+                            (!readsTickBefore(owner) &&
+                                closesLoop(loopsOf(documents), store, source))))
                     ? documents
                     : keptSource(
                           linked(inputsFor, documents, owner, store, param, source, seq),
@@ -673,6 +717,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     voices: ['decay', 'glide', 'volume'],
     drums: ['swing', 'volume'],
     pedals: ['value'],
+    gates: ['threshold', 'rename'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -743,6 +788,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     voices: 'voice',
     drums: 'drum machine',
     pedals: 'pedal',
+    gates: 'gate',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>

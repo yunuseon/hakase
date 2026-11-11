@@ -1,0 +1,104 @@
+:host {
+    display: block;
+    block-size: 100%;
+    container-type: inline-size;
+}
+
+.gate {
+    display: grid;
+    gap: var(--space-1-5);
+    align-content: start;
+    font: var(--text-xs) var(--font-ui);
+    color: var(--muted);
+}
+
+.face {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.glyph {
+    flex: none;
+    inline-size: var(--space-8);
+    block-size: var(--space-8);
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.bit {
+    flex: none;
+    inline-size: var(--space-5);
+    block-size: var(--space-5);
+    border-radius: 50%;
+    background: var(--well);
+    border: 1px solid var(--edge);
+}
+
+.bit[data-on] {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 var(--space-2) color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 1px;
+    block-size: var(--space-2);
+}
+
+.row span {
+    background: var(--well);
+    border-radius: 1px;
+}
+
+.row span[data-on] {
+    background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.row span[data-now] {
+    outline: 1px solid var(--ink);
+}
+
+.steps {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.steps button {
+    block-size: var(--space-5);
+    padding: 0;
+    background: var(--well);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.steps button[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.toggle {
+    justify-self: start;
+}
+
+.threshold {
+    inline-size: 100%;
+}
+
+.name {
+    inline-size: 100%;
+    font: var(--text-xs) var(--font-mono);
+}
+
+.summary {
+    margin: 0;
+}

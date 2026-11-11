@@ -21,6 +21,7 @@ import { progressProgram } from './programs/progress.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
 import { outputProgram } from './programs/output.program.ts';
 import { pedalProgram } from './programs/pedal.program.ts';
+import { gateProgram } from './programs/gate.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
@@ -47,6 +48,15 @@ export const programs = {
     feedback: pedalProgram('feedback'),
     mix: pedalProgram('mix'),
     blur: pedalProgram('blur'),
+    nand: gateProgram('nand'),
+    delay: gateProgram('delay'),
+    switch: gateProgram('switch'),
+    pattern: gateProgram('pattern'),
+    compare: gateProgram('compare'),
+    lamp: gateProgram('lamp'),
+    'pin-in': gateProgram('pin-in'),
+    'pin-out': gateProgram('pin-out'),
+    const: gateProgram('const'),
     blueprints: blueprintsProgram,
     tasks: tasksProgram,
     tickets: ticketsProgram,

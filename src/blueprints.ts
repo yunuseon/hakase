@@ -11,6 +11,7 @@ import { parseVoice, type Voice } from './components/voice/voice.ts';
 import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
+import { parseGate, type Gate } from './gates.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
 import { isProgramId } from './program.ts';
@@ -62,6 +63,7 @@ type HeldKind =
     | 'voices'
     | 'drums'
     | 'pedals'
+    | 'gates'
     | 'sketchLinks';
 
 type Entries<M> =
@@ -128,8 +130,16 @@ export const reduceBlueprints = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices, drums, pedals, sketchLinks }: Documents) =>
-    new Map<StoreId, Linked>([...signals, ...pens, ...voices, ...drums, ...pedals, ...sketchLinks]);
+const linkedOf = ({ signals, pens, voices, drums, pedals, gates, sketchLinks }: Documents) =>
+    new Map<StoreId, Linked>([
+        ...signals,
+        ...pens,
+        ...voices,
+        ...drums,
+        ...pedals,
+        ...gates,
+        ...sketchLinks,
+    ]);
 
 const picked = <V>(map: ReadonlyMap<StoreId, V>, stores: ReadonlySet<StoreId>) =>
     [...map].filter(([id]) => stores.has(id));
@@ -238,6 +248,7 @@ export const blueprintOf = (
             voices: picked(documents.voices, stores),
             drums: picked(documents.drums, stores),
             pedals: picked(documents.pedals, stores),
+            gates: picked(documents.gates, stores),
             sketchLinks: picked(documents.sketchLinks, stores),
         },
         formulas,
@@ -402,6 +413,12 @@ export const placed = (
             ...drums,
             sources: { volume: sourceOf(drums.sources.volume) },
         })),
+        gates: into(documents.gates, held.gates, gate => ({
+            ...gate,
+            sources: Object.fromEntries(
+                Object.entries(gate.sources).map(([param, source]) => [param, sourceOf(source)]),
+            ),
+        })),
         pedals: into(documents.pedals, held.pedals, pedal => ({
             ...pedal,
             sources: Object.fromEntries(
@@ -507,6 +524,10 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 pens: entriesOf(heldOf('pens'), parsePen),
                 voices: entriesOf(heldOf('voices'), parseVoice),
                 drums: entriesOf(heldOf('drums'), parseDrums),
+                gates: entriesOf(heldOf('gates'), parseGate).flatMap(
+                    ([id, gate]): (readonly [StoreId, Gate])[] =>
+                        gate === null ? [] : [[id, gate]],
+                ),
                 pedals: entriesOf(heldOf('pedals'), parseStoredPedal).flatMap(
                     ([id, pedal]): (readonly [StoreId, Pedal])[] =>
                         pedal === null ? [] : [[id, pedal]],

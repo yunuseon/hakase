@@ -23,6 +23,7 @@ import type { Drawing, PenCommand } from './components/pen/pen.ts';
 import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
 import type { DrumsCommand, Kit } from './components/drums/drums.ts';
 import type { Pedal, PedalCommand } from './pedals.ts';
+import type { Gate, GateCommand } from './gates.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
 import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
@@ -53,6 +54,15 @@ export const PROGRAM_IDS = [
     'feedback',
     'mix',
     'blur',
+    'nand',
+    'delay',
+    'switch',
+    'pattern',
+    'compare',
+    'lamp',
+    'pin-in',
+    'pin-out',
+    'const',
     'blueprints',
     'tasks',
     'tickets',
@@ -107,6 +117,7 @@ export type AppInput =
     | { readonly kind: 'voice'; readonly command: VoiceCommand }
     | { readonly kind: 'drums'; readonly command: DrumsCommand }
     | { readonly kind: 'pedal'; readonly command: PedalCommand }
+    | { readonly kind: 'gate'; readonly command: GateCommand }
     | {
           readonly kind: 'modulate';
           readonly store: string;
@@ -167,6 +178,8 @@ export type AppState = {
     readonly sounding$: Observable<Sounding>;
     readonly kit$: Observable<Kit>;
     readonly pedal$: Observable<Pedal>;
+    readonly gate$: Observable<Gate>;
+    readonly bits$: Observable<Uint8Array>;
     readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
     readonly linkedDriver$: (param: string) => Observable<Driver | null>;
     readonly followedImage$: (input: string) => Observable<Image>;
@@ -247,6 +260,11 @@ export type ProcessView = {
 
 export const CATEGORIES = [
     { id: 'make', title: 'Make', icon: 'M4 20 L9.5 9.5 L15 20 Z M14 4 H20 V10 H14 Z' },
+    {
+        id: 'logic',
+        title: 'Logic',
+        icon: 'M4 6 H11 A6 6 0 0 1 11 18 H4 Z M17 12 H21 M1 9 H4 M1 15 H4',
+    },
     {
         id: 'plan',
         title: 'Plan',

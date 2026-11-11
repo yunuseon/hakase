@@ -57,6 +57,8 @@ export const documentActions$ = ({
                         return [{ kind: 'pens', store, command: input.command }];
                     case 'voice':
                         return [{ kind: 'voices', store, command: input.command }];
+                    case 'gate':
+                        return [{ kind: 'gates', store, command: input.command }];
                     case 'pedal':
                         return [{ kind: 'pedals', store, command: input.command }];
                     case 'drums':

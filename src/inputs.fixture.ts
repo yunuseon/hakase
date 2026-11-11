@@ -1,3 +1,4 @@
+import { isGateKind } from './gates.ts';
 import { isPedalKind } from './pedals.ts';
 import {
     knobInputs,
@@ -13,6 +14,7 @@ import {
     playbackInput,
     imageInput,
     pedalInputs,
+    gateInputs,
     progressInput,
     sourceInput,
     type InputsFor,
@@ -28,20 +30,22 @@ export const inputsFor: InputsFor = program =>
             ? { playback: playbackInput, ...voiceInputs }
             : program === 'drums'
               ? { playback: playbackInput, ...drumsInputs }
-              : isPedalKind(program)
-                ? { playback: playbackInput, ...pedalInputs(program) }
-                : program === 'output'
-                  ? { playback: playbackInput, in: imageInput('in') }
-                  : program === 'plot'
-                    ? { playback: playbackInput, ...plotInputs }
-                    : program === 'signal'
-                      ? { playback: playbackInput, ...signalInputs }
-                      : program === 'timeline'
-                        ? { playback: ownPlaybackInput }
-                        : program === 'playhead'
-                          ? { progress: progressInput }
-                          : program === 'progress'
-                            ? { source: sourceInput }
-                            : program === 'focus'
-                              ? { ...focusInputs }
-                              : {};
+              : isGateKind(program)
+                ? { playback: playbackInput, ...gateInputs(program) }
+                : isPedalKind(program)
+                  ? { playback: playbackInput, ...pedalInputs(program) }
+                  : program === 'output'
+                    ? { playback: playbackInput, in: imageInput('in') }
+                    : program === 'plot'
+                      ? { playback: playbackInput, ...plotInputs }
+                      : program === 'signal'
+                        ? { playback: playbackInput, ...signalInputs }
+                        : program === 'timeline'
+                          ? { playback: ownPlaybackInput }
+                          : program === 'playhead'
+                            ? { progress: progressInput }
+                            : program === 'progress'
+                              ? { source: sourceInput }
+                              : program === 'focus'
+                                ? { ...focusInputs }
+                                : {};

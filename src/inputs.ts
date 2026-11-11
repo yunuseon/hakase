@@ -7,6 +7,7 @@ import type { Tickets } from './shared/tickets.ts';
 import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
 import { PEDALS, type PedalKind } from './pedals.ts';
+import { GATES, type GateKind } from './gates.ts';
 import { agendaReading, focusReading, ticketsReading } from './readings.ts';
 import type { StoreId } from './stores.ts';
 
@@ -21,6 +22,7 @@ export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
 export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId };
 export type PedalBinding = { readonly kind: PedalKind; readonly store: StoreId };
+export type GateBinding = { readonly kind: GateKind; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
@@ -32,7 +34,8 @@ export type Follow =
     | VoiceBinding
     | DrumsBinding
     | SketchBinding
-    | PedalBinding;
+    | PedalBinding
+    | GateBinding;
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
@@ -137,6 +140,21 @@ export const IMAGE_SOURCES = [
 export const isImageKind = (kind: string): boolean =>
     IMAGE_SOURCES.some(source => source.kind === kind);
 
+const gateSource = <K extends GateKind>(kind: K) =>
+    ({ kind, program: kind, title: GATES[kind].title, access: 'read' }) as const;
+
+export const GATE_SOURCES = [
+    gateSource('nand'),
+    gateSource('delay'),
+    gateSource('switch'),
+    gateSource('pattern'),
+    gateSource('compare'),
+    gateSource('lamp'),
+    gateSource('pin-in'),
+    gateSource('pin-out'),
+    gateSource('const'),
+] as const;
+
 export const SOURCES = [
     playbackSource,
     focusSource,
@@ -148,6 +166,7 @@ export const SOURCES = [
     voiceSource,
     drumsSource,
     ...IMAGE_SOURCES,
+    ...GATE_SOURCES,
 ] as const;
 
 type Source = (typeof SOURCES)[number];
@@ -325,6 +344,25 @@ export const pedalInputs = (kind: PedalKind): Readonly<Record<string, StoreInput
     return Object.fromEntries(entries);
 };
 
+const bitInput = (param: string) =>
+    ({
+        title: param,
+        from: 'store',
+        param,
+        group: null,
+        sources: GATE_SOURCES,
+        initial: null,
+    }) satisfies StoreInput;
+
+export const gateInputs = (kind: GateKind): Readonly<Record<string, StoreInput>> => {
+    const entries: readonly (readonly [string, StoreInput])[] = [
+        ...GATES[kind].bits.map(param => [param, bitInput(param)] as const),
+        ...GATES[kind].drives.map(param => [param, driveInput(param, param, 'Drives')] as const),
+    ];
+
+    return Object.fromEntries(entries);
+};
+
 export const ownPlaybackInput = {
     title: 'Playback',
     from: 'own',
@@ -423,6 +461,16 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'mix':
         case 'blur':
             return kind;
+        case 'nand':
+        case 'delay':
+        case 'switch':
+        case 'pattern':
+        case 'compare':
+        case 'lamp':
+        case 'pin-in':
+        case 'pin-out':
+        case 'const':
+            return kind;
     }
 };
 
@@ -456,6 +504,16 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'feedback':
         case 'mix':
         case 'blur':
+            return { kind, store };
+        case 'nand':
+        case 'delay':
+        case 'switch':
+        case 'pattern':
+        case 'compare':
+        case 'lamp':
+        case 'pin-in':
+        case 'pin-out':
+        case 'const':
             return { kind, store };
         default:
             return null;

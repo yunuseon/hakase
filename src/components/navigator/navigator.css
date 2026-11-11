@@ -247,7 +247,7 @@
     inline-size: min(var(--spacing) * 86, calc(100% - var(--space-10)));
 }
 :host([data-launcher]) .state-mode {
-    inset-inline-start: calc(var(--control-lg) * 3 + var(--space-5));
+    inset-inline-start: calc(var(--control-lg) * 4 + var(--space-5));
 }
 
 :host(:not([data-open])) .navigator {

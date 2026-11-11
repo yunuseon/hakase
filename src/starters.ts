@@ -28,6 +28,7 @@ const held = {
     voices: [],
     drums: [],
     pedals: [],
+    gates: [],
     sketchLinks: [],
 } satisfies Blueprint['held'];
 

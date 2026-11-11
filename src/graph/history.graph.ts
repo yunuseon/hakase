@@ -35,6 +35,7 @@ export const begunFrom = (stored: Restored): History => {
         voices: stored.voices,
         drums: stored.drums,
         pedals: stored.pedals,
+        gates: stored.gates,
         focusLinks: stored.focusLinks,
         sketchLinks: stored.sketchLinks,
         library: stored.library,

@@ -1,3 +1,4 @@
+import { GATE_DEFAULTS } from '../gates.ts';
 import { defaultPedal } from '../pedals.ts';
 import { NONE } from '../image.ts';
 import { animationFrames, defer, EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
@@ -127,6 +128,8 @@ export const programDemo = (
         followedImage$: () => of(NONE),
         pedal$: of(defaultPedal('mix')),
         image$: of(NONE),
+        gate$: of(GATE_DEFAULTS.switch),
+        bits$: of(new Uint8Array(16)),
         linkedName$: () => of(null),
         followedSignal$: input =>
             empty || input !== 'a'
