@@ -1024,6 +1024,20 @@ const step = (
     }
 };
 
+export const sameStructure = (a: Workspace, b: Workspace): boolean => {
+    if (a.stores !== b.stores || a.processes.length !== b.processes.length) {
+        return false;
+    }
+
+    const before = new Map(a.processes.map(process => [process.id, process]));
+
+    return b.processes.every(process => {
+        const was = before.get(process.id);
+
+        return was !== undefined && was.store === process.store && was.follows === process.follows;
+    });
+};
+
 // Bound or followed: a clock a sketch runs on is in use even with no timeline window open.
 export const usedStores = (processes: readonly Process[]): ReadonlySet<StoreId> =>
     new Set(processes.flatMap(({ store, follows }) => [store, ...followedStores(follows)]));
@@ -1062,9 +1076,11 @@ export const reduceWorkspace = (
 
     const next = seen === workspace ? stepped : { ...stepped, camera: workspace.camera };
 
+    const links = next.links.filter(link => touching(next.processes, link));
+
     return {
         ...next,
-        links: next.links.filter(link => touching(next.processes, link)),
+        links: links.length === next.links.length ? next.links : links,
         stores: pruned(next.stores, usedStores(next.processes)),
     };
 };
@@ -1446,39 +1462,71 @@ export type Listed = {
 };
 
 // numeric: ids are `${program}-${launched}`, and "sketch-10" must sort after "sketch-9".
-const byLaunch = (a: Process, b: Process): number =>
-    a.id.localeCompare(b.id, undefined, { numeric: true });
+const launchOrder = new Intl.Collator(undefined, { numeric: true });
+
+// One collator, not localeCompare with options: that builds a new one for every comparison.
+const byLaunch = (a: Process, b: Process): number => launchOrder.compare(a.id, b.id);
 
 export const listed = (processes: readonly Process[]): readonly Listed[] => {
     const front = processes.at(-1)?.id;
+    const counted = new Map<ProgramId, number>();
 
-    return [...processes].sort(byLaunch).map((process, index, sorted) => ({
-        process,
-        ordinal:
-            sorted.slice(0, index).filter(({ program }) => program === process.program).length + 1,
-        focused: process.id === front,
-    }));
+    return [...processes].sort(byLaunch).map(process => {
+        const ordinal = (counted.get(process.program) ?? 0) + 1;
+        counted.set(process.program, ordinal);
+
+        return { process, ordinal, focused: process.id === front };
+    });
 };
 
-export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
-    processes.flatMap((first, index) =>
-        processes.slice(index + 1).flatMap(second => {
-            const seam = seamBetween(boxOf(first), boxOf(second));
+const touchingPairs = (boxes: readonly Rect[]): readonly (readonly [number, number])[] => {
+    const order = boxes
+        .map((_, index) => index)
+        .sort((p, q) => (boxes[p]?.x ?? 0) - (boxes[q]?.x ?? 0));
+    const pairs: (readonly [number, number])[] = [];
 
-            return seam === null
-                ? []
-                : [
-                      {
-                          a: first.id,
-                          b: second.id,
-                          x: seam.x,
-                          y: seam.y,
-                          vertical: seam.vertical,
-                          linked: links.some(link => sameLink(link, first.id, second.id)),
-                      },
-                  ];
-        }),
-    );
+    order.forEach((p, at) => {
+        const box = boxes[p];
+
+        for (let next = at + 1; box !== undefined && next < order.length; next += 1) {
+            const q = order[next] ?? p;
+
+            if ((boxes[q]?.x ?? Infinity) > box.x + box.width + TOUCHING) {
+                break;
+            }
+
+            pairs.push(p < q ? [p, q] : [q, p]);
+        }
+    });
+
+    return pairs.sort(([a, b], [c, d]) => a - c || b - d);
+};
+
+export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] => {
+    const boxes = processes.map(boxOf);
+
+    return touchingPairs(boxes).flatMap(([p, q]) => {
+        const first = processes[p];
+        const second = processes[q];
+        const seam =
+            first === undefined || second === undefined
+                ? null
+                : seamBetween(boxOf(first), boxOf(second));
+
+        return seam === null || first === undefined || second === undefined
+            ? []
+            : [
+                  {
+                      a: first.id,
+                      b: second.id,
+                      x: seam.x,
+                      y: seam.y,
+                      vertical: seam.vertical,
+                      linked: links.some(link => sameLink(link, first.id, second.id)),
+                  },
+              ];
+    });
+};
 
 type Step = {
     readonly key: string;

@@ -4,7 +4,7 @@ import type { Appearance } from '../appearance.ts';
 import { appearances, type AppearanceName } from '../appearances.ts';
 import { linkedOf, type History } from '../documents.ts';
 import type { ProcessId, Written } from '../program.ts';
-import type { Workspace } from '../workspace.ts';
+import { sameStructure, type Workspace } from '../workspace.ts';
 
 const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
@@ -15,6 +15,26 @@ export const projectionsOf = (history$: Observable<History>) => {
     const workspace$: Observable<Workspace> = documents$.pipe(
         map(({ workspace }) => workspace),
         distinctUntilChanged(),
+    );
+    const stores$ = workspace$.pipe(
+        map(({ stores }) => stores),
+        distinctUntilChanged(),
+    );
+    const structure$ = workspace$.pipe(
+        distinctUntilChanged(sameStructure),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const index$ = workspace$.pipe(
+        map(
+            ({ processes }) =>
+                new Map(
+                    processes.map((process, index) => [
+                        process.id,
+                        { process, index, last: processes.length - 1 },
+                    ]),
+                ),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
     );
     const camera$ = workspace$.pipe(
         map(({ camera }) => camera),
@@ -132,6 +152,9 @@ export const projectionsOf = (history$: Observable<History>) => {
         history$,
         documents$,
         workspace$,
+        stores$,
+        structure$,
+        index$,
         camera$,
         ids$,
         settings$,

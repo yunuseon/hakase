@@ -1,6 +1,6 @@
 import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
 import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
-import { closesLoop, type Linked } from './shared/signal.ts';
+import { dependentsOf, type Linked } from './shared/signal.ts';
 import { colourOf, withMain, type StoreEntry } from './stores.ts';
 import { isProgramId } from './program.ts';
 import type { Process } from './workspace.ts';
@@ -15,8 +15,17 @@ export const inputGroups = (
     processes: readonly Process[],
     stores: readonly StoreEntry[],
     linked: ReadonlyMap<string, Linked>,
-): readonly FollowGroup[] =>
-    Object.entries(inputs).flatMap(([name, definition]) => {
+): readonly FollowGroup[] => {
+    const looping = dependentsOf(linked, process.store);
+    const users = new Map<string, number>();
+
+    processes.forEach(({ store, follows }) => {
+        new Set([store, ...followedStores(follows)]).forEach(id => {
+            users.set(id, (users.get(id) ?? 0) + 1);
+        });
+    });
+
+    return Object.entries(inputs).flatMap(([name, definition]) => {
         if (definition.from === 'own') {
             return [];
         }
@@ -46,23 +55,17 @@ export const inputGroups = (
                     : []),
             ].join(' · '),
             options: withMain(source.program, stores)
-                .filter(
-                    store =>
-                        definition.from !== 'store' || !closesLoop(linked, process.store, store.id),
-                )
+                .filter(store => definition.from !== 'store' || !looping.has(store.id))
                 .map(store => ({
                     id: store.id,
                     name: store.name,
                     colour: colourOf(store.id),
-                    users: processes.filter(
-                        other =>
-                            other.store === store.id ||
-                            followedStores(other.follows).includes(store.id),
-                    ).length,
+                    users: users.get(store.id) ?? 0,
                     current: kind === source.kind && bound === store.id,
                 })),
         }));
     });
+};
 
 export const storeInputCommand = (inputs: ProgramInputs, gesture: WindowGesture) => {
     if (gesture.kind !== 'follow' && gesture.kind !== 'unfollow') {

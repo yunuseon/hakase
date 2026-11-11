@@ -2961,6 +2961,32 @@ reallocation, sketch buffer reallocation during zoom, the zip's CRC — are fixe
 above. Web workers were considered and are not needed: nothing measured is
 main-thread bound except the PNG read-back.
 
+**Many windows stay cheap because nothing per window scans every window.**
+Logic gates are tiny windows, so the canvas must hold hundreds. A drag move at
+161 windows took 8.8 ms and now takes under 1 ms, from four rules:
+
+- **A window finds itself through `index$`**, one `Map` of id → process,
+  position and last index built once per workspace change. Each window derives
+  its slot, store, follows and clock from one entry stream deduplicated by
+  reference, so a drag elsewhere leaves it untouched.
+- **Menus and wiring read `structure$`**, which emits only when stores or some
+  process's `store` or `follows` reference changes (`sameStructure`). A drag or a
+  raise keeps every one of those references. Lookups of a store's owner read
+  `stores$`, never the whole workspace.
+- **`inputGroups` precomputes per call**: one `dependentsOf(linked, store)` set
+  stands in for a `closesLoop` per option, and one user count map for a scan per
+  option.
+- **Whole-canvas derivations are linear or swept.** `listed` numbers windows
+  with one running count per program, behind one shared `Intl.Collator` (a
+  `localeCompare` with options builds a collator per comparison and cost 8 ms
+  at 200 windows). `seamsOf` only tries pairs whose columns meet, swept by left
+  edge, and returns exactly what checking every pair returns, which a test pins.
+
+Measure with a scripted drag of one window (60 synthetic `pointermove`s,
+synchronous time per move) at 11, 71, 161 and 200 windows, and profile with the
+JS Self-Profiling API when a number surprises you: the first guess here (the
+per-window selectors) was right in kind and wrong in size.
+
 ## Verifying UI changes
 
 The app must actually be looked at, not just compiled. Note that an embedded /

@@ -256,6 +256,29 @@ export const reachedFrom = (
     return step(new Set(roots));
 };
 
+export const dependentsOf = (
+    all: ReadonlyMap<string, Linked>,
+    target: string,
+): ReadonlySet<string> => {
+    const readers = new Map<string, string[]>();
+
+    all.forEach(({ sources }, id) => {
+        Object.values(sources).forEach(source => {
+            if (source !== null) {
+                readers.set(source, [...(readers.get(source) ?? []), id]);
+            }
+        });
+    });
+
+    const step = (found: ReadonlySet<string>): ReadonlySet<string> => {
+        const next = new Set([...found, ...[...found].flatMap(id => readers.get(id) ?? [])]);
+
+        return next.size === found.size ? found : step(next);
+    };
+
+    return step(new Set([target]));
+};
+
 export const closesLoop = (all: ReadonlyMap<string, Linked>, target: string, source: string) =>
     reachedFrom(all, [source]).has(target);
 

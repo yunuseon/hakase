@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     closesLoop,
+    dependentsOf,
     defaultSignal,
     drawn,
     parseSignal,
@@ -191,5 +192,27 @@ describe('chains', () => {
     it('reaches every store a chain follows, so a prune keeps them', () => {
         expect([...reachedFrom(all, ['fast'])].sort()).toEqual(['fast', 'slow']);
         expect([...reachedFrom(all, ['slow'])]).toEqual(['slow']);
+    });
+});
+
+describe('dependentsOf', () => {
+    it('answers exactly what closesLoop answers, for every pair', () => {
+        const linked = (sources: Readonly<Record<string, string | null>>) => ({ sources });
+        const all = new Map([
+            ['a', linked({ in: 'b' })],
+            ['b', linked({ in: 'c', other: null })],
+            ['c', linked({})],
+            ['d', linked({ in: 'a' })],
+            ['e', linked({ in: 'e' })],
+        ]);
+        const ids = ['a', 'b', 'c', 'd', 'e', 'z'];
+
+        ids.forEach(target => {
+            const looping = dependentsOf(all, target);
+
+            ids.forEach(source => {
+                expect(looping.has(source)).toBe(closesLoop(all, target, source));
+            });
+        });
     });
 });

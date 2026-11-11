@@ -33,13 +33,17 @@ import { inStore, type StoreEvent, type StoreId } from '../stores.ts';
 import { usedStores } from '../workspace.ts';
 import type { Projections } from './projections.graph.ts';
 
-type Reads = Pick<Projections, 'workspace$' | 'linked$' | 'focusLinks$' | 'agendas$'> & {
+type Reads = Pick<
+    Projections,
+    'workspace$' | 'structure$' | 'linked$' | 'focusLinks$' | 'agendas$'
+> & {
     readonly stored: Pick<Restored, 'focus' | 'playback'>;
     readonly inputs$: Observable<AppSignal>;
 };
 
 export const timekeepingOf = ({
     workspace$,
+    structure$,
     linked$,
     focusLinks$,
     agendas$,
@@ -137,7 +141,7 @@ export const timekeepingOf = ({
     const playbacks$ = createClocks$(
         routePlayback$(
             inputs$,
-            workspace$.pipe(
+            structure$.pipe(
                 map(({ processes }) =>
                     processes.map(process => ({
                         id: process.id,

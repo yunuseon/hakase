@@ -61,14 +61,17 @@ const usersOf = (processes: readonly Process[], id: StoreId): number =>
         process => process.store === id || followedStores(process.follows).includes(id),
     ).length;
 
+type Entry = { readonly process: Process; readonly index: number; readonly last: number };
+
 type Reads = Pick<Chrome, 'canvas'> &
-    Pick<Projections, 'workspace$' | 'ids$' | 'settings$' | 'linked$'> &
+    Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'linked$'> &
     Pick<Selection, 'selectedIds$'> &
     Pick<StateMode, 'wiringEvents$'> & { readonly scoped: Scoped };
 
 export const windowsOf = ({
     canvas,
-    workspace$,
+    structure$,
+    index$,
     ids$,
     settings$,
     linked$,
@@ -76,31 +79,47 @@ export const windowsOf = ({
     wiringEvents$,
     scoped,
 }: Reads) => {
-    const slot$ = (id: ProcessId): Observable<Slot> =>
-        workspace$.pipe(
-            mergeMap(({ processes }) => {
-                const index = processes.findIndex(process => process.id === id);
-                const process = processes[index];
+    const entryOf = (id: ProcessId) =>
+        index$.pipe(
+            mergeMap(all => {
+                const entry = all.get(id);
 
-                // Depth is the position in the list, so raising is a reorder.
-                return process === undefined
-                    ? EMPTY
-                    : of({
-                          frame: { ...process.frame, z: index + 1 },
-                          focused: index === processes.length - 1,
-                      });
+                return entry === undefined ? EMPTY : of(entry);
             }),
+            distinctUntilChanged(
+                (a, b) => a.process === b.process && a.index === b.index && a.last === b.last,
+            ),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
+
+    const slotOf = (entry$: Observable<Entry>): Observable<Slot> =>
+        entry$.pipe(
+            // Depth is the position in the list, so raising is a reorder.
+            map(({ process, index, last }) => ({
+                frame: { ...process.frame, z: index + 1 },
+                focused: index === last,
+            })),
             distinctUntilChanged(sameSlot),
         );
 
-    const binding$ = (id: ProcessId): Observable<StoreId> =>
-        workspace$.pipe(
-            mergeMap(({ processes }) => {
-                const process = processes.find(candidate => candidate.id === id);
-
-                return process === undefined ? EMPTY : of(process.store);
-            }),
+    const storeOf = (entry$: Observable<Entry>): Observable<StoreId> =>
+        entry$.pipe(
+            map(({ process }) => process.store),
             distinctUntilChanged(),
+        );
+
+    const followsOf = (entry$: Observable<Entry>): Observable<Bindings> =>
+        entry$.pipe(
+            map(({ process }) => process.follows),
+            distinctUntilChanged(),
+        );
+
+    const clockOf = (entry$: Observable<Entry>): Observable<PlaybackBinding | null> =>
+        entry$.pipe(
+            map(({ process }) =>
+                playbackBinding(inputsFor(process.program), process.store, process.follows),
+            ),
+            distinctUntilChanged((a, b) => a?.store === b?.store),
         );
 
     const followOptions$ = ({
@@ -115,7 +134,7 @@ export const windowsOf = ({
 
         return definitions.every(definition => definition.from === 'own')
             ? of(null)
-            : combineLatest([workspace$, signals$]).pipe(
+            : combineLatest([structure$, signals$]).pipe(
                   map(([{ processes, stores }, signals]) => {
                       const process = processes.find(process => process.id === id);
 
@@ -133,11 +152,10 @@ export const windowsOf = ({
               );
     };
 
-    // null for a program that keeps no state of its own: its window shows no chip.
     const storeOptions$ = ({ id, program }: Process): Observable<readonly StoreOption[] | null> =>
         HOLDING[program] === null
             ? of(null)
-            : workspace$.pipe(
+            : structure$.pipe(
                   map(({ processes, stores }) => {
                       const current = processes.find(process => process.id === id)?.store;
 
@@ -154,7 +172,7 @@ export const windowsOf = ({
                   distinctUntilChanged(sameOptions),
               );
 
-    const switches$: Observable<readonly SwitchGroup[]> = workspace$.pipe(
+    const switches$: Observable<readonly SwitchGroup[]> = structure$.pipe(
         map(({ processes, stores }) =>
             stores
                 .map(
@@ -164,7 +182,7 @@ export const windowsOf = ({
                 .join('|'),
         ),
         distinctUntilChanged(),
-        withLatestFrom(workspace$),
+        withLatestFrom(structure$),
         map(([, { processes, stores }]) =>
             CATEGORIES.map((category): SwitchGroup => ({
                 title: category.title,
@@ -192,40 +210,27 @@ export const windowsOf = ({
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const followsOf$ = (id: ProcessId): Observable<Bindings> =>
-        workspace$.pipe(
-            mergeMap(({ processes }) => {
-                const process = processes.find(candidate => candidate.id === id);
-
-                return process === undefined ? EMPTY : of(process.follows);
-            }),
-            distinctUntilChanged(),
-        );
-
-    const clockOf$ = (id: ProcessId): Observable<PlaybackBinding | null> =>
-        workspace$.pipe(
-            map(({ processes }) => {
-                const process = processes.find(candidate => candidate.id === id);
-
-                return process === undefined
-                    ? null
-                    : playbackBinding(inputsFor(process.program), process.store, process.follows);
-            }),
-            distinctUntilChanged((a, b) => a?.store === b?.store),
-        );
-
-    const appeared$: Observable<Process> = workspace$.pipe(
-        map(({ processes }) => processes),
-        startWith<readonly Process[]>([]),
+    const appeared$: Observable<Process> = ids$.pipe(
+        startWith<readonly ProcessId[]>([]),
         pairwise(),
-        mergeMap(([before, after]) =>
-            after.filter(process => !before.some(({ id }) => id === process.id)),
-        ),
+        withLatestFrom(index$),
+        mergeMap(([[before, after], all]) => {
+            const known = new Set(before);
+
+            return after.flatMap(id => {
+                const process = known.has(id) ? undefined : all.get(id)?.process;
+
+                return process === undefined ? [] : [process];
+            });
+        }),
     );
 
     const signals$: Observable<ProcessSignal> = appeared$.pipe(
         mergeMap(process => {
             const program = programOf(process.program);
+            const entry$ = entryOf(process.id);
+            const store$ = storeOf(entry$);
+            const clock$ = clockOf(entry$);
 
             return program === undefined
                 ? EMPTY
@@ -233,10 +238,10 @@ export const windowsOf = ({
                       program,
                       {
                           id: process.id,
-                          slot$: slot$(process.id),
-                          store$: binding$(process.id),
-                          clock$: clockOf$(process.id),
-                          settings$: binding$(process.id).pipe(
+                          slot$: slotOf(entry$),
+                          store$,
+                          clock$,
+                          settings$: store$.pipe(
                               switchMap(store =>
                                   settings$.pipe(
                                       map(all =>
@@ -247,7 +252,7 @@ export const windowsOf = ({
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(binding$(process.id), clockOf$(process.id), followsOf$(process.id)),
+                      scoped(store$, clock$, followsOf(entry$)),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(

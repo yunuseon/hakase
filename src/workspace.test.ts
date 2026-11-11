@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+    boxOf,
     defaultWorkspace,
+    listed,
+    seamBetween,
+    seamsOf,
     labelOf,
     parseWorkspace,
     reduceWorkspace,
@@ -930,4 +934,82 @@ it('erases an area without changing any programs and refuses an empty erasure', 
     );
     expect(cut.sections).toHaveLength(2);
     expect(cut.processes).toBe(before.processes);
+});
+
+describe('many windows', () => {
+    // A seeded layout of boxes on a coarse grid, so touching, overlapping and far-apart pairs all occur.
+    const layout = (count: number, seed: number): Workspace => {
+        const random = (n: number) => {
+            const x = Math.sin(seed * 9301 + n * 49297) * 233280;
+
+            return x - Math.floor(x);
+        };
+        const base = defaultWorkspace(viewport, inputsFor);
+        const processes = Array.from({ length: count }, (_, index) => {
+            const width = 40 + Math.floor(random(index * 4) * 4) * 40;
+            const height = 40 + Math.floor(random(index * 4 + 1) * 4) * 40;
+            const frame = {
+                x: Math.floor(random(index * 4 + 2) * 12) * 40,
+                y: Math.floor(random(index * 4 + 3) * 12) * 40,
+                z: 0,
+                width,
+                height,
+            };
+
+            return {
+                id: `progress-${index}`,
+                program: 'progress' as const,
+                store: 'progress',
+                follows: { source: { kind: 'focus' as const, store: 'focus' } },
+                frame,
+                measured: { width, height },
+            };
+        });
+
+        return {
+            ...base,
+            processes,
+            links: [{ a: 'progress-0', b: 'progress-1' }],
+        };
+    };
+
+    const allPairs = ({ processes, links }: Workspace) =>
+        processes.flatMap((first, index) =>
+            processes.slice(index + 1).flatMap(second => {
+                const seam = seamBetween(boxOf(first), boxOf(second));
+
+                return seam === null
+                    ? []
+                    : [
+                          {
+                              a: first.id,
+                              b: second.id,
+                              ...seam,
+                              linked: links.some(
+                                  ({ a, b }) =>
+                                      (a === first.id && b === second.id) ||
+                                      (a === second.id && b === first.id),
+                              ),
+                          },
+                      ];
+            }),
+        );
+
+    it('finds exactly the seams a check of every pair finds, in the same order', () => {
+        const found = [1, 2, 3, 4, 5].map(seed => {
+            const workspace = layout(60, seed);
+
+            expect(seamsOf(workspace)).toEqual(allPairs(workspace));
+
+            return allPairs(workspace).length;
+        });
+
+        expect(Math.min(...found)).toBeGreaterThan(5);
+    });
+
+    it('numbers each program in launch order', () => {
+        const ordinals = listed(layout(9, 7).processes).map(({ ordinal }) => ordinal);
+
+        expect(ordinals).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    });
 });

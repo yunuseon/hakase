@@ -101,6 +101,7 @@ export const scopedOf = ({
     history$,
     documents$,
     workspace$,
+    stores$,
     camera$,
     settings$,
     tickets$,
@@ -188,7 +189,13 @@ export const scopedOf = ({
         ),
         history$: history$.pipe(map(entriesOf)),
         tasks$: workspace$.pipe(
-            map(({ processes }) =>
+            map(({ processes }) => processes),
+            distinctUntilChanged(
+                (a, b) =>
+                    a.length === b.length &&
+                    a.every((process, index) => process.id === b[index]?.id),
+            ),
+            map(processes =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
                     const program = programOf(process.program);
 
@@ -246,9 +253,9 @@ export const scopedOf = ({
         );
 
     const pedalIn = (store: StoreId) =>
-        combineLatest([pedals$, workspace$]).pipe(
-            map(([all, workspace]) => {
-                const owner = ownerOf(workspace, store);
+        combineLatest([pedals$, stores$]).pipe(
+            map(([all, stores]) => {
+                const owner = ownerOf({ stores }, store);
 
                 return (
                     all.get(store) ??
@@ -326,10 +333,10 @@ export const scopedOf = ({
     };
 
     const linkIn = (store: StoreId, param: string) =>
-        combineLatest([linked$, workspace$]).pipe(
-            map(([linked, workspace]) => {
+        combineLatest([linked$, stores$]).pipe(
+            map(([linked, stores]) => {
                 const source = sourceIn(linked, store, param);
-                const owner = source === null ? null : ownerOf(workspace, source);
+                const owner = source === null ? null : ownerOf({ stores }, source);
                 const kind = SOURCES.find(({ program }) => program === owner)?.kind;
 
                 return source === null || kind === undefined ? null : progressBinding(kind, source);
@@ -425,8 +432,8 @@ export const scopedOf = ({
     ): Observable<Image> =>
         seen.has(store)
             ? of(NONE)
-            : workspace$.pipe(
-                  map(workspace => ownerOf(workspace, store)),
+            : stores$.pipe(
+                  map(stores => ownerOf({ stores }, store)),
                   distinctUntilChanged(),
                   switchMap(owner =>
                       owner === 'sketch'
@@ -554,11 +561,11 @@ export const scopedOf = ({
                     switchMap(binding =>
                         binding === null
                             ? of(null)
-                            : workspace$.pipe(
+                            : stores$.pipe(
                                   map(
-                                      workspace =>
-                                          workspace.stores.find(({ id }) => id === binding.store)
-                                              ?.name ?? binding.store,
+                                      stores =>
+                                          stores.find(({ id }) => id === binding.store)?.name ??
+                                          binding.store,
                                   ),
                               ),
                     ),
