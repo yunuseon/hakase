@@ -433,6 +433,10 @@ const drawPedal = (
             gl.activeTexture(gl.TEXTURE0 + PREVIOUS_UNIT);
             gl.bindTexture(gl.TEXTURE_2D, entry.output.texture);
             gl.uniform1i(shader.at('uPrevious'), PREVIOUS_UNIT);
+            // A new stage has no past: its first frame is the picture itself, not a fade from black.
+            if (entry.cooked === null) {
+                gl.uniform1fv(shader.at('uKnobs'), [0, ...knobs.slice(1)]);
+            }
             drawPass(engine, spare);
             entry.spare = entry.output;
             entry.output = spare;

@@ -184,7 +184,10 @@ export const withMain = (
 ): readonly StoreEntry[] => {
     const own = stores.filter(store => store.program === program);
 
-    return HOLDING[program]?.holds === 'document' && !own.some(({ id }) => id === program)
+    // Only a shared document has a Main to offer: a private one's windows each start their own, as a pedal's do.
+    return HOLDING[program]?.holds === 'document' &&
+        HOLDING[program]?.sharing === 'shared' &&
+        !own.some(({ id }) => id === program)
         ? [mainStore(program), ...own]
         : own;
 };

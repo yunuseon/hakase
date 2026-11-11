@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colourOf, keptStores, pruned, reduceStores, type StoreEntry } from './stores.ts';
+import { colourOf, keptStores, pruned, reduceStores, withMain, type StoreEntry } from './stores.ts';
 
 const count = reduceStores((total: number, step: number) => total + step, 0);
 
@@ -76,5 +76,13 @@ describe('keptStores', () => {
         ];
 
         expect([...keptStores(all, stores).keys()]).toEqual(['tickets', 'store-4']);
+    });
+});
+
+describe('withMain', () => {
+    it('offers the Main of a shared document, but none for a program whose windows each start their own', () => {
+        expect(withMain('signal', []).map(({ id }) => id)).toEqual(['signal']);
+        expect(withMain('kaleido', [])).toEqual([]);
+        expect(withMain('sketch', [])).toEqual([]);
     });
 });
