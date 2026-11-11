@@ -97,6 +97,10 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ gates }) => gates),
         distinctUntilChanged(),
     );
+    const boxes$ = documents$.pipe(
+        map(({ boxes }) => boxes),
+        distinctUntilChanged(),
+    );
     const drums$ = documents$.pipe(
         map(({ drums }) => drums),
         distinctUntilChanged(),
@@ -110,13 +114,23 @@ export const projectionsOf = (history$: Observable<History>) => {
                 a.drums === b.drums &&
                 a.pedals === b.pedals &&
                 a.gates === b.gates &&
+                a.boxes === b.boxes &&
                 a.focusLinks === b.focusLinks &&
                 a.sketchLinks === b.sketchLinks,
         ),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
-    const linked$ = linking$.pipe(map(linkedOf), shareReplay({ bufferSize: 1, refCount: true }));
-    const loops$ = linking$.pipe(map(loopsOf), shareReplay({ bufferSize: 1, refCount: true }));
+    // One record, not three streams: a reader that combined them would fire once per stream on every link.
+    const links$ = linking$.pipe(
+        map(documents => ({
+            linked: linkedOf(documents),
+            loops: loopsOf(documents),
+            boxes: documents.boxes,
+            names: new Map([...documents.gates].map(([id, gate]) => [id, gate.name])),
+        })),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const linked$ = links$.pipe(map(({ linked }) => linked));
     const focusLinks$ = documents$.pipe(
         map(({ focusLinks }) => focusLinks),
         distinctUntilChanged(),
@@ -177,7 +191,8 @@ export const projectionsOf = (history$: Observable<History>) => {
         drums$,
         pedals$,
         gates$,
-        loops$,
+        boxes$,
+        links$,
         linked$,
         focusLinks$,
         sketchLinks$,

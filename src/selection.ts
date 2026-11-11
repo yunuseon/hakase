@@ -11,7 +11,9 @@ export const selectionView = (
     live: readonly ProcessId[],
     ids: readonly ProcessId[],
     copied: boolean,
+    boxable = false,
 ): SelectionView => ({
     copied,
+    boxable,
     count: live.filter(id => ids.includes(id)).length,
 });

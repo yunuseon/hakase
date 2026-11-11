@@ -392,19 +392,21 @@ export const chromeStories: readonly Story[] = [
         variants: [
             { id: 'selected', title: 'Programs selected' },
             { id: 'copied', title: 'Copied programs' },
+            { id: 'gates', title: 'Gates that can be a component' },
             { id: 'empty', title: 'No selection' },
         ],
         controls: [],
         defaults,
         height: 380,
         action: null,
-        code: 'const selection = new HksSelection();\nconst lifetime$ = selection.connect$(view$);\n// Fold selection.changes$ into copy, paste, save, delete and clear requests.',
+        code: 'const selection = new HksSelection();\nconst lifetime$ = selection.connect$(view$);\n// Fold selection.changes$ into copy, paste, save, component, delete and clear requests.',
         create: ({ variant }) => {
             const element = new HksSelection();
             const events$ = element.changes$.pipe(share());
             const seed = {
                 count: variant === 'empty' ? 0 : 2,
                 copied: variant === 'copied',
+                boxable: variant === 'gates',
             };
             const view$ = events$.pipe(
                 scan(

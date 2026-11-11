@@ -43,6 +43,7 @@ import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind } from '../inputs.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
+import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 
 type Pace = { readonly seconds: number; readonly ticks: number };
@@ -96,6 +97,7 @@ type StoreKey =
     | 'pedal$'
     | 'gate$'
     | 'bits$'
+    | 'box$'
     | 'image$'
     | 'linkedName$';
 
@@ -124,6 +126,7 @@ export const scopedOf = ({
     drums$,
     pedals$,
     gates$,
+    boxes$,
     linked$,
     library$,
     blueprints$,
@@ -658,6 +661,18 @@ export const scopedOf = ({
                     ),
                 ),
                 distinctUntilChanged(),
+            ),
+            box$: combineLatest([store$, pace$]).pipe(
+                switchMap(([store, { ticks, seconds }]) =>
+                    combineLatest([
+                        boxes$.pipe(
+                            map(all => all.get(store) ?? EMPTY_BOX),
+                            distinctUntilChanged(),
+                        ),
+                        circuit$,
+                        tableOf(ticks, seconds),
+                    ]).pipe(map(([box, gates, table]) => boxReading(box, gates, table, ticks))),
+                ),
             ),
             image$: store$.pipe(switchMap(store => imageIn(store, pace$))),
             linkedName$: param =>

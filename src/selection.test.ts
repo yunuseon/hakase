@@ -31,10 +31,12 @@ describe('program selection', () => {
             ),
         ).toEqual({
             copied: true,
+            boxable: false,
             count: 1,
         });
         expect(selectionView([], [first.id], true)).toEqual({
             copied: true,
+            boxable: false,
             count: 0,
         });
     });

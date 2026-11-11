@@ -3,6 +3,8 @@ import { HksImageView } from '../components/image-view/image-view.component.ts';
 import { HksPedal } from '../components/pedal/pedal.component.ts';
 import { HksGate } from '../components/gate/gate.component.ts';
 import type { GateView } from '../components/gate/gate.ts';
+import { HksBox } from '../components/box/box.component.ts';
+import type { BoxView } from '../components/box/box.ts';
 import { GATE_DEFAULTS, GATES, reduceGate, type Bit } from '../gates.ts';
 import { circuitTable } from '../circuit.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
@@ -222,6 +224,64 @@ export const detailStories: readonly Story[] = [
                         name: kind === 'pin-out' ? gate.name : null,
                     };
                 }),
+            );
+
+            return {
+                element,
+                run$: element.connect$(view$),
+                events$: element.changes$.pipe(map(change => recorded(change.kind, change))),
+            };
+        },
+    },
+    {
+        id: 'component',
+        title: 'Component',
+        group: 'Controls',
+        description:
+            'Gates boxed into one window: its name, its input pins on the left and output pins on the right, each with its bit now and across the loop. Open puts the gates back on the canvas. In state mode each pin is a jack of its own.',
+        elements: ['hks-box'],
+        variants: [
+            { id: 'adder', title: 'Half adder' },
+            { id: 'empty', title: 'No input pins' },
+        ],
+        controls: [],
+        defaults,
+        height: 220,
+        action: 'changes$',
+        code: 'const box = new HksBox();\nconst lifetime$ = box.connect$(view$);\nconst commands$ = box.changes$; // rename, open',
+        create: ({ variant }) => {
+            const element = new HksBox();
+            const row = (bits: readonly Bit[]) => ({ bit: bits[5] ?? 0, row: bits });
+            const a: Bit[] = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1];
+            const b: Bit[] = [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1];
+            const pin = (store: string, name: string, bits: readonly Bit[]) => ({
+                store,
+                name,
+                ...row(bits),
+            });
+            const view$ = element.changes$.pipe(
+                scan(
+                    (name, change) => (change.kind === 'rename' ? change.name : name),
+                    'half adder',
+                ),
+                startWith('half adder'),
+                map((name): BoxView => ({
+                    name,
+                    tick: 5,
+                    inputs: variant === 'empty' ? [] : [pin('a', 'a', a), pin('b', 'b', b)],
+                    outputs: [
+                        pin(
+                            'sum',
+                            'sum',
+                            a.map((bit, at): Bit => (bit === b[at] ? 0 : 1)),
+                        ),
+                        pin(
+                            'carry',
+                            'carry',
+                            a.map((bit, at): Bit => (bit === 1 && b[at] === 1 ? 1 : 0)),
+                        ),
+                    ],
+                })),
             );
 
             return {

@@ -12,6 +12,7 @@ import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { parseGate, type Gate } from './gates.ts';
+import { parseBox, type Box } from './boxes.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
 import { isProgramId } from './program.ts';
@@ -64,6 +65,7 @@ type HeldKind =
     | 'drums'
     | 'pedals'
     | 'gates'
+    | 'boxes'
     | 'sketchLinks';
 
 type Entries<M> =
@@ -130,8 +132,9 @@ export const reduceBlueprints = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices, drums, pedals, gates, sketchLinks }: Documents) =>
+const linkedOf = ({ signals, pens, voices, drums, pedals, gates, boxes, sketchLinks }: Documents) =>
     new Map<StoreId, Linked>([
+        ...boxes,
         ...signals,
         ...pens,
         ...voices,
@@ -249,6 +252,7 @@ export const blueprintOf = (
             drums: picked(documents.drums, stores),
             pedals: picked(documents.pedals, stores),
             gates: picked(documents.gates, stores),
+            boxes: picked(documents.boxes, stores),
             sketchLinks: picked(documents.sketchLinks, stores),
         },
         formulas,
@@ -357,7 +361,8 @@ export const placed = (
                             id: storeOf(entry.id),
                             // A copy is not its program's main store, so it should not answer to the name.
                             name: entry.name === MAIN ? blueprint.name : entry.name,
-                            kept: HOLDING[entry.program]?.sharing !== 'private',
+                            // Stores hidden in a component have no window to keep them, so a stage's own flag is kept.
+                            kept: entry.kept || HOLDING[entry.program]?.sharing !== 'private',
                         })),
                     ],
                 ),
@@ -417,6 +422,27 @@ export const placed = (
             ...gate,
             sources: Object.fromEntries(
                 Object.entries(gate.sources).map(([param, source]) => [param, sourceOf(source)]),
+            ),
+        })),
+        boxes: into(documents.boxes, held.boxes, (box): Box => ({
+            ...box,
+            inner: box.inner.map(window => ({
+                ...window,
+                store: storeOf(window.store),
+                follows: Object.fromEntries(
+                    Object.entries(window.follows).map(([name, binding]) => [
+                        name,
+                        { ...binding, store: storeOf(binding.store) },
+                    ]),
+                ),
+            })),
+            inputs: box.inputs.map(storeOf),
+            outputs: box.outputs.map(storeOf),
+            sources: Object.fromEntries(
+                Object.entries(box.sources).map(([inner, source]) => [
+                    storeOf(inner),
+                    sourceOf(source),
+                ]),
             ),
         })),
         pedals: into(documents.pedals, held.pedals, pedal => ({
@@ -527,6 +553,9 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 gates: entriesOf(heldOf('gates'), parseGate).flatMap(
                     ([id, gate]): (readonly [StoreId, Gate])[] =>
                         gate === null ? [] : [[id, gate]],
+                ),
+                boxes: entriesOf(heldOf('boxes'), stored => parseBox(stored, inputsFor)).flatMap(
+                    ([id, box]): (readonly [StoreId, Box])[] => (box === null ? [] : [[id, box]]),
                 ),
                 pedals: entriesOf(heldOf('pedals'), parseStoredPedal).flatMap(
                     ([id, pedal]): (readonly [StoreId, Pedal])[] =>

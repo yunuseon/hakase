@@ -31,7 +31,7 @@ import type { Chrome } from './chrome.graph.ts';
 import type { Projections } from './projections.graph.ts';
 
 type Reads = Pick<Chrome, 'canvas' | 'navigator' | 'wiring'> &
-    Pick<Projections, 'workspace$' | 'linked$' | 'loops$' | 'ids$'> & {
+    Pick<Projections, 'workspace$' | 'links$' | 'ids$'> & {
         readonly signals$: Observable<ProcessSignal>;
     };
 
@@ -40,8 +40,7 @@ export const stateModeOf = ({
     navigator,
     wiring,
     workspace$,
-    linked$,
-    loops$,
+    links$,
     ids$,
     signals$,
 }: Reads) => {
@@ -82,14 +81,13 @@ export const stateModeOf = ({
 
     const wiringView$: Observable<WiringView | null> = combineLatest([
         workspace$,
-        linked$,
-        loops$,
+        links$,
         session$,
         remScale$,
         coarsePointer$,
     ]).pipe(
-        map(([workspace, signals, loops, session, unit, touch]) =>
-            wiringOf(workspace, signals, inputsFor, session, unit, touch, loops),
+        map(([workspace, { linked, loops, boxes, names }, session, unit, touch]) =>
+            wiringOf(workspace, linked, inputsFor, session, unit, touch, loops, boxes, names),
         ),
         distinctUntilChanged(sameWiring),
         shareReplay({ bufferSize: 1, refCount: true }),

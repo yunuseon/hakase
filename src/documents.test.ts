@@ -36,6 +36,7 @@ const started = (): Documents => ({
     focusLinks: new Map(),
     pedals: new Map(),
     gates: new Map(),
+    boxes: new Map(),
     sketchLinks: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,

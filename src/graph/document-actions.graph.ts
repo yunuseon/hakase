@@ -1,5 +1,5 @@
 import { merge, type Observable } from 'rxjs';
-import { map, mergeMap, withLatestFrom } from 'rxjs/operators';
+import { filter, map, mergeMap, withLatestFrom } from 'rxjs/operators';
 import { capturedActions } from '../capture.ts';
 import type { DocumentAction } from '../documents.ts';
 import { footprintAt } from '../placing.ts';
@@ -12,13 +12,15 @@ import type { Projections } from './projections.graph.ts';
 import type { Selection } from './selection.graph.ts';
 import type { StateMode } from './state-mode.graph.ts';
 
-type Reads = Pick<Intents, 'picked$'> &
+type Reads = Pick<Intents, 'picked$' | 'selectionCommands$'> &
     Pick<Projections, 'documents$'> &
-    Pick<Selection, 'placing$' | 'captures$'> &
+    Pick<Selection, 'placing$' | 'captures$' | 'selectedIds$'> &
     Pick<StateMode, 'wiringCommands$'> & { readonly inputs$: Observable<AppSignal> };
 
 export const documentActions$ = ({
     picked$,
+    selectionCommands$,
+    selectedIds$,
     documents$,
     placing$,
     captures$,
@@ -59,6 +61,10 @@ export const documentActions$ = ({
                         return [{ kind: 'voices', store, command: input.command }];
                     case 'gate':
                         return [{ kind: 'gates', store, command: input.command }];
+                    case 'box':
+                        return [{ kind: 'boxes', store, command: input.command }];
+                    case 'unbox':
+                        return [{ kind: 'unbox', id }];
                     case 'pedal':
                         return [{ kind: 'pedals', store, command: input.command }];
                     case 'drums':
@@ -129,6 +135,11 @@ export const documentActions$ = ({
                           },
                       ];
             }),
+        ),
+        selectionCommands$.pipe(
+            filter(command => command === 'component'),
+            withLatestFrom(selectedIds$),
+            map(([, ids]): DocumentAction => ({ kind: 'box', ids })),
         ),
         captures$.pipe(
             mergeMap(({ command, blueprint }): DocumentAction[] =>

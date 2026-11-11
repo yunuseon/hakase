@@ -47,6 +47,7 @@ import {
     type Gate,
     type GateCommand,
 } from './gates.ts';
+import { boxed, EMPTY_BOX, reduceBox, unboxed, type Box, type BoxCommand } from './boxes.ts';
 import {
     isSketchParam,
     isUnlinked,
@@ -132,6 +133,7 @@ export type Documents = {
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
     readonly gates: ReadonlyMap<StoreId, Gate>;
+    readonly boxes: ReadonlyMap<StoreId, Box>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
@@ -156,6 +158,7 @@ type StoreCommands = {
     readonly drums: DrumsCommand;
     readonly pedals: PedalCommand;
     readonly gates: GateCommand;
+    readonly boxes: BoxCommand;
 };
 
 type StoreDocument = keyof StoreCommands;
@@ -171,6 +174,8 @@ export type DocumentAction =
               readonly command: StoreCommands[K];
           };
       }[StoreDocument]
+    | { readonly kind: 'box'; readonly ids: readonly ProcessId[] }
+    | { readonly kind: 'unbox'; readonly id: ProcessId }
     | { readonly kind: 'library'; readonly command: LibraryCommand }
     | { readonly kind: 'blueprints'; readonly command: BlueprintCommand }
     | { readonly kind: 'place'; readonly blueprint: string; readonly view: Rect }
@@ -235,6 +240,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     drums: storeEvent(documents.drums, event),
     pedals: storeEvent(documents.pedals, event),
     gates: storeEvent(documents.gates, event),
+    boxes: storeEvent(documents.boxes, event),
     focusLinks: storeEvent(documents.focusLinks, event),
     sketchLinks: storeEvent(documents.sketchLinks, event),
 });
@@ -246,11 +252,20 @@ export const linkedOf = ({
     drums,
     pedals,
     gates,
+    boxes,
     focusLinks,
     sketchLinks,
 }: Pick<
     Documents,
-    'signals' | 'pens' | 'voices' | 'drums' | 'pedals' | 'gates' | 'focusLinks' | 'sketchLinks'
+    | 'signals'
+    | 'pens'
+    | 'voices'
+    | 'drums'
+    | 'pedals'
+    | 'gates'
+    | 'boxes'
+    | 'focusLinks'
+    | 'sketchLinks'
 >) =>
     new Map<StoreId, Linked>([
         ...signals,
@@ -259,6 +274,7 @@ export const linkedOf = ({
         ...drums,
         ...pedals,
         ...gates,
+        ...boxes,
         ...focusLinks,
         ...sketchLinks,
     ]);
@@ -601,6 +617,30 @@ export const reduceDocuments =
                           ),
                       };
             }
+            case 'boxes':
+                return ownerOf(documents.workspace, action.store) !== 'box' ||
+                    !documents.boxes.has(action.store)
+                    ? documents
+                    : {
+                          ...documents,
+                          boxes: commanded(
+                              documents.boxes,
+                              action.store,
+                              EMPTY_BOX,
+                              reduceBox,
+                              action.command,
+                              seq,
+                          ),
+                      };
+            case 'box':
+            case 'unbox': {
+                const parts =
+                    action.kind === 'box'
+                        ? boxed(documents, action.ids, seq, inputsFor)
+                        : unboxed(documents, action.id, seq, inputsFor);
+
+                return parts === null ? documents : { ...documents, ...parts };
+            }
             case 'pedals': {
                 const owner = ownerOf(documents.workspace, action.store);
 
@@ -717,6 +757,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     drums: ['swing', 'volume'],
     pedals: ['value'],
     gates: ['threshold', 'rename'],
+    boxes: ['rename'],
 };
 
 export const stepOfDocument = (action: DocumentAction, before: Documents): StepKind => {
@@ -731,6 +772,8 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'look':
         case 'paste':
         case 'place':
+        case 'box':
+        case 'unbox':
             return { key: action.kind, joins: false };
         case 'blueprints':
             return action.command.kind === 'rename'
@@ -788,6 +831,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     drums: 'drum machine',
     pedals: 'pedal',
     gates: 'gate',
+    boxes: 'component',
 };
 
 const storeName = ({ stores }: Workspace, id: StoreId) =>
@@ -823,6 +867,10 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
                   ? `Renamed blueprint ${was?.name ?? ''} to ${command.name}`
                   : `Deleted blueprint ${was?.name ?? ''}`;
         }
+        case 'box':
+            return `Made a component of ${action.ids.length} programs`;
+        case 'unbox':
+            return `Opened ${storeName(before.workspace, before.workspace.processes.find(({ id }) => id === action.id)?.store ?? '')}`;
         case 'paste':
             return `Pasted ${action.blueprint.windows.length} programs`;
         case 'place':

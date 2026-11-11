@@ -32,20 +32,22 @@ export const inputsFor: InputsFor = program =>
               ? { playback: playbackInput, ...drumsInputs }
               : isGateKind(program)
                 ? { playback: playbackInput, ...gateInputs(program) }
-                : isPedalKind(program)
-                  ? { playback: playbackInput, ...pedalInputs(program) }
-                  : program === 'output'
-                    ? { playback: playbackInput, in: imageInput('in') }
-                    : program === 'plot'
-                      ? { playback: playbackInput, ...plotInputs }
-                      : program === 'signal'
-                        ? { playback: playbackInput, ...signalInputs }
-                        : program === 'timeline'
-                          ? { playback: ownPlaybackInput }
-                          : program === 'playhead'
-                            ? { progress: progressInput }
-                            : program === 'progress'
-                              ? { source: sourceInput }
-                              : program === 'focus'
-                                ? { ...focusInputs }
-                                : {};
+                : program === 'box'
+                  ? { playback: playbackInput }
+                  : isPedalKind(program)
+                    ? { playback: playbackInput, ...pedalInputs(program) }
+                    : program === 'output'
+                      ? { playback: playbackInput, in: imageInput('in') }
+                      : program === 'plot'
+                        ? { playback: playbackInput, ...plotInputs }
+                        : program === 'signal'
+                          ? { playback: playbackInput, ...signalInputs }
+                          : program === 'timeline'
+                            ? { playback: ownPlaybackInput }
+                            : program === 'playhead'
+                              ? { progress: progressInput }
+                              : program === 'progress'
+                                ? { source: sourceInput }
+                                : program === 'focus'
+                                  ? { ...focusInputs }
+                                  : {};

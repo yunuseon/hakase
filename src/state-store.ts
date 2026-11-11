@@ -37,6 +37,7 @@ import type { InputsFor } from './inputs.ts';
 import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { parseGate, type Gate } from './gates.ts';
+import { parseBox, type Box } from './boxes.ts';
 import {
     isSketchParam,
     linkedSketch,
@@ -75,6 +76,7 @@ export type Snapshot = {
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
     readonly gates: ReadonlyMap<StoreId, Gate>;
+    readonly boxes: ReadonlyMap<StoreId, Box>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
     readonly library: Library;
@@ -175,6 +177,7 @@ const fresh: Restored = {
     sketchLinks: new Map(),
     pedals: new Map(),
     gates: new Map(),
+    boxes: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
     seq: 0,
@@ -316,6 +319,11 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
                 ([id, gate]): [StoreId, Gate][] => (gate === null ? [] : [[id, gate]]),
             ),
         ),
+        boxes: new Map(
+            [
+                ...byStore(field(stored, 'boxes'), 'boxes', value => parseBox(value, inputsFor)),
+            ].flatMap(([id, box]): [StoreId, Box][] => (box === null ? [] : [[id, box]])),
+        ),
         pedals: new Map(
             [...byStore(field(stored, 'pedals'), 'pedals', parseStoredPedal)].flatMap(
                 ([id, pedal]): [StoreId, Pedal][] => (pedal === null ? [] : [[id, pedal]]),
@@ -370,6 +378,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         sketchLinks: saved(snapshot.sketchLinks),
         pedals: saved(snapshot.pedals),
         gates: saved(snapshot.gates),
+        boxes: saved(snapshot.boxes),
         library: snapshot.library,
         blueprints: snapshot.blueprints,
         seq: snapshot.seq,

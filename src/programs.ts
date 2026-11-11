@@ -22,6 +22,7 @@ import { plotProgram } from './programs/plot.program.ts';
 import { outputProgram } from './programs/output.program.ts';
 import { pedalProgram } from './programs/pedal.program.ts';
 import { gateProgram } from './programs/gate.program.ts';
+import { boxProgram } from './programs/box.program.ts';
 import { signalProgram } from './programs/signal.program.ts';
 import { sketchProgram } from './programs/sketch.program.ts';
 import { tasksProgram } from './programs/tasks.program.ts';
@@ -57,6 +58,7 @@ export const programs = {
     'pin-in': gateProgram('pin-in'),
     'pin-out': gateProgram('pin-out'),
     const: gateProgram('const'),
+    box: boxProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,
     tickets: ticketsProgram,

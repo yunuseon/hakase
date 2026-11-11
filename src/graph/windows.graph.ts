@@ -64,7 +64,7 @@ const usersOf = (processes: readonly Process[], id: StoreId): number =>
 type Entry = { readonly process: Process; readonly index: number; readonly last: number };
 
 type Reads = Pick<Chrome, 'canvas'> &
-    Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'linked$' | 'loops$'> &
+    Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'links$'> &
     Pick<Selection, 'selectedIds$'> &
     Pick<StateMode, 'wiringEvents$'> & { readonly scoped: Scoped };
 
@@ -74,8 +74,7 @@ export const windowsOf = ({
     index$,
     ids$,
     settings$,
-    linked$,
-    loops$,
+    links$,
     selectedIds$,
     wiringEvents$,
     scoped,
@@ -130,7 +129,7 @@ export const windowsOf = ({
         const inputs = inputsFor(program);
         const definitions = Object.values(inputs);
         const signals$ = definitions.some(definition => definition.from === 'store')
-            ? combineLatest([linked$, loops$])
+            ? links$.pipe(map(({ linked, loops }) => [linked, loops] as const))
             : of([new Map<string, Linked>(), new Map<string, Linked>()] as const);
 
         return definitions.every(definition => definition.from === 'own')

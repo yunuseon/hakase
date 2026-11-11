@@ -17,7 +17,7 @@ export class HksSelection extends HTMLElement {
         root.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = renderView<SelectionView>(
             root,
-            { count: 0, copied: false },
+            { count: 0, copied: false, boxable: false },
             view =>
                 html`<div
                     class="actions"
@@ -44,6 +44,14 @@ export class HksSelection extends HTMLElement {
                     </button>
                     <button class="ui-button" data-command="save" ?disabled=${view.count === 0}>
                         Save as blueprint
+                    </button>
+                    <button
+                        class="ui-button"
+                        data-command="component"
+                        ?disabled=${!view.boxable}
+                        title="Box the selected gates into one component (needs a pin out)"
+                    >
+                        Make component
                     </button>
                     <button
                         class="ui-button"

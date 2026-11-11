@@ -130,6 +130,7 @@ export const programDemo = (
         image$: of(NONE),
         gate$: of(GATE_DEFAULTS.switch),
         bits$: of(new Uint8Array(16)),
+        box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),
         followedSignal$: input =>
             empty || input !== 'a'

@@ -19,6 +19,7 @@ import { ghostOf } from '../placing.ts';
 import { categoriesOf } from '../program-categories.ts';
 import { programList } from '../programs.ts';
 import { selectionView } from '../selection.ts';
+import { canBox } from '../boxes.ts';
 import { zoomLabel } from '../shared/camera.ts';
 import { blueprintIn } from '../starters.ts';
 import { boxOf, seamsOf } from '../workspace.ts';
@@ -83,7 +84,7 @@ type Shown = Chrome &
     Pick<Intents, 'paletteOpen$' | 'drawing$'> &
     Pick<
         Projections,
-        'workspace$' | 'camera$' | 'ids$' | 'blueprints$' | 'history$' | 'look$' | 'appearance$'
+        'workspace$' | 'camera$' | 'blueprints$' | 'history$' | 'look$' | 'appearance$'
     > &
     Pick<Selection, 'selectedIds$' | 'clipboard$' | 'placing$'> &
     Pick<StateMode, 'mode$' | 'wiringView$'>;
@@ -103,7 +104,6 @@ export const connectChrome$ = ({
     drawing$,
     workspace$,
     camera$,
-    ids$,
     blueprints$,
     history$,
     look$,
@@ -126,8 +126,20 @@ export const connectChrome$ = ({
         toolbar.connect$(),
         sectionDrawing.connect$(drawing$),
         selection.connect$(
-            combineLatest([selectedIds$, ids$, clipboard$]).pipe(
-                map(([selected, live, copied]) => selectionView(live, selected, copied !== null)),
+            combineLatest([selectedIds$, workspace$, clipboard$]).pipe(
+                map(([selected, workspace, copied]) =>
+                    selectionView(
+                        workspace.processes.map(({ id }) => id),
+                        selected,
+                        copied !== null,
+                        canBox(
+                            workspace,
+                            selected.filter(id =>
+                                workspace.processes.some(process => process.id === id),
+                            ),
+                        ),
+                    ),
+                ),
             ),
         ),
         seams.connect$(workspace$.pipe(map(seamsOf))),

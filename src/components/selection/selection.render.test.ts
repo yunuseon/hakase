@@ -9,7 +9,7 @@ it('exposes selection actions and removes their listeners and toolbar on teardow
     document.body.append(element);
     const commands: SelectionCommand[] = [];
     const running = merge(
-        element.connect$(of({ count: 1, copied: false })),
+        element.connect$(of({ count: 1, copied: false, boxable: false })),
         element.changes$,
     ).subscribe(value => {
         if (value !== undefined) commands.push(value);

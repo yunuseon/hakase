@@ -42,6 +42,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     'pin-in': stage,
     'pin-out': stage,
     const: stage,
+    box: stage,
     paint: document,
     pen: document,
     voice: document,
