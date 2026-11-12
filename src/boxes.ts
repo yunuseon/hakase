@@ -83,12 +83,12 @@ export const boxed = (
     const height = BOX_HEAD + PIN_ROW * (inputs.length + outputs.length);
     const clock = inside
         .map(({ follows }) => followedBy(follows, 'playback'))
-        .find(binding => binding?.kind === 'playback') ?? { kind: 'playback', store: 'timeline' };
+        .find(binding => binding?.kind === 'playback');
     const draft: Draft = {
         id: `box-${seq}`,
         program: 'box',
         store,
-        follows: { playback: clock },
+        follows: clock === undefined ? {} : { playback: clock },
         frame: { x: bounds.x, y: bounds.y, z: 0, width: BOX_WIDTH, height },
         measured: { width: BOX_WIDTH, height },
     };

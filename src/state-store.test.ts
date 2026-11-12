@@ -163,3 +163,32 @@ describe('sketch link migration', () => {
         });
     });
 });
+
+describe('constant migration', () => {
+    it('brings back a constant as a switch, on at its old default unless it was saved off', () => {
+        const restored = parseSnapshot(
+            {
+                version: 1,
+                workspace: {
+                    ...base,
+                    processes: [
+                        window('const', 'const-1'),
+                        { ...window('const', 'const-2'), id: 'const-2' },
+                    ],
+                    stores: [
+                        { id: 'const-1', program: 'const', name: 'const 1', kept: false },
+                        { id: 'const-2', program: 'const', name: 'const 2', kept: false },
+                    ],
+                },
+                gates: { byStore: { 'const-2': { kind: 'const', value: 0 } } },
+            },
+            inputsFor,
+        );
+
+        expect(
+            restored?.workspace?.processes.filter(({ program }) => program === 'switch'),
+        ).toHaveLength(2);
+        expect(restored?.gates.get('const-1')).toMatchObject({ kind: 'switch', value: 1 });
+        expect(restored?.gates.get('const-2')).toMatchObject({ kind: 'switch', value: 0 });
+    });
+});

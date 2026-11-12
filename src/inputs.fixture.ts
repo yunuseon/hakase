@@ -12,6 +12,7 @@ import {
     sceneInputs,
     ownPlaybackInput,
     playbackInput,
+    loosePlaybackInput,
     imageInput,
     pedalInputs,
     gateInputs,
@@ -31,9 +32,9 @@ export const inputsFor: InputsFor = program =>
             : program === 'drums'
               ? { playback: playbackInput, ...drumsInputs }
               : isGateKind(program)
-                ? { playback: playbackInput, ...gateInputs(program) }
+                ? { playback: loosePlaybackInput, ...gateInputs(program) }
                 : program === 'box'
-                  ? { playback: playbackInput }
+                  ? { playback: loosePlaybackInput }
                   : isPedalKind(program)
                     ? { playback: playbackInput, ...pedalInputs(program) }
                     : program === 'output'

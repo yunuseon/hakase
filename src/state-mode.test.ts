@@ -47,7 +47,10 @@ describe('state mode', () => {
         for (const socket of view.sockets) {
             expect(anchorOf(socket, unit, view.rowHeight).y).toBe(socket.y + 22 * unit);
             const following = view.sockets.find(
-                other => other.window === socket.window && other.y > socket.y,
+                other =>
+                    other.window === socket.window &&
+                    other.end.kind === socket.end.kind &&
+                    other.y > socket.y,
             );
             if (following !== undefined) {
                 expect(following.y - socket.y).toBeGreaterThanOrEqual(view.rowHeight);
@@ -55,6 +58,20 @@ describe('state mode', () => {
         }
         expect(sameWiring(view, { ...view, rowHeight: view.rowHeight + 1 })).toBe(false);
     });
+    it('puts the jacks of a window too small for its rows on its edges', () => {
+        const nand = run([{ ...launch, program: 'nand', size: { width: 184, height: 64 } }]);
+        const view = wiringOf(nand, new Map(), inputsFor, on, 1);
+        const gate = nand.processes.at(-1);
+        if (view === null || gate === undefined) throw new Error('Missing wiring view');
+        const mine = view.sockets.filter(socket => socket.window === gate.id);
+        const { x, width } = gate.frame;
+
+        expect(mine.map(socket => socket.title)).toEqual(['Output', 'Playback', 'a', 'b']);
+        mine.forEach(socket => {
+            expect(anchorOf(socket, 1).x).toBe(socket.end.kind === 'store' ? x + width : x);
+        });
+    });
+
     it('holds temporary mode until every active interaction finishes', () => {
         const held = reduceSession(defaultSession, { kind: 'hold', held: true });
         expect(modeOf(held).active).toBe(true);

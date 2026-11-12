@@ -63,7 +63,6 @@ export const PROGRAM_IDS = [
     'lamp',
     'pin-in',
     'pin-out',
-    'const',
     'box',
     'blueprints',
     'tasks',

@@ -57,7 +57,6 @@ export const programs = {
     lamp: gateProgram('lamp'),
     'pin-in': gateProgram('pin-in'),
     'pin-out': gateProgram('pin-out'),
-    const: gateProgram('const'),
     box: boxProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,

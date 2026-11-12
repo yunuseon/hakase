@@ -1837,9 +1837,26 @@ boxed into a **component** whose gates are hidden but still there.
 **A gate is a row of a table.** `GATES` in `src/gates.ts` gives each kind its
 title, its bit inputs (`bits`), its level inputs (`drives`, only compare's
 `in`), its icon and summary: nand, delay, switch, pattern, compare, lamp,
-pin in, pin out and const. `gateProgram(kind)` makes the program and
+pin in and pin out. `gateProgram(kind)` makes the program and
 `gateInputs(kind)` its store inputs. Holding is `stage`, a private document,
 so two NANDs are two gates. Everything else is built from NANDs, by hand.
+There was a constant gate as well; it behaved exactly as a switch, so it was
+folded into one, and a saved constant comes back as a switch with its bit
+(`RENAMED`, `parseGate`, `progressBinding`).
+
+**A gate window is as small as its content**: one line (its bit and the loop's
+row, or a pattern's steps), two for a pin's name or a compare's threshold, at
+the `size` its `GATES` entry gives. Its chrome is every window's: there is no
+small kind of window. Such a window is too small for its jacks inside it, so
+state mode puts them on its edges (below).
+
+**A clock is optional for gates and components.** They take
+`loosePlaybackInput`, which starts unbound: a gate with no clock is the circuit
+as it stands, evaluated at one tick, so switches and NANDs work and
+a pattern holds its first step, and the window shows its bit without a row. A
+window with no clock stands at 0 with a pace of one tick (`STILL` in
+`app-state.graph.ts`), so its program needs no case for it. A component boxed
+from gates with no clock has none either.
 
 **Time is ticks, replayed.** Each clock has `ticks` per loop (1 to 64, 16 by
 default), set in the timeline beside the duration and routed like it. The
@@ -1897,9 +1914,7 @@ NANDs boxed as a component, two lamps, and a counter that is one NAND and one
 delay.
 
 Still open: a voice's or drum machine's inputs take signals only (they are
-resolved through `waveOf`), so a bit cannot gate a sound yet; and a gate window
-is a full window, about 160 units square, because state mode needs room for
-its jacks.
+resolved through `waveOf`), so a bit cannot gate a sound yet.
 
 ## Blueprints
 
@@ -2008,6 +2023,14 @@ both programs match. A dotted wire joins windows that share a state. Every wire
 enters an input level from the left, even when the target lies behind its
 source, so which end is which reads at a glance; a backward wire's pull grows with
 how far apart the jacks are, capped, so both ends stay readable.
+
+**A window too small for its rows wears its jacks on its edges.** When the
+rows would not fit inside its frame (`inside` in `wiringOf`), its inputs line
+up on its left edge and its outputs on its right, centred, each jack straddling
+the edge, so a gate's wires meet it where a schematic's would. It is decided
+from the frame alone, so a larger root size or touch rows can tip any small
+window over, and its menus open downward at full height rather than clamped to
+a frame they cannot fit in.
 
 **Inputs come in groups, so a window's jacks always fit inside it.** A
 followed input may name a `group` in its definition (the sketch's Knobs, Camera

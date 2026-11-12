@@ -36,7 +36,7 @@ import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
 import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
-import { parseGate, type Gate } from './gates.ts';
+import { GATE_DEFAULTS, parseGate, type Gate } from './gates.ts';
 import { parseBox, type Box } from './boxes.ts';
 import {
     isSketchParam,
@@ -93,6 +93,19 @@ const entriesOf = (value: unknown): [string, unknown][] =>
 
 const field = (value: unknown, key: string): unknown =>
     entriesOf(value).find(([name]) => name === key)?.[1];
+
+// A constant left at its default 1 saved no document, and as a switch it would read 0.
+const constantsFrom = (stored: unknown): [StoreId, Gate][] => {
+    const stores = field(field(stored, 'workspace'), 'stores');
+
+    return (Array.isArray(stores) ? stores : []).flatMap((entry): [StoreId, Gate][] => {
+        const id = field(entry, 'id');
+
+        return field(entry, 'program') === 'const' && typeof id === 'string'
+            ? [[id, { ...GATE_DEFAULTS.switch, value: 1 }]]
+            : [];
+    });
+};
 
 const looksFrom = (value: unknown): ReadonlyMap<AppearanceName, Appearance> =>
     new Map(
@@ -314,11 +327,12 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
         pens: byStore(field(stored, 'pens'), 'pen', parsePen),
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
-        gates: new Map(
-            [...byStore(field(stored, 'gates'), 'gates', parseGate)].flatMap(
+        gates: new Map([
+            ...constantsFrom(stored),
+            ...[...byStore(field(stored, 'gates'), 'gates', parseGate)].flatMap(
                 ([id, gate]): [StoreId, Gate][] => (gate === null ? [] : [[id, gate]]),
             ),
-        ),
+        ]),
         boxes: new Map(
             [
                 ...byStore(field(stored, 'boxes'), 'boxes', value => parseBox(value, inputsFor)),

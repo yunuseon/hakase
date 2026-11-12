@@ -5,7 +5,7 @@ import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.
 import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
 import { defaultPedal } from './pedals.ts';
-import { GATE_DEFAULTS, type Bit, type Gate, type GateKind } from './gates.ts';
+import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
 import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
@@ -107,10 +107,14 @@ const gate = (kind: GateKind, sources: Gate['sources'] = {}, rest: Partial<Gate>
     ...rest,
 });
 
-const GATE_SIZE = { width: 160, height: 176 };
-
 const inner = (id: string, program: GateKind, x: number, y: number) => {
-    const { settings: _, ...draft } = opened(id, program, id, { x, y, ...GATE_SIZE }, TICK);
+    const { settings: _, ...draft } = opened(
+        id,
+        program,
+        id,
+        { x, y, ...GATES[program].size },
+        TICK,
+    );
 
     return draft;
 };
@@ -122,14 +126,14 @@ const ADDER: Box = {
     name: 'half adder',
     inner: [
         inner('pa', 'pin-in', 0, 0),
-        inner('pb', 'pin-in', 0, 192),
-        inner('n1', 'nand', 176, 96),
-        inner('n2', 'nand', 352, 0),
-        inner('n3', 'nand', 352, 192),
-        inner('n4', 'nand', 528, 0),
-        inner('n5', 'nand', 528, 192),
-        inner('sum', 'pin-out', 704, 0),
-        inner('carry', 'pin-out', 704, 192),
+        inner('pb', 'pin-in', 0, 120),
+        inner('n1', 'nand', 224, 60),
+        inner('n2', 'nand', 424, 0),
+        inner('n3', 'nand', 424, 120),
+        inner('n4', 'nand', 624, 0),
+        inner('n5', 'nand', 624, 120),
+        inner('sum', 'pin-out', 824, 0),
+        inner('carry', 'pin-out', 824, 120),
     ],
     inputs: ['pa', 'pb'],
     outputs: ['sum', 'carry'],
@@ -492,16 +496,16 @@ export const STARTERS: readonly Starter[] = [
         name: 'Logic primer',
         summary:
             'Two patterns into a half adder built from NAND gates and boxed into a component, and a one-gate counter that flips every tick through a delay. Open the component to see its gates.',
-        size: { width: 640, height: 768 },
+        size: { width: 720, height: 520 },
         windows: [
             opened('tick', 'timeline', 'tick', { x: 24, y: 48, width: 360, height: 120 }),
-            opened('a', 'pattern', 'a', { x: 24, y: 184, ...GATE_SIZE }, TICK),
-            opened('b', 'pattern', 'b', { x: 24, y: 376, ...GATE_SIZE }, TICK),
-            opened('adder', 'box', 'adder', { x: 200, y: 184, width: 240, height: 224 }, TICK),
-            opened('lsum', 'lamp', 'lsum', { x: 456, y: 184, ...GATE_SIZE }, TICK),
-            opened('lcarry', 'lamp', 'lcarry', { x: 456, y: 376, ...GATE_SIZE }, TICK),
-            opened('q', 'delay', 'q', { x: 24, y: 568, ...GATE_SIZE }, TICK),
-            opened('nq', 'nand', 'nq', { x: 200, y: 568, ...GATE_SIZE }, TICK),
+            opened('a', 'pattern', 'a', { x: 24, y: 184, ...GATES.pattern.size }, TICK),
+            opened('b', 'pattern', 'b', { x: 24, y: 280, ...GATES.pattern.size }, TICK),
+            opened('adder', 'box', 'adder', { x: 256, y: 184, width: 240, height: 224 }, TICK),
+            opened('lsum', 'lamp', 'lsum', { x: 512, y: 184, ...GATES.lamp.size }, TICK),
+            opened('lcarry', 'lamp', 'lcarry', { x: 512, y: 280, ...GATES.lamp.size }, TICK),
+            opened('q', 'delay', 'q', { x: 24, y: 440, ...GATES.delay.size }, TICK),
+            opened('nq', 'nand', 'nq', { x: 224, y: 440, ...GATES.nand.size }, TICK),
         ],
         stores: [
             {

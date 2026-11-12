@@ -14,7 +14,6 @@ const evaluated = (
         case 'nand':
             return bitAt('a') === 1 && bitAt('b') === 1 ? 0 : 1;
         case 'switch':
-        case 'const':
             return gate.value;
         case 'pattern':
             return gate.steps[Math.floor((tick * gate.steps.length) / ticks)] ?? 0;

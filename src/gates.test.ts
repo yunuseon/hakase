@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { GATE_DEFAULTS, loopEdges, parseGate, reduceGate, sourceOfGate } from './gates.ts';
+import { progressBinding } from './inputs.ts';
+import { inputsFor } from './inputs.fixture.ts';
+import { processFrom, storeFrom } from './workspace.ts';
 
 describe('gate documents', () => {
-    it('toggle only a switch or a constant, and keep steps inside their bounds', () => {
+    it('toggle only a switch, and keep steps inside their bounds', () => {
         const pattern = GATE_DEFAULTS.pattern;
 
         expect(reduceGate(GATE_DEFAULTS.switch, { kind: 'toggle' }).value).toBe(1);
@@ -38,6 +41,19 @@ describe('gate documents', () => {
         expect(parsed?.threshold).toBe(0.5);
         expect(parseGate({ kind: 'constructor' })).toBeNull();
         expect(parseGate(null)).toBeNull();
+    });
+
+    it('bring a saved constant back as a switch holding the same bit', () => {
+        const frame = { x: 0, y: 0, z: 0, width: 184, height: 64 };
+
+        expect(parseGate({ kind: 'const', value: 1 })).toMatchObject({ kind: 'switch', value: 1 });
+        expect(
+            processFrom({ id: 'const-4', program: 'const', store: 'const-4', frame }, inputsFor),
+        ).toMatchObject({ program: 'switch', store: 'const-4' });
+        expect(storeFrom({ id: 'const-4', program: 'const', name: 'const 4' })).toMatchObject([
+            { program: 'switch', name: 'const 4' },
+        ]);
+        expect(progressBinding('const', 'const-4')).toEqual({ kind: 'switch', store: 'const-4' });
     });
 
     it("cut only a delay's input out of the loop graph", () => {

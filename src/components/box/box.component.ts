@@ -1,4 +1,4 @@
-import { html } from 'lit-html';
+import { html, nothing } from 'lit-html';
 import { ref } from 'lit-html/directives/ref.js';
 import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
@@ -24,11 +24,16 @@ const pin = (view: PinView, tick: number, side: 'in' | 'out') => {
 
     return html`<div class="pin">
         ${side === 'in' ? [bit, label] : [label, bit]}
-        <div class="row" aria-hidden="true">
-            ${view.row.map(
-                (on, at) => html`<span ?data-on=${on === 1} ?data-now=${at === tick}></span>`,
-            )}
-        </div>
+        ${
+            view.row.length < 2
+                ? nothing
+                : html`<div class="row" aria-hidden="true">
+                      ${view.row.map(
+                          (on, at) =>
+                              html`<span ?data-on=${on === 1} ?data-now=${at === tick}></span>`,
+                      )}
+                  </div>`
+        }
     </div>`;
 };
 

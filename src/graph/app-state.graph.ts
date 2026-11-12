@@ -47,6 +47,8 @@ import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 
 type Pace = { readonly seconds: number; readonly ticks: number };
+
+const STILL: Pace = { seconds: 1, ticks: 1 };
 import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
 import { isThemeName } from '../components/sketch/themes/registry.ts';
 import { NONE, sameImage, type Image } from '../image.ts';
@@ -334,7 +336,6 @@ export const scopedOf = ({
             : settings$.pipe(map(all => all.get(target.store) ?? null));
     };
 
-    // A program reads its own state already narrowed to its window's store, so it never learns stores exist.
     const sources = {
         focus$: timerIn,
         plan$: planIn,
@@ -600,8 +601,14 @@ export const scopedOf = ({
         );
 
         // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
-        const pace$ = clock.pipe(
-            map(({ duration, ticks }): Pace => ({ seconds: duration, ticks })),
+        const pace$ = clock$.pipe(
+            switchMap(binding =>
+                binding === null
+                    ? of(STILL)
+                    : clock.pipe(
+                          map(({ duration, ticks }): Pace => ({ seconds: duration, ticks })),
+                      ),
+            ),
             distinctUntilChanged((a, b) => a.seconds === b.seconds && a.ticks === b.ticks),
             shareReplay({ bufferSize: 1, refCount: true }),
         );
@@ -616,8 +623,8 @@ export const scopedOf = ({
                 ),
                 shareReplay({ bufferSize: 1, refCount: true }),
             ),
-            playhead$: clock.pipe(
-                map(({ at }) => at),
+            playhead$: clock$.pipe(
+                switchMap(binding => (binding === null ? of(0) : clock.pipe(map(({ at }) => at)))),
                 distinctUntilChanged(),
             ),
             playing$: clock.pipe(

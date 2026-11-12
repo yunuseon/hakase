@@ -6,92 +6,101 @@ import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
+import type { Bit } from '../../gates.ts';
 import type { GateChange, GateView } from './gate.ts';
 import css from './gate.css?inline';
 
 const sheet = styleSheet(css);
 
 const empty: GateView = {
-    icon: '',
     summary: '',
     bit: 0,
     tick: 0,
     row: [],
     toggle: false,
     steps: null,
+    step: 0,
     threshold: null,
     name: null,
 };
 
+const Row = (view: GateView) =>
+    html`<div class="row" aria-hidden="true">
+        ${view.row.map(
+            (bit, tick) =>
+                html`<span ?data-on=${bit === 1} ?data-now=${tick === view.tick}></span>`,
+        )}
+    </div>`;
+
+const Steps = (steps: readonly Bit[], now: number) =>
+    html`<div class="steps" role="group" aria-label="steps">
+        ${steps.map(
+            (bit, index) =>
+                html`<button
+                    type="button"
+                    data-step=${index}
+                    ?data-now=${index === now}
+                    aria-pressed=${bit === 1 ? 'true' : 'false'}
+                    aria-label=${`step ${index + 1}`}
+                ></button>`,
+        )}
+    </div>`;
+
 const TEMPLATE = (view: GateView) =>
-    html`<div class="face">
-            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true">
-                <path d=${view.icon}></path>
-            </svg>
-            <span
-                class="bit"
-                role="img"
-                aria-label=${view.bit === 1 ? 'on' : 'off'}
-                ?data-on=${view.bit === 1}
-            ></span>
+    html`<div class="face" title=${view.summary}>
             ${
                 view.toggle
-                    ? html`<button class="ui-button toggle" type="button" data-toggle>
-                          ${view.bit === 1 ? 'turn off' : 'turn on'}
-                      </button>`
-                    : nothing
+                    ? html`<button
+                          class="bit"
+                          type="button"
+                          data-toggle
+                          aria-pressed=${view.bit === 1 ? 'true' : 'false'}
+                          aria-label=${view.bit === 1 ? 'turn off' : 'turn on'}
+                          ?data-on=${view.bit === 1}
+                      ></button>`
+                    : html`<span
+                          class="bit"
+                          role="img"
+                          aria-label=${view.bit === 1 ? 'on' : 'off'}
+                          ?data-on=${view.bit === 1}
+                      ></span>`
             }
-        </div>
-        <div class="row" aria-hidden="true">
-            ${view.row.map(
-                (bit, tick) =>
-                    html`<span ?data-on=${bit === 1} ?data-now=${tick === view.tick}></span>`,
-            )}
-        </div>
-        ${
-            view.steps === null
-                ? nothing
-                : html`<div class="steps" role="group" aria-label="steps">
-                      ${view.steps.map(
-                          (bit, index) =>
-                              html`<button
-                                  type="button"
-                                  data-step=${index}
-                                  aria-pressed=${bit === 1 ? 'true' : 'false'}
-                                  aria-label=${`step ${index + 1}`}
-                              ></button>`,
-                      )}
-                  </div>`
-        }
-        ${
-            view.threshold === null
-                ? nothing
-                : html`<label
-                      >threshold
-                      <input
+            ${
+                view.name === null
+                    ? nothing
+                    : html`<input
+                          class="ui-field name"
+                          type="text"
+                          aria-label="pin name"
+                          ${ref(element => {
+                              if (element instanceof HTMLInputElement) {
+                                  displayValue(element, view.name ?? '');
+                              }
+                          })}
+                      />`
+            }
+            ${
+                view.threshold === null
+                    ? nothing
+                    : html`<input
                           class="ui-range threshold"
                           type="range"
                           min="0"
                           max="1"
                           step="0.01"
+                          aria-label="threshold"
                           .value=${String(view.threshold)}
-                  /></label>`
-        }
-        ${
-            view.name === null
-                ? nothing
-                : html`<input
-                      class="ui-field name"
-                      type="text"
-                      aria-label="pin name"
-                      ${ref(element => {
-                          if (element instanceof HTMLInputElement) {
-                              displayValue(element, view.name ?? '');
-                          }
-                      })}
-                  />`
-        }
-        <p class="summary">${view.summary}</p>`;
+                      />`
+            }
+            ${
+                view.steps !== null
+                    ? Steps(view.steps, view.step)
+                    : view.name === null && view.threshold === null && view.row.length > 0
+                      ? Row(view)
+                      : nothing
+            }
+        </div>
+        ${(view.name === null && view.threshold === null) || view.row.length === 0 ? nothing : Row(view)}`;
 
 export class HksGate extends HTMLElement {
     readonly changes$: Observable<GateChange>;

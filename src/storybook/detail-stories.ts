@@ -2,10 +2,10 @@ import { EMPTY, from, merge, of, type Observable } from 'rxjs';
 import { HksImageView } from '../components/image-view/image-view.component.ts';
 import { HksPedal } from '../components/pedal/pedal.component.ts';
 import { HksGate } from '../components/gate/gate.component.ts';
-import type { GateView } from '../components/gate/gate.ts';
+import { gateView } from '../components/gate/gate.ts';
 import { HksBox } from '../components/box/box.component.ts';
 import type { BoxView } from '../components/box/box.ts';
-import { GATE_DEFAULTS, GATES, reduceGate, type Bit } from '../gates.ts';
+import { GATE_DEFAULTS, reduceGate, type Bit } from '../gates.ts';
 import { circuitTable } from '../circuit.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
 import { defaultPedal, PEDALS, reducePedal, valueOf } from '../pedals.ts';
@@ -207,23 +207,15 @@ export const detailStories: readonly Story[] = [
             const view$ = element.changes$.pipe(
                 scan(reduceGate, GATE_DEFAULTS[kind]),
                 startWith(GATE_DEFAULTS[kind]),
-                map((gate): GateView => {
-                    const row =
+                map(gate =>
+                    gateView(
+                        kind,
+                        gate,
                         circuitTable(new Map([['gate', gate]]), 16).get('gate') ??
-                        new Uint8Array(16);
-
-                    return {
-                        icon: GATES[kind].icon,
-                        summary: GATES[kind].summary,
-                        bit: row[5] === 1 ? 1 : 0,
-                        tick: 5,
-                        row: [...row].map((bit): Bit => (bit === 1 ? 1 : 0)),
-                        toggle: kind === 'switch',
-                        steps: kind === 'pattern' ? gate.steps : null,
-                        threshold: kind === 'compare' ? gate.threshold : null,
-                        name: kind === 'pin-out' ? gate.name : null,
-                    };
-                }),
+                            new Uint8Array(16),
+                        5,
+                    ),
+                ),
             );
 
             return {

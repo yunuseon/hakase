@@ -129,6 +129,7 @@ describe('components', () => {
 
         expect(before).toEqual([1, 1, 1, 1]);
         expect(box?.program).toBe('box');
+        expect(box?.follows).toEqual({});
         expect(windows(present)).not.toContain(nand.id);
         expect(present.boxes.get(box?.store ?? '')).toMatchObject({
             inputs: [pinIn.store],

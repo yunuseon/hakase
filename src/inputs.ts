@@ -152,7 +152,6 @@ export const GATE_SOURCES = [
     gateSource('lamp'),
     gateSource('pin-in'),
     gateSource('pin-out'),
-    gateSource('const'),
 ] as const;
 
 export const SOURCES = [
@@ -200,6 +199,11 @@ export const playbackInput = {
     group: null,
     sources: [playbackSource],
     initial: { kind: 'playback', store: 'timeline' },
+} as const satisfies FollowedInput;
+
+export const loosePlaybackInput = {
+    ...playbackInput,
+    initial: null,
 } as const satisfies FollowedInput;
 
 export const progressInput = {
@@ -480,7 +484,6 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
-        case 'const':
             return kind;
     }
 };
@@ -495,9 +498,11 @@ export const progressBinding = (kind: string, store: StoreId) => {
             return { kind, store };
         case 'tickets':
             return { kind, store };
-        // Saved before to-do lists grew into tickets.
+        // Saved under programs since folded into others.
         case 'todo':
             return { kind: 'tickets' as const, store };
+        case 'const':
+            return { kind: 'switch' as const, store };
         case 'signal':
             return { kind, store };
         case 'paint':
@@ -524,7 +529,6 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
-        case 'const':
             return { kind, store };
         default:
             return null;

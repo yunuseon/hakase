@@ -5,7 +5,7 @@ import type { Pin } from '../boxes.ts';
 import { HksBox } from '../components/box/box.component.ts';
 import type { BoxView, PinView } from '../components/box/box.ts';
 import type { Bit } from '../gates.ts';
-import { playbackInput } from '../inputs.ts';
+import { loosePlaybackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 const pinView =
@@ -19,7 +19,7 @@ const pinView =
 
 export const boxProgram = {
     id: 'box',
-    inputs: { playback: playbackInput },
+    inputs: { playback: loosePlaybackInput },
     title: 'component',
     category: 'logic',
     icon: 'M4 6h16v12H4zM2 10h2M2 14h2M20 12h2M8 10h8M8 14h5',

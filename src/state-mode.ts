@@ -107,6 +107,7 @@ export const modeOf = ({ pinned, held, locks }: ModeSession) => ({
 
 const SOCKET_WIDTH = 180;
 const INDENT = 14;
+const EDGE_WIDTH = 120;
 
 type Row =
     | { readonly kind: 'input'; readonly name: string; readonly group: string | null }
@@ -154,149 +155,8 @@ export const wiringOf = (
     const laid = processes.map(process => {
         const frame = boxOf(process);
         const inputs = inputsFor(process.program);
-        const width = Math.min(SOCKET_WIDTH * unit, frame.width - 16 * unit);
-        const rowAt = (row: number) =>
-            frame.y + (touch ? 56 : 40) * unit + row * (rowHeight + 2 * unit);
-        const output: Socket[] =
-            HOLDING[process.program] === null || process.program === 'box'
-                ? []
-                : [
-                      {
-                          key: `${process.id}:output`,
-                          window: process.id,
-                          x: frame.x + frame.width - width - 8 * unit,
-                          y: rowAt(0),
-                          width,
-                          menu: menuFor(frame.y, frame.height, rowAt(0), unit, rowHeight),
-                          title: 'Output',
-                          colour: colourOf(process.store),
-                          end: {
-                              kind: 'store',
-                              id: process.store,
-                              program: process.program,
-                              feeds:
-                                  SOURCES.find(source => source.program === process.program)
-                                      ?.kind ?? null,
-                          },
-                          receiver: {
-                              kind: 'own',
-                              window: process.id,
-                              program: process.program,
-                              store: process.store,
-                          },
-                          current: process.store,
-                          optional: false,
-                          options: withMain(process.program, stores).map(store => ({
-                              ...store,
-                              colour: colourOf(store.id),
-                              source: '',
-                          })),
-                          group: null,
-                          hidden: false,
-                      },
-                  ];
-        const inputSocket = (
-            name: string,
-            group: string | null,
-            at: { x: number; y: number },
-            choices: ReturnType<typeof inputGroups>,
-            inputs: ReturnType<InputsFor>,
-            store: string,
-            key: string,
-            label?: string,
-        ) => {
-            const options = choices.filter(choice => choice.input === name);
-            const definition = definitionOf(inputs, name);
-            const onStore = definition?.from === 'store';
-            const current = options
-                .flatMap(choice => choice.options)
-                .find(option => option.current);
-            const indent = group === null ? 0 : INDENT * unit;
-
-            return {
-                key: `${process.id}:input:${key}`,
-                window: process.id,
-                x: at.x + indent,
-                y: at.y,
-                width: width - indent,
-                menu: menuFor(frame.y, frame.height, at.y, unit, rowHeight),
-                title: label ?? options[0]?.label ?? name,
-                colour: current?.colour ?? 'var(--muted)',
-                end: {
-                    kind: 'port',
-                    owner: onStore ? 'store' : 'window',
-                    sink: onStore ? store : process.id,
-                    input: definition?.from === 'store' ? definition.param : name,
-                    accepts: options.map(choice => choice.source),
-                    cuttable: options[0]?.optional === true,
-                },
-                receiver: null,
-                current: current?.id ?? '',
-                optional: options[0]?.optional === true,
-                options: options.flatMap(choice =>
-                    choice.options.map(option => ({
-                        ...option,
-                        name: options.length > 1 ? `${choice.title} · ${option.name}` : option.name,
-                        source: choice.source,
-                    })),
-                ),
-                group,
-                hidden: false,
-            } satisfies Socket;
-        };
-        const nameOf = (id: string) =>
-            pinNames.get(id) || (stores.find(entry => entry.id === id)?.name ?? id);
-        const pinSockets = ({ inputs: pinsIn, outputs: pinsOut }: Box, first: number): Socket[] => [
-            ...pinsIn.flatMap((pin, index) => {
-                const row = first + index;
-                const draft: Draft = { ...process, program: 'pin-in', store: pin };
-
-                if (!ownsInputs(inputsFor)(draft)) {
-                    return [];
-                }
-
-                const pinInputs = inputsFor('pin-in');
-                const choices = inputGroups(draft, pinInputs, processes, stores, signals, loops);
-
-                return [
-                    inputSocket(
-                        'in',
-                        null,
-                        { x: frame.x + 8 * unit, y: rowAt(row) },
-                        choices,
-                        pinInputs,
-                        pin,
-                        pin,
-                        nameOf(pin),
-                    ),
-                ];
-            }),
-            ...pinsOut.map((pin, index): Socket => ({
-                key: `${process.id}:output:${pin}`,
-                window: process.id,
-                x: frame.x + frame.width - width - 8 * unit,
-                y: rowAt(first + pinsIn.length + index),
-                width,
-                menu: menuFor(
-                    frame.y,
-                    frame.height,
-                    rowAt(first + pinsIn.length + index),
-                    unit,
-                    rowHeight,
-                ),
-                title: nameOf(pin),
-                colour: colourOf(pin),
-                end: { kind: 'store', id: pin, program: 'pin-out', feeds: 'pin-out' },
-                receiver: null,
-                current: pin,
-                optional: false,
-                options: [{ id: pin, name: nameOf(pin), colour: colourOf(pin), source: '' }],
-                group: null,
-                hidden: false,
-            })),
-        ];
         const box = process.program === 'box' ? boxes.get(process.store) : undefined;
-
+        const owned = HOLDING[process.program] !== null && process.program !== 'box';
         const choices = inputGroups(process, inputs, processes, stores, signals, loops);
         const names = [...new Set(choices.map(group => group.input))];
         const groupOf = (name: string) => {
@@ -329,13 +189,167 @@ export const wiringOf = (
                           : []),
                   ];
         });
-        const rowOf = (index: number) => output.length + index;
+        const ins = rows.length + (box?.inputs.length ?? 0);
+        const outs = (owned ? 1 : 0) + (box?.outputs.length ?? 0);
+        const pitch = rowHeight + 2 * unit;
+        const clearance = (touch ? 56 : 40) * unit;
+        const inside =
+            clearance + (ins + outs) * pitch + 8 * unit <= frame.height &&
+            frame.width - 16 * unit >= EDGE_WIDTH * unit;
+        const width = inside
+            ? Math.min(SOCKET_WIDTH * unit, frame.width - 16 * unit)
+            : EDGE_WIDTH * unit;
+        const rowAt = (row: number) => frame.y + clearance + row * pitch;
+        const column = (index: number, count: number) =>
+            frame.y + frame.height / 2 - (count * pitch - 2 * unit) / 2 + index * pitch;
+        const menuAt = (y: number) =>
+            inside
+                ? menuFor(frame.y, frame.height, y, unit, rowHeight)
+                : { above: false, height: 160 * unit };
+        const inputAt = (index: number) =>
+            inside
+                ? { x: frame.x + 8 * unit, y: rowAt((owned ? 1 : 0) + index) }
+                : { x: frame.x - 10 * unit, y: column(index, ins) };
+        const outputAt = (index: number) =>
+            inside
+                ? {
+                      x: frame.x + frame.width - width - 8 * unit,
+                      y: rowAt(owned && index === 0 ? 0 : ins + index),
+                  }
+                : { x: frame.x + frame.width + 10 * unit - width, y: column(index, outs) };
+        const output: Socket[] = !owned
+            ? []
+            : [
+                  {
+                      key: `${process.id}:output`,
+                      window: process.id,
+                      ...outputAt(0),
+                      width,
+                      menu: menuAt(outputAt(0).y),
+                      title: 'Output',
+                      colour: colourOf(process.store),
+                      end: {
+                          kind: 'store',
+                          id: process.store,
+                          program: process.program,
+                          feeds:
+                              SOURCES.find(source => source.program === process.program)?.kind ??
+                              null,
+                      },
+                      receiver: {
+                          kind: 'own',
+                          window: process.id,
+                          program: process.program,
+                          store: process.store,
+                      },
+                      current: process.store,
+                      optional: false,
+                      options: withMain(process.program, stores).map(store => ({
+                          ...store,
+                          colour: colourOf(store.id),
+                          source: '',
+                      })),
+                      group: null,
+                      hidden: false,
+                  },
+              ];
+        const inputSocket = (
+            name: string,
+            group: string | null,
+            at: { x: number; y: number },
+            choices: ReturnType<typeof inputGroups>,
+            inputs: ReturnType<InputsFor>,
+            store: string,
+            key: string,
+            label?: string,
+        ) => {
+            const options = choices.filter(choice => choice.input === name);
+            const definition = definitionOf(inputs, name);
+            const onStore = definition?.from === 'store';
+            const current = options
+                .flatMap(choice => choice.options)
+                .find(option => option.current);
+            const indent = group === null ? 0 : INDENT * unit;
 
+            return {
+                key: `${process.id}:input:${key}`,
+                window: process.id,
+                x: at.x + indent,
+                y: at.y,
+                width: width - indent,
+                menu: menuAt(at.y),
+                title: label ?? options[0]?.label ?? name,
+                colour: current?.colour ?? 'var(--muted)',
+                end: {
+                    kind: 'port',
+                    owner: onStore ? 'store' : 'window',
+                    sink: onStore ? store : process.id,
+                    input: definition?.from === 'store' ? definition.param : name,
+                    accepts: options.map(choice => choice.source),
+                    cuttable: options[0]?.optional === true,
+                },
+                receiver: null,
+                current: current?.id ?? '',
+                optional: options[0]?.optional === true,
+                options: options.flatMap(choice =>
+                    choice.options.map(option => ({
+                        ...option,
+                        name: options.length > 1 ? `${choice.title} · ${option.name}` : option.name,
+                        source: choice.source,
+                    })),
+                ),
+                group,
+                hidden: false,
+            } satisfies Socket;
+        };
+        const nameOf = (id: string) =>
+            pinNames.get(id) || (stores.find(entry => entry.id === id)?.name ?? id);
+        const pinSockets = ({ inputs: pinsIn, outputs: pinsOut }: Box): Socket[] => [
+            ...pinsIn.flatMap((pin, index) => {
+                const draft: Draft = { ...process, program: 'pin-in', store: pin };
+
+                if (!ownsInputs(inputsFor)(draft)) {
+                    return [];
+                }
+
+                const pinInputs = inputsFor('pin-in');
+                const choices = inputGroups(draft, pinInputs, processes, stores, signals, loops);
+
+                return [
+                    inputSocket(
+                        'in',
+                        null,
+                        inputAt(rows.length + index),
+                        choices,
+                        pinInputs,
+                        pin,
+                        pin,
+                        nameOf(pin),
+                    ),
+                ];
+            }),
+            ...pinsOut.map((pin, index): Socket => ({
+                key: `${process.id}:output:${pin}`,
+                window: process.id,
+                ...outputAt(output.length + index),
+                width,
+                menu: menuAt(outputAt(output.length + index).y),
+                title: nameOf(pin),
+                colour: colourOf(pin),
+                end: { kind: 'store', id: pin, program: 'pin-out', feeds: 'pin-out' },
+                receiver: null,
+                current: pin,
+                optional: false,
+                options: [{ id: pin, name: nameOf(pin), colour: colourOf(pin), source: '' }],
+                group: null,
+                hidden: false,
+            })),
+        ];
         const socketOf = (name: string, group: string | null, at: { x: number; y: number }) =>
             inputSocket(name, group, at, choices, inputs, process.store, name);
 
         const placed = rows.map((row, index) => {
-            const at = { x: frame.x + 8 * unit, y: rowAt(rowOf(index)) };
+            const at = inputAt(index);
 
             if (row.kind === 'input') {
                 return { sockets: [socketOf(row.name, row.group, at)], groups: [] };
@@ -379,7 +393,7 @@ export const wiringOf = (
             sockets: [
                 ...output,
                 ...placed.flatMap(entry => entry.sockets),
-                ...(box === undefined ? [] : pinSockets(box, rowOf(rows.length))),
+                ...(box === undefined ? [] : pinSockets(box)),
             ],
             groups: placed.flatMap(entry => entry.groups),
         };

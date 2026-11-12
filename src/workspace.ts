@@ -1107,6 +1107,7 @@ const RENAMED: Readonly<Record<string, ProgramId>> = {
     pieces: 'blueprints',
     todo: 'tickets',
     board: 'tickets',
+    const: 'switch',
 };
 
 const renamed = (program: string): string =>
