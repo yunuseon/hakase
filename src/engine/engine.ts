@@ -32,6 +32,9 @@ import {
 } from '../image.ts';
 import { PEDALS, type PedalKind } from '../pedals.ts';
 import type { Size } from '../components/window/frame.ts';
+import type { Rgb } from '../lib/color.ts';
+import { createInkPass, inked, loadStroke, type InkPass } from '../shared/gl/ink.ts';
+import { dabCount, type Stroke } from '../shared/stroke.ts';
 import { createProgram } from '../shared/gl/program.ts';
 import blur from './shaders/blur.frag?raw';
 import colourmap from './shaders/colourmap.frag?raw';
@@ -40,6 +43,7 @@ import kaleido from './shaders/kaleido.frag?raw';
 import mix from './shaders/mix.frag?raw';
 import pass from './shaders/pass.vert?raw';
 import present from './shaders/present.frag?raw';
+import sheet from './shaders/sheet.frag?raw';
 import {
     createMultisampled,
     createTarget,
@@ -115,7 +119,9 @@ export type Engine = {
     readonly gl: WebGL2RenderingContext;
     readonly vao: WebGLVertexArrayObject;
     readonly blank: WebGLTexture;
-    readonly passes: Readonly<Record<PedalKind | 'present', Pass>>;
+    readonly passes: Readonly<Record<PedalKind | 'present' | 'sheet', Pass>>;
+    readonly ink: InkPass;
+    readonly sheets: Map<string, Sheet>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
     readonly checks: Map<string, FormulaCheck>;
@@ -128,13 +134,23 @@ const PREVIOUS_UNIT = 6;
 const KNOB_SLOTS = 8;
 const FORGET_MS = 3000;
 
-const FRAGMENTS: Readonly<Record<PedalKind | 'present', string>> = {
+type Sheet = {
+    readonly whole: Target;
+    readonly now: Target;
+    drawn: { readonly stroke: Stroke; readonly ink: Rgb } | null;
+    used: number;
+};
+
+export const SHEET_SIDE = 768;
+
+const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet', string>> = {
     colourmap,
     kaleido,
     feedback,
     mix,
     blur,
     present,
+    sheet,
 };
 
 const passOf = (gl: WebGL2RenderingContext, fragment: string): Pass => {
@@ -177,7 +193,10 @@ export const createEngine = (): Engine => {
             mix: passOf(gl, FRAGMENTS.mix),
             blur: passOf(gl, FRAGMENTS.blur),
             present: passOf(gl, FRAGMENTS.present),
+            sheet: passOf(gl, FRAGMENTS.sheet),
         },
+        ink: createInkPass(gl),
+        sheets: new Map(),
         sources: new Map(),
         entries: new Map(),
         checks: new Map(),
@@ -530,6 +549,13 @@ const forget = (engine: Engine, now: number): void => {
             engine.entries.delete(key);
         }
     });
+    engine.sheets.forEach((sheet, key) => {
+        if (now - sheet.used > FORGET_MS) {
+            releaseTarget(gl, sheet.whole);
+            releaseTarget(gl, sheet.now);
+            engine.sheets.delete(key);
+        }
+    });
     engine.sources.forEach((source, store) => {
         if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
             releaseSource(gl, source);
@@ -684,4 +710,76 @@ export const presented = (
     drawn(engine, texture, width, height);
 
     return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
+};
+
+const inkedInto = (engine: Engine, into: Target, stroke: Stroke, count: number, ink: Rgb): void => {
+    const { gl } = engine;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, into.framebuffer);
+    gl.viewport(0, 0, into.width, into.height);
+    gl.disable(gl.DEPTH_TEST);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    inked(engine.ink, stroke, count, {
+        side: SHEET_SIDE,
+        colour: [ink.r, ink.g, ink.b],
+        flip: -1,
+    });
+    gl.disable(gl.BLEND);
+};
+
+const sameRgb = (a: Rgb, b: Rgb): boolean => a.r === b.r && a.g === b.g && a.b === b.b;
+
+// A pen's sheet: its whole figure drawn once per stroke, the line so far on every count, laid on the paper here because the canvas is opaque.
+export const sheetOf = (
+    engine: Engine,
+    key: string,
+    stroke: Stroke,
+    count: number,
+    { ink, paper, faint }: { readonly ink: Rgb; readonly paper: Rgb; readonly faint: number },
+    now: number,
+): Promise<ImageBitmap> => {
+    const { gl } = engine;
+    const sheet = engine.sheets.get(key) ?? {
+        whole: createTarget(gl, SHEET_SIDE, SHEET_SIDE),
+        now: createTarget(gl, SHEET_SIDE, SHEET_SIDE),
+        drawn: null,
+        used: now,
+    };
+    engine.sheets.set(key, sheet);
+    sheet.used = now;
+
+    loadStroke(engine.ink, stroke);
+
+    if (sheet.drawn?.stroke !== stroke || !sameRgb(sheet.drawn.ink, ink)) {
+        inkedInto(engine, sheet.whole, stroke, dabCount(stroke), ink);
+        sheet.drawn = { stroke, ink };
+    }
+
+    inkedInto(engine, sheet.now, stroke, count, ink);
+
+    const shader = engine.passes.sheet;
+    grown(engine, SHEET_SIDE, SHEET_SIDE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, SHEET_SIDE, SHEET_SIDE);
+    gl.useProgram(shader.program);
+    bindInput(engine, 0, sheet.whole.texture);
+    bindInput(engine, 1, sheet.now.texture);
+    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
+    gl.uniform1i(shader.at('uIn1'), INPUT_UNIT + 1);
+    gl.uniform3f(shader.at('uPaper'), paper.r, paper.g, paper.b);
+    gl.uniform1f(shader.at('uFaint'), faint);
+    gl.bindVertexArray(engine.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    gl.activeTexture(gl.TEXTURE0);
+    forget(engine, now);
+
+    return createImageBitmap(
+        engine.canvas,
+        0,
+        engine.canvas.height - SHEET_SIDE,
+        SHEET_SIDE,
+        SHEET_SIDE,
+    );
 };

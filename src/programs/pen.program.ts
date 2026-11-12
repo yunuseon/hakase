@@ -1,9 +1,14 @@
-import { merge } from 'rxjs';
-import { ignoreElements, map, shareReplay } from 'rxjs/operators';
+import { combineLatest, merge } from 'rxjs';
+import { distinctUntilChanged, ignoreElements, map, shareReplay, switchMap } from 'rxjs/operators';
+import { sheet$ } from '../engine/view.ts';
+import { parseHexColor } from '../lib/color.ts';
+import { dabsAt } from '../shared/stroke.ts';
 import { HksPen } from '../components/pen/pen.component.ts';
 import { strokeOf } from '../components/pen/pen.ts';
 import { penInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
+
+const FAINT = 0.22;
 
 export const penProgram = {
     id: 'pen',
@@ -18,15 +23,47 @@ export const penProgram = {
 
         return {
             element: pen,
-            run$: ({ drawing$, playhead$ }) => {
+            run$: ({ drawing$, playhead$, look$, appearance$ }, { store$ }) => {
                 const shared$ = drawing$.pipe(shareReplay({ bufferSize: 1, refCount: true }));
                 const stroke$ = shared$.pipe(
                     map(strokeOf),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
+                const count$ = combineLatest([stroke$, playhead$]).pipe(
+                    map(([stroke, t]) => dabsAt(stroke, t)),
+                    distinctUntilChanged(),
+                );
+                const colours$ = look$.pipe(
+                    switchMap(name => appearance$(name)),
+                    map(({ value }) => ({
+                        ink: parseHexColor(value.ink),
+                        paper: parseHexColor(value.well),
+                        faint: FAINT,
+                    })),
+                    distinctUntilChanged(
+                        (a, b) =>
+                            a.ink.r === b.ink.r &&
+                            a.ink.g === b.ink.g &&
+                            a.ink.b === b.ink.b &&
+                            a.paper.r === b.paper.r &&
+                            a.paper.g === b.paper.g &&
+                            a.paper.b === b.paper.b,
+                    ),
+                );
 
                 return merge(
-                    pen.connect$(shared$, stroke$, playhead$).pipe(ignoreElements()),
+                    pen
+                        .connect$(
+                            shared$,
+                            sheet$(
+                                store$.pipe(map(store => `pen:${store}`)),
+                                stroke$,
+                                count$,
+                                colours$,
+                            ),
+                            playhead$,
+                        )
+                        .pipe(ignoreElements()),
                     pen.changes$.pipe(map((command): AppInput => ({ kind: 'pen', command }))),
                 );
             },

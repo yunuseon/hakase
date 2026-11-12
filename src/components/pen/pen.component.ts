@@ -7,13 +7,10 @@ import { SymmetryIcon } from '../../shared/brush-icon.component.ts';
 
 import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
-import { parseHexColor } from '../../lib/color.ts';
+import { map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { guidesOf, isSymmetry, SYMMETRIES } from '../../shared/brush.ts';
-import { createInkPass, inked, loadStroke, type InkPass } from '../../shared/gl/ink.ts';
-import { dabCount, dabsAt, type Stroke } from '../../shared/stroke.ts';
 import {
     isMode,
     MAX_WEIGHT,
@@ -26,7 +23,6 @@ import {
 import css from './pen.css?inline';
 
 const sheet = styleSheet(css);
-const SHEET = 768;
 
 const TEMPLATE = () =>
     html`<div class="bar">
@@ -76,8 +72,7 @@ const TEMPLATE = () =>
         </div>
         <div class="stage">
             <div class="sheet">
-                <canvas class="whole" width=${ifDefined(SHEET)} height=${ifDefined(SHEET)}></canvas
-                ><canvas class="ink" width=${ifDefined(SHEET)} height=${ifDefined(SHEET)}></canvas
+                <canvas class="ink"></canvas
                 ><svg
                     class="guides"
                     viewBox="0 0 100 100"
@@ -99,26 +94,10 @@ const dataOf = (target: EventTarget | null, name: string) =>
         ? (target.closest(`[data-${name}]`)?.getAttribute(`data-${name}`) ?? null)
         : null;
 
-const rgbOf = (hex: string): readonly [number, number, number] => {
-    const { r, g, b } = parseHexColor(hex);
-
-    return [r, g, b];
-};
-
-const drawn = (pass: InkPass, stroke: Stroke, count: number, colour: string) => {
-    const { gl } = pass;
-
-    gl.viewport(0, 0, SHEET, SHEET);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    inked(pass, stroke, count, { side: SHEET, colour: rgbOf(colour), flip: -1 });
-};
-
 export class HksPen extends HTMLElement {
     readonly changes$: Observable<PenCommand>;
 
     private readonly shadow: ShadowRoot;
-    private readonly pass: InkPass;
 
     private readonly rendering: Rendering;
 
@@ -141,15 +120,6 @@ export class HksPen extends HTMLElement {
                     path => svg`<path d=${ifDefined(path)}></path>`,
                 ),
         );
-
-        const gl = requireElement(shadow, '.ink', HTMLCanvasElement).getContext('webgl2', {
-            premultipliedAlpha: true,
-            antialias: false,
-        });
-        if (!(gl instanceof WebGL2RenderingContext)) {
-            throw new Error('This browser does not support WebGL2');
-        }
-        this.pass = createInkPass(gl);
 
         // From the host, as what was really clicked: inside a shadow root the event is retargeted to it.
         const picked$ = fromElementEvent$(this, 'click').pipe(
@@ -179,17 +149,13 @@ export class HksPen extends HTMLElement {
 
     connect$(
         drawing$: Observable<Drawing>,
-        stroke$: Observable<Stroke>,
+        sheet$: Observable<ImageBitmap>,
         t$: Observable<number>,
     ): Observable<void> {
         const shadow = this.shadow;
-        const whole = requireElement(shadow, '.whole', HTMLCanvasElement);
-        const ink = requireElement(shadow, '.ink', HTMLCanvasElement);
-        const pass = this.pass;
+        const ink = requireElement(shadow, '.ink', HTMLCanvasElement).getContext('bitmaprenderer');
         const tip = requireChild(shadow, '.tip');
         const hint = requireChild(shadow, '.hint');
-        const colour = (token: string) =>
-            getComputedStyle(this).getPropertyValue(token).trim() || '#000000';
 
         const checked = (name: string, value: string) => {
             for (const button of shadow.querySelectorAll(`[data-${name}]`)) {
@@ -218,21 +184,9 @@ export class HksPen extends HTMLElement {
             }),
         );
 
-        // Drawn whole once per stroke and copied out at once, before the live drawing replaces it.
-        const figure$ = stroke$.pipe(
-            tap(stroke => {
-                loadStroke(pass, stroke);
-                drawn(pass, stroke, dabCount(stroke), colour('--ink'));
-                whole.getContext('2d')?.clearRect(0, 0, SHEET, SHEET);
-                whole.getContext('2d')?.drawImage(ink, 0, 0);
-            }),
-        );
-
-        const now$ = combineLatest([stroke$, t$]).pipe(
-            map(([stroke, t]) => ({ stroke, count: dabsAt(stroke, t) })),
-            distinctUntilChanged((a, b) => a.stroke === b.stroke && a.count === b.count),
-            tap(({ stroke, count }) => {
-                drawn(pass, stroke, count, colour('--ink'));
+        const shown$ = sheet$.pipe(
+            tap(bitmap => {
+                ink?.transferFromImageBitmap(bitmap);
             }),
         );
 
@@ -248,7 +202,7 @@ export class HksPen extends HTMLElement {
             this.rendering.lifetime$,
             connectChoices$(this.shadow),
             this.guideView.lifetime$,
-            merge(controls$, figure$, now$, tip$).pipe(map(() => undefined)),
+            merge(controls$, shown$, tip$).pipe(map(() => undefined)),
         );
     }
 }

@@ -70,10 +70,6 @@
     block-size: 100%;
 }
 
-.whole {
-    opacity: 0.22;
-}
-
 .guides {
     position: absolute;
     inset: 0;

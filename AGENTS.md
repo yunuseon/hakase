@@ -1610,10 +1610,12 @@ line. Two readers share the pass, which is why it and `program.ts` live in
   touches — framebuffer, viewport, scissor, depth, blend, clear colour, program —
   because a simulation step or a strip tile may be mid-way through its own. The
   formula still reads `paint(x, y)`; it never learns which kind fed it.
-- **The window** draws it onto a WebGL canvas flipped for the screen, the
-  whole figure once per stroke, copied straight onto a 2D canvas shown faintly
-  beneath (a WebGL canvas without `preserveDrawingBuffer` must be copied in the
-  same task), then the part drawn so far on every playhead change.
+- **The window** shows a sheet the engine draws (`sheetOf`, `sheet$`): the
+  whole figure into a transparent layer once per stroke, the part drawn so far
+  into another on every count, both laid onto the paper by `sheet.frag`, because
+  the engine's canvas is opaque. The colours are the appearance's `ink` and
+  `well`, read from app state as data rather than from CSS at draw time; the
+  guides and the tip stay in the DOM above it.
 
 ## Voice
 
@@ -3080,8 +3082,9 @@ from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
 
 The other limit is the browser's: a page keeps at most **16 WebGL contexts**
 and silently loses the oldest past that (measured). That is why sketch windows
-and their strips draw through the one engine. What still holds a context of its
-own: a pen window, and an export while it runs. **The engine recovers from a lost context**: `engine$`
+and their strips, and pen windows, draw through the one engine: it is the only
+`getContext('webgl2')` in the app, and an export makes a second one only while
+it runs. **The engine recovers from a lost context**: `engine$`
 completes when its canvas reports the loss and `repeat` makes a fresh one, and
 because every picture is a recipe and time is replayed, every window simply
 draws again, simulations included. Forcing the loss with sixteen throwaway

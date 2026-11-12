@@ -1,15 +1,18 @@
 import {
     animationFrameScheduler,
     combineLatest,
+    EMPTY,
     from,
     Observable,
     type ObservableInput,
 } from 'rxjs';
 import { auditTime, concatMap, map, repeat, shareReplay, switchMap } from 'rxjs/operators';
 import type { Image } from '../image.ts';
+import type { Stroke } from '../shared/stroke.ts';
 import {
     checkFormula,
     cook,
+    sheetOf,
     createEngine,
     presented,
     releaseEngine,
@@ -86,5 +89,26 @@ export const checked$ = (text$: Observable<string>): Observable<FormulaCheck> =>
             engine instanceof Error
                 ? from([{ ok: false, message: engine.message } as const])
                 : text$.pipe(map(text => checkFormula(engine, text))),
+        ),
+    );
+
+export type SheetColours = Parameters<typeof sheetOf>[4];
+
+export const sheet$ = (
+    key$: Observable<string>,
+    stroke$: Observable<Stroke>,
+    count$: Observable<number>,
+    colours$: Observable<SheetColours>,
+): Observable<ImageBitmap> =>
+    engine$.pipe(
+        switchMap(engine =>
+            engine instanceof Error
+                ? EMPTY
+                : combineLatest([key$, stroke$, count$, colours$]).pipe(
+                      auditTime(0, animationFrameScheduler),
+                      concatMap(([key, stroke, count, colours]) =>
+                          from(sheetOf(engine, key, stroke, count, colours, performance.now())),
+                      ),
+                  ),
         ),
     );
