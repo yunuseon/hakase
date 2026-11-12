@@ -4,23 +4,12 @@ import { fitted, supersampleFor, type StripLayout } from '../components/sketch/a
 import { evolves } from '../components/sketch/gl/sketch-program.ts';
 import { centre } from '../components/sketch/params.ts';
 import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
-import { buildRamp } from '../components/sketch/theme.ts';
 import type { Size } from '../components/window/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
-import { cook, filmed, filmFor, framedIn } from './engine.ts';
+import { backdropOf, cook, filmed, filmFor, framedIn } from './engine.ts';
 import { engine$ } from './view.ts';
 
 const SETTLE_MS = 250;
-
-const backdropOf = (image: Image): readonly [number, number, number] => {
-    if (image.kind !== 'points') {
-        return [0, 0, 0];
-    }
-
-    const ramp = buildRamp(image.theme);
-
-    return [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255];
-};
 
 const replays = (image: Image): boolean =>
     stagesOf(image).some(stage => stage.kind === 'points' && evolves(stage.source));
@@ -107,7 +96,7 @@ export const filmstrip$ = (
                             const t =
                                 Math.min(index * geometry.perTile, geometry.frames - 1) /
                                 geometry.frames;
-                            const texture = cook(
+                            const picture = cook(
                                 engine,
                                 image,
                                 {
@@ -126,9 +115,8 @@ export const filmstrip$ = (
                             framedIn(
                                 engine,
                                 film,
-                                texture,
+                                picture,
                                 { x: at * slot.width, ...slot },
-                                box,
                                 backdrop,
                             );
                         },

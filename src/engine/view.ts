@@ -10,6 +10,7 @@ import { auditTime, concatMap, map, repeat, shareReplay, switchMap } from 'rxjs/
 import type { Image } from '../image.ts';
 import type { Stroke } from '../shared/stroke.ts';
 import {
+    backdropOf,
     checkFormula,
     cook,
     sheetOf,
@@ -57,9 +58,9 @@ const failed = (error: unknown): View => ({
 
 const framed = (engine: Engine, image: Image, moment: Moment): ObservableInput<View> => {
     try {
-        const texture = cook(engine, image, moment, performance.now());
+        const picture = cook(engine, image, moment, performance.now());
 
-        return presented(engine, texture, moment.width, moment.height)
+        return presented(engine, picture, moment.width, moment.height, backdropOf(image))
             .then((bitmap): View => ({ kind: 'frame', bitmap }))
             .catch(failed);
     } catch (error) {

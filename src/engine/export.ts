@@ -43,7 +43,7 @@ const frameAt = (
     t: number,
     pass: number,
 ) => {
-    const texture = cook(
+    const picture = cook(
         engine,
         image,
         {
@@ -58,7 +58,7 @@ const frameAt = (
         },
         performance.now(),
     );
-    drawn(engine, texture, pixels.width, pixels.height);
+    drawn(engine, picture?.texture ?? null, pixels.width, pixels.height);
 };
 
 export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {

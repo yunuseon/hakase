@@ -1,3 +1,4 @@
+import { fitted } from '../components/sketch/animation.ts';
 import { evolutionTo, stepAt, type Evolved } from '../components/sketch/evolution.ts';
 import { panelParams, samePointer, type Pointer } from '../components/sketch/params.ts';
 import {
@@ -106,6 +107,19 @@ type Cooked = {
     readonly dotScale: number;
 };
 
+type Claim = {
+    readonly width: number;
+    readonly height: number;
+    readonly rank: number;
+    used: number;
+};
+
+export type Picture = {
+    readonly texture: WebGLTexture;
+    readonly width: number;
+    readonly height: number;
+};
+
 type Entry = {
     output: Target;
     readonly samples: Multisampled | null;
@@ -126,6 +140,7 @@ export type Engine = {
     readonly films: Map<'strip', Film>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
+    readonly claims: Map<string, Map<string, Claim>>;
     readonly checks: Map<string, FormulaCheck>;
 };
 
@@ -206,6 +221,7 @@ export const createEngine = (): Engine => {
         films: new Map(),
         sources: new Map(),
         entries: new Map(),
+        claims: new Map(),
         checks: new Map(),
     };
 };
@@ -563,6 +579,16 @@ const forget = (engine: Engine, now: number): void => {
             engine.sheets.delete(key);
         }
     });
+    engine.claims.forEach((claims, key) => {
+        claims.forEach((claim, size) => {
+            if (now - claim.used > FORGET_MS) {
+                claims.delete(size);
+            }
+        });
+        if (claims.size === 0) {
+            engine.claims.delete(key);
+        }
+    });
     engine.films.forEach((film, key) => {
         if (now - film.used > FORGET_MS) {
             releaseTarget(gl, film.target);
@@ -580,14 +606,35 @@ const forget = (engine: Engine, now: number): void => {
 const sameFrame = (a: Size | null, b: Size | null): boolean =>
     a === null || b === null ? a === b : a.width === b.width && a.height === b.height;
 
-export const cook = (
-    engine: Engine,
-    image: Image,
-    moment: Moment,
-    now: number,
-): WebGLTexture | null => {
-    const drawn = stagesOf(image).reduce((textures, stage) => {
-        const entry = entryOf(engine, stage, moment);
+// The longest chain asking for a stage decides its size, the larger picture breaking a tie, so a chain is drawn once a frame at the shape of its end.
+const claimed = (engine: Engine, key: string, rank: number, moment: Moment, now: number): Size => {
+    const claims = engine.claims.get(key) ?? new Map<string, Claim>();
+    claims.set(`${moment.width}x${moment.height}#${rank}`, {
+        width: moment.width,
+        height: moment.height,
+        rank,
+        used: now,
+    });
+    engine.claims.set(key, claims);
+
+    return [...claims.values()].reduce((best, claim) =>
+        claim.rank > best.rank ||
+        (claim.rank === best.rank && claim.width * claim.height > best.width * best.height)
+            ? claim
+            : best,
+    );
+};
+
+export const cook = (engine: Engine, image: Image, moment: Moment, now: number): Picture | null => {
+    const stages = stagesOf(image);
+    const drawn = stages.reduce((pictures, stage) => {
+        // A sketch's own window frames it at its own size, a picture no chain shares.
+        const { width, height } =
+            moment.frame === null
+                ? claimed(engine, keyOf(stage.store, moment.lane), stages.length, moment, now)
+                : moment;
+        const sized = { ...moment, width, height };
+        const entry = entryOf(engine, stage, sized);
         const fresh =
             entry.cooked !== null &&
             entry.cooked.t === moment.t &&
@@ -599,16 +646,16 @@ export const cook = (
 
         if (!fresh) {
             if (stage.kind === 'points') {
-                drawPoints(engine, entry, stage, moment);
+                drawPoints(engine, entry, stage, sized);
             } else {
                 drawPedal(
                     engine,
                     entry,
                     stage,
                     stage.inputs.map(input =>
-                        input.kind === 'none' ? null : (textures.get(input.store) ?? null),
+                        input.kind === 'none' ? null : (pictures.get(input.store)?.texture ?? null),
                     ),
-                    moment,
+                    sized,
                 );
             }
             entry.cooked = {
@@ -623,8 +670,12 @@ export const cook = (
 
         entry.used = now;
 
-        return new Map(textures).set(stage.store, entry.output.texture);
-    }, new Map<string, WebGLTexture>());
+        return new Map(pictures).set(stage.store, {
+            texture: entry.output.texture,
+            width,
+            height,
+        });
+    }, new Map<string, Picture>());
 
     forget(engine, now);
 
@@ -708,28 +759,40 @@ export const drawn = (
 };
 
 // A tile's slot takes the picture's backdrop, then the picture fitted inside it, the way the window frames it.
+export const backdropOf = (image: Image): readonly [number, number, number] => {
+    if (image.kind !== 'points') {
+        return [0, 0, 0];
+    }
+
+    const ramp = buildRamp(image.theme);
+
+    return [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255];
+};
+
+// The picture fitted into its slot, the backdrop around it: a stage drawn at its chain's shape need not be the slot's.
 export const framedIn = (
     engine: Engine,
-    film: Target,
-    texture: WebGLTexture | null,
+    into: Target | null,
+    picture: Picture | null,
     slot: { readonly x: number; readonly width: number; readonly height: number },
-    box: {
-        readonly x: number;
-        readonly y: number;
-        readonly width: number;
-        readonly height: number;
-    },
     backdrop: readonly [number, number, number],
 ): void => {
     const { gl } = engine;
+    const box =
+        picture === null
+            ? { x: 0, y: 0, width: slot.width, height: slot.height }
+            : fitted(slot, picture);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, film.framebuffer);
+    if (into === null) {
+        grown(engine, slot.x + slot.width, slot.height);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, into?.framebuffer ?? null);
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(slot.x, 0, slot.width, slot.height);
     gl.clearColor(...backdrop, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.SCISSOR_TEST);
-    drawn(engine, texture, box.width, box.height, slot.x + box.x, box.y, film);
+    drawn(engine, picture?.texture ?? null, box.width, box.height, slot.x + box.x, box.y, into);
 };
 
 // The film's bottom rows, averaged factor x factor into the canvas at the strip's own size.
@@ -762,11 +825,12 @@ export const filmed = (
 
 export const presented = (
     engine: Engine,
-    texture: WebGLTexture | null,
+    picture: Picture | null,
     width: number,
     height: number,
+    backdrop: readonly [number, number, number],
 ): Promise<ImageBitmap> => {
-    drawn(engine, texture, width, height);
+    framedIn(engine, null, picture, { x: 0, width, height }, backdrop);
 
     return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
 };

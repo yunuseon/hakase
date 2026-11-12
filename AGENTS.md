@@ -1830,9 +1830,19 @@ warm-up's pictures. Its frame strip is the sketch's own `HksFrameStrip` and
 strip maths, with tiles cooked by the shared engine (`engine/thumbnails.ts`): a
 tile is one more size, drawn at an offset into the engine's canvas and averaged
 down in one `createImageBitmap`, and a tile whose recipe and moment are
-unchanged comes from the cache. Sharing is **per size**: two windows of exactly
-one size share every stage, two of different sizes cook the chain twice, which
-a common render size per chain could avoid if it is ever measured to matter. The **Pedalboard**
+unchanged comes from the cache.
+
+**A chain is drawn once a frame, at the shape of its end.** Each window used to
+cook its chain at its own size, so Light show drew its chain about three times a
+frame and played at 38 fps with 52 windows in view and the script idle; drawn
+once it holds 60. A request that frames by the reference side (a pedal, an
+Output, their strips) **claims** a size for every stage it reaches (`claimed`):
+the longest chain asking wins, the larger picture breaks a tie, and a claim
+lapses after three seconds unasked, so a resized window gives up its old size.
+A window showing a stage mid-chain gets the end's shape and `framedIn` fits it
+inside, with the backdrop around it, like a monitor; every window then agrees
+with what the Output exports. A sketch's own window frames by its own size and
+claims nothing, since no chain shares that picture. The **Pedalboard**
 starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
 **Light show** is the showcase, every pedal kind in one graph: a trefoil
