@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    DAY_SECONDS,
     DEFAULT_TICKS,
     initialClock,
     initialTransport,
@@ -7,6 +8,8 @@ import {
     reduceClocks,
     reduceTransport,
     restedClocks,
+    secondsOf,
+    timeOfDayLabel,
     type Transport,
 } from './playhead.ts';
 
@@ -154,5 +157,76 @@ describe('ticks per loop', () => {
                 ticks: 8,
             }).get('loop')?.ticks,
         ).toBe(8);
+    });
+});
+
+describe('a day clock', () => {
+    const day = reduceClocks(
+        new Map([
+            ['loop', { ...initialClock, at: 0.25 }],
+            ['day', { ...initialClock, playing: true }],
+        ]),
+        { kind: 'clock', store: 'day', command: { kind: 'day' } },
+    );
+
+    it('stops playing, takes the day as its loop, and keeps its own length for later', () => {
+        const clock = day.get('day') ?? initialClock;
+
+        expect(clock.day).toBe(true);
+        expect(clock.playing).toBe(false);
+        expect(secondsOf(clock)).toBe(DAY_SECONDS);
+        expect(clock.duration).toBe(initialClock.duration);
+    });
+
+    it('stands where the wall clock says, and moves no other clock', () => {
+        const next = reduceClocks(day, { kind: 'wall', at: 0.6 });
+
+        expect(next.get('day')?.at).toBe(0.6);
+        expect(next.get('loop')).toBe(day.get('loop'));
+        expect(reduceClocks(next, { kind: 'wall', at: 0.6 })).toBe(next);
+        expect(
+            reduceClocks(new Map([['loop', initialClock]]), { kind: 'wall', at: 0.6 }).get('loop'),
+        ).toBe(initialClock);
+    });
+
+    it('refuses play, stop and scrubbing, and lets go of the day when asked again', () => {
+        const refused = [
+            { kind: 'command', command: 'toggle' },
+            { kind: 'command', command: 'stop' },
+            { kind: 'scrub', scrub: { phase: 'grab', at: 0.1 } },
+        ] as const;
+
+        refused.forEach(command => {
+            expect(reduceClocks(day, { kind: 'clock', store: 'day', command }).get('day')).toBe(
+                day.get('day'),
+            );
+        });
+        expect(
+            reduceClocks(day, { kind: 'clock', store: 'day', command: { kind: 'day' } }).get('day')
+                ?.day,
+        ).toBe(false);
+    });
+
+    it('is saved where it last stood, read back and seeded', () => {
+        const moved = reduceClocks(day, { kind: 'wall', at: 0.7 });
+
+        expect(restedClocks(day, moved)).toBe(day);
+        expect(parseClock({ day: true }).day).toBe(true);
+        expect(parseClock({ day: 'yes' }).day).toBe(false);
+        expect(
+            reduceClocks(new Map(), {
+                kind: 'seed',
+                to: 'placed',
+                duration: 8,
+                looping: true,
+                day: true,
+            }).get('placed')?.day,
+        ).toBe(true);
+    });
+
+    it('labels a moment as the time of day', () => {
+        expect(timeOfDayLabel(0)).toBe('00:00');
+        expect(timeOfDayLabel(0.5)).toBe('12:00');
+        expect(timeOfDayLabel((9 * 60 + 41) / (24 * 60) + 1e-9)).toBe('09:41');
     });
 });

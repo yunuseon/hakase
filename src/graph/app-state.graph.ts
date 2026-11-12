@@ -1,4 +1,5 @@
 import { combineLatest, EMPTY, of, type Observable } from 'rxjs';
+import { secondsOf } from '../shared/playhead.ts';
 import {
     distinctUntilChanged,
     map,
@@ -36,13 +37,13 @@ import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
 import type { AppState, ProgramId, Task } from '../program.ts';
 import { inputsFor, programOf } from '../programs.ts';
-import type { Driver } from '../shared/curve.ts';
+import { driverAt, type Driver } from '../shared/curve.ts';
 import { defaultPicture } from '../shared/picture.ts';
-import { defaultSignal, sameWave, waveOf } from '../shared/signal.ts';
+import { defaultSignal, sameWave, TIME, waveOf } from '../shared/signal.ts';
 import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
-import { isImageKind } from '../inputs.ts';
+import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
@@ -442,27 +443,59 @@ export const scopedOf = ({
             distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
         );
 
+    const driverOf = (binding: Follow, pace$: Observable<Pace>): Observable<Driver | null> =>
+        binding.kind === 'signal'
+            ? waveIn(binding.store)
+            : binding.kind === 'voice'
+              ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+                    map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
+                )
+              : binding.kind === 'drums'
+                ? combineLatest([kitIn(binding.store), pace$]).pipe(
+                      map(([kit, { seconds }]) => kitCurve(kit, seconds)),
+                  )
+                : isGateKind(binding.kind)
+                  ? pace$.pipe(
+                        switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
+                        map(table => table.get(binding.store) ?? null),
+                        distinctUntilChanged(),
+                        map(row => (row === null ? null : bitCurve(row))),
+                    )
+                  : of(null);
+
+    const nowOn = (binding: Follow, clock: StoreId): Observable<Driver | null> => {
+        const clock$ = playbackIn(clock).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+        const pace$ = clock$.pipe(
+            map((now): Pace => ({ seconds: secondsOf(now), ticks: now.ticks })),
+            distinctUntilChanged((a, b) => a.seconds === b.seconds && a.ticks === b.ticks),
+        );
+
+        // Chained, not combined: the clock moves both the driver and the moment, and must not fire twice.
+        return driverOf(binding, pace$).pipe(
+            switchMap(driver =>
+                driver === null
+                    ? of(null)
+                    : clock$.pipe(
+                          map(({ at }) => at),
+                          distinctUntilChanged(),
+                          map((at): Driver => ({ samples: Float32Array.of(driverAt(driver, at)) })),
+                      ),
+            ),
+        );
+    };
+
     const driverIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
         linkIn(store, param).pipe(
-            switchMap((binding): Observable<Driver | null> =>
-                binding?.kind === 'signal'
-                    ? waveIn(binding.store)
-                    : binding?.kind === 'voice'
-                      ? combineLatest([soundingIn(binding.store), pace$]).pipe(
-                            map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
-                        )
-                      : binding?.kind === 'drums'
-                        ? combineLatest([kitIn(binding.store), pace$]).pipe(
-                              map(([kit, { seconds }]) => kitCurve(kit, seconds)),
-                          )
-                        : binding !== null && isGateKind(binding.kind)
-                          ? pace$.pipe(
-                                switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
-                                map(table => table.get(binding.store) ?? null),
-                                distinctUntilChanged(),
-                                map(row => (row === null ? null : bitCurve(row))),
-                            )
-                          : of(null),
+            switchMap(binding =>
+                binding === null
+                    ? of(null)
+                    : linkIn(binding.store, TIME).pipe(
+                          switchMap(time =>
+                              time?.kind === 'playback'
+                                  ? nowOn(binding, time.store)
+                                  : driverOf(binding, pace$),
+                          ),
+                      ),
             ),
         );
 
@@ -594,10 +627,19 @@ export const scopedOf = ({
 
     return (
         store$: Observable<StoreId>,
-        clock$: Observable<PlaybackBinding | null>,
+        playback$: Observable<PlaybackBinding | null>,
         follows$: Observable<Bindings>,
         shown$: Observable<boolean> = of(true),
     ): AppState => {
+        // A source read on a clock of its own is shown on it, or its window would mark a moment nobody reads.
+        const clock$ = combineLatest([
+            playback$,
+            store$.pipe(switchMap(store => linkIn(store, TIME))),
+        ]).pipe(
+            map(([binding, time]) => (time?.kind === 'playback' ? time : binding)),
+            distinctUntilChanged((a, b) => a?.store === b?.store),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
         const followed$ = (input: string) =>
             follows$.pipe(
                 map(follows => followedBy(follows, input)),
@@ -618,7 +660,7 @@ export const scopedOf = ({
                 binding === null
                     ? of(STILL)
                     : clock.pipe(
-                          map(({ duration, ticks }): Pace => ({ seconds: duration, ticks })),
+                          map((now): Pace => ({ seconds: secondsOf(now), ticks: now.ticks })),
                       ),
             ),
             distinctUntilChanged((a, b) => a.seconds === b.seconds && a.ticks === b.ticks),

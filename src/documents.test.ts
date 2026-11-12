@@ -311,6 +311,21 @@ describe('links', () => {
         expect(labels(history).at(-1)).toBe('Set Main depth to follow other');
     });
 
+    it('read a signal or a gate on a clock of its own, and refuse anything else there', () => {
+        const before = run(fresh(), [launched('signal'), launched('nand'), launched('pen')]);
+        const history = run(before, [
+            { kind: 'link', store: 'signal', param: 'time', source: 'timeline' },
+            { kind: 'link', store: 'nand', param: 'time', source: 'timeline' },
+            { kind: 'link', store: 'pen', param: 'time', source: 'timeline' },
+            { kind: 'link', store: 'signal', param: 'depth', source: 'timeline' },
+        ]);
+
+        expect(history.present.signals.get('signal')?.sources.time).toBe('timeline');
+        expect(history.present.gates.get('nand')?.sources['time']).toBe('timeline');
+        expect(history.present.signals.get('signal')?.sources.depth ?? null).toBeNull();
+        expect(history.steps).toHaveLength(before.steps.length + 2);
+    });
+
     it('refuse a source of a kind the input does not take', () => {
         const before = run(fresh(), [launched('pen'), launched('focus')]);
         const history = run(before, [{ kind: 'link', store: 'pen', param: 'x', source: 'focus' }]);

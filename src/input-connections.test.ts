@@ -30,6 +30,7 @@ describe('store-owned inputs', () => {
             'phase',
             'offset',
             'depth',
+            'time',
         ]);
         expect(initialFollows(inputsFor('signal'))).toEqual({
             playback: { kind: 'playback', store: 'timeline' },
@@ -49,7 +50,10 @@ describe('store-owned inputs', () => {
         const signals = new Map([
             [
                 'signal',
-                { ...defaultSignal, sources: { phase: null, offset: null, depth: 'other' } },
+                {
+                    ...defaultSignal,
+                    sources: { phase: null, offset: null, depth: 'other', time: null },
+                },
             ],
         ]);
         const selected = (current: Process) =>
@@ -67,7 +71,10 @@ describe('store-owned inputs', () => {
         const signals = new Map([
             [
                 'other',
-                { ...defaultSignal, sources: { phase: 'signal', offset: null, depth: null } },
+                {
+                    ...defaultSignal,
+                    sources: { phase: 'signal', offset: null, depth: null, time: null },
+                },
             ],
         ]);
 

@@ -28,6 +28,9 @@ describe('playback routing', () => {
         expect(
             input(emptyRouting, 'timeline', playback, { kind: 'duration', seconds: 12 }).commands,
         ).toEqual([{ store: 'movie', command: { kind: 'duration', seconds: 12 } }]);
+        expect(input(emptyRouting, 'timeline', playback, { kind: 'day' }).commands).toEqual([
+            { store: 'movie', command: { kind: 'day' } },
+        ]);
         expect(grab(emptyRouting).commands).toEqual([
             { store: 'movie', command: { kind: 'scrub', scrub: { phase: 'grab', at: 0.4 } } },
         ]);

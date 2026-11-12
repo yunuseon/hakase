@@ -14,6 +14,13 @@ export const PARAMS = ['phase', 'offset', 'depth'] as const;
 export type Param = (typeof PARAMS)[number];
 export const isParam = (value: string): value is Param => PARAMS.some(param => param === value);
 
+export const TIME = 'time';
+
+export const SOURCE_PARAMS = [...PARAMS, TIME] as const;
+export type SourceParam = (typeof SOURCE_PARAMS)[number];
+export const isSourceParam = (value: string): value is SourceParam =>
+    SOURCE_PARAMS.some(param => param === value);
+
 export const FIELDS = [...PARAMS, 'glide'] as const;
 export type Field = (typeof FIELDS)[number];
 export const isField = (value: string): value is Field => FIELDS.some(field => field === value);
@@ -23,7 +30,7 @@ export type StepCount = (typeof STEP_COUNTS)[number];
 export const isStepCount = (value: number): value is StepCount =>
     STEP_COUNTS.some(count => count === value);
 
-export type Sources = Readonly<Record<Param, string | null>>;
+export type Sources = Readonly<Record<SourceParam, string | null>>;
 
 export type Signal = {
     readonly shape: Shape;
@@ -37,7 +44,7 @@ export type Signal = {
     readonly sources: Sources;
 };
 
-const unsourced: Sources = { phase: null, offset: null, depth: null };
+const unsourced: Sources = { phase: null, offset: null, depth: null, time: null };
 
 export const defaultSignal: Signal = {
     shape: 'sine',
@@ -60,7 +67,7 @@ export type SignalCommand =
     | { readonly kind: 'step-count'; readonly count: StepCount }
     // From and to as fractions of the editor, so a fast stroke still sets every step it crossed.
     | { readonly kind: 'draw'; readonly from: Point; readonly to: Point }
-    | { readonly kind: 'source'; readonly param: Param; readonly source: string | null };
+    | { readonly kind: 'source'; readonly param: SourceParam; readonly source: string | null };
 
 type Point = { readonly x: number; readonly y: number };
 
@@ -304,8 +311,14 @@ const sourcesFrom = (value: unknown): Sources => {
 
         return typeof id === 'string' ? id : null;
     };
+    const time = field(value, TIME);
 
-    return { phase: source('phase'), offset: source('offset'), depth: source('depth') };
+    return {
+        phase: source('phase'),
+        offset: source('offset'),
+        depth: source('depth'),
+        time: typeof time === 'string' ? time : null,
+    };
 };
 
 const stepsFrom = (value: unknown) => {

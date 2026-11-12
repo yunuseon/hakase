@@ -262,10 +262,20 @@ const storedSignalInput = (param: string) =>
         initial: null,
     }) satisfies StoreInput;
 
+export const timeInput = {
+    title: 'read on',
+    from: 'store',
+    param: 'time',
+    group: null,
+    sources: [playbackSource],
+    initial: null,
+} satisfies StoreInput;
+
 export const signalInputs = {
     phase: storedSignalInput('phase'),
     offset: storedSignalInput('offset'),
     depth: storedSignalInput('depth'),
+    time: timeInput,
 };
 
 export const knobInputs = {
@@ -373,6 +383,7 @@ export const gateInputs = (kind: GateKind): Readonly<Record<string, StoreInput>>
     const entries: readonly (readonly [string, StoreInput])[] = [
         ...GATES[kind].bits.map(param => [param, bitInput(param)] as const),
         ...GATES[kind].drives.map(param => [param, levelInput(param)] as const),
+        ['time', timeInput] as const,
     ];
 
     return Object.fromEntries(entries);

@@ -77,6 +77,7 @@ export type ClockSeed = {
     readonly duration: number;
     readonly looping: boolean;
     readonly ticks?: number;
+    readonly day?: boolean;
 };
 
 export const MAIN = 'Main';

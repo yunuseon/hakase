@@ -36,6 +36,8 @@ export const minuteOfDay = (ms: number): number => {
     return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
 };
 
+export const dayFractionOf = (ms: number): number => Math.min(minuteOfDay(ms) / (24 * 60), 1);
+
 export const weekdayOf = (day: Day): number => dateOf(day).getDay();
 
 export const dayLabel = (day: Day, locale?: string): string =>

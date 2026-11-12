@@ -2828,6 +2828,60 @@ back to the offset it started from. That is what `pairwise()` is doing there.
 `defaultDuration` seeds at 8 seconds and `parseDuration` rejects anything not above 0. The reducer still guards against 0,
 which now means only "a loop of no length cannot advance".
 
+## The day as a clock
+
+**A clock can run on the time of day.** The timeline's sun turns its clock
+into a **day clock** (`Clock.day`): its loop is today, `at` is how far through
+the local day the wall clock stands (`dayFractionOf`), and `secondsOf` reads
+its loop as 86,400 seconds. It cannot be played, stopped or scrubbed (the fold
+refuses those commands, so the dial and a frame strip simply cannot move it),
+and its ticks stay its own, so 24 ticks are hours and a
+24-step pattern gate is a schedule. It keeps its loop length for when the sun
+is turned off again.
+
+- **The wall reaches the fold as an action**, `wall` with the day's fraction,
+  from a stream `createClocks$` takes as a parameter: `lib/rx.ts` touches
+  `window`, and the fold is shared code the tests load in Node. It runs only
+  while some clock is a day clock, once a second, and moves only those clocks,
+  so every other clock keeps its reference.
+- **It is saved where it stood still** (`restedClocks`), like a playing clock,
+  or storage would be rewritten every second; on load the next wall action puts
+  it back on today.
+- The timeline reads `14:32 / 24 h` (`timeOfDayLabel`) and greys its keys; the
+  window's own playhead, pace and everything built on them follow unchanged,
+  so a dial, a plot, a gate or a signal shows the day with no code of its own.
+
+**A source can be read on a clock of its own.** A follower reads a source at
+its **own** playhead, which is what keeps a wave identical on two clocks and an
+export exact. That makes a day clock useless to a sketch looping every eight
+seconds: following a schedule on its own playhead reads the schedule's 8 s
+compression, and put on the day clock itself the sketch would move one
+86,400th of its loop a second. So signals and gates have a store input
+`time` (**read on**, `timeInput`), accepting a playback store:
+
+- **It lives in the source's own `sources`**, beside phase, offset and depth or
+  a gate's bits, so saving, forking, pruning (`reachedFrom` keeps the clock),
+  undo and blueprints carry it with no code of their own. The circuit reads
+  only `GATES[kind].bits`, and `waveOf` only `PARAMS`, so neither mistakes it
+  for an input.
+- **`driverIn` decides it in one place.** A followed store with a `time` link is
+  resolved by `nowOn`: the driver is built at **that** clock's pace (a gate's
+  table at its ticks, a voice curve at its length) and sampled at its moment
+  into a one-sample `Curve`, one value over the follower's whole loop. It is a
+  pure function of that clock's moment; a thumbnail or an export takes it as it
+  stands when it is made, as it takes the pointer.
+- **The driver and the moment are chained, not combined**: the clock moves
+  both, and a `combineLatest` would fire twice on a change of pace.
+- Only the followed store's own `time` counts. A signal chained into it is
+  evaluated at the same moment as its parent, whatever clock it names.
+
+**A source is shown on the clock it is read on.** `scoped` takes the window's
+playback binding and its store's `time` link together and prefers the link, so
+a signal read on the day marks the time of day and a gate steps on it, whatever
+its own playback input says; letting go of the link hands the window back to
+that input. Every reader of the window's clock (playhead, pace, ticks) follows
+from that one choice.
+
 ## Themes
 
 A **theme** is a document exactly like a formula: named, kept in a registry,

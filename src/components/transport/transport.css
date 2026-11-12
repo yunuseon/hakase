@@ -34,8 +34,29 @@
     outline-offset: 2px;
 }
 
-.loop[aria-pressed='true'] {
+.loop[aria-pressed='true'],
+.day[aria-pressed='true'] {
     color: var(--accent);
+}
+
+.toggle:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.whole-day {
+    display: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+:host([data-day]) .whole-day {
+    display: inline;
+}
+
+:host([data-day]) .length {
+    display: none;
 }
 
 .time {

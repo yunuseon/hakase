@@ -87,6 +87,8 @@ export const reduceRouting = (routing: Routing, action: RoutingAction): Routing 
                 ...routing,
                 commands: [{ store, command: { kind: 'ticks', count: input.count } }],
             };
+        case 'day':
+            return { ...routing, commands: [{ store, command: { kind: 'day' } }] };
         default:
             return { ...routing, commands: [] };
     }

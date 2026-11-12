@@ -4,7 +4,7 @@ import { ignoreElements, map } from 'rxjs/operators';
 import { HksLinearSlider } from '../components/slider/linear/linear-slider.component.ts';
 import { HksTransport } from '../components/transport/transport.component.ts';
 import type { AppInput, Program } from '../program.ts';
-import { elapsedLabel } from '../shared/playhead.ts';
+import { elapsedLabel, timeOfDayLabel } from '../shared/playhead.ts';
 
 export const timelineProgram = {
     id: 'timeline',
@@ -22,20 +22,24 @@ export const timelineProgram = {
 
         return {
             element: slider,
-            run$: ({ playhead$, playing$, looping$, duration$, ticks$ }) => {
-                const clock$ = combineLatest([playhead$, duration$]).pipe(
-                    map(([at, duration]) => elapsedLabel(at, duration)),
+            run$: ({ playhead$, playing$, looping$, duration$, ticks$, clock$: now$ }) => {
+                const day$ = now$.pipe(map(({ day }) => day));
+                const clock$ = combineLatest([playhead$, duration$, day$]).pipe(
+                    map(([at, duration, day]) =>
+                        day ? timeOfDayLabel(at) : elapsedLabel(at, duration),
+                    ),
                 );
 
                 return merge(
                     slider.connect$(playhead$).pipe(ignoreElements()),
                     transport
-                        .connect$(playing$, looping$, clock$, duration$, ticks$)
+                        .connect$(playing$, looping$, clock$, duration$, ticks$, day$)
                         .pipe(ignoreElements()),
                     slider.changes$.pipe(map((scrub): AppInput => ({ kind: 'scrub', ...scrub }))),
                     transport.commands$.pipe(
                         map((command): AppInput => ({ kind: 'transport', command })),
                     ),
+                    transport.days$.pipe(map((): AppInput => ({ kind: 'day' }))),
                     transport.ticks$.pipe(map((count): AppInput => ({ kind: 'ticks', count }))),
                     transport.durations$.pipe(
                         map((seconds): AppInput => ({ kind: 'duration', seconds })),

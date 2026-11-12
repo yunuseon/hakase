@@ -1249,6 +1249,7 @@ const clockSeedFrom = (value: unknown): ClockSeed | null =>
               Number.isFinite(value.ticks)
                   ? { ticks: value.ticks }
                   : {}),
+              ...('day' in value && value.day === true ? { day: true } : {}),
           }
         : null;
 

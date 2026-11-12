@@ -94,6 +94,7 @@ export type AppInput =
     | { readonly kind: 'transport'; readonly command: TransportCommand }
     | { readonly kind: 'duration'; readonly seconds: number }
     | { readonly kind: 'ticks'; readonly count: number }
+    | { readonly kind: 'day' }
     | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }

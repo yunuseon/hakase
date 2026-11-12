@@ -89,7 +89,7 @@ import { viewOnly, type Settings } from './settings.ts';
 import {
     closesLoop,
     defaultSignal,
-    isParam,
+    isSourceParam,
     reachedFrom,
     reduceSignal,
     type Linked,
@@ -347,7 +347,7 @@ const linked = (
 
     switch (owner) {
         case 'signal':
-            return isParam(param)
+            return isSourceParam(param)
                 ? reduce(
                       documents,
                       { kind: 'signals', store, command: { kind: 'source', param, source } },

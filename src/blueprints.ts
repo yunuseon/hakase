@@ -210,6 +210,7 @@ export const blueprintOf = (
                       duration: saved.duration,
                       looping: saved.looping,
                       ...(saved.ticks === undefined ? {} : { ticks: saved.ticks }),
+                      ...(saved.day ? { day: true } : {}),
                   };
 
         return program === undefined
@@ -393,6 +394,7 @@ export const placed = (
                 phase: sourceOf(signal.sources.phase),
                 offset: sourceOf(signal.sources.offset),
                 depth: sourceOf(signal.sources.depth),
+                time: sourceOf(signal.sources.time),
             },
         })),
         paintings: into(documents.paintings, held.paintings),

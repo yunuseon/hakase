@@ -34,9 +34,23 @@ const TEMPLATE = () =>
                 <path class="ring" d="M9.5 4.5 A4 4 0 1 0 10 7"></path>
                 <path d="M7.5 2.5 L10 4.8 L10.6 1.6 Z"></path>
             </svg></button
+        ><button
+            class="ui-icon day"
+            type="button"
+            aria-label="run on the time of day"
+            title="run on the time of day: the loop is today, and it cannot be played or scrubbed"
+            aria-pressed="false"
+        >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+                <circle cx="6" cy="6" r="2.2"></circle>
+                <path
+                    class="ring"
+                    d="M6 1 V2.2 M6 9.8 V11 M1 6 H2.2 M9.8 6 H11 M2.5 2.5 L3.3 3.3 M8.7 8.7 L9.5 9.5 M2.5 9.5 L3.3 8.7 M8.7 3.3 L9.5 2.5"
+                ></path>
+            </svg></button
         ><span class="time"
-            ><span class="clock"></span><span class="of">/</span
-            ><label class="field" title="loop length in seconds"
+            ><span class="clock"></span><span class="of">/</span><span class="whole-day">24 h</span
+            ><label class="field length" title="loop length in seconds"
                 ><input
                     class="duration"
                     type="number"
@@ -63,10 +77,13 @@ export class HksTransport extends HTMLElement {
     readonly commands$: Observable<TransportCommand>;
     readonly durations$: Observable<number>;
     readonly ticks$: Observable<number>;
+    readonly days$: Observable<void>;
 
-    private readonly toggle: HTMLElement;
+    private readonly toggle: HTMLButtonElement;
     private readonly glyph: SVGPathElement;
-    private readonly loop: HTMLElement;
+    private readonly loop: HTMLButtonElement;
+    private readonly stop: HTMLButtonElement;
+    private readonly day: HTMLElement;
     private readonly clock: HTMLElement;
     private readonly duration: HTMLInputElement;
     private readonly ticks: HTMLInputElement;
@@ -80,20 +97,22 @@ export class HksTransport extends HTMLElement {
         shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
-        this.toggle = requireChild(shadow, '.toggle');
+        this.toggle = requireElement(shadow, '.toggle', HTMLButtonElement);
+        this.stop = requireElement(shadow, '.stop', HTMLButtonElement);
+        this.day = requireChild(shadow, '.day');
         this.glyph = requireElement(shadow, '.glyph', SVGPathElement);
-        this.loop = requireChild(shadow, '.loop');
+        this.loop = requireElement(shadow, '.loop', HTMLButtonElement);
         this.clock = requireChild(shadow, '.clock');
         this.duration = requireElement(shadow, '.duration', HTMLInputElement);
         this.ticks = requireElement(shadow, '.ticks', HTMLInputElement);
 
         this.commands$ = merge(
             fromElementEvent$(this.toggle, 'click').pipe(map((): TransportCommand => 'toggle')),
-            fromElementEvent$(requireChild(shadow, '.stop'), 'click').pipe(
-                map((): TransportCommand => 'stop'),
-            ),
+            fromElementEvent$(this.stop, 'click').pipe(map((): TransportCommand => 'stop')),
             fromElementEvent$(this.loop, 'click').pipe(map((): TransportCommand => 'loop')),
         );
+
+        this.days$ = fromElementEvent$(this.day, 'click').pipe(map(() => undefined));
 
         // change, not input: input fires per keystroke, and "1" would apply on the way to "12".
         this.durations$ = fromElementEvent$(this.duration, 'change').pipe(
@@ -119,6 +138,7 @@ export class HksTransport extends HTMLElement {
         clock$: Observable<string>,
         duration$: Observable<number>,
         ticks$: Observable<number> = EMPTY,
+        day$: Observable<boolean> = EMPTY,
     ): Observable<void> {
         return merge(
             this.rendering.lifetime$,
@@ -148,6 +168,16 @@ export class HksTransport extends HTMLElement {
                     distinctUntilChanged(),
                     tap(text => {
                         this.duration.value = text;
+                    }),
+                ),
+                day$.pipe(
+                    distinctUntilChanged(),
+                    tap(day => {
+                        this.toggleAttribute('data-day', day);
+                        this.day.setAttribute('aria-pressed', String(day));
+                        this.toggle.disabled = day;
+                        this.stop.disabled = day;
+                        this.loop.disabled = day;
                     }),
                 ),
                 ticks$.pipe(

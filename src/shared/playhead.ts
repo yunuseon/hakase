@@ -94,19 +94,32 @@ export const clampedTicks = (count: number): number =>
 export type Clock = Transport & {
     readonly duration: number;
     readonly ticks: number;
+    readonly day: boolean;
+};
+
+export const DAY_SECONDS = 86_400;
+
+export const secondsOf = (clock: Clock): number => (clock.day ? DAY_SECONDS : clock.duration);
+
+export const timeOfDayLabel = (at: number): string => {
+    const minutes = Math.floor(at * 24 * 60);
+
+    return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 };
 
 export const initialClock: Clock = {
     ...initialTransport,
     duration: defaultDuration,
     ticks: DEFAULT_TICKS,
+    day: false,
 };
 
 export type ClockCommand =
     | { readonly kind: 'command'; readonly command: TransportCommand }
     | { readonly kind: 'scrub'; readonly scrub: Scrub }
     | { readonly kind: 'duration'; readonly seconds: number }
-    | { readonly kind: 'ticks'; readonly count: number };
+    | { readonly kind: 'ticks'; readonly count: number }
+    | { readonly kind: 'day' };
 
 export type Clocks = ReadonlyMap<string, Clock>;
 
@@ -119,27 +132,35 @@ type ClocksAction =
           readonly duration: number;
           readonly looping: boolean;
           readonly ticks?: number;
+          readonly day?: boolean;
       }
     | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> }
-    | { readonly kind: 'advance'; readonly ms: number };
+    | { readonly kind: 'advance'; readonly ms: number }
+    | { readonly kind: 'wall'; readonly at: number };
 
 const running = ({ playing, held }: Clock): boolean => playing && !held;
 
 const commanded = (clock: Clock, command: ClockCommand): Clock => {
     switch (command.kind) {
         case 'command':
-            return {
-                ...clock,
-                ...reduceTransport(clock, { kind: 'command', command: command.command }),
-            };
+            return clock.day
+                ? clock
+                : {
+                      ...clock,
+                      ...reduceTransport(clock, { kind: 'command', command: command.command }),
+                  };
         case 'scrub':
-            return { ...clock, ...reduceTransport(clock, { kind: 'scrub', scrub: command.scrub }) };
+            return clock.day
+                ? clock
+                : { ...clock, ...reduceTransport(clock, { kind: 'scrub', scrub: command.scrub }) };
         case 'duration':
             return { ...clock, duration: command.seconds };
         case 'ticks':
             return Number.isFinite(command.count)
                 ? { ...clock, ticks: clampedTicks(command.count) }
                 : clock;
+        case 'day':
+            return { ...clock, day: !clock.day, playing: false, held: false };
     }
 };
 
@@ -166,6 +187,7 @@ export const reduceClocks = (clocks: Clocks, action: ClocksAction): Clocks => {
                       duration: action.duration,
                       looping: action.looping,
                       ticks: clampedTicks(action.ticks ?? DEFAULT_TICKS),
+                      day: action.day === true,
                   });
         case 'keep': {
             const kept = new Map([...clocks].filter(([store]) => action.stores.has(store)));
@@ -188,6 +210,19 @@ export const reduceClocks = (clocks: Clocks, action: ClocksAction): Clocks => {
                         : clock,
                 ]),
             );
+        case 'wall': {
+            const moved = [...clocks].filter(([, clock]) => clock.day && clock.at !== action.at);
+
+            return moved.length === 0
+                ? clocks
+                : new Map([
+                      ...clocks,
+                      ...moved.map(([store, clock]): [string, Clock] => [
+                          store,
+                          { ...clock, at: action.at },
+                      ]),
+                  ]);
+        }
     }
 };
 
@@ -200,10 +235,13 @@ export const createClocks$ = (
               readonly to: string;
               readonly duration: number;
               readonly looping: boolean;
+              readonly day?: boolean;
           }
         | { readonly kind: 'keep'; readonly stores: ReadonlySet<string> }
     >,
     initial: Clocks,
+    // Where the day stands now, 0 to 1: passed in, since the wall clock lives at the edge.
+    day$: Observable<number>,
 ): Observable<Clocks> => {
     const clocks$: Observable<Clocks> = merge(
         commands$.pipe(map((stamped): ClocksAction => ({ kind: 'clock', ...stamped }))),
@@ -224,6 +262,12 @@ export const createClocks$ = (
             ),
             map((ms): ClocksAction => ({ kind: 'advance', ms })),
         ),
+        defer(() => clocks$).pipe(
+            map(clocks => [...clocks.values()].some(({ day }) => day)),
+            distinctUntilChanged(),
+            switchMap(any => (any ? day$ : EMPTY)),
+            map((at): ClocksAction => ({ kind: 'wall', at })),
+        ),
     ).pipe(
         scan(reduceClocks, initial),
         startWith(initial),
@@ -242,7 +286,9 @@ export const restedClocks = (kept: Clocks, now: Clocks): Clocks => {
 
             return [
                 store,
-                clock.playing && before !== undefined ? { ...clock, at: before.at } : clock,
+                (clock.playing || clock.day) && before !== undefined
+                    ? { ...clock, at: before.at }
+                    : clock,
             ];
         }),
     );
@@ -258,7 +304,8 @@ const sameRest = (a: Clock | undefined, b: Clock): boolean =>
     a.at === b.at &&
     a.looping === b.looping &&
     a.duration === b.duration &&
-    a.ticks === b.ticks;
+    a.ticks === b.ticks &&
+    a.day === b.day;
 
 const field = (value: object, key: string): unknown =>
     Object.entries(value).find(([name]) => name === key)?.[1];
@@ -284,5 +331,6 @@ export const parseClock = (value: unknown): Clock => {
             typeof ticks === 'number' && Number.isFinite(ticks)
                 ? clampedTicks(ticks)
                 : DEFAULT_TICKS,
+        day: field(value, 'day') === true,
     };
 };

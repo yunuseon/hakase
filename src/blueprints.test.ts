@@ -100,7 +100,10 @@ const scene = (extra: readonly Process[] = []): Documents => {
         signals: new Map([
             [
                 'store-a',
-                { ...defaultSignal, sources: { phase: null, offset: null, depth: 'store-b' } },
+                {
+                    ...defaultSignal,
+                    sources: { phase: null, offset: null, depth: 'store-b', time: null },
+                },
             ],
             ['store-b', defaultSignal],
         ]),

@@ -66,7 +66,13 @@ describe('state mode', () => {
         const mine = view.sockets.filter(socket => socket.window === gate.id);
         const { x, width } = gate.frame;
 
-        expect(mine.map(socket => socket.title)).toEqual(['Output', 'Playback', 'a', 'b']);
+        expect(mine.map(socket => socket.title)).toEqual([
+            'Output',
+            'Playback',
+            'a',
+            'b',
+            'read on',
+        ]);
         mine.forEach(socket => {
             expect(anchorOf(socket, 1).x).toBe(socket.end.kind === 'store' ? x + width : x);
         });

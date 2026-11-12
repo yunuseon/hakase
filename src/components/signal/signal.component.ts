@@ -15,6 +15,7 @@ import {
     pairwise,
     scan,
     share,
+    shareReplay,
     startWith,
     tap,
 } from 'rxjs/operators';
@@ -470,7 +471,8 @@ export class HksSignal extends HTMLElement {
                     zero.setAttribute('y2', String(plot.zero));
                 }
             }),
-            share(),
+            // Replayed: the marker subscribes after the plot, and a wave that arrives at once would never reach it.
+            shareReplay({ bufferSize: 1, refCount: true }),
         );
 
         const marker$ = combineLatest([plot$, t$]).pipe(

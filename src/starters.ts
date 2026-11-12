@@ -119,7 +119,7 @@ const pedal = (
 
 const gate = (kind: GateKind, sources: Gate['sources'] = {}, rest: Partial<Gate> = {}): Gate => ({
     ...GATE_DEFAULTS[kind],
-    sources,
+    sources: { ...GATE_DEFAULTS[kind].sources, ...sources },
     ...rest,
 });
 

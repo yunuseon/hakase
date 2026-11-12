@@ -145,7 +145,7 @@ describe('parseSignal', () => {
 
         expect(saved.offset).toBeCloseTo(0.5);
         expect(saved.depth).toBeCloseTo(0.3);
-        expect(saved.sources).toEqual({ phase: null, offset: null, depth: 'slow' });
+        expect(saved.sources).toEqual({ phase: null, offset: null, depth: 'slow', time: null });
     });
 });
 
@@ -154,7 +154,7 @@ describe('chains', () => {
     const fast: Signal = {
         ...defaultSignal,
         rate: 4,
-        sources: { phase: null, offset: null, depth: 'slow' },
+        sources: { phase: null, offset: null, depth: 'slow', time: null },
     };
     const all = new Map([
         ['slow', slow],
@@ -182,8 +182,20 @@ describe('chains', () => {
         expect(closesLoop(all, 'fast', 'slow')).toBe(false);
 
         const looped = new Map<string, Signal>([
-            ['a', { ...defaultSignal, sources: { phase: 'b', offset: null, depth: null } }],
-            ['b', { ...defaultSignal, sources: { phase: 'a', offset: null, depth: null } }],
+            [
+                'a',
+                {
+                    ...defaultSignal,
+                    sources: { phase: 'b', offset: null, depth: null, time: null },
+                },
+            ],
+            [
+                'b',
+                {
+                    ...defaultSignal,
+                    sources: { phase: 'a', offset: null, depth: null, time: null },
+                },
+            ],
         ]);
 
         expect(waveOf(looped, 'a').mods.phase?.mods.phase).toBeNull();

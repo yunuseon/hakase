@@ -20,7 +20,7 @@ import {
     type Plan,
 } from '../components/focus/focus.ts';
 import { playbackBinding } from '../inputs.ts';
-import { dayOf, minuteOfDay } from '../lib/day.ts';
+import { dayFractionOf, dayOf, minuteOfDay } from '../lib/day.ts';
 import { wallClock$ } from '../lib/rx.ts';
 import { routePlayback$ } from '../playback-routing.ts';
 import type { AppSignal } from '../process.ts';
@@ -156,6 +156,7 @@ export const timekeepingOf = ({
         ),
         merge(storeEvents$, seeds$),
         stored.playback,
+        wallClock$.pipe(map(dayFractionOf)),
     );
 
     // Where each clock last rested: storage need not follow the playhead every frame it runs.

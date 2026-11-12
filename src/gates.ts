@@ -1,3 +1,5 @@
+import { TIME } from './shared/signal.ts';
+
 export const GATE_KINDS = [
     'nand',
     'delay',
@@ -110,6 +112,7 @@ export type Gate = {
 export const paramsOf = (kind: GateKind): readonly string[] => [
     ...GATES[kind].bits,
     ...GATES[kind].drives,
+    TIME,
 ];
 
 const made = (kind: GateKind): Gate => ({
