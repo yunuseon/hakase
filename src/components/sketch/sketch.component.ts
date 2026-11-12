@@ -1,48 +1,35 @@
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { mountView, type Rendering } from '../../lib/lit.ts';
-import { combineLatest, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, filter, map, pairwise, scan, tap } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { merge, of, type Observable } from 'rxjs';
+import { filter, map, tap } from 'rxjs/operators';
+import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$, pointerDrag$ } from '../../shared/drag.ts';
-import type { Orbit, OrbitAction } from './space.ts';
-import { cappedRatio, pointerAt, samePointer, type Pointer, type SketchParams } from './params.ts';
-import { buildRamp } from './theme.ts';
-import { applyGeometry, createSurface, type Surface } from './gl/surface.ts';
-import { drawFrame, prepare, type Sketch } from './gl/sketch-program.ts';
-import { bindState, evolve, simulated$, type Simulation } from './gl/simulation.ts';
-import { evolutionTo, stepAt, type Clock, type Evolution } from './evolution.ts';
+import type { OrbitAction } from './space.ts';
+import { pointerAt, type Pointer } from './params.ts';
 import type { Size } from '../window/frame.ts';
+import type { Shown } from '../../shared/shown.ts';
 import css from './sketch.css?inline';
 
 const sheet = styleSheet(css);
 
-type Frame = {
-    readonly stage: {
-        readonly sketch: Sketch;
-        readonly params: SketchParams;
-        readonly simulation: Simulation | null;
-    };
-    readonly clock: Clock;
-    readonly pointer: Pointer;
-    readonly orbit: Orbit;
-    readonly evolution: Evolution;
-};
-
 const TEMPLATE = () =>
-    html`<div class="viewport"><slot name="status"></slot></div>
+    html`<div class="viewport">
+            <canvas></canvas>
+            <p class="message" hidden></p>
+            <slot name="status"></slot>
+        </div>
         <slot name="controls"></slot>`;
 
 export class HksSketch extends HTMLElement {
-    readonly gl: WebGL2RenderingContext;
     readonly pointers$: Observable<Omit<Pointer, 'down'>>;
     readonly presses$: Observable<boolean>;
     readonly orbits$: Observable<OrbitAction>;
     readonly sizes$: Observable<Size>;
 
-    private readonly surface: Surface<HTMLCanvasElement>;
-
+    private readonly canvas: HTMLCanvasElement;
+    private readonly message: HTMLElement;
     private readonly rendering: Rendering;
 
     constructor() {
@@ -53,10 +40,10 @@ export class HksSketch extends HTMLElement {
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         const viewport = requireChild(shadow, '.viewport');
-        this.surface = createSurface(viewport);
-        this.gl = this.surface.gl;
+        const canvas = requireElement(shadow, 'canvas', HTMLCanvasElement);
+        this.canvas = canvas;
+        this.message = requireChild(shadow, '.message');
 
-        const { canvas } = this.surface;
         // getBoundingClientRect, not offset*: the pointer is in screen pixels, zoom included.
         this.pointers$ = fromElementEvent$(canvas, 'pointermove').pipe(
             map(event => pointerAt(event.clientX, event.clientY, canvas.getBoundingClientRect())),
@@ -90,81 +77,24 @@ export class HksSketch extends HTMLElement {
         );
     }
 
-    connect$(
-        params$: Observable<SketchParams>,
-        clock$: Observable<Clock>,
-        sketch$: Observable<Sketch>,
-        ratio$: Observable<number>,
-        pointer$: Observable<Pointer>,
-        orbit$: Observable<Orbit>,
-    ): Observable<void> {
-        // One chain: geometry as its own stream made a diamond that drew twice.
-        const prepared$ = combineLatest([params$, sketch$, ratio$]).pipe(
-            map(([params, sketch, ratio]) => ({
-                params,
-                sketch,
-                ratio: cappedRatio(ratio, params),
-                ramp: buildRamp(params.theme),
-            })),
-            tap(({ params, sketch, ratio, ramp }) => {
-                applyGeometry(this.surface, {
-                    width: params.width,
-                    height: params.height,
-                    ratio,
-                });
-                prepare(this.surface, sketch, params, ramp, ratio);
-            }),
-        );
+    connect$(shown$: Observable<Shown>): Observable<void> {
+        const context = this.canvas.getContext('bitmaprenderer');
 
-        const frames$ = combineLatest([
-            simulated$(this.surface.gl, prepared$),
-            clock$,
-            pointer$.pipe(distinctUntilChanged(samePointer)),
-            orbit$,
-        ]).pipe(
-            scan(
-                (done: Frame | null, [stage, clock, pointer, orbit]): Frame => ({
-                    stage,
-                    clock,
-                    pointer,
-                    orbit,
-                    evolution: evolutionTo(
-                        done !== null && done.stage.simulation === stage.simulation
-                            ? done.evolution.end
-                            : null,
-                        stage.simulation === null
-                            ? 0
-                            : stepAt(clock.t, clock.seconds, stage.sketch.steps),
-                    ),
+        return merge(
+            this.rendering.lifetime$,
+            shown$.pipe(
+                tap(shown => {
+                    this.message.hidden = shown.kind === 'frame';
+
+                    if (shown.kind === 'frame') {
+                        context?.transferFromImageBitmap(shown.bitmap);
+                    } else {
+                        this.message.textContent = shown.text;
+                    }
                 }),
-                null,
+                map(() => undefined),
             ),
-            filter((frame): frame is Frame => frame !== null),
-            tap(({ stage: { sketch, params, simulation }, clock, pointer, orbit, evolution }) => {
-                const { gl } = this.surface;
-
-                if (simulation !== null) {
-                    evolve(this.surface, sketch, simulation, evolution, {
-                        params,
-                        seconds: clock.seconds,
-                        pointer,
-                        orbit,
-                    });
-                    bindState(gl, sketch, simulation, evolution.end.front);
-                }
-
-                drawFrame(this.surface, sketch, params, clock.t, pointer, orbit);
-            }),
         );
-
-        const retired$ = sketch$.pipe(
-            pairwise(),
-            tap(([replaced]) => {
-                this.surface.gl.deleteProgram(replaced.program);
-            }),
-        );
-
-        return merge(this.rendering.lifetime$, merge(frames$, retired$).pipe(map(() => undefined)));
     }
 }
 

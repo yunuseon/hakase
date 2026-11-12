@@ -1,6 +1,9 @@
 import { GATE_DEFAULTS } from '../gates.ts';
 import { defaultPedal } from '../pedals.ts';
-import { NONE } from '../image.ts';
+import { NONE, type Image } from '../image.ts';
+import { asSketch } from '../settings.ts';
+import { emptyLibrary } from '../library.ts';
+import { UNDRIVEN } from '../components/sketch/params.ts';
 import { animationFrames, defer, EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -127,7 +130,26 @@ export const programDemo = (
         linkedDriver$: () => of(null),
         followedImage$: () => of(NONE),
         pedal$: of(defaultPedal('mix')),
-        image$: of(NONE),
+        image$: select(state => state.settings).pipe(
+            map((stored): Image => {
+                if (stored?.kind !== 'sketch') {
+                    return NONE;
+                }
+
+                const sketch = asSketch(stored);
+
+                return {
+                    kind: 'points',
+                    store: 'storybook-preview',
+                    source: sourceOf(sketch.formula, emptyLibrary),
+                    panel: sketch.panel,
+                    theme: themes[sketch.theme],
+                    orbit: sketch.orbit,
+                    drivers: UNDRIVEN,
+                    sheet: null,
+                };
+            }),
+        ),
         gate$: of(GATE_DEFAULTS.switch),
         bits$: of(new Uint8Array(16)),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),

@@ -1,5 +1,5 @@
 import { knobInputs, paintInput, playbackInput, sceneInputs } from '../inputs.ts';
-import { asapScheduler, combineLatest, EMPTY, merge, of, timer, type Observable } from 'rxjs';
+import { asapScheduler, combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     exhaustMap,
@@ -16,14 +16,11 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
-import { compileFormula$ } from '../components/sketch/compile.ts';
-import { knobsUsed } from '../components/sketch/gl/sketch-program.ts';
-import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
+import { reduceOrbit, sameOrbit, type OrbitAction } from '../components/sketch/space.ts';
 import { optionsOf } from '../library.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
-import { sameTheme } from '../components/sketch/theme.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import { liveReadouts } from '../components/sketch/controls/controls.ts';
 import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
@@ -52,16 +49,15 @@ import {
     centre,
     DRIVES,
     panelParams,
-    samePanel,
-    steppedRatio,
     type Pointer,
     type SketchParams,
 } from '../components/sketch/params.ts';
 import { asSketch, controlsView, withControl, type SketchSettings } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
+import { viewRatio$, windowMoment$ } from '../engine/moment.ts';
+import { checked$, view$ } from '../engine/view.ts';
+import { shownOf } from './output.program.ts';
 import type { Size } from '../components/window/frame.ts';
-
-const SETTLE_MS = 150;
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 
@@ -95,7 +91,7 @@ export const sketchProgram = {
         return {
             element: sketch,
             run$: (state, { settings$: stored$ }) => {
-                const { playhead$, source$, zoom$ } = state;
+                const { playhead$, zoom$ } = state;
                 // Without the comparator, every resize observation would re-prepare the shader even at the same size.
                 const size$ = sketch.sizes$.pipe(
                     distinctUntilChanged(sameSize),
@@ -108,53 +104,28 @@ export const sketchProgram = {
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                // samePanel, or every orbit drag would rebuild the theme ramp and re-prepare.
-                const panel$ = settings$.pipe(
-                    map(({ panel }) => panel),
-                    distinctUntilChanged(samePanel),
+                const points$ = state.image$.pipe(
+                    mergeMap(image => (image.kind === 'points' ? of(image) : EMPTY)),
+                    shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                const theme$ = settings$.pipe(
-                    map(({ theme }) => theme),
+                const signals$ = points$.pipe(
+                    map(({ drivers }) => drivers),
                     distinctUntilChanged(),
-                    switchMap(name => state.theme$(name)),
-                    map(({ value }) => value),
-                    distinctUntilChanged(sameTheme),
                 );
 
-                const signals$ = combineLatest({
-                    k1: state.linkedDriver$('k1'),
-                    k2: state.linkedDriver$('k2'),
-                    k3: state.linkedDriver$('k3'),
-                    k4: state.linkedDriver$('k4'),
-                    turn: state.linkedDriver$('turn'),
-                    pitch: state.linkedDriver$('pitch'),
-                    distance: state.linkedDriver$('distance'),
-                    focus: state.linkedDriver$('focus'),
-                    colour: state.linkedDriver$('colour'),
-                    size: state.linkedDriver$('size'),
-                    depth: state.linkedDriver$('depth'),
-                    trails: state.linkedDriver$('trails'),
-                }).pipe(shareReplay({ bufferSize: 1, refCount: true }));
-
-                const params$ = combineLatest([
-                    panel$,
-                    size$,
-                    theme$,
-                    signals$,
-                    state.linkedPicture$('paint'),
-                ]).pipe(
-                    map(([panel, size, theme, signals, picture]): SketchParams => ({
-                        ...panelParams(panel, signals, picture),
+                const params$ = combineLatest([points$, size$]).pipe(
+                    map(([{ panel, drivers, sheet, theme }, size]): SketchParams => ({
+                        ...panelParams(panel, drivers, sheet),
                         ...size,
                         theme,
                     })),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                const orbit$ = settings$.pipe(
+                const orbit$ = points$.pipe(
                     map(({ orbit }) => orbit),
-                    distinctUntilChanged(),
+                    distinctUntilChanged(sameOrbit),
                 );
 
                 // This window's choice; the text behind it is shared with whoever matches.
@@ -164,34 +135,25 @@ export const sketchProgram = {
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
-                const text$ = formula$.pipe(
-                    switchMap(name =>
-                        source$(name).pipe(
-                            map(({ value }) => value),
-                            distinctUntilChanged(),
-                        ),
-                    ),
-                    shareReplay({ bufferSize: 1, refCount: true }),
-                );
-
-                // Per process: each canvas has its own GL context to compile into.
-                const compiled$ = compileFormula$(sketch.gl, text$).pipe(
-                    shareReplay({ bufferSize: 1, refCount: true }),
-                );
-
-                const shader$ = compiled$.pipe(
-                    // A failure simply does not emit, so the canvas keeps the last shader.
-                    mergeMap(result => (result.ok ? of(result.sketch) : EMPTY)),
-                );
-
-                // A new ratio reallocates the buffer (50ms at the cap), so a moving zoom waits to settle; the first is at once.
-                const ratio$ = combineLatest([devicePixelRatio$, zoom$]).pipe(
-                    map(([pixelRatio, zoom]) => steppedRatio(pixelRatio, zoom)),
+                const text$ = points$.pipe(
+                    map(({ source }) => source),
                     distinctUntilChanged(),
-                    switchMap((ratio, index) =>
-                        index === 0 ? of(ratio) : timer(SETTLE_MS).pipe(map(() => ratio)),
-                    ),
+                    shareReplay({ bufferSize: 1, refCount: true }),
                 );
+
+                const checks$ = checked$(text$).pipe(
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+
+                const pointer$ = combineLatest([
+                    sketch.pointers$.pipe(startWith(centre)),
+                    sketch.presses$.pipe(startWith(false), distinctUntilChanged()),
+                ]).pipe(map(([{ x, y }, down]): Pointer => ({ x, y, down })));
+
+                const shown$ = view$(
+                    points$,
+                    windowMoment$(state.clock$, size$, viewRatio$(zoom$), pointer$),
+                ).pipe(map(shownOf('This window shows no sketch.')));
 
                 const exportSettings$ = settings$.pipe(
                     map(settings => settings.export),
@@ -334,26 +296,12 @@ export const sketchProgram = {
                 });
 
                 return merge(
-                    sketch
-                        .connect$(
-                            params$,
-                            combineLatest([playhead$, state.duration$]).pipe(
-                                map(([t, seconds]) => ({ t, seconds })),
-                            ),
-                            shader$,
-                            ratio$,
-                            combineLatest([
-                                sketch.pointers$.pipe(startWith(centre)),
-                                sketch.presses$.pipe(startWith(false), distinctUntilChanged()),
-                            ]).pipe(map(([{ x, y }, down]): Pointer => ({ x, y, down }))),
-                            orbit$,
-                        )
-                        .pipe(ignoreElements()),
+                    sketch.connect$(shown$).pipe(ignoreElements()),
                     fpsCounter.connect$(playhead$).pipe(ignoreElements()),
                     controls
                         .connect$(
                             settings$.pipe(map(controlsView)),
-                            shader$.pipe(map(knobsUsed)),
+                            checks$.pipe(mergeMap(check => (check.ok ? of(check.knobs) : EMPTY))),
                             state.library$.pipe(map(optionsOf)),
                             signals$.pipe(
                                 map(signals => DRIVES.filter(drive => signals[drive] !== null)),
@@ -420,12 +368,12 @@ export const sketchProgram = {
                             })),
                         ),
                     ).pipe(map(changed)),
-                    compiled$.pipe(
+                    checks$.pipe(
                         withLatestFrom(formula$),
-                        map(([result, formula]): AppInput => ({
+                        map(([check, formula]): AppInput => ({
                             kind: 'diagnostic',
                             formula,
-                            message: result.ok ? null : result.message,
+                            message: check.ok ? null : check.message,
                         })),
                     ),
                 );

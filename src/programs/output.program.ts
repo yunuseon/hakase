@@ -14,7 +14,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksImageView } from '../components/image-view/image-view.component.ts';
-import type { Shown } from '../components/image-view/image-view.ts';
+import type { Shown } from '../shared/shown.ts';
 import {
     exportPixels,
     followed,

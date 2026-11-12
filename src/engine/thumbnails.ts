@@ -58,7 +58,14 @@ export const imageThumbnails$ = (
                                   const texture = cook(
                                       engine,
                                       image,
-                                      { t, seconds, ...slot, pointer: centre, pass: 0 },
+                                      {
+                                          t,
+                                          seconds,
+                                          ...slot,
+                                          pointer: centre,
+                                          pass: 0,
+                                          scale: null,
+                                      },
                                       now,
                                   );
                                   drawn(engine, texture, slot.width, slot.height, at * slot.width);

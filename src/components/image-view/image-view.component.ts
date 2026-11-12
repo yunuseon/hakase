@@ -5,7 +5,7 @@ import { mountView, type Rendering } from '../../lib/lit.ts';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { observeResize$ } from '../../lib/rx.ts';
 import type { Size } from '../window/frame.ts';
-import type { Shown } from './image-view.ts';
+import type { Shown } from '../../shared/shown.ts';
 import css from './image-view.css?inline';
 
 const sheet = styleSheet(css);

@@ -45,7 +45,7 @@ const frameAt = (
     const texture = cook(
         engine,
         image,
-        { t, seconds, ...pixels, pointer: centre, pass },
+        { t, seconds, ...pixels, pointer: centre, pass, scale: null },
         performance.now(),
     );
     drawn(engine, texture, pixels.width, pixels.height);

@@ -64,6 +64,21 @@ export type Drive = (typeof DRIVES)[number];
 
 export type Signals = Readonly<Record<Drive, Driver | null>>;
 
+export const UNDRIVEN: Signals = {
+    k1: null,
+    k2: null,
+    k3: null,
+    k4: null,
+    turn: null,
+    pitch: null,
+    distance: null,
+    focus: null,
+    colour: null,
+    size: null,
+    depth: null,
+    trails: null,
+};
+
 const MIN_FOCUS = 0.1;
 const MAX_FOCUS = 10;
 const MAX_DOT = 64;

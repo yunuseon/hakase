@@ -1,6 +1,6 @@
 import { combineLatest, of, timer, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, switchMap } from 'rxjs/operators';
-import { centre, steppedRatio } from '../components/sketch/params.ts';
+import { centre, samePointer, steppedRatio, type Pointer } from '../components/sketch/params.ts';
 import type { Size } from '../components/window/frame.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Clock } from '../shared/playhead.ts';
@@ -9,8 +9,11 @@ import type { Moment } from './engine.ts';
 const MAX_SIDE = 2048;
 const SETTLE_MS = 150;
 
+const scaleOf = ({ width, height }: Size, ratio: number): number =>
+    Math.min(ratio, MAX_SIDE / Math.max(width, height, 1));
+
 export const pixelsOf = ({ width, height }: Size, ratio: number): Size => {
-    const scale = Math.min(ratio, MAX_SIDE / Math.max(width, height, 1));
+    const scale = scaleOf({ width, height }, ratio);
 
     return {
         width: Math.max(1, Math.round(width * scale)),
@@ -40,6 +43,7 @@ export const momentOf$ = (
             ...pixelsOf(size, ratio),
             pointer: centre,
             pass: 0,
+            scale: null,
         })),
         distinctUntilChanged(
             (a, b) =>
@@ -48,4 +52,21 @@ export const momentOf$ = (
                 a.width === b.width &&
                 a.height === b.height,
         ),
+    );
+
+export const windowMoment$ = (
+    clock$: Observable<Clock>,
+    size$: Observable<Size>,
+    ratio$: Observable<number>,
+    pointer$: Observable<Pointer>,
+): Observable<Moment> =>
+    combineLatest([clock$, size$, ratio$, pointer$.pipe(distinctUntilChanged(samePointer))]).pipe(
+        map(([{ at, duration }, size, ratio, pointer]) => ({
+            t: at,
+            seconds: duration,
+            ...pixelsOf(size, ratio),
+            pointer,
+            pass: 0,
+            scale: scaleOf(size, ratio),
+        })),
     );

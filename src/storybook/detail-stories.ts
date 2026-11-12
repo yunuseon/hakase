@@ -9,7 +9,7 @@ import { GATE_DEFAULTS, reduceGate, type Bit } from '../gates.ts';
 import { circuitTable } from '../circuit.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
 import { defaultPedal, PEDALS, reducePedal, valueOf } from '../pedals.ts';
-import type { Shown } from '../components/image-view/image-view.ts';
+import type { Shown } from '../shared/shown.ts';
 import { filter, map, scan, share, shareReplay, startWith, withLatestFrom } from 'rxjs/operators';
 import { HksTicketCreator } from '../components/ticket-creator/ticket-creator.component.ts';
 import {

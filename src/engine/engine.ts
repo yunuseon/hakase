@@ -3,6 +3,7 @@ import { panelParams, samePointer, type Pointer } from '../components/sketch/par
 import {
     createSketch,
     drawFrame,
+    knobsUsed,
     prepare,
     type Sketch,
 } from '../components/sketch/gl/sketch-program.ts';
@@ -54,7 +55,13 @@ export type Moment = {
     readonly height: number;
     readonly pointer: Pointer;
     readonly pass: number;
+    // Pixels per sketch unit: a window's own, so its dots keep their size; null frames it at the reference side.
+    readonly scale: number | null;
 };
+
+export type FormulaCheck =
+    | { readonly ok: true; readonly knobs: ReturnType<typeof knobsUsed> }
+    | { readonly ok: false; readonly message: string };
 
 type Pass = {
     readonly program: WebGLProgram;
@@ -66,6 +73,7 @@ type Prepared = {
     readonly image: PointsImage;
     readonly width: number;
     readonly height: number;
+    readonly scale: number;
     readonly backdrop: readonly [number, number, number];
 };
 
@@ -83,6 +91,7 @@ type Cooked = {
     readonly t: number;
     readonly pass: number;
     readonly pointer: Pointer;
+    readonly scale: number | null;
 };
 
 type Entry = {
@@ -102,6 +111,7 @@ export type Engine = {
     readonly passes: Readonly<Record<PedalKind | 'present', Pass>>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
+    readonly checks: Map<string, FormulaCheck>;
 };
 
 const REFERENCE_SIDE = 640;
@@ -163,7 +173,34 @@ export const createEngine = (): Engine => {
         },
         sources: new Map(),
         entries: new Map(),
+        checks: new Map(),
     };
+};
+
+const CHECKS_KEPT = 16;
+
+export const checkFormula = (engine: Engine, text: string): FormulaCheck => {
+    const known = engine.checks.get(text);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const result = createSketch(engine.gl, text);
+    const check: FormulaCheck = result.ok
+        ? { ok: true, knobs: knobsUsed(result.sketch) }
+        : { ok: false, message: result.message };
+
+    if (result.ok) {
+        engine.gl.deleteProgram(result.sketch.program);
+    }
+
+    [...engine.checks.keys()]
+        .slice(0, Math.max(0, engine.checks.size - CHECKS_KEPT + 1))
+        .forEach(old => engine.checks.delete(old));
+    engine.checks.set(text, check);
+
+    return check;
 };
 
 export const releaseEngine = ({ gl }: Engine): void => {
@@ -233,6 +270,7 @@ const samePrepared = (prepared: Prepared | null, next: Omit<Prepared, 'backdrop'
     prepared.sketch === next.sketch &&
     prepared.width === next.width &&
     prepared.height === next.height &&
+    prepared.scale === next.scale &&
     prepared.image.panel === next.image.panel &&
     prepared.image.theme === next.image.theme &&
     prepared.image.sheet === next.image.sheet;
@@ -264,6 +302,7 @@ const compiled = (gl: WebGL2RenderingContext, source: Source, text: string): Ske
 const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Moment): void => {
     const { gl, canvas } = engine;
     const { width, height, t, seconds, pointer } = moment;
+    const scale = moment.scale ?? Math.max(width, height) / REFERENCE_SIDE;
     const target = entry.output;
     const source = sourceOf(engine, image.store);
     const sketch = compiled(gl, source, image.source);
@@ -277,7 +316,6 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
     } else {
-        const scale = Math.max(width, height) / REFERENCE_SIDE;
         const params = {
             width: width / scale,
             height: height / scale,
@@ -289,7 +327,7 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-        if (!samePrepared(source.prepared, { sketch, image, width, height })) {
+        if (!samePrepared(source.prepared, { sketch, image, width, height, scale })) {
             const ramp = buildRamp(image.theme);
             prepare(surface, sketch, params, ramp, scale);
             source.prepared = {
@@ -297,6 +335,7 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
                 image,
                 width,
                 height,
+                scale,
                 backdrop: [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255],
             };
         } else {
@@ -497,6 +536,7 @@ export const cook = (
             entry.cooked.t === moment.t &&
             entry.cooked.pass === moment.pass &&
             samePointer(entry.cooked.pointer, moment.pointer) &&
+            entry.cooked.scale === moment.scale &&
             sameImage(entry.cooked.image, stage);
 
         if (!fresh) {
@@ -518,6 +558,7 @@ export const cook = (
                 t: moment.t,
                 pass: moment.pass,
                 pointer: moment.pointer,
+                scale: moment.scale,
             };
         }
 

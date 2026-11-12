@@ -5,14 +5,16 @@ import {
     Observable,
     type ObservableInput,
 } from 'rxjs';
-import { auditTime, concatMap, shareReplay, switchMap } from 'rxjs/operators';
+import { auditTime, concatMap, map, shareReplay, switchMap } from 'rxjs/operators';
 import type { Image } from '../image.ts';
 import {
+    checkFormula,
     cook,
     createEngine,
     presented,
     releaseEngine,
     type Engine,
+    type FormulaCheck,
     type Moment,
 } from './engine.ts';
 
@@ -66,5 +68,14 @@ export const view$ = (image$: Observable<Image>, moment$: Observable<Moment>): O
                               : framed(engine, image, moment),
                       ),
                   ),
+        ),
+    );
+
+export const checked$ = (text$: Observable<string>): Observable<FormulaCheck> =>
+    engine$.pipe(
+        switchMap(engine =>
+            engine instanceof Error
+                ? from([{ ok: false, message: engine.message } as const])
+                : text$.pipe(map(text => checkFormula(engine, text))),
         ),
     );
