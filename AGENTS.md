@@ -1827,6 +1827,11 @@ one size share every stage, two of different sizes cook the chain twice, which
 a common render size per chain could avoid if it is ever measured to matter. The **Pedalboard**
 starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
+**Light show** is the showcase, every pedal kind in one graph: a trefoil
+turned by a saw, folded and fed back, and a vortex blurred by a kick drum's
+level, screened together by a mix a sine swells, graded by a colour map whose
+offset a saw cycles and whose amount a pattern gate strobes. Its plot draws the
+four signals that move it.
 
 ## Logic
 

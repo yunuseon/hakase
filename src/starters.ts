@@ -4,7 +4,7 @@ import { defaultVoice, type Voice } from './components/voice/voice.ts';
 import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.ts';
 import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
-import { defaultPedal } from './pedals.ts';
+import { defaultPedal, type Pedal, type PedalKind } from './pedals.ts';
 import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
 import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
@@ -100,6 +100,22 @@ const SONG = { playback: { kind: 'playback', store: 'song' } } as const;
 const LOOP = { playback: { kind: 'playback', store: 'loop' } } as const;
 
 const TICK = { playback: { kind: 'playback', store: 'tick' } } as const;
+
+const SHOW = { playback: { kind: 'playback', store: 'show' } } as const;
+
+const bits = (marks: string): readonly Bit[] => [...marks].map(mark => (mark === '1' ? 1 : 0));
+
+const pedal = (
+    kind: PedalKind,
+    values: Readonly<Record<string, number>>,
+    sources: Readonly<Record<string, string>>,
+    choice?: string,
+): Pedal => ({
+    ...defaultPedal(kind),
+    values: { ...defaultPedal(kind).values, ...values },
+    sources: { ...defaultPedal(kind).sources, ...sources },
+    choice: choice ?? defaultPedal(kind).choice,
+});
 
 const gate = (kind: GateKind, sources: Gate['sources'] = {}, rest: Partial<Gate> = {}): Gate => ({
     ...GATE_DEFAULTS[kind],
@@ -490,6 +506,122 @@ export const STARTERS: readonly Starter[] = [
             { a: 'tint', b: 'out' },
             { a: 'source', b: 'spin' },
         ],
+    },
+    {
+        id: 'starter-light-show',
+        name: 'Light show',
+        summary:
+            'Two sketches through six pedals into one picture: a turning knot folded by a kaleidoscope and echoed by feedback, a vortex softened in time with a kick drum, screened together, colour graded and strobed by a gate. Four signals and a plot show what moves what. Press play.',
+        size: { width: 2168, height: 1244 },
+        windows: [
+            opened('show', 'timeline', 'show', { x: 24, y: 48, width: 360, height: 120 }),
+            opened('spin', 'signal', 'spin', { x: 400, y: 48, width: 280, height: 236 }, SHOW),
+            opened('drift', 'signal', 'drift', { x: 696, y: 48, width: 280, height: 236 }, SHOW),
+            opened('swell', 'signal', 'swell', { x: 992, y: 48, width: 280, height: 236 }, SHOW),
+            opened('cycle', 'signal', 'cycle', { x: 1288, y: 48, width: 280, height: 236 }, SHOW),
+            opened(
+                'plot',
+                'plot',
+                'plot',
+                { x: 1584, y: 48, width: 560, height: 236 },
+                {
+                    ...SHOW,
+                    a: { kind: 'signal', store: 'spin' },
+                    b: { kind: 'signal', store: 'drift' },
+                    c: { kind: 'signal', store: 'swell' },
+                    d: { kind: 'signal', store: 'cycle' },
+                },
+                { ...defaultPlot, layout: 'lanes' },
+            ),
+            opened('knot', 'sketch', 'knot', { x: 24, y: 300, width: 360, height: 452 }, SHOW, {
+                ...defaultSketch,
+                formula: 'trefoil',
+                theme: 'ice',
+                panel: { ...defaultPanel, mode: 'lines', dimension: 64 },
+            }),
+            opened('fold', 'kaleido', 'fold', { x: 400, y: 300, width: 300, height: 452 }, SHOW),
+            opened('echo', 'feedback', 'echo', { x: 716, y: 300, width: 300, height: 452 }, SHOW),
+            opened('blend', 'mix', 'blend', { x: 1032, y: 300, width: 300, height: 452 }, SHOW),
+            opened(
+                'grade',
+                'colourmap',
+                'grade',
+                { x: 1348, y: 300, width: 300, height: 452 },
+                SHOW,
+            ),
+            opened(
+                'out',
+                'output',
+                'output',
+                { x: 1664, y: 300, width: 480, height: 620 },
+                { ...SHOW, in: { kind: 'colourmap', store: 'grade' } },
+            ),
+            opened('swirl', 'sketch', 'swirl', { x: 24, y: 768, width: 360, height: 452 }, SHOW, {
+                ...defaultSketch,
+                formula: 'vortex',
+                theme: 'dusk',
+                panel: { ...defaultPanel, dimension: 72, trails: 0.4 },
+            }),
+            opened('haze', 'blur', 'haze', { x: 400, y: 768, width: 300, height: 452 }, SHOW),
+            opened('pulse', 'drums', 'pulse', { x: 716, y: 768, width: 440, height: 300 }, SHOW),
+            opened('strobe', 'pattern', 'strobe', { x: 1172, y: 768, ...GATES.pattern.size }, SHOW),
+        ],
+        stores: [
+            {
+                ...own('show', 'timeline', 'Light show'),
+                clock: { duration: 16, looping: true, ticks: 16 },
+            },
+            own('spin', 'signal', 'Spin'),
+            own('drift', 'signal', 'Drift'),
+            own('swell', 'signal', 'Swell'),
+            own('cycle', 'signal', 'Cycle'),
+            own('knot', 'sketch', 'Knot'),
+            own('swirl', 'sketch', 'Swirl'),
+            own('fold', 'kaleido', 'Fold'),
+            own('echo', 'feedback', 'Echo'),
+            own('haze', 'blur', 'Haze'),
+            own('blend', 'mix', 'Blend'),
+            own('grade', 'colourmap', 'Grade'),
+            own('pulse', 'drums', 'Pulse'),
+            own('strobe', 'pattern', 'Strobe'),
+        ],
+        held: {
+            ...held,
+            signals: [
+                ['spin', { ...defaultSignal, shape: 'saw', rate: 1, offset: 0.5, depth: 0.5 }],
+                ['drift', { ...defaultSignal, shape: 'sine', rate: 2, offset: 0, depth: 0.02 }],
+                ['swell', { ...defaultSignal, shape: 'sine', rate: 1, offset: 0.6, depth: 0.35 }],
+                ['cycle', { ...defaultSignal, shape: 'saw', rate: 1, offset: 0, depth: 1 }],
+            ],
+            sketchLinks: [
+                ['knot', { sources: { ...unlinkedSketch.sources, turn: 'spin' } }],
+                ['swirl', { sources: { ...unlinkedSketch.sources, k1: 'swell', k4: 'cycle' } }],
+            ],
+            drums: [
+                ['pulse', { ...defaultDrums, volume: 0.6, pattern: PRESETS['four on the floor'] }],
+            ],
+            gates: [['strobe', gate('pattern', {}, { steps: bits('1111111111110101') })]],
+            pedals: [
+                ['fold', pedal('kaleido', { segments: 8 }, { in: 'knot', rotate: 'spin' })],
+                [
+                    'echo',
+                    pedal('feedback', { decay: 0.9, zoom: 1.025 }, { in: 'fold', rotate: 'drift' }),
+                ],
+                ['haze', pedal('blur', {}, { in: 'swirl', radius: 'pulse' })],
+                ['blend', pedal('mix', {}, { a: 'echo', b: 'haze', amount: 'swell' }, 'screen')],
+                [
+                    'grade',
+                    pedal(
+                        'colourmap',
+                        {},
+                        { in: 'blend', offset: 'cycle', amount: 'strobe' },
+                        'ember',
+                    ),
+                ],
+            ],
+        },
+        formulas: [],
+        links: [],
     },
     {
         id: 'starter-logic',

@@ -184,6 +184,37 @@ describe('starter blueprints', () => {
         expect(after.workspace.links).toHaveLength(before.workspace.links.length + 5);
     });
 
+    it('places a Light show whose two chains meet in one graded picture', () => {
+        const before = scene();
+        const after = placed(before, starter('starter-light-show'), view, 300, inputsFor);
+        const id = (name: string) =>
+            after.workspace.stores.find(
+                store => store.name === name && store.id.startsWith('store-300'),
+            )?.id ?? '';
+        const output = after.workspace.processes.find(({ program }) => program === 'output');
+
+        expect(after.pedals.get(id('Fold'))?.sources).toMatchObject({
+            in: id('Knot'),
+            rotate: id('Spin'),
+        });
+        expect(after.pedals.get(id('Echo'))?.sources).toMatchObject({ in: id('Fold') });
+        expect(after.pedals.get(id('Haze'))?.sources).toMatchObject({
+            in: id('Swirl'),
+            radius: id('Pulse'),
+        });
+        expect(after.pedals.get(id('Blend'))).toMatchObject({
+            choice: 'screen',
+            sources: { a: id('Echo'), b: id('Haze'), amount: id('Swell') },
+        });
+        expect(after.pedals.get(id('Grade'))?.sources).toMatchObject({
+            in: id('Blend'),
+            offset: id('Cycle'),
+            amount: id('Strobe'),
+        });
+        expect(after.sketchLinks.get(id('Knot'))?.sources.turn).toBe(id('Spin'));
+        expect(output?.follows).toMatchObject({ in: { kind: 'colourmap', store: id('Grade') } });
+    });
+
     it('places a Logic primer whose half adder adds and whose counter counts', () => {
         const before = scene();
         const after = placed(before, starter('starter-logic'), view, 300, inputsFor);
