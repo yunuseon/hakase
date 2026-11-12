@@ -28,10 +28,11 @@
     const capture = window.createImageBitmap.bind(window);
     window.createImageBitmap = (...args) => {
         const start = performance.now();
-        const [, , , w, h, options] = args;
+        const [source, , , w, h, options] = args;
+        const sourced = `${source?.width}x${source?.height}`;
         const pixels = (options?.resizeWidth ?? w ?? 0) * (options?.resizeHeight ?? h ?? 0);
         return capture(...args).then(bitmap => {
-            bitmaps.push({ ms: performance.now() - start, pixels: w * h || pixels });
+            bitmaps.push({ ms: performance.now() - start, pixels: w * h || pixels, sourced });
             return bitmap;
         });
     };
@@ -80,6 +81,7 @@
                 1e6 /
                 (ms / 1000)
             ).toFixed(1),
+            'source canvas': [...new Set(bitmaps.map(({ sourced }) => sourced))].join(' '),
             'long frames': long.length,
             'long frame ms': long.reduce((sum, e) => sum + e.duration, 0).toFixed(0),
             'long frame render ms': long
