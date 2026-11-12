@@ -7,7 +7,7 @@ import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
 import { buildRamp } from '../components/sketch/theme.ts';
 import type { Size } from '../components/window/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
-import { cook, framedIn, reserved } from './engine.ts';
+import { cook, filmed, filmFor, framedIn } from './engine.ts';
 import { engine$ } from './view.ts';
 
 const SETTLE_MS = 250;
@@ -85,9 +85,13 @@ export const filmstrip$ = (
                         },
                         limit,
                     );
+                    const tile = {
+                        width: Math.max(1, Math.round(geometry.tileWidth * ratio)),
+                        height: Math.max(1, Math.round(geometry.tileHeight * ratio)),
+                    };
                     const slot = {
-                        width: Math.max(1, Math.round(geometry.tileWidth * ratio * supersample)),
-                        height: Math.max(1, Math.round(geometry.tileHeight * ratio * supersample)),
+                        width: tile.width * supersample,
+                        height: tile.height * supersample,
                     };
                     const box = frame === null ? { x: 0, y: 0, ...slot } : fitted(slot, frame);
                     const dotScale =
@@ -95,7 +99,7 @@ export const filmstrip$ = (
                     const backdrop = backdropOf(image);
                     const now = performance.now();
 
-                    reserved(engine, slot.width * count, slot.height);
+                    const film = filmFor(engine, slot.width * count, slot.height, now);
 
                     // Left to right, so one replay from the start passes every tile's moment in turn.
                     Array.from({ length: count }, (_, at) => range.first + at).forEach(
@@ -121,6 +125,7 @@ export const filmstrip$ = (
                             );
                             framedIn(
                                 engine,
+                                film,
                                 texture,
                                 { x: at * slot.width, ...slot },
                                 box,
@@ -129,20 +134,8 @@ export const filmstrip$ = (
                         },
                     );
 
-                    // Bottom rows, where GL draws; and a true area average, not the bilinear CSS scaling that skips pixels.
                     return from(
-                        createImageBitmap(
-                            engine.canvas,
-                            0,
-                            engine.canvas.height - slot.height,
-                            slot.width * count,
-                            slot.height,
-                            {
-                                resizeWidth: Math.round(count * geometry.tileWidth * ratio),
-                                resizeHeight: Math.round(geometry.tileHeight * ratio),
-                                resizeQuality: 'high',
-                            },
-                        ),
+                        filmed(engine, film, tile.width * count, tile.height, supersample),
                     ).pipe(
                         map((bitmap): Filmstrip => ({
                             bitmap,

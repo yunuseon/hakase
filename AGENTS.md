@@ -2422,19 +2422,25 @@ tried as well and changed nothing, so it is not there. Thumbnails re-render at
 most once per animation frame (`auditTime(0, animationFrameScheduler)`), so they
 move with the canvas rather than stepping behind it.
 
-That picture's canvas is **never resized down**. The number of visible tiles and
-their width change on every pinch tick and every time playback pages the strip,
-and reallocating a canvas that size (up to the GPU's limit at 8x supersampling)
-took up to 100 ms — a pinch ran at 32 fps. The engine's `reserved` only grows
-it, by half at least and capped at `MAX_VIEWPORT_DIMS`, and a strip reserves its
-**whole width before its first tile**: growing clears the canvas, and growing
-tile by tile left only the last one, a black strip that went unnoticed for the
-Output's. Everything else grows it exactly (`grown`), because an export writes
-the whole canvas out. The strip is drawn into its bottom
-rows (GL's origin is bottom-left), and `createImageBitmap(canvas, x, y, w, h,
-resize)` crops and averages it down in one step. Copying out rather than
-`transferToImageBitmap` also keeps the buffer instead of handing it over each
-frame.
+**A strip never draws on the engine's canvas.** Every bitmap a window takes
+from that canvas copies the whole of it, however small the crop, so a strip
+that grew it to 5632 x 512 made all eight windows of Light show copy 2.9
+megapixels each per frame to show 0.4 between them, and playback fell to 47 fps
+with the script idle at 1.2 ms. The tiles go into a **film** of their own
+(`filmFor`, one target per engine), and `filmed` averages it down into the
+canvas at the strip's final size with a box filter (`downsample.frag`), so the
+canvas stays as small as the largest window.
+
+The film is **never resized down**. The number of visible tiles and their width
+change on every pinch tick and every time playback pages the strip, and
+reallocating something that size (up to the GPU's limit at 8x supersampling)
+took up to 100 ms — a pinch ran at 32 fps. `filmFor` only grows it, by half at
+least and capped at the viewport and texture limits, and a strip reserves its
+**whole width before its first tile**: growing clears it, and growing tile by
+tile left only the last one, a black strip that went unnoticed for the Output's.
+The canvas grows exactly (`grown`), because an export writes the whole canvas
+out. A slot is a whole number of the tile's pixels times the supersampling, so
+the average covers each block exactly.
 Its host has `contain: inline-size`, which is load-bearing: without it the
 thousands-of-pixels track sets the controls' intrinsic width, and the strip
 pushes past the window instead of scrolling inside it.
@@ -2467,9 +2473,9 @@ are traps:
 - **Do not raster at tile size.** A dot under a couple of pixels loses most of
   its coverage and the miniature reads pale. Tiles render supersampled —
   `supersampleFor`, up to 8x, lowered to fit `MAX_VIEWPORT_DIMS` because a wide
-  strip at 8x would not fit one canvas — and `createImageBitmap` with
-  `resizeQuality: 'high'` averages them down; CSS scaling of a canvas is bilinear
-  and skips most of the pixels. 4x still read pale on dense spikes; 8x matched a
+  strip at 8x would not fit one target — and `filmed` averages them down, a true
+  area average; CSS scaling of a canvas is bilinear and skips most of the
+  pixels. 4x still read pale on dense spikes; 8x matched a
   high-quality downscale of the sketch itself.
 
 The fragment shader's two size rules — the anti-aliasing band and `SMALL_DOT`,

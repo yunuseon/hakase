@@ -42,6 +42,7 @@ import feedback from './shaders/feedback.frag?raw';
 import kaleido from './shaders/kaleido.frag?raw';
 import mix from './shaders/mix.frag?raw';
 import pass from './shaders/pass.vert?raw';
+import downsample from './shaders/downsample.frag?raw';
 import present from './shaders/present.frag?raw';
 import sheet from './shaders/sheet.frag?raw';
 import {
@@ -119,9 +120,10 @@ export type Engine = {
     readonly gl: WebGL2RenderingContext;
     readonly vao: WebGLVertexArrayObject;
     readonly blank: WebGLTexture;
-    readonly passes: Readonly<Record<PedalKind | 'present' | 'sheet', Pass>>;
+    readonly passes: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample', Pass>>;
     readonly ink: InkPass;
     readonly sheets: Map<string, Sheet>;
+    readonly films: Map<'strip', Film>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
     readonly checks: Map<string, FormulaCheck>;
@@ -143,7 +145,9 @@ type Sheet = {
 
 export const SHEET_SIDE = 768;
 
-const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet', string>> = {
+type Film = { readonly target: Target; used: number };
+
+const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample', string>> = {
     colourmap,
     kaleido,
     feedback,
@@ -151,6 +155,7 @@ const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet', string>> = {
     blur,
     present,
     sheet,
+    downsample,
 };
 
 const passOf = (gl: WebGL2RenderingContext, fragment: string): Pass => {
@@ -194,9 +199,11 @@ export const createEngine = (): Engine => {
             blur: passOf(gl, FRAGMENTS.blur),
             present: passOf(gl, FRAGMENTS.present),
             sheet: passOf(gl, FRAGMENTS.sheet),
+            downsample: passOf(gl, FRAGMENTS.downsample),
         },
         ink: createInkPass(gl),
         sheets: new Map(),
+        films: new Map(),
         sources: new Map(),
         entries: new Map(),
         checks: new Map(),
@@ -556,6 +563,12 @@ const forget = (engine: Engine, now: number): void => {
             engine.sheets.delete(key);
         }
     });
+    engine.films.forEach((film, key) => {
+        if (now - film.used > FORGET_MS) {
+            releaseTarget(gl, film.target);
+            engine.films.delete(key);
+        }
+    });
     engine.sources.forEach((source, store) => {
         if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
             releaseSource(gl, source);
@@ -635,20 +648,35 @@ const grownSide = (current: number, needed: number, limit: number): number =>
         ? current
         : Math.min(limit, Math.ceil(Math.max(needed, current * 1.5) / GROWTH) * GROWTH);
 
-// Growing clears the canvas, so a strip reserves its whole width before its first tile; by half at least, or every pinch reallocates.
-export const reserved = (engine: Engine, width: number, height: number): void => {
-    const { canvas, gl } = engine;
+// A strip draws into a target of its own, never the canvas: every bitmap a window takes copies the whole canvas, however small its crop.
+// Growing clears it, so a strip reserves its whole width before its first tile; by half at least, or every pinch reallocates.
+export const filmFor = (engine: Engine, width: number, height: number, now: number): Target => {
+    const { gl } = engine;
     const dimensions: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
-    const limit = dimensions instanceof Int32Array ? (dimensions[0] ?? 4096) : 4096;
+    const limit = Math.min(
+        dimensions instanceof Int32Array ? (dimensions[0] ?? 4096) : 4096,
+        Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 4096,
+    );
+    const known = engine.films.get('strip');
     const next = {
-        width: grownSide(canvas.width, width, limit),
-        height: grownSide(canvas.height, height, limit),
+        width: grownSide(known?.target.width ?? 0, width, limit),
+        height: grownSide(known?.target.height ?? 0, height, limit),
     };
+    const film =
+        known !== undefined &&
+        known.target.width === next.width &&
+        known.target.height === next.height
+            ? known
+            : { target: createTarget(gl, next.width, next.height), used: now };
 
-    if (next.width !== canvas.width || next.height !== canvas.height) {
-        canvas.width = next.width;
-        canvas.height = next.height;
+    if (known !== undefined && film !== known) {
+        releaseTarget(gl, known.target);
     }
+
+    film.used = now;
+    engine.films.set('strip', film);
+
+    return film.target;
 };
 
 export const drawn = (
@@ -658,12 +686,15 @@ export const drawn = (
     height: number,
     x = 0,
     y = 0,
+    into: Target | null = null,
 ): void => {
     const { gl } = engine;
     const shader = engine.passes.present;
 
-    grown(engine, x + width, y + height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (into === null) {
+        grown(engine, x + width, y + height);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, into?.framebuffer ?? null);
     gl.viewport(x, y, width, height);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -679,6 +710,7 @@ export const drawn = (
 // A tile's slot takes the picture's backdrop, then the picture fitted inside it, the way the window frames it.
 export const framedIn = (
     engine: Engine,
+    film: Target,
     texture: WebGLTexture | null,
     slot: { readonly x: number; readonly width: number; readonly height: number },
     box: {
@@ -691,14 +723,41 @@ export const framedIn = (
 ): void => {
     const { gl } = engine;
 
-    grown(engine, slot.x + slot.width, slot.height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, film.framebuffer);
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(slot.x, 0, slot.width, slot.height);
     gl.clearColor(...backdrop, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.SCISSOR_TEST);
-    drawn(engine, texture, box.width, box.height, slot.x + box.x, box.y);
+    drawn(engine, texture, box.width, box.height, slot.x + box.x, box.y, film);
+};
+
+// The film's bottom rows, averaged factor x factor into the canvas at the strip's own size.
+export const filmed = (
+    engine: Engine,
+    film: Target,
+    width: number,
+    height: number,
+    factor: number,
+): Promise<ImageBitmap> => {
+    const { gl } = engine;
+    const shader = engine.passes.downsample;
+
+    grown(engine, width, height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.useProgram(shader.program);
+    bindInput(engine, 0, film.texture);
+    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
+    gl.uniform1i(shader.at('uFactor'), factor);
+    gl.bindVertexArray(engine.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    gl.activeTexture(gl.TEXTURE0);
+
+    return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
 };
 
 export const presented = (
