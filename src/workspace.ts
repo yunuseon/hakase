@@ -620,6 +620,20 @@ const resizedToNeighbours = (
     };
 };
 
+const SHOWN_MARGIN = 120;
+
+export const onScreen = (box: Rect, camera: Camera, viewport: Extent): boolean => {
+    const view = visibleWorld(camera, viewport);
+    const margin = SHOWN_MARGIN / camera.zoom;
+
+    return (
+        box.x < view.x + view.width + margin &&
+        box.x + box.width > view.x - margin &&
+        box.y < view.y + view.height + margin &&
+        box.y + box.height > view.y - margin
+    );
+};
+
 const SECTION_INSET = 0.12;
 
 export const visibleWorld = (camera: Camera, viewport: Extent): Rect => ({

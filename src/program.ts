@@ -289,6 +289,8 @@ export type Program<K extends ProgramId = ProgramId> = {
     readonly size: Size;
     // The smallest window its content still lays out in; the workspace clamps every resize to it.
     readonly minimum: Size;
+    // Off screen, a window's clock stops reaching it; one that is heard as well as seen keeps it.
+    readonly audible?: true;
     // A factory, not an element: two processes of one program need two elements.
     readonly launch: () => ProcessView;
 };

@@ -24,7 +24,8 @@ import { CATEGORIES, type ProcessId, type Slot } from '../program.ts';
 import { inputsFor, programList, programOf } from '../programs.ts';
 import type { Linked } from '../shared/signal.ts';
 import { colourOf, HOLDING, settingsKey, withMain, type StoreId } from '../stores.ts';
-import type { Process } from '../workspace.ts';
+import { boxOf, onScreen, type Process } from '../workspace.ts';
+import { viewport$ } from '../lib/rx.ts';
 import type { Scoped } from './app-state.graph.ts';
 import type { Chrome } from './chrome.graph.ts';
 import type { Projections } from './projections.graph.ts';
@@ -64,7 +65,7 @@ const usersOf = (processes: readonly Process[], id: StoreId): number =>
 type Entry = { readonly process: Process; readonly index: number; readonly last: number };
 
 type Reads = Pick<Chrome, 'canvas'> &
-    Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'links$'> &
+    Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'links$' | 'camera$'> &
     Pick<Selection, 'selectedIds$'> &
     Pick<StateMode, 'wiringEvents$'> & { readonly scoped: Scoped };
 
@@ -75,6 +76,7 @@ export const windowsOf = ({
     ids$,
     settings$,
     links$,
+    camera$,
     selectedIds$,
     wiringEvents$,
     scoped,
@@ -99,6 +101,12 @@ export const windowsOf = ({
                 focused: index === last,
             })),
             distinctUntilChanged(sameSlot),
+        );
+
+    const shownOf = (entry$: Observable<Entry>): Observable<boolean> =>
+        combineLatest([entry$, camera$, viewport$]).pipe(
+            map(([{ process }, camera, viewport]) => onScreen(boxOf(process), camera, viewport)),
+            distinctUntilChanged(),
         );
 
     const storeOf = (entry$: Observable<Entry>): Observable<StoreId> =>
@@ -251,7 +259,12 @@ export const windowsOf = ({
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(store$, clock$, followsOf(entry$)),
+                      scoped(
+                          store$,
+                          clock$,
+                          followsOf(entry$),
+                          'audible' in program ? of(true) : shownOf(entry$),
+                      ),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(

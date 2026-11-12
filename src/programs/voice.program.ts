@@ -33,6 +33,7 @@ export const voiceProgram = {
     icon: 'M9 18 V6 L19 4 V16 M9 18 A2.5 2.5 0 1 1 4 18 A2.5 2.5 0 1 1 9 18 M19 16 A2.5 2.5 0 1 1 14 16 A2.5 2.5 0 1 1 19 16',
     size: { width: 400, height: 360 },
     minimum: { width: 300, height: 300 },
+    audible: true,
     launch: () => {
         const voice = new HksVoice();
 

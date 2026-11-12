@@ -12,6 +12,7 @@ import {
     usedStores,
     type Workspace,
     type WorkspaceAction,
+    onScreen,
 } from './workspace.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { defaultSignal } from './shared/signal.ts';
@@ -28,6 +29,21 @@ const run = (history: History, actions: readonly WorkspaceAction[]): History => 
 });
 
 const fresh = (): History => ({ present: defaultWorkspace(viewport, inputsFor) });
+
+describe('on screen', () => {
+    const viewport = { width: 800, height: 600 };
+
+    it('counts a window in view or within the margin, at any zoom', () => {
+        const box = (x: number, y: number) => ({ x, y, width: 100, height: 100 });
+
+        expect(onScreen(box(300, 200), { x: 0, y: 0, zoom: 1 }, viewport)).toBe(true);
+        expect(onScreen(box(850, 200), { x: 0, y: 0, zoom: 1 }, viewport)).toBe(true);
+        expect(onScreen(box(1000, 200), { x: 0, y: 0, zoom: 1 }, viewport)).toBe(false);
+        expect(onScreen(box(-300, 200), { x: 0, y: 0, zoom: 1 }, viewport)).toBe(false);
+        expect(onScreen(box(1000, 200), { x: 0, y: 0, zoom: 0.5 }, viewport)).toBe(true);
+        expect(onScreen(box(1000, 200), { x: -900, y: 0, zoom: 1 }, viewport)).toBe(true);
+    });
+});
 
 describe('launch placement', () => {
     const launch = {

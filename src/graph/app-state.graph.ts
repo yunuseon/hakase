@@ -587,6 +587,7 @@ export const scopedOf = ({
         store$: Observable<StoreId>,
         clock$: Observable<PlaybackBinding | null>,
         follows$: Observable<Bindings>,
+        shown$: Observable<boolean> = of(true),
     ): AppState => {
         const followed$ = (input: string) =>
             follows$.pipe(
@@ -595,8 +596,10 @@ export const scopedOf = ({
             );
         const narrowed = <T>(select: (store: StoreId) => Observable<T>): Observable<T> =>
             store$.pipe(switchMap(select));
-        const clock = clock$.pipe(
-            switchMap(binding => (binding === null ? EMPTY : playbackIn(binding.store))),
+        const clock = combineLatest([clock$, shown$]).pipe(
+            switchMap(([binding, shown]) =>
+                binding === null || !shown ? EMPTY : playbackIn(binding.store),
+            ),
             shareReplay({ bufferSize: 1, refCount: true }),
         );
 

@@ -786,7 +786,6 @@ export class HksWindow extends HTMLElement {
                 ),
                 combineLatest([stores$, follows$, this.expanded$]).pipe(
                     tap(([stores, follows, expanded]) => {
-                        // A window with no store of its own shows the one it runs on: the dial shows its clock.
                         const current =
                             stores?.find(option => option.current) ??
                             follows

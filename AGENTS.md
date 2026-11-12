@@ -3062,6 +3062,24 @@ reallocation, sketch buffer reallocation during zoom, the zip's CRC — are fixe
 above. Web workers were considered and are not needed: nothing measured is
 main-thread bound except the PNG read-back.
 
+**A window out of view does no per-frame work.** Each window's `shown` is
+derived from the camera, the viewport and its box (`onScreen`, with a margin of
+120 screen pixels, so it starts drawing just before it slides in), and
+`scoped` withholds its clock while it is false: the playhead, the clock, the
+pace and everything built on them stop arriving, so a sketch, a pedal view, a
+signal, a plot or a gate pauses with no code of its own and picks up at the
+current moment when it comes back. Programs that are heard as well as seen
+(voice and drums) are `audible` and keep their clock, or panning away would
+stop the music. An export snapshots its request when it starts, so leaving
+the view does not stall it. With four clocks playing, script per frame went
+from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
+
+The other limit is the browser's: a page keeps at most **16 WebGL contexts**
+and silently loses the oldest past that (measured). Every sketch window, pen
+window and open frame strip holds one, besides the engine's, and nothing yet
+handles a lost context, so around 13 sketches the oldest goes blank. Drawing
+sketches through the shared engine, as pedals already are, would lift it.
+
 **Many windows stay cheap because nothing per window scans every window.**
 Logic gates are tiny windows, so the canvas must hold hundreds. A drag move at
 161 windows took 8.8 ms and now takes under 1 ms, from four rules:
