@@ -12,6 +12,8 @@
             t.shadowRoot.querySelector(`button[aria-label="${label}"]`)?.click(),
         );
     const scripts = new Map();
+    const running = () =>
+        transports().filter(t => t.shadowRoot.querySelector('button[aria-label="pause"]')).length;
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = callback =>
         raf(stamp => {
@@ -45,12 +47,14 @@
         const g = sorted(gaps);
         const s = sorted(scripts.values());
         return {
+            'clocks playing': running(),
+            'app callbacks': s.length,
             fps: Math.round(gaps.length / (ms / 1000)),
             'frame median ms': at(g, 0.5),
             'frame p95 ms': at(g, 0.95),
             'frames over 25 ms': gaps.filter(gap => gap > 25).length,
-            'script median ms': at(s, 0.5),
-            'script p95 ms': at(s, 0.95),
+            'script median ms': at(s, 0.5) ?? '0',
+            'script p95 ms': at(s, 0.95) ?? '0',
         };
     };
     const windows = all(document).filter(e => e.tagName === 'HKS-WINDOW');
@@ -67,6 +71,6 @@
     window.requestAnimationFrame = raf;
     console.table({ paused, playing });
     console.log(
-        `${windows.length} windows, ${inView} in view, ${innerWidth}x${innerHeight} at ${devicePixelRatio}x`,
+        `${transports().length} timelines, ${windows.length} windows, ${inView} in view, ${innerWidth}x${innerHeight} at ${devicePixelRatio}x`,
     );
 })();
