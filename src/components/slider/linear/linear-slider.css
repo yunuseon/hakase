@@ -1,7 +1,7 @@
 :host {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     block-size: 100%;
     min-block-size: 0;
     min-inline-size: 0;
@@ -15,64 +15,54 @@
 .track {
     position: relative;
     flex: 1;
-    min-block-size: 2rem;
+    min-block-size: var(--control-lg);
+    overflow: hidden;
+    background: var(--well);
+    border-radius: var(--radius-lg);
     cursor: pointer;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
 }
 
-.track::before {
-    content: '';
-    position: absolute;
-    inset-inline: 0;
-    inset-block: 0;
-    block-size: var(--space-1);
-    margin-block: auto;
-    background-color: var(--edge);
-    border-radius: var(--radius-xs);
+.track:hover {
+    background: color-mix(in srgb, var(--well) 94%, var(--ink));
 }
 
-/* Ticks at every eighth: a scale to read the loop against, not a snap. */
+/* A ruler to read the loop against, not a snap: eighths, with the half taller. */
 .track::after {
     content: '';
     position: absolute;
-    inset-inline: 0;
-    inset-block-start: 0;
-    block-size: calc(50% - var(--space-1-5));
-    background: linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 12.5% 100% repeat-x;
-    border-inline-end: 1px solid var(--rule);
+    inset: 0;
+    z-index: 1;
+    background:
+        linear-gradient(
+                90deg,
+                transparent calc(50% - 0.5px),
+                var(--rule) 0 calc(50% + 0.5px),
+                transparent 0
+            )
+            0 100% / 100% 40% no-repeat,
+        linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 100% / 12.5% 22% repeat-x;
+    pointer-events: none;
 }
 
 .indicator {
     position: absolute;
-    inset-block-start: 0;
+    inset-block: 0;
     inset-inline-start: 0;
-    block-size: 100%;
+    min-inline-size: 3px;
     pointer-events: none;
-}
-
-.indicator::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    block-size: var(--space-1);
-    margin-block: auto;
-    background-color: var(--accent);
-    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .indicator::after {
     content: '';
     position: absolute;
-    inset-block: 0;
-    inset-inline-end: calc(var(--spacing) * -1.75);
-    inline-size: var(--space-3-5);
-    block-size: var(--space-3-5);
-    margin-block: auto;
-    background-color: var(--panel);
-    border-radius: 50%;
-    box-shadow:
-        0 0 0 2px var(--accent),
-        0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    z-index: 2;
+    inset-block: var(--space-1);
+    inset-inline-end: 0;
+    inline-size: 3px;
+    background: var(--accent);
+    border-radius: var(--radius-full);
 }
