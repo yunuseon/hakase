@@ -45,6 +45,7 @@ const started = (): Documents => ({
     themes: new Map(),
     looks: new Map(),
     look: 'paper',
+    aspect: '1:1',
 });
 
 const reduce = reduceHistory(documentsKit(inputsFor));

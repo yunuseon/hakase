@@ -16,6 +16,7 @@ import {
 import { HksImageView } from '../components/image-view/image-view.component.ts';
 import type { Shown } from '../shared/shown.ts';
 import {
+    aspectSize,
     exportPixels,
     followed,
     frameAtX,
@@ -38,7 +39,7 @@ import {
     type SavedFile,
 } from '../components/sketch/export/export-panel.component.ts';
 import { imageExport$, imageStill$ } from '../engine/export.ts';
-import { momentOf$, viewRatio$ } from '../engine/moment.ts';
+import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$, type View } from '../engine/view.ts';
 import { imageInput, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -50,6 +51,9 @@ export const shownOf =
         view.kind === 'frame'
             ? view
             : { kind: 'message', text: view.kind === 'empty' ? empty : view.message };
+
+// Large enough that rounding keeps the ratio: at 1 every aspect rounds to a square.
+const ASPECT_SIDE = 2160;
 
 export const outputProgram = {
     id: 'output',
@@ -69,7 +73,19 @@ export const outputProgram = {
 
         return {
             element: view,
-            run$: ({ followedImage$, clock$, zoom$, duration$, playhead$, playing$ }, self) => {
+            run$: (
+                {
+                    followedImage$,
+                    clock$,
+                    zoom$,
+                    duration$,
+                    playhead$,
+                    playing$,
+                    aspect$,
+                    previewSide$,
+                },
+                self,
+            ) => {
                 const settings$ = self.settings$.pipe(map(asOutput), distinctUntilChanged());
                 const exportSettings$ = settings$.pipe(
                     map(settings => settings.export),
@@ -82,6 +98,10 @@ export const outputProgram = {
                     map(([seconds, { fps }]) => frameCount(seconds, fps)),
                     distinctUntilChanged(),
                 );
+                const shape$ = aspect$.pipe(
+                    map(aspect => aspectSize(aspect, ASPECT_SIDE)),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
                 const ratio$ = viewRatio$(zoom$).pipe(
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
@@ -91,9 +111,9 @@ export const outputProgram = {
                         map(({ stripLevel }) => stripLevel),
                         distinctUntilChanged(),
                     ),
-                    view.sizes$,
+                    shape$,
                 ]).pipe(
-                    map(([frames, level, size]) => stripGeometry(frames, level, size)),
+                    map(([frames, level, shape]) => stripGeometry(frames, level, shape)),
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
                 const visible$ = strip.visible$.pipe(
@@ -126,12 +146,7 @@ export const outputProgram = {
                     }),
                 );
 
-                const request$ = combineLatest([
-                    image$,
-                    duration$,
-                    view.sizes$,
-                    exportSettings$,
-                ]).pipe(
+                const request$ = combineLatest([image$, duration$, shape$, exportSettings$]).pipe(
                     map(([image, seconds, size, settings]) => ({
                         image,
                         seconds,
@@ -167,7 +182,7 @@ export const outputProgram = {
                     ),
                 );
 
-                const summary$ = combineLatest([view.sizes$, exportSettings$, frames$]).pipe(
+                const summary$ = combineLatest([shape$, exportSettings$, frames$]).pipe(
                     map(([size, settings, frames]) => {
                         const { width, height } = exportPixels(size, settings.size);
 
@@ -178,7 +193,10 @@ export const outputProgram = {
                 return merge(
                     view
                         .connect$(
-                            view$(image$, momentOf$(clock$, view.sizes$, ratio$)).pipe(
+                            view$(
+                                image$,
+                                chainShowing$(clock$, aspect$, previewSide$, view.sizes$, ratio$),
+                            ).pipe(
                                 map(
                                     shownOf(
                                         'Nothing plugged in. In state mode, wire a sketch into in.',
@@ -191,7 +209,13 @@ export const outputProgram = {
                         .connect$(
                             layout$,
                             playhead$,
-                            filmstrip$(image$, of(null), duration$, ratio$, layout$),
+                            filmstrip$(
+                                image$,
+                                shape$.pipe(map(shape => ({ frame: null, shape }))),
+                                duration$,
+                                ratio$,
+                                layout$,
+                            ),
                             merge(
                                 follow$,
                                 stripZooms$.pipe(
@@ -202,7 +226,7 @@ export const outputProgram = {
                         )
                         .pipe(ignoreElements()),
                     exporter
-                        .connect$(exportSettings$, summary$, status$, files$)
+                        .connect$(exportSettings$, summary$, status$, files$, aspect$)
                         .pipe(ignoreElements()),
                     strip.seeks$.pipe(
                         withLatestFrom(geometry$),
@@ -219,6 +243,7 @@ export const outputProgram = {
                             settings: { ...settings, stripLevel: level },
                         })),
                     ),
+                    exporter.aspects$.pipe(map((aspect): AppInput => ({ kind: 'aspect', aspect }))),
                     exporter.changes$.pipe(
                         withLatestFrom(settings$),
                         map(([change, settings]): AppInput => ({

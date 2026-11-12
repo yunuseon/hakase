@@ -1117,7 +1117,7 @@ not enough: a ctrl+wheel zoom still crossed a step every few ticks, and at the
 cap each reallocation took 50 ms. So `viewRatio$` waits until the zoom has
 settled for `SETTLE_MS` (150 ms) before it emits, and in the meantime CSS
 scales the last picture; the first value applies at once, or a sketch would
-open late. The window's moment (`windowMoment$`) carries its **scale**, pixels
+open late. The window's moment (`windowShowing$`) carries its **scale**, pixels
 per sketch unit, so the engine sizes its dots as the window would; a pedal's
 moment carries none, and the engine frames the sketch at the reference side.
 
@@ -1832,17 +1832,33 @@ tile is one more size, drawn at an offset into the engine's canvas and averaged
 down in one `createImageBitmap`, and a tile whose recipe and moment are
 unchanged comes from the cache.
 
-**A chain is drawn once a frame, at the shape of its end.** Each window used to
-cook its chain at its own size, so Light show drew its chain about three times a
-frame and played at 38 fps with 52 windows in view and the script idle; drawn
-once it holds 60. A request that frames by the reference side (a pedal, an
-Output, their strips) **claims** a size for every stage it reaches (`claimed`):
-the longest chain asking wins, the larger picture breaks a tie, and a claim
-lapses after three seconds unasked, so a resized window gives up its old size.
-A window showing a stage mid-chain gets the end's shape and `framedIn` fits it
-inside, with the backdrop around it, like a monitor; every window then agrees
-with what the Output exports. A sketch's own window frames by its own size and
-claims nothing, since no chain shares that picture. The **Pedalboard**
+**A chain's picture has the app's aspect, not a window's.** The aspect is a
+document like the look (`Documents.aspect`, one of `ASPECTS`, 1:1 by default),
+saved and undoable, and picked in any Output's export panel; the panel hides
+the row for a sketch, which its window frames. Every window showing a chain
+(a pedal, an Output) asks for it at that aspect and one preview size
+(`chainShowing$`), so the moment and therefore every stage's target is the same
+for all of them, and a chain is drawn once a frame
+however many windows show parts of it. A **Showing** pairs that moment with the
+window's own pixels, the `slot`, and `presented` fits the picture inside with
+the backdrop around it, like a monitor; an Output's strip and export take the
+aspect too, so every window agrees with what is exported. Each window used to
+ask at its own size: Light show then drew its chain about three times a frame
+and played at 38 fps with 52 windows in view and the script idle; drawn once it
+holds 60. Deriving one shape inside the engine from whichever windows asked
+was tried first and dropped: a picture then depended on what else was open,
+which no recipe said. A sketch's own window still frames by its own size
+(`windowShowing$`): no chain shares that picture.
+
+**The preview size is one for the app, derived from the workspace**
+(`previewSideOf`, `AppState.previewSide$`): the widest pedal or Output window
+in view, in pixels at the current zoom, rounded up to 256, 512, 1024 or 2048.
+It sets only how finely a chain is drawn, never what. A fixed 1024 drew up to
+twenty times the pixels a zoomed-out window shows and fell to 45 fps; a size
+per window, even stepped, drew a chain once per step present and held 55; one
+for the app holds 60.
+
+The **Pedalboard**
 starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
 **Light show** is the showcase, every pedal kind in one graph: a trefoil

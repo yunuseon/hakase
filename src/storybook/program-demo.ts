@@ -91,6 +91,8 @@ export const programDemo = (
             select(state => ({ value: state.themes.get(name) ?? themes[name], from: null })),
         error$: () => of(null),
         look$: select(state => state.look),
+        aspect$: select(state => state.aspect),
+        previewSide$: of(512),
         library$: select(state => state.library),
         blueprints$: of({ items: [] }),
         tasks$: of(

@@ -14,18 +14,20 @@ const SETTLE_MS = 250;
 const replays = (image: Image): boolean =>
     stagesOf(image).some(stage => stage.kind === 'points' && evolves(stage.source));
 
+// A sketch is framed by its window; a chain by nothing, at the app's aspect.
+export type Framing = { readonly frame: Size | null; readonly shape: Size };
+
 type Scene = {
     readonly image: Image;
-    readonly frame: Size | null;
+    readonly framing: Framing;
     readonly seconds: number;
     readonly ratio: number;
     readonly layout: StripLayout;
 };
 
-// A frame of null shows the picture at the tile's own shape, as a pedal's window does.
 export const filmstrip$ = (
     image$: Observable<Image>,
-    frame$: Observable<Size | null>,
+    framing$: Observable<Framing>,
     seconds$: Observable<number>,
     ratio$: Observable<number>,
     layout$: Observable<StripLayout>,
@@ -36,10 +38,10 @@ export const filmstrip$ = (
                 return EMPTY;
             }
 
-            const scene$ = combineLatest([image$, frame$, seconds$, ratio$, layout$]).pipe(
-                map(([image, frame, seconds, ratio, layout]): Scene => ({
+            const scene$ = combineLatest([image$, framing$, seconds$, ratio$, layout$]).pipe(
+                map(([image, framing, seconds, ratio, layout]): Scene => ({
                     image: stillOf(image),
-                    frame,
+                    framing,
                     seconds,
                     ratio,
                     layout,
@@ -58,7 +60,8 @@ export const filmstrip$ = (
                     debounceTime(SETTLE_MS),
                 ),
             ).pipe(
-                concatMap(({ image, frame, seconds, ratio, layout: { geometry, range } }) => {
+                concatMap(({ image, framing, seconds, ratio, layout: { geometry, range } }) => {
+                    const { frame, shape } = framing;
                     const count = range.last - range.first + 1;
 
                     if (image.kind === 'none' || count <= 0) {
@@ -82,7 +85,7 @@ export const filmstrip$ = (
                         width: tile.width * supersample,
                         height: tile.height * supersample,
                     };
-                    const box = frame === null ? { x: 0, y: 0, ...slot } : fitted(slot, frame);
+                    const box = fitted(slot, shape);
                     const dotScale =
                         frame === null ? 1 : box.width / Math.max(frame.width, 1) / ratio;
                     const backdrop = backdropOf(image);

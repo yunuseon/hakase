@@ -3,7 +3,7 @@ import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import { HksImageView } from '../components/image-view/image-view.component.ts';
 import { HksPedal } from '../components/pedal/pedal.component.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
-import { momentOf$, viewRatio$ } from '../engine/moment.ts';
+import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$ } from '../engine/view.ts';
 import { pedalInputs, playbackInput } from '../inputs.ts';
 import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
@@ -29,7 +29,16 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
 
             return {
                 element: view,
-                run$: ({ image$, pedal$, linkedDriver$, linkedName$, clock$, zoom$ }) => {
+                run$: ({
+                    image$,
+                    pedal$,
+                    linkedDriver$,
+                    linkedName$,
+                    clock$,
+                    zoom$,
+                    aspect$,
+                    previewSide$,
+                }) => {
                     const driven$ = combineLatest(
                         spec.knobs.map(({ name }) =>
                             linkedDriver$(name).pipe(
@@ -62,7 +71,13 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                             .connect$(
                                 view$(
                                     image$,
-                                    momentOf$(clock$, view.sizes$, viewRatio$(zoom$)),
+                                    chainShowing$(
+                                        clock$,
+                                        aspect$,
+                                        previewSide$,
+                                        view.sizes$,
+                                        viewRatio$(zoom$),
+                                    ),
                                 ).pipe(
                                     map(
                                         shownOf(

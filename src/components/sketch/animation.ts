@@ -14,6 +14,19 @@ export type ExportSize = (typeof EXPORT_SIZES)[number];
 export const isExportSize = (value: number): value is ExportSize =>
     EXPORT_SIZES.some(size => size === value);
 
+export const ASPECTS = ['1:1', '4:5', '4:3', '3:2', '16:9', '9:16'] as const;
+export type Aspect = (typeof ASPECTS)[number];
+export const isAspect = (value: unknown): value is Aspect =>
+    ASPECTS.some(aspect => aspect === value);
+export const DEFAULT_ASPECT: Aspect = '1:1';
+
+export const aspectSize = (aspect: Aspect, long: number): Size => {
+    const [width = 1, height = 1] = aspect.split(':').map(Number);
+    const scale = long / Math.max(width, height);
+
+    return { width: Math.round(width * scale), height: Math.round(height * scale) };
+};
+
 export const FORMATS = ['webm', 'png'] as const;
 export type Format = (typeof FORMATS)[number];
 export const isFormat = (value: string): value is Format =>

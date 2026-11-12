@@ -1,5 +1,6 @@
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
+import type { Aspect } from './components/sketch/animation.ts';
 import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
 import {
     defaultBookmarks,
@@ -142,6 +143,7 @@ export type Documents = {
     readonly themes: ReadonlyMap<ThemeName, Written<Theme>>;
     readonly looks: ReadonlyMap<AppearanceName, Written<Appearance>>;
     readonly look: AppearanceName;
+    readonly aspect: Aspect;
 };
 
 type StoreCommands = {
@@ -208,7 +210,8 @@ export type DocumentAction =
           readonly value: Appearance;
           readonly from: ProcessId;
       }
-    | { readonly kind: 'look'; readonly name: AppearanceName };
+    | { readonly kind: 'look'; readonly name: AppearanceName }
+    | { readonly kind: 'aspect'; readonly aspect: Aspect };
 
 const commanded = <S, C>(
     all: ReadonlyMap<StoreId, S>,
@@ -731,6 +734,10 @@ export const reduceDocuments =
                 return action.name === documents.look
                     ? documents
                     : { ...documents, look: action.name };
+            case 'aspect':
+                return action.aspect === documents.aspect
+                    ? documents
+                    : { ...documents, aspect: action.aspect };
         }
     };
 
@@ -770,6 +777,7 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'prune':
         case 'library':
         case 'look':
+        case 'aspect':
         case 'paste':
         case 'place':
         case 'box':
@@ -883,6 +891,8 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return `Edited the ${action.name} look`;
         case 'look':
             return `Switched to the ${action.name} look`;
+        case 'aspect':
+            return `Made pictures ${action.aspect}`;
         default:
             return `Edited ${TITLES[action.kind]} ${storeName(before.workspace, action.store)}`;
     }

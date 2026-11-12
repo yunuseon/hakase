@@ -19,8 +19,8 @@ import {
     releaseEngine,
     type Engine,
     type FormulaCheck,
-    type Moment,
 } from './engine.ts';
+import type { Showing } from './moment.ts';
 
 export type View =
     | { readonly kind: 'empty' }
@@ -56,11 +56,11 @@ const failed = (error: unknown): View => ({
     message: error instanceof Error ? error.message : String(error),
 });
 
-const framed = (engine: Engine, image: Image, moment: Moment): ObservableInput<View> => {
+const framed = (engine: Engine, image: Image, { moment, slot }: Showing): ObservableInput<View> => {
     try {
         const picture = cook(engine, image, moment, performance.now());
 
-        return presented(engine, picture, moment.width, moment.height, backdropOf(image))
+        return presented(engine, picture, slot.width, slot.height, backdropOf(image))
             .then((bitmap): View => ({ kind: 'frame', bitmap }))
             .catch(failed);
     } catch (error) {
@@ -68,17 +68,17 @@ const framed = (engine: Engine, image: Image, moment: Moment): ObservableInput<V
     }
 };
 
-export const view$ = (image$: Observable<Image>, moment$: Observable<Moment>): Observable<View> =>
+export const view$ = (image$: Observable<Image>, showing$: Observable<Showing>): Observable<View> =>
     engine$.pipe(
         switchMap(engine =>
             engine instanceof Error
                 ? from([{ kind: 'failed', message: engine.message } as const])
-                : combineLatest([image$, moment$]).pipe(
+                : combineLatest([image$, showing$]).pipe(
                       auditTime(0, animationFrameScheduler),
-                      concatMap(([image, moment]) =>
+                      concatMap(([image, showing]) =>
                           image.kind === 'none'
                               ? [{ kind: 'empty' } as const]
-                              : framed(engine, image, moment),
+                              : framed(engine, image, showing),
                       ),
                   ),
         ),

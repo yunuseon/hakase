@@ -129,6 +129,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         themes: new Map(),
         looks: new Map(),
         look: 'paper',
+        aspect: '1:1',
     };
 };
 

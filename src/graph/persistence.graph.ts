@@ -10,6 +10,7 @@ type Saved = Pick<
     | 'history$'
     | 'workspace$'
     | 'look$'
+    | 'aspect$'
     | 'looks$'
     | 'edits$'
     | 'palettes$'
@@ -39,6 +40,7 @@ export const persisted$ = ({
     history$,
     workspace$,
     look$,
+    aspect$,
     looks$,
     edits$,
     palettes$,
@@ -68,6 +70,7 @@ export const persisted$ = ({
         combineLatest({
             workspace: workspace$,
             look: look$,
+            aspect: aspect$,
             looks: looks$.pipe(map(valuesOf)),
             formulas: edits$.pipe(map(valuesOf)),
             themes: palettes$.pipe(map(valuesOf)),

@@ -8,7 +8,10 @@ import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, saveFile, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
 import {
+    ASPECTS,
     EXPORT_SIZES,
+    isAspect,
+    type Aspect,
     FRAME_RATES,
     QUALITIES,
     type ExportChange,
@@ -19,7 +22,11 @@ import css from './export-panel.css?inline';
 const sheet = styleSheet(css);
 
 const select = (field: string, label: string, options: readonly (readonly [string, string])[]) =>
-    html`<label class="item" data-video=${ifDefined(field === 'quality' ? '' : undefined)}
+    html`<label
+        class="item"
+        data-video=${ifDefined(field === 'quality' ? '' : undefined)}
+        data-aspect=${ifDefined(field === 'aspect' ? '' : undefined)}
+        ?hidden=${field === 'aspect'}
         ><span class="key">${label}</span
         ><hks-select
             class="ui-field pick"
@@ -33,7 +40,11 @@ const select = (field: string, label: string, options: readonly (readonly [strin
 
 const TEMPLATE = () =>
     html`<div class="row">
-            ${select('format', 'format', [
+            ${select(
+                'aspect',
+                'aspect',
+                ASPECTS.map(aspect => [aspect, aspect]),
+            )}${select('format', 'format', [
                 ['webm', 'WebM video'],
                 ['png', 'PNG frames (zip)'],
             ])}${select(
@@ -77,6 +88,7 @@ const TEXT = ['format', 'quality'] as const;
 
 export class HksExportPanel extends HTMLElement {
     readonly changes$: Observable<ExportChange>;
+    readonly aspects$: Observable<Aspect>;
     readonly starts$: Observable<void>;
     readonly cancels$: Observable<void>;
     readonly stills$: Observable<void>;
@@ -128,6 +140,15 @@ export class HksExportPanel extends HTMLElement {
                 return text === undefined ? [] : [{ field: text, value: target.value }];
             }),
         );
+        this.aspects$ = fromElementEvent$(requireChild(shadow, '.row'), 'change').pipe(
+            mergeMap(({ target }) =>
+                target instanceof HksSelect &&
+                target.dataset['field'] === 'aspect' &&
+                isAspect(target.value)
+                    ? [target.value]
+                    : [],
+            ),
+        );
     }
 
     private pick(field: string): HksSelect {
@@ -139,6 +160,7 @@ export class HksExportPanel extends HTMLElement {
         summary$: Observable<string>,
         status$: Observable<ExportStatus>,
         files$: Observable<SavedFile>,
+        aspect$: Observable<Aspect | null>,
     ): Observable<void> {
         const fields$ = [...NUMERIC, ...TEXT].map(field =>
             settings$.pipe(
@@ -155,6 +177,17 @@ export class HksExportPanel extends HTMLElement {
             distinctUntilChanged(),
             tap(video => {
                 requireElement(this.shadow, '[data-video]', HTMLElement).hidden = !video;
+            }),
+        );
+
+        // Only a chain's picture has the app's aspect; a sketch's window frames its own.
+        const aspected$ = aspect$.pipe(
+            distinctUntilChanged(),
+            tap(aspect => {
+                requireElement(this.shadow, '[data-aspect]', HTMLElement).hidden = aspect === null;
+                if (aspect !== null) {
+                    this.pick('aspect').value = aspect;
+                }
             }),
         );
 
@@ -193,6 +226,7 @@ export class HksExportPanel extends HTMLElement {
                 connectSelects$(this.shadow),
                 ...fields$,
                 video$,
+                aspected$,
                 summarised$,
                 shown$,
                 saved$,

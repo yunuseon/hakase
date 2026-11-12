@@ -1,3 +1,4 @@
+import { DEFAULT_ASPECT } from '../components/sketch/animation.ts';
 import type { AppInput } from '../program.ts';
 import type { Settings } from '../settings.ts';
 import { appearances, isAppearanceName, defaultLook, type AppearanceName } from '../appearances.ts';
@@ -84,6 +85,7 @@ export const sandboxSeed = (settings: Settings | undefined, empty = false) => ({
     clock: initialClock,
     library: emptyLibrary,
     look: defaultLook,
+    aspect: DEFAULT_ASPECT,
     appearances: new Map<AppearanceName, Appearance>(
         Object.keys(appearances)
             .filter(isAppearanceName)
@@ -143,6 +145,8 @@ export const reduceSandbox = (state: Sandbox, input: SandboxInput): Sandbox => {
             return { ...state, library: reduceLibrary(state.library, input.command) };
         case 'look':
             return { ...state, look: input.name };
+        case 'aspect':
+            return { ...state, aspect: input.aspect };
         case 'appearance':
             return {
                 ...state,

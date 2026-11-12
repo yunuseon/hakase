@@ -44,6 +44,7 @@ const started = (): Documents => ({
     themes: new Map(),
     looks: new Map(),
     look: 'paper',
+    aspect: '1:1',
 });
 
 const reduce = reduceHistory(documentsKit(inputsFor));
@@ -191,6 +192,17 @@ describe('one log for every document', () => {
             ),
         ).toEqual(['milk']);
         expect(run(forked, [{ kind: 'undo' }]).present.tickets.has(store)).toBe(false);
+    });
+
+    it('makes the picture aspect one step, and refuses an unchanged one', () => {
+        const history = run(fresh(), [
+            { kind: 'aspect', aspect: '16:9' },
+            { kind: 'aspect', aspect: '16:9' },
+        ]);
+
+        expect(history.present.aspect).toBe('16:9');
+        expect(labels(history).at(-1)).toBe('Made pictures 16:9');
+        expect(run(history, [{ kind: 'undo' }]).present.aspect).toBe('1:1');
     });
 
     it('lets a prune be undone, data and all', () => {

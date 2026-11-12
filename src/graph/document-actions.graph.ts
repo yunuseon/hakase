@@ -96,6 +96,8 @@ export const documentActions$ = ({
                         ];
                     case 'look':
                         return [{ kind: 'look', name: input.name }];
+                    case 'aspect':
+                        return [{ kind: 'aspect', aspect: input.aspect }];
                     case 'prune':
                         return [{ kind: 'prune' }];
                     default:

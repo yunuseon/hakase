@@ -161,6 +161,10 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ look }) => look),
         distinctUntilChanged(),
     );
+    const aspect$ = documents$.pipe(
+        map(({ aspect }) => aspect),
+        distinctUntilChanged(),
+    );
     const looks$ = documents$.pipe(
         map(({ looks }) => looks),
         distinctUntilChanged(),
@@ -201,6 +205,7 @@ export const projectionsOf = (history$: Observable<History>) => {
         edits$,
         palettes$,
         look$,
+        aspect$,
         looks$,
         appearance$,
     };

@@ -45,6 +45,7 @@ export const begunFrom = (stored: Restored): History => {
         themes: restored(stored.themes),
         looks: restored(stored.looks),
         look: stored.look,
+        aspect: stored.aspect,
     };
 
     return startTimeline(started, Math.max(stored.seq, seqFloor(started)));

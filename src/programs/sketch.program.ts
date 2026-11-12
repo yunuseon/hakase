@@ -55,7 +55,7 @@ import {
 } from '../components/sketch/params.ts';
 import { asSketch, controlsView, withControl, type SketchSettings } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
-import { viewRatio$, windowMoment$ } from '../engine/moment.ts';
+import { viewRatio$, windowShowing$ } from '../engine/moment.ts';
 import { checked$, view$ } from '../engine/view.ts';
 import { shownOf } from './output.program.ts';
 import type { Size } from '../components/window/frame.ts';
@@ -148,7 +148,7 @@ export const sketchProgram = {
 
                 const shown$ = view$(
                     points$,
-                    windowMoment$(state.clock$, size$, viewRatio$(zoom$), pointer$),
+                    windowShowing$(state.clock$, size$, viewRatio$(zoom$), pointer$),
                 ).pipe(map(shownOf('This window shows no sketch.')));
 
                 const exportSettings$ = settings$.pipe(
@@ -222,7 +222,7 @@ export const sketchProgram = {
                         tab === 'animation'
                             ? filmstrip$(
                                   points$,
-                                  size$,
+                                  size$.pipe(map(size => ({ frame: size, shape: size }))),
                                   state.duration$,
                                   devicePixelRatio$,
                                   layout$,
@@ -323,7 +323,7 @@ export const sketchProgram = {
                         )
                         .pipe(ignoreElements()),
                     exporter
-                        .connect$(exportSettings$, summary$, status$, files$)
+                        .connect$(exportSettings$, summary$, status$, files$, of(null))
                         .pipe(ignoreElements()),
                     strip.seeks$.pipe(
                         withLatestFrom(geometry$),

@@ -8,6 +8,7 @@ import type { BlueprintCommand, Blueprints } from './blueprints.ts';
 import type { Theme } from './components/sketch/theme.ts';
 import type { ThemeName } from './components/sketch/themes/registry.ts';
 import type { Frame, Size } from './components/window/frame.ts';
+import type { Aspect } from './components/sketch/animation.ts';
 import type { NoteCommand, Notes } from './components/note/note.ts';
 import type { Focus, FocusCommand, Plan } from './components/focus/focus.ts';
 import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
@@ -96,6 +97,7 @@ export type AppInput =
     | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
+    | { readonly kind: 'aspect'; readonly aspect: Aspect }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'locate'; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
@@ -165,6 +167,8 @@ export type AppState = {
     readonly theme$: (theme: ThemeName) => Observable<Written<Theme>>;
     readonly error$: (formula: FormulaId) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
+    readonly aspect$: Observable<Aspect>;
+    readonly previewSide$: Observable<number>;
     readonly library$: Observable<Library>;
     readonly blueprints$: Observable<Blueprints>;
     readonly tasks$: Observable<readonly Task[]>;

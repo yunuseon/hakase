@@ -192,3 +192,11 @@ describe('constant migration', () => {
         expect(restored?.gates.get('const-2')).toMatchObject({ kind: 'switch', value: 0 });
     });
 });
+
+describe('picture aspect', () => {
+    it('restores a saved aspect and falls back for a forged one', () => {
+        expect(parseSnapshot({ ...saved, aspect: '16:9' }, inputsFor)?.aspect).toBe('16:9');
+        expect(parseSnapshot({ ...saved, aspect: '7:3' }, inputsFor)?.aspect).toBe('1:1');
+        expect(parseSnapshot(saved, inputsFor)?.aspect).toBe('1:1');
+    });
+});

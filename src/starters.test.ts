@@ -36,6 +36,7 @@ const scene = (): Documents => ({
     themes: new Map(),
     looks: new Map(),
     look: 'paper',
+    aspect: '1:1',
 });
 
 const view = { x: 0, y: 0, width: 1400, height: 900 };

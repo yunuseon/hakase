@@ -30,7 +30,8 @@ import {
 import { ownerOf } from '../documents.ts';
 import { sourceIn } from '../input-connections.ts';
 import { parseTarget, type Global } from '../inventory.ts';
-import { wallClock$ } from '../lib/rx.ts';
+import { devicePixelRatio$, viewport$, wallClock$ } from '../lib/rx.ts';
+import { previewSideOf } from '../engine/moment.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
 import type { AppState, ProgramId, Task } from '../program.ts';
@@ -135,6 +136,7 @@ export const scopedOf = ({
     edits$,
     palettes$,
     look$,
+    aspect$,
     looks$,
     appearance$,
     timers$,
@@ -142,6 +144,11 @@ export const scopedOf = ({
     playbackIn,
     inputs$,
 }: Reads) => {
+    const previewSide$ = combineLatest([workspace$, viewport$, devicePixelRatio$]).pipe(
+        map(([workspace, viewport, ratio]) => previewSideOf(workspace, viewport, ratio)),
+        distinctUntilChanged(),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
     const diagnostics$ = inputs$.pipe(
         mergeMap(({ input }) => (input.kind === 'diagnostic' ? of(input) : EMPTY)),
         scan(
@@ -190,6 +197,8 @@ export const scopedOf = ({
         theme$: (theme: ThemeName) =>
             palettes$.pipe(map(all => all.get(theme) ?? { value: themes[theme], from: null })),
         look$,
+        aspect$,
+        previewSide$,
         appearance$,
         library$,
         blueprints$,

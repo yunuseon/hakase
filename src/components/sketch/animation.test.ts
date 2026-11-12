@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    aspectSize,
     exportFrames,
     exportPixels,
     fitted,
@@ -14,6 +15,14 @@ import {
 } from './animation.ts';
 
 const square = { width: 640, height: 640 };
+
+describe('aspectSize', () => {
+    it('puts the long side on the longer of the two', () => {
+        expect(aspectSize('16:9', 1024)).toEqual({ width: 1024, height: 576 });
+        expect(aspectSize('9:16', 1024)).toEqual({ width: 576, height: 1024 });
+        expect(aspectSize('1:1', 1024)).toEqual({ width: 1024, height: 1024 });
+    });
+});
 
 describe('stripGeometry', () => {
     it('shows one frame per tile at level 0', () => {

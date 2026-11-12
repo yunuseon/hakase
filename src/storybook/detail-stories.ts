@@ -26,7 +26,7 @@ import {
     HksExportPanel,
     type ExportStatus,
 } from '../components/sketch/export/export-panel.component.ts';
-import { defaultExport, withExportChange } from '../components/sketch/animation.ts';
+import { DEFAULT_ASPECT, defaultExport, withExportChange } from '../components/sketch/animation.ts';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { HksPreviewError } from '../components/storybook/preview-error.component.ts';
 import { defaults, recorded, type Story } from './story.ts';
@@ -129,7 +129,7 @@ export const detailStories: readonly Story[] = [
         defaults,
         height: 210,
         action: null,
-        code: 'const exporter = new HksExportPanel();\nconst lifetime$ = exporter.connect$(settings$, summary$, status$, files$);\nconst requests$ = merge(exporter.starts$, exporter.stills$, exporter.cancels$);',
+        code: 'const exporter = new HksExportPanel();\nconst lifetime$ = exporter.connect$(settings$, summary$, status$, files$, aspect$);\nconst requests$ = merge(exporter.starts$, exporter.stills$, exporter.cancels$);',
         create: ({ args$, variant }) => {
             const element = new HksExportPanel();
             const changes$ = element.changes$.pipe(share());
@@ -148,9 +148,16 @@ export const detailStories: readonly Story[] = [
             );
             return {
                 element,
-                run$: element.connect$(settings$, of('8 seconds · local example'), status$, EMPTY),
+                run$: element.connect$(
+                    settings$,
+                    of('8 seconds · local example'),
+                    status$,
+                    EMPTY,
+                    element.aspects$.pipe(startWith(DEFAULT_ASPECT)),
+                ),
                 events$: merge(
                     changes$.pipe(map(change => recorded('settings', change))),
+                    element.aspects$.pipe(map(aspect => recorded('aspect', aspect))),
                     element.starts$.pipe(map(() => recorded('export', 'requested'))),
                     element.stills$.pipe(map(() => recorded('still', 'requested'))),
                     element.cancels$.pipe(map(() => recorded('cancel', 'requested'))),
