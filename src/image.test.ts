@@ -7,6 +7,7 @@ import {
     NONE,
     sameImage,
     stagesOf,
+    stillOf,
     type Image,
     type PedalImage,
     type PointsImage,
@@ -57,6 +58,20 @@ const pedal = (
 });
 
 describe('image recipes', () => {
+    it('stand still for a tile: trails off in every sketch of a chain, set or driven', () => {
+        const trailing: PointsImage = {
+            ...points('a'),
+            panel: { ...defaultPanel, trails: 0.6 },
+            drivers: { ...undriven, trails: { samples: new Float32Array([0.2, 0.8]) } },
+        };
+        const still = stillOf(pedal('mix', [trailing, points('b')]));
+        const [first] = still.kind === 'pedal' ? still.inputs : [];
+
+        expect(first).toMatchObject({ panel: { trails: 0 }, drivers: { trails: null } });
+        expect(still.kind === 'pedal' && still.pedal).toBe(mix);
+        expect(stillOf(NONE)).toBe(NONE);
+    });
+
     it('compare by what they draw, not by which object carried them', () => {
         expect(sameImage(points('sketch-2'), points('sketch-2'))).toBe(true);
         expect(sameImage(points('sketch-2'), points('sketch-2', 'vec4 formula'))).toBe(false);
