@@ -16,7 +16,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
-import { reduceOrbit, sameOrbit, type OrbitAction } from '../components/sketch/space.ts';
+import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
 import { optionsOf } from '../library.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
 import { HksSketch } from '../components/sketch/sketch.component.ts';
@@ -24,13 +24,14 @@ import type { AppInput, Program } from '../program.ts';
 import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import { liveReadouts } from '../components/sketch/controls/controls.ts';
 import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
-import { thumbnails$ } from '../components/sketch/strip/thumbnails.ts';
+import { filmstrip$ } from '../engine/thumbnails.ts';
 import {
     HksExportPanel,
     type ExportStatus,
     type SavedFile,
 } from '../components/sketch/export/export-panel.component.ts';
-import { export$, statusOf, still$ } from '../components/sketch/export/export.ts';
+import { statusOf } from '../components/sketch/export/export.ts';
+import { imageExport$, imageStill$ } from '../engine/export.ts';
 import {
     exportPixels,
     followed,
@@ -121,11 +122,6 @@ export const sketchProgram = {
                         theme,
                     })),
                     shareReplay({ bufferSize: 1, refCount: true }),
-                );
-
-                const orbit$ = points$.pipe(
-                    map(({ orbit }) => orbit),
-                    distinctUntilChanged(sameOrbit),
                 );
 
                 // This window's choice; the text behind it is shared with whoever matches.
@@ -224,47 +220,43 @@ export const sketchProgram = {
                 const thumbnailed$ = tab$.pipe(
                     switchMap(tab =>
                         tab === 'animation'
-                            ? thumbnails$(
-                                  text$,
-                                  combineLatest([
-                                      params$,
-                                      orbit$,
-                                      devicePixelRatio$,
-                                      state.duration$,
-                                  ]).pipe(
-                                      map(([params, orbit, ratio, seconds]) => ({
-                                          params,
-                                          orbit,
-                                          ratio,
-                                          seconds,
-                                      })),
-                                  ),
+                            ? filmstrip$(
+                                  points$,
+                                  size$,
+                                  state.duration$,
+                                  devicePixelRatio$,
                                   layout$,
                               )
                             : EMPTY,
                     ),
                 );
 
-                const request$ = combineLatest([text$, params$, orbit$, exportSettings$]).pipe(
-                    map(([source, params, orbit, settings]) => ({
-                        source,
-                        params,
-                        orbit,
+                const request$ = combineLatest([
+                    points$,
+                    state.duration$,
+                    size$,
+                    exportSettings$,
+                ]).pipe(
+                    map(([image, seconds, size, settings]) => ({
+                        image,
+                        seconds,
+                        size,
                         settings,
+                        framed: true,
                     })),
                 );
 
                 // exhaustMap: a second click while exporting is ignored, not a second export.
                 const exported$ = merge(
                     exporter.starts$.pipe(
-                        withLatestFrom(request$, state.duration$),
-                        exhaustMap(([, request, seconds]) =>
-                            export$({ ...request, seconds }).pipe(takeUntil(exporter.cancels$)),
+                        withLatestFrom(request$),
+                        exhaustMap(([, request]) =>
+                            imageExport$(request).pipe(takeUntil(exporter.cancels$)),
                         ),
                     ),
                     exporter.stills$.pipe(
-                        withLatestFrom(request$, playhead$, state.duration$),
-                        exhaustMap(([, request, t, seconds]) => still$({ ...request, seconds }, t)),
+                        withLatestFrom(request$, playhead$),
+                        exhaustMap(([, request, t]) => imageStill$(request, t)),
                     ),
                 ).pipe(share());
 

@@ -1,5 +1,3 @@
-import { Observable, of } from 'rxjs';
-import { distinctUntilChanged, map, share, startWith, switchMap, takeWhile } from 'rxjs/operators';
 import { momentOf, type Evolution, type Front } from '../evolution.ts';
 import type { PanelParams, Pointer } from '../params.ts';
 import type { Orbit } from '../space.ts';
@@ -66,22 +64,6 @@ export const releaseSimulation = (
         gl.deleteTexture(texture);
     });
 };
-
-export const simulation$ = (gl: WebGL2RenderingContext, side: number): Observable<Simulation> =>
-    new Observable(subscriber => {
-        try {
-            const simulation = createSimulation(gl, side);
-            subscriber.next(simulation);
-
-            return () => {
-                releaseSimulation(gl, simulation);
-            };
-        } catch (error) {
-            subscriber.error(error);
-
-            return undefined;
-        }
-    });
 
 export const bindState = (
     gl: WebGL2RenderingContext,
@@ -172,41 +154,4 @@ export const evolve = (
     if (scissor) {
         gl.enable(gl.SCISSOR_TEST);
     }
-};
-
-type Stage = { readonly sketch: Sketch; readonly params: PanelParams };
-
-type SimulationKey = { readonly sketch: Sketch; readonly side: number } | null;
-
-const keyOf = ({ sketch, params }: Stage): SimulationKey =>
-    sketch.evolves ? { sketch, side: 2 * params.dimension } : null;
-
-const sameKey = (a: SimulationKey, b: SimulationKey): boolean =>
-    a === null || b === null ? a === b : a.sketch === b.sketch && a.side === b.side;
-
-export const simulated$ = <T extends Stage>(
-    gl: WebGL2RenderingContext,
-    stage$: Observable<T>,
-): Observable<T & { readonly simulation: Simulation | null }> => {
-    const shared$ = stage$.pipe(share());
-
-    return shared$.pipe(
-        distinctUntilChanged((a, b) => sameKey(keyOf(a), keyOf(b))),
-        switchMap(first => {
-            const key = keyOf(first);
-            const state$: Observable<Simulation | null> =
-                key === null ? of(null) : simulation$(gl, key.side);
-
-            return state$.pipe(
-                switchMap(simulation =>
-                    shared$.pipe(
-                        startWith(first),
-                        // Never with another key's state: those textures may already be released.
-                        takeWhile(stage => sameKey(keyOf(stage), key)),
-                        map(stage => ({ ...stage, simulation })),
-                    ),
-                ),
-            );
-        }),
-    );
 };

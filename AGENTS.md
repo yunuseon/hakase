@@ -273,10 +273,12 @@ equation) and `coral` (Gray-Scott) are the worked examples.
   textures carry no mutable index. A jump to the end of Coral's 8 s loop replays
   about 3,800 steps in a third of a second; a loop restart is a few steps.
 - **The state textures are a resource keyed by formula and lattice size**
-  (`simulated$`): kept across every other change, so a knob or a camera drag
+  in the engine: kept across every other change, so a knob or a camera drag
   never resets the simulation, and released when either changes. The engine
-  keeps one per store, shared by everyone drawing that store at the same
-  moment; the thumbnails and an export still own their own.
+  keeps one per store and **lane**: the live window and any pedal share the
+  default lane, and a strip draws in its own (`lane: 'strip'`), or its replay
+  from the first tile would throw the live simulation back every frame. An
+  export has an engine of its own.
 - **Thumbnails replay once per render**, left to right, drawing each tile as the
   replay passes its moment. Because that can cost a third of a second, a sketch
   that evolves renders its strip once things settle (250 ms), not on every frame
@@ -2421,8 +2423,12 @@ move with the canvas rather than stepping behind it.
 That picture's canvas is **never resized down**. The number of visible tiles and
 their width change on every pinch tick and every time playback pages the strip,
 and reallocating a canvas that size (up to the GPU's limit at 8x supersampling)
-took up to 100 ms — a pinch ran at 32 fps. `growSurface` only grows it, by half
-at least and capped at `MAX_VIEWPORT_DIMS`, the strip is drawn into its bottom
+took up to 100 ms — a pinch ran at 32 fps. The engine's `reserved` only grows
+it, by half at least and capped at `MAX_VIEWPORT_DIMS`, and a strip reserves its
+**whole width before its first tile**: growing clears the canvas, and growing
+tile by tile left only the last one, a black strip that went unnoticed for the
+Output's. Everything else grows it exactly (`grown`), because an export writes
+the whole canvas out. The strip is drawn into its bottom
 rows (GL's origin is bottom-left), and `createImageBitmap(canvas, x, y, w, h,
 resize)` crops and averages it down in one step. Copying out rather than
 `transferToImageBitmap` also keeps the buffer instead of handing it over each
@@ -2431,20 +2437,20 @@ Its host has `contain: inline-size`, which is load-bearing: without it the
 thousands-of-pixels track sets the controls' intrinsic width, and the strip
 pushes past the window instead of scrolling inside it.
 
-**Thumbnails and export never touch the live canvas.** Each renders in a GL
-context of its own (`createOffscreenSurface` on an `OffscreenCanvas`, wrapped in
-`offscreen$` so unsubscribing releases it with `WEBGL_lose_context`), compiling
-the same formula text the sketch shows. That is what decoupled export from the
-screen: resolution is the export's own (480 to 2160 px on the long side, aspect
-from the sketch, rounded even because VP8 and VP9 reject odd sizes), the canvas
-zoom no longer matters, the sketch keeps playing while you export, and there is
-no capture clock overriding the playhead any more. The thumbnail context exists
-only while the Animation tab is open — `switchMap` on the tab — and the export's
-only while exporting.
+**A sketch's strip and export are an Output's.** Both draw the sketch's own
+recipe through the engine (`filmstrip$`, `imageExport$`), the strip in the
+shared engine while the Animation tab is open and an export in an engine of its
+own while it runs. That is what decouples export from the screen: resolution is
+the export's own (480 to 2160 px on the long side, aspect from the sketch,
+rounded even because VP8 and VP9 reject odd sizes), the canvas zoom no longer
+matters, the sketch keeps playing while you export, and no capture clock
+overrides the playhead.
 
-`prepareStill` takes a scale of pixels per **sketch CSS pixel**, not a device
-ratio, because dots are sized in CSS pixels: an export at 2160 px scales them up
-with the picture.
+**A sketch is framed by its window, a pedal by the reference side.** A moment's
+`frame` is the sketch-unit size the picture stands for: the window's for the
+live view, its strip and its export (`framed: true`), so an export at 2160 px
+scales the dots up with the picture; `null` for a pedal or an Output, which
+frame every sketch in a chain at `REFERENCE_SIDE`.
 
 **A thumbnail is the frame scaled down, never reframed.** It renders with the
 sketch's own parameters, size included, fitted into its tile and centred
@@ -2466,15 +2472,16 @@ are traps:
 
 The fragment shader's two size rules — the anti-aliasing band and `SMALL_DOT`,
 below which a dot keeps its soft edge — are in the **live sketch's** pixels:
-`uDotScale` is target pixels per on-screen pixel, 1 for the sketch and
-`(picture px / sketch CSS px) / devicePixelRatio` for a thumbnail. Measured in the
+`uDotScale`, the moment's `dotScale`, is target pixels per on-screen pixel, 1
+for the sketch and `(picture px / sketch CSS px) / devicePixelRatio` for a
+thumbnail. Measured in the
 thumbnail's own pixels, the same dot would be "small" there and crisp in the
 sketch, and dense areas came out half as dark. Exports keep 1: they are their
-own picture, not a view of the screen. Thumbnails draw with trails off, since
-each tile stands alone; an export with trails plays the loop once unrecorded
+own picture, not a view of the screen. Thumbnails draw with trails off
+(`stillOf` on the recipe), since each tile stands alone; an export with trails plays the loop once unrecorded
 first, so the first kept frame carries the trail of the last.
 
-**The encoder paces the export; there is no timer.** `export$` `concatMap`s over
+**The encoder paces the export; there is no timer.** `imageExport$` `concatMap`s over
 the frame list: it draws a frame, then hands the canvas to the writer and waits
 for it before the next. For WebM the writer is WebCodecs' `VideoEncoder`, given
 each frame's exact timestamp and a key frame every two seconds, and `drained`
@@ -2483,7 +2490,7 @@ export never holds every frame in memory. For PNG frames it is
 `convertToBlob`. A throttled tab therefore only exports slower, never wrong.
 `exhaustMap` ignores a second Export while one runs, and Export is disabled in
 place rather than swapped for Cancel, or a double-click would start and stop
-one. The surface and writer stay open until unsubscribed, which is why `export$`
+one. The engine and writer stay open until unsubscribed, which is why `imageExport$`
 ends at the file with `takeWhile(…, true)`.
 
 **The zip never stalls at the end.** Its CRC-32 is a plain table loop (a
@@ -3073,9 +3080,8 @@ from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
 
 The other limit is the browser's: a page keeps at most **16 WebGL contexts**
 and silently loses the oldest past that (measured). That is why sketch windows
-draw through the one engine. What still holds a context of its own: a pen
-window, a sketch's frame strip while its Animation tab is open, and an export
-while it runs. **The engine recovers from a lost context**: `engine$`
+and their strips draw through the one engine. What still holds a context of its
+own: a pen window, and an export while it runs. **The engine recovers from a lost context**: `engine$`
 completes when its canvas reports the loss and `repeat` makes a fresh one, and
 because every picture is a recipe and time is replayed, every window simply
 draws again, simulations included. Forcing the loss with sixteen throwaway

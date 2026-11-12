@@ -11,7 +11,7 @@ import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$, observeResize$ } from '../../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../../shared/drag.ts';
 import { frameAt, markerX, type StripLayout, type Visible } from '../animation.ts';
-import type { Filmstrip } from './thumbnails.ts';
+import type { Filmstrip } from './filmstrip.ts';
 import css from './frame-strip.css?inline';
 
 const sheet = styleSheet(css);

@@ -42,6 +42,8 @@ const PLACES_SAMPLES = /\bvec2\s+lattice\s*\(/;
 const MAPS_SPACE = /\bvec3\s+space\s*\(/;
 const DECLARES_WRAP = /^\s*#define\s+WRAPS\b/m;
 const EVOLVES = /\bvec4\s+evolve\s*\(/;
+
+export const evolves = (formula: string): boolean => EVOLVES.test(formula);
 const SEEDS = /\bvec4\s+initial\s*\(/;
 const DECLARES_STEPS = /^\s*#define\s+STEPS\s+(\d+)\b/m;
 // `#define K1 feed_rate` names a knob: never expanded, since nothing in GLSL is spelt K1.

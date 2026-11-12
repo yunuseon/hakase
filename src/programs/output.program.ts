@@ -30,7 +30,7 @@ import {
     type ZoomGesture,
 } from '../components/sketch/animation.ts';
 import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
-import { imageThumbnails$ } from '../engine/thumbnails.ts';
+import { filmstrip$ } from '../engine/thumbnails.ts';
 import { statusOf } from '../components/sketch/export/export.ts';
 import {
     HksExportPanel,
@@ -132,7 +132,13 @@ export const outputProgram = {
                     view.sizes$,
                     exportSettings$,
                 ]).pipe(
-                    map(([image, seconds, size, settings]) => ({ image, seconds, size, settings })),
+                    map(([image, seconds, size, settings]) => ({
+                        image,
+                        seconds,
+                        size,
+                        settings,
+                        framed: false,
+                    })),
                 );
 
                 const exported$ = merge(
@@ -185,7 +191,7 @@ export const outputProgram = {
                         .connect$(
                             layout$,
                             playhead$,
-                            imageThumbnails$(image$, duration$, ratio$, layout$),
+                            filmstrip$(image$, of(null), duration$, ratio$, layout$),
                             merge(
                                 follow$,
                                 stripZooms$.pipe(

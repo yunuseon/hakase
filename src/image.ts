@@ -106,3 +106,18 @@ export const knobAt = (image: PedalImage, name: string, t: number): number => {
         ? valueOf(image.pedal, name)
         : Math.min(spec.max, Math.max(spec.min, driverAt(driver, t)));
 };
+
+export const stillOf = (image: Image): Image => {
+    switch (image.kind) {
+        case 'none':
+            return image;
+        case 'points':
+            return {
+                ...image,
+                panel: { ...image.panel, trails: 0 },
+                drivers: { ...image.drivers, trails: null },
+            };
+        case 'pedal':
+            return { ...image, inputs: image.inputs.map(stillOf) };
+    }
+};

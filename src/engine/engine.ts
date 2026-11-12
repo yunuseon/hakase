@@ -31,6 +31,7 @@ import {
     type PointsImage,
 } from '../image.ts';
 import { PEDALS, type PedalKind } from '../pedals.ts';
+import type { Size } from '../components/window/frame.ts';
 import { createProgram } from '../shared/gl/program.ts';
 import blur from './shaders/blur.frag?raw';
 import colourmap from './shaders/colourmap.frag?raw';
@@ -55,8 +56,12 @@ export type Moment = {
     readonly height: number;
     readonly pointer: Pointer;
     readonly pass: number;
-    // Pixels per sketch unit: a window's own, so its dots keep their size; null frames it at the reference side.
-    readonly scale: number | null;
+    // The sketch-unit size the picture stands for, a window's own; null frames it at the reference side.
+    readonly frame: Size | null;
+    // Target pixels per on-screen pixel of the live sketch: below 1 for a tile, so its small dots keep their soft edge.
+    readonly dotScale: number;
+    // Readers in different lanes keep apart simulations, or a strip's replay would reset the live one every frame.
+    readonly lane: string;
 };
 
 export type FormulaCheck =
@@ -74,6 +79,7 @@ type Prepared = {
     readonly width: number;
     readonly height: number;
     readonly scale: number;
+    readonly dotScale: number;
     readonly backdrop: readonly [number, number, number];
 };
 
@@ -91,7 +97,8 @@ type Cooked = {
     readonly t: number;
     readonly pass: number;
     readonly pointer: Pointer;
-    readonly scale: number | null;
+    readonly frame: Size | null;
+    readonly dotScale: number;
 };
 
 type Entry = {
@@ -207,6 +214,8 @@ export const releaseEngine = ({ gl }: Engine): void => {
     gl.getExtension('WEBGL_lose_context')?.loseContext();
 };
 
+const keyOf = (store: string, lane: string): string => (lane === '' ? store : `${store}#${lane}`);
+
 const sourceOf = (engine: Engine, store: string): Source => {
     const known = engine.sources.get(store);
 
@@ -238,7 +247,7 @@ const releaseSource = (gl: WebGL2RenderingContext, source: Source): void => {
 };
 
 const entryOf = (engine: Engine, stage: PointsImage | PedalImage, moment: Moment): Entry => {
-    const key = `${stage.store}@${moment.width}x${moment.height}`;
+    const key = `${keyOf(stage.store, moment.lane)}@${moment.width}x${moment.height}`;
     const known = engine.entries.get(key);
 
     if (known !== undefined) {
@@ -271,6 +280,7 @@ const samePrepared = (prepared: Prepared | null, next: Omit<Prepared, 'backdrop'
     prepared.width === next.width &&
     prepared.height === next.height &&
     prepared.scale === next.scale &&
+    prepared.dotScale === next.dotScale &&
     prepared.image.panel === next.image.panel &&
     prepared.image.theme === next.image.theme &&
     prepared.image.sheet === next.image.sheet;
@@ -302,9 +312,13 @@ const compiled = (gl: WebGL2RenderingContext, source: Source, text: string): Ske
 const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Moment): void => {
     const { gl, canvas } = engine;
     const { width, height, t, seconds, pointer } = moment;
-    const scale = moment.scale ?? Math.max(width, height) / REFERENCE_SIDE;
+    const scale =
+        moment.frame === null
+            ? Math.max(width, height) / REFERENCE_SIDE
+            : width / Math.max(moment.frame.width, 1);
+    const { dotScale } = moment;
     const target = entry.output;
-    const source = sourceOf(engine, image.store);
+    const source = sourceOf(engine, keyOf(image.store, moment.lane));
     const sketch = compiled(gl, source, image.source);
     const { samples } = entry;
 
@@ -327,15 +341,16 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-        if (!samePrepared(source.prepared, { sketch, image, width, height, scale })) {
+        if (!samePrepared(source.prepared, { sketch, image, width, height, scale, dotScale })) {
             const ramp = buildRamp(image.theme);
-            prepare(surface, sketch, params, ramp, scale);
+            prepare(surface, sketch, params, ramp, scale, dotScale);
             source.prepared = {
                 sketch,
                 image,
                 width,
                 height,
                 scale,
+                dotScale,
                 backdrop: [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255],
             };
         } else {
@@ -523,6 +538,9 @@ const forget = (engine: Engine, now: number): void => {
     });
 };
 
+const sameFrame = (a: Size | null, b: Size | null): boolean =>
+    a === null || b === null ? a === b : a.width === b.width && a.height === b.height;
+
 export const cook = (
     engine: Engine,
     image: Image,
@@ -536,7 +554,8 @@ export const cook = (
             entry.cooked.t === moment.t &&
             entry.cooked.pass === moment.pass &&
             samePointer(entry.cooked.pointer, moment.pointer) &&
-            entry.cooked.scale === moment.scale &&
+            sameFrame(entry.cooked.frame, moment.frame) &&
+            entry.cooked.dotScale === moment.dotScale &&
             sameImage(entry.cooked.image, stage);
 
         if (!fresh) {
@@ -558,7 +577,8 @@ export const cook = (
                 t: moment.t,
                 pass: moment.pass,
                 pointer: moment.pointer,
-                scale: moment.scale,
+                frame: moment.frame,
+                dotScale: moment.dotScale,
             };
         }
 
@@ -572,6 +592,7 @@ export const cook = (
     return image.kind === 'none' ? null : (drawn.get(image.store) ?? null);
 };
 
+// Exactly what is drawn: an export writes the whole canvas out, so it must be the picture's size.
 const grown = (engine: Engine, width: number, height: number): void => {
     const { canvas } = engine;
 
@@ -581,19 +602,43 @@ const grown = (engine: Engine, width: number, height: number): void => {
     }
 };
 
+const GROWTH = 512;
+
+const grownSide = (current: number, needed: number, limit: number): number =>
+    needed <= current
+        ? current
+        : Math.min(limit, Math.ceil(Math.max(needed, current * 1.5) / GROWTH) * GROWTH);
+
+// Growing clears the canvas, so a strip reserves its whole width before its first tile; by half at least, or every pinch reallocates.
+export const reserved = (engine: Engine, width: number, height: number): void => {
+    const { canvas, gl } = engine;
+    const dimensions: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    const limit = dimensions instanceof Int32Array ? (dimensions[0] ?? 4096) : 4096;
+    const next = {
+        width: grownSide(canvas.width, width, limit),
+        height: grownSide(canvas.height, height, limit),
+    };
+
+    if (next.width !== canvas.width || next.height !== canvas.height) {
+        canvas.width = next.width;
+        canvas.height = next.height;
+    }
+};
+
 export const drawn = (
     engine: Engine,
     texture: WebGLTexture | null,
     width: number,
     height: number,
     x = 0,
+    y = 0,
 ): void => {
     const { gl } = engine;
     const shader = engine.passes.present;
 
-    grown(engine, x + width, height);
+    grown(engine, x + width, y + height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(x, 0, width, height);
+    gl.viewport(x, y, width, height);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     gl.useProgram(shader.program);
@@ -603,6 +648,31 @@ export const drawn = (
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
     gl.activeTexture(gl.TEXTURE0);
+};
+
+// A tile's slot takes the picture's backdrop, then the picture fitted inside it, the way the window frames it.
+export const framedIn = (
+    engine: Engine,
+    texture: WebGLTexture | null,
+    slot: { readonly x: number; readonly width: number; readonly height: number },
+    box: {
+        readonly x: number;
+        readonly y: number;
+        readonly width: number;
+        readonly height: number;
+    },
+    backdrop: readonly [number, number, number],
+): void => {
+    const { gl } = engine;
+
+    grown(engine, slot.x + slot.width, slot.height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(slot.x, 0, slot.width, slot.height);
+    gl.clearColor(...backdrop, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.disable(gl.SCISSOR_TEST);
+    drawn(engine, texture, box.width, box.height, slot.x + box.x, box.y);
 };
 
 export const presented = (

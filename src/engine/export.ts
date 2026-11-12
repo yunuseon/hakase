@@ -17,6 +17,7 @@ export type ImageExport = {
     readonly seconds: number;
     readonly size: Size;
     readonly settings: ExportSettings;
+    readonly framed: boolean;
 };
 
 const ownEngine$ = new Observable<Engine>(subscriber => {
@@ -37,7 +38,7 @@ export const hasHistory = (image: Image): boolean =>
 
 const frameAt = (
     engine: Engine,
-    { image, seconds }: ImageExport,
+    { image, seconds, size, framed }: ImageExport,
     pixels: Size,
     t: number,
     pass: number,
@@ -45,7 +46,16 @@ const frameAt = (
     const texture = cook(
         engine,
         image,
-        { t, seconds, ...pixels, pointer: centre, pass, scale: null },
+        {
+            t,
+            seconds,
+            ...pixels,
+            pointer: centre,
+            pass,
+            frame: framed ? size : null,
+            dotScale: 1,
+            lane: '',
+        },
         performance.now(),
     );
     drawn(engine, texture, pixels.width, pixels.height);

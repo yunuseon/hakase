@@ -43,7 +43,9 @@ export const momentOf$ = (
             ...pixelsOf(size, ratio),
             pointer: centre,
             pass: 0,
-            scale: null,
+            frame: null,
+            dotScale: 1,
+            lane: '',
         })),
         distinctUntilChanged(
             (a, b) =>
@@ -67,6 +69,8 @@ export const windowMoment$ = (
             ...pixelsOf(size, ratio),
             pointer,
             pass: 0,
-            scale: scaleOf(size, ratio),
+            frame: size,
+            dotScale: 1,
+            lane: '',
         })),
     );
