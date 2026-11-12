@@ -51,11 +51,13 @@ export const chromeStories: readonly Story[] = [
         defaults,
         height: 360,
         action: null,
-        code: "const navigator = new HksNavigator();\nconst launcher = new HksToolbar().categories(categoriesOf(programs));\nlauncher.slot = 'launcher';\nnavigator.append(launcher);\nconst lifetime$ = merge(\n  launcher.connect$(),\n  navigator.connect$(map$, zoom$, open$, history$, mode$),\n);\n// The owner folds launcher.launches$ and navigator requests.",
+        code: "const navigator = new HksNavigator();\nconst categories = categoriesOf(programs);\nconst launcher = new HksToolbar().categories(categories);\nlauncher.slot = 'launcher';\nnavigator.style.setProperty('--launcher-keys', String(categories.length));\nnavigator.append(launcher);\nconst lifetime$ = merge(\n  launcher.connect$(),\n  navigator.connect$(map$, zoom$, open$, history$, mode$),\n);\n// The owner folds launcher.launches$ and navigator requests.",
         create: ({ variant }) => {
             const element = new HksNavigator();
-            const launcher = new HksToolbar().categories(categoriesOf(Object.values(programs)));
+            const categories = categoriesOf(Object.values(programs));
+            const launcher = new HksToolbar().categories(categories);
             launcher.slot = 'launcher';
+            element.style.setProperty('--launcher-keys', String(categories.length));
             element.append(launcher);
             const open$ = element.toggles$.pipe(
                 scan(open => !open, variant !== 'compact'),
@@ -495,6 +497,7 @@ export const chromeStories: readonly Story[] = [
                                     width: 150,
                                     menu: { above: false, height: 90 },
                                     title: 'Signal',
+                                    type: 'level',
                                     colour: 'var(--accent)',
                                     end: {
                                         kind: 'store',
@@ -524,6 +527,7 @@ export const chromeStories: readonly Story[] = [
                                     width: 150,
                                     menu: { above: false, height: 90 },
                                     title: 'Knob 1',
+                                    type: 'level',
                                     colour: 'var(--accent)',
                                     end: {
                                         kind: 'port',

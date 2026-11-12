@@ -31,6 +31,7 @@ const held = {
     drums: [],
     pedals: [],
     gates: [],
+    converters: [],
     boxes: [],
     sketchLinks: [],
 } satisfies Blueprint['held'];

@@ -8,7 +8,9 @@ import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
 import { PEDALS, type PedalKind } from './pedals.ts';
 import { GATES, type GateKind } from './gates.ts';
+import { CONVERTERS, type ConverterKind } from './converters.ts';
 import { agendaReading, focusReading, ticketsReading } from './readings.ts';
+import type { PortType } from './port-types.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
@@ -23,6 +25,7 @@ export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId };
 export type PedalBinding = { readonly kind: PedalKind; readonly store: StoreId };
 export type GateBinding = { readonly kind: GateKind; readonly store: StoreId };
+export type ConverterBinding = { readonly kind: ConverterKind; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
@@ -35,7 +38,8 @@ export type Follow =
     | DrumsBinding
     | SketchBinding
     | PedalBinding
-    | GateBinding;
+    | GateBinding
+    | ConverterBinding;
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
@@ -47,6 +51,7 @@ export type InputSources = {
 
 const playbackSource = {
     kind: 'playback',
+    makes: 'clock',
     program: 'timeline',
     title: 'Playback',
     access: 'scrub',
@@ -54,6 +59,7 @@ const playbackSource = {
 
 const focusSource = {
     kind: 'focus',
+    makes: 'timer',
     program: 'focus',
     title: 'Focus',
     access: 'read',
@@ -65,6 +71,7 @@ const focusSource = {
 
 const agendaSource = {
     kind: 'agenda',
+    makes: 'schedule',
     program: 'agenda',
     title: 'Agenda',
     access: 'read',
@@ -76,6 +83,7 @@ const agendaSource = {
 
 const ticketsSource = {
     kind: 'tickets',
+    makes: 'tasks',
     program: 'tickets',
     title: 'Tickets',
     access: 'read',
@@ -85,6 +93,7 @@ const ticketsSource = {
 
 const signalSource = {
     kind: 'signal',
+    makes: 'level',
     program: 'signal',
     title: 'Signal',
     access: 'read',
@@ -92,6 +101,7 @@ const signalSource = {
 
 const paintSource = {
     kind: 'paint',
+    makes: 'sheet',
     program: 'paint',
     title: 'Painting',
     access: 'read',
@@ -99,6 +109,7 @@ const paintSource = {
 
 const penSource = {
     kind: 'pen',
+    makes: 'sheet',
     program: 'pen',
     title: 'Pen',
     access: 'read',
@@ -106,6 +117,7 @@ const penSource = {
 
 const voiceSource = {
     kind: 'voice',
+    makes: 'sound',
     program: 'voice',
     title: 'Voice',
     access: 'read',
@@ -113,6 +125,7 @@ const voiceSource = {
 
 const drumsSource = {
     kind: 'drums',
+    makes: 'sound',
     program: 'drums',
     title: 'Drums',
     access: 'read',
@@ -120,13 +133,14 @@ const drumsSource = {
 
 const sketchSource = {
     kind: 'sketch',
+    makes: 'picture',
     program: 'sketch',
     title: 'Sketch',
     access: 'read',
 } as const;
 
 const pedalSource = <K extends PedalKind>(kind: K) =>
-    ({ kind, program: kind, title: PEDALS[kind].title, access: 'read' }) as const;
+    ({ kind, makes: 'picture', program: kind, title: PEDALS[kind].title, access: 'read' }) as const;
 
 export const IMAGE_SOURCES = [
     sketchSource,
@@ -141,7 +155,7 @@ export const isImageKind = (kind: string): boolean =>
     IMAGE_SOURCES.some(source => source.kind === kind);
 
 const gateSource = <K extends GateKind>(kind: K) =>
-    ({ kind, program: kind, title: GATES[kind].title, access: 'read' }) as const;
+    ({ kind, makes: 'bit', program: kind, title: GATES[kind].title, access: 'read' }) as const;
 
 export const GATE_SOURCES = [
     gateSource('nand'),
@@ -153,6 +167,17 @@ export const GATE_SOURCES = [
     gateSource('pin-in'),
     gateSource('pin-out'),
 ] as const;
+
+const converterSource = <K extends ConverterKind>(kind: K) =>
+    ({
+        kind,
+        makes: CONVERTERS[kind].makes,
+        program: kind,
+        title: CONVERTERS[kind].title,
+        access: 'read',
+    }) as const;
+
+export const CONVERTER_SOURCES = [converterSource('timing')] as const;
 
 export const SOURCES = [
     playbackSource,
@@ -166,22 +191,30 @@ export const SOURCES = [
     drumsSource,
     ...IMAGE_SOURCES,
     ...GATE_SOURCES,
+    ...CONVERTER_SOURCES,
 ] as const;
 
 type Source = (typeof SOURCES)[number];
 
 export type FollowedInput = {
     readonly title: string;
+    readonly takes: PortType;
     readonly from: 'followed';
     readonly group: string | null;
     readonly sources: readonly Source[];
     readonly initial: Follow | null;
 };
 
-export type OwnInput = { readonly title: string; readonly from: 'own'; readonly kind: 'playback' };
+export type OwnInput = {
+    readonly title: string;
+    readonly takes: PortType;
+    readonly from: 'own';
+    readonly kind: 'playback';
+};
 
 export type StoreInput = {
     readonly title: string;
+    readonly takes: PortType;
     readonly from: 'store';
     readonly param: string;
     readonly group: string | null;
@@ -195,6 +228,7 @@ export type InputsFor = (program: ProgramId) => ProgramInputs;
 
 export const playbackInput = {
     title: 'Playback',
+    takes: 'clock',
     from: 'followed',
     group: null,
     sources: [playbackSource],
@@ -208,6 +242,7 @@ export const loosePlaybackInput = {
 
 export const progressInput = {
     title: 'Progress',
+    takes: 'clock',
     from: 'followed',
     group: null,
     sources: [playbackSource],
@@ -216,6 +251,7 @@ export const progressInput = {
 
 export const sourceInput = {
     title: 'Source',
+    takes: 'reading',
     from: 'followed',
     group: null,
     sources: [focusSource, agendaSource, ticketsSource],
@@ -225,6 +261,7 @@ export const sourceInput = {
 const signalInput = (title: string, group: string) =>
     ({
         title,
+        takes: 'level',
         from: 'followed',
         group,
         sources: [signalSource],
@@ -234,10 +271,11 @@ const signalInput = (title: string, group: string) =>
 const driveInput = (title: string, param: string, group: string) =>
     ({
         title,
+        takes: 'level',
         from: 'store',
         param,
         group,
-        sources: [signalSource, voiceSource, drumsSource, ...GATE_SOURCES],
+        sources: [signalSource, voiceSource, drumsSource, ...GATE_SOURCES, ...CONVERTER_SOURCES],
         initial: null,
     }) satisfies StoreInput;
 
@@ -245,16 +283,18 @@ const driveInput = (title: string, param: string, group: string) =>
 const levelInput = (param: string) =>
     ({
         title: param,
+        takes: 'level',
         from: 'store',
         param,
         group: null,
-        sources: [signalSource, voiceSource, drumsSource],
+        sources: [signalSource, voiceSource, drumsSource, ...CONVERTER_SOURCES],
         initial: null,
     }) satisfies StoreInput;
 
 const storedSignalInput = (param: string) =>
     ({
         title: param,
+        takes: 'level',
         from: 'store',
         param,
         group: null,
@@ -264,6 +304,7 @@ const storedSignalInput = (param: string) =>
 
 export const timeInput = {
     title: 'read on',
+    takes: 'clock',
     from: 'store',
     param: 'time',
     group: null,
@@ -298,6 +339,7 @@ export const sceneInputs = {
 
 export const paintInput = {
     title: 'paint',
+    takes: 'sheet',
     from: 'store',
     param: 'paint',
     group: null,
@@ -322,6 +364,7 @@ export const voiceInputs = {
 export const focusInputs = {
     agenda: {
         title: 'agenda',
+        takes: 'schedule',
         from: 'store',
         param: 'agenda',
         group: null,
@@ -344,6 +387,7 @@ export const plotInputs = {
 export const imageInput = (title: string) =>
     ({
         title,
+        takes: 'picture',
         from: 'followed',
         group: null,
         sources: IMAGE_SOURCES,
@@ -353,6 +397,7 @@ export const imageInput = (title: string) =>
 const imageStoreInput = (param: string) =>
     ({
         title: param,
+        takes: 'picture',
         from: 'store',
         param,
         group: null,
@@ -372,6 +417,7 @@ export const pedalInputs = (kind: PedalKind): Readonly<Record<string, StoreInput
 const bitInput = (param: string) =>
     ({
         title: param,
+        takes: 'bit',
         from: 'store',
         param,
         group: null,
@@ -389,8 +435,22 @@ export const gateInputs = (kind: GateKind): Readonly<Record<string, StoreInput>>
     return Object.fromEntries(entries);
 };
 
+export const converterInputs = (kind: ConverterKind): Readonly<Record<string, StoreInput>> => ({
+    in: {
+        title: 'in',
+        takes: CONVERTERS[kind].takes,
+        from: 'store',
+        param: 'in',
+        group: null,
+        sources: SOURCES.filter(source => source.makes === CONVERTERS[kind].takes),
+        initial: null,
+    },
+    time: timeInput,
+});
+
 export const ownPlaybackInput = {
     title: 'Playback',
+    takes: 'clock',
     from: 'own',
     kind: 'playback',
 } as const satisfies OwnInput;
@@ -495,6 +555,7 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
+        case 'timing':
             return kind;
     }
 };
@@ -540,6 +601,7 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
+        case 'timing':
             return { kind, store };
         default:
             return null;

@@ -2,7 +2,7 @@ import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
 import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
 import { dependentsOf, type Linked } from './shared/signal.ts';
 import { readsTickBefore } from './gates.ts';
-import { colourOf, withMain, type StoreEntry } from './stores.ts';
+import { colourOf, MAIN, withMain, type StoreEntry } from './stores.ts';
 import { isProgramId } from './program.ts';
 import type { Process } from './workspace.ts';
 
@@ -22,6 +22,8 @@ export const inputGroups = (
         ? new Set<string>()
         : dependentsOf(loops, process.store);
     const users = new Map<string, number>();
+    const time = sourceIn(linked, process.store, 'time');
+    const readOn = time === null ? null : (stores.find(({ id }) => id === time)?.name ?? MAIN);
 
     processes.forEach(({ store, follows }) => {
         new Set([store, ...followedStores(follows)]).forEach(id => {
@@ -58,6 +60,8 @@ export const inputGroups = (
                     ? ['read-only']
                     : []),
             ].join(' · '),
+            type: definition.takes,
+            setAside: definition.from === 'followed' && source.kind === 'playback' ? readOn : null,
             options: withMain(source.program, stores)
                 .filter(store => definition.from !== 'store' || !looping.has(store.id))
                 .map(store => ({

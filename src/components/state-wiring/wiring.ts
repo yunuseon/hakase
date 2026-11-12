@@ -14,6 +14,7 @@ export type Socket = {
     readonly width: number;
     readonly menu: { readonly above: boolean; readonly height: number };
     readonly title: string;
+    readonly type: string | null;
     readonly colour: string;
     readonly end: End;
     readonly receiver: End | null;

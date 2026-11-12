@@ -36,6 +36,7 @@ const started = (): Documents => ({
     focusLinks: new Map(),
     pedals: new Map(),
     gates: new Map(),
+    converters: new Map(),
     boxes: new Map(),
     sketchLinks: new Map(),
     library: emptyLibrary,
@@ -324,6 +325,29 @@ describe('links', () => {
         expect(history.present.gates.get('nand')?.sources['time']).toBe('timeline');
         expect(history.present.signals.get('signal')?.sources.depth ?? null).toBeNull();
         expect(history.steps).toHaveLength(before.steps.length + 2);
+    });
+
+    it('let a knob follow an agenda only through a converter', () => {
+        const before = run(fresh(), [
+            act({
+                kind: 'launch',
+                program: 'timing',
+                size: { width: 280, height: 220 },
+                viewport,
+            }),
+        ]);
+        const timing =
+            before.present.workspace.processes.find(({ program }) => program === 'timing')?.store ??
+            '';
+        const history = run(before, [
+            { kind: 'link', store: timing, param: 'in', source: 'agenda' },
+            { kind: 'link', store: 'sketch-2', param: 'k1', source: timing },
+            { kind: 'link', store: 'sketch-2', param: 'k2', source: 'agenda' },
+        ]);
+
+        expect(history.present.converters.get(timing)?.sources.in).toBe('agenda');
+        expect(history.present.sketchLinks.get('sketch-2')?.sources.k1).toBe(timing);
+        expect(history.present.sketchLinks.get('sketch-2')?.sources.k2 ?? null).toBeNull();
     });
 
     it('refuse a source of a kind the input does not take', () => {

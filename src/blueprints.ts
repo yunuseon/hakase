@@ -12,6 +12,7 @@ import { parseDrums, type Drums } from './components/drums/drums.ts';
 import type { Documents } from './documents.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { parseGate, type Gate } from './gates.ts';
+import { parseConverter, type Converter } from './converters.ts';
 import { parseBox, type Box } from './boxes.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
@@ -65,6 +66,7 @@ type HeldKind =
     | 'drums'
     | 'pedals'
     | 'gates'
+    | 'converters'
     | 'boxes'
     | 'sketchLinks';
 
@@ -132,8 +134,19 @@ export const reduceBlueprints = (
     }
 };
 
-const linkedOf = ({ signals, pens, voices, drums, pedals, gates, boxes, sketchLinks }: Documents) =>
+const linkedOf = ({
+    signals,
+    pens,
+    voices,
+    drums,
+    pedals,
+    gates,
+    converters,
+    boxes,
+    sketchLinks,
+}: Documents) =>
     new Map<StoreId, Linked>([
+        ...converters,
         ...boxes,
         ...signals,
         ...pens,
@@ -253,6 +266,7 @@ export const blueprintOf = (
             drums: picked(documents.drums, stores),
             pedals: picked(documents.pedals, stores),
             gates: picked(documents.gates, stores),
+            converters: picked(documents.converters, stores),
             boxes: picked(documents.boxes, stores),
             sketchLinks: picked(documents.sketchLinks, stores),
         },
@@ -426,6 +440,13 @@ export const placed = (
                 Object.entries(gate.sources).map(([param, source]) => [param, sourceOf(source)]),
             ),
         })),
+        converters: into(documents.converters, held.converters, converter => ({
+            ...converter,
+            sources: {
+                in: sourceOf(converter.sources.in),
+                time: sourceOf(converter.sources.time),
+            },
+        })),
         boxes: into(documents.boxes, held.boxes, (box): Box => ({
             ...box,
             inner: box.inner.map(window => ({
@@ -555,6 +576,10 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 gates: entriesOf(heldOf('gates'), parseGate).flatMap(
                     ([id, gate]): (readonly [StoreId, Gate])[] =>
                         gate === null ? [] : [[id, gate]],
+                ),
+                converters: entriesOf(heldOf('converters'), parseConverter).flatMap(
+                    ([id, converter]): (readonly [StoreId, Converter])[] =>
+                        converter === null ? [] : [[id, converter]],
                 ),
                 boxes: entriesOf(heldOf('boxes'), stored => parseBox(stored, inputsFor)).flatMap(
                     ([id, box]): (readonly [StoreId, Box])[] => (box === null ? [] : [[id, box]]),

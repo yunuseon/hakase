@@ -48,6 +48,14 @@ import {
     type Gate,
     type GateCommand,
 } from './gates.ts';
+import {
+    CONVERTER_DEFAULTS,
+    isConverterKind,
+    isConverterParam,
+    reduceConverter,
+    type Converter,
+    type ConverterCommand,
+} from './converters.ts';
 import { boxed, EMPTY_BOX, reduceBox, unboxed, type Box, type BoxCommand } from './boxes.ts';
 import {
     isSketchParam,
@@ -134,6 +142,7 @@ export type Documents = {
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
     readonly gates: ReadonlyMap<StoreId, Gate>;
+    readonly converters: ReadonlyMap<StoreId, Converter>;
     readonly boxes: ReadonlyMap<StoreId, Box>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
@@ -160,6 +169,7 @@ type StoreCommands = {
     readonly drums: DrumsCommand;
     readonly pedals: PedalCommand;
     readonly gates: GateCommand;
+    readonly converters: ConverterCommand;
     readonly boxes: BoxCommand;
 };
 
@@ -243,6 +253,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     drums: storeEvent(documents.drums, event),
     pedals: storeEvent(documents.pedals, event),
     gates: storeEvent(documents.gates, event),
+    converters: storeEvent(documents.converters, event),
     boxes: storeEvent(documents.boxes, event),
     focusLinks: storeEvent(documents.focusLinks, event),
     sketchLinks: storeEvent(documents.sketchLinks, event),
@@ -255,6 +266,7 @@ export const linkedOf = ({
     drums,
     pedals,
     gates,
+    converters,
     boxes,
     focusLinks,
     sketchLinks,
@@ -266,6 +278,7 @@ export const linkedOf = ({
     | 'drums'
     | 'pedals'
     | 'gates'
+    | 'converters'
     | 'boxes'
     | 'focusLinks'
     | 'sketchLinks'
@@ -277,6 +290,7 @@ export const linkedOf = ({
         ...drums,
         ...pedals,
         ...gates,
+        ...converters,
         ...boxes,
         ...focusLinks,
         ...sketchLinks,
@@ -397,7 +411,13 @@ const linked = (
                         { kind: 'gates', store, command: { kind: 'source', param, source } },
                         seq,
                     )
-                  : documents;
+                  : isConverterKind(owner) && isConverterParam(param)
+                    ? reduce(
+                          documents,
+                          { kind: 'converters', store, command: { kind: 'source', param, source } },
+                          seq,
+                      )
+                    : documents;
     }
 };
 
@@ -620,6 +640,23 @@ export const reduceDocuments =
                           ),
                       };
             }
+            case 'converters': {
+                const owner = ownerOf(documents.workspace, action.store);
+
+                return owner === null || !isConverterKind(owner)
+                    ? documents
+                    : {
+                          ...documents,
+                          converters: commanded(
+                              documents.converters,
+                              action.store,
+                              CONVERTER_DEFAULTS[owner],
+                              reduceConverter,
+                              action.command,
+                              seq,
+                          ),
+                      };
+            }
             case 'boxes':
                 return ownerOf(documents.workspace, action.store) !== 'box' ||
                     !documents.boxes.has(action.store)
@@ -764,6 +801,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     drums: ['swing', 'volume'],
     pedals: ['value'],
     gates: ['threshold', 'rename'],
+    converters: [],
     boxes: ['rename'],
 };
 
@@ -839,6 +877,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     drums: 'drum machine',
     pedals: 'pedal',
     gates: 'gate',
+    converters: 'converter',
     boxes: 'component',
 };
 

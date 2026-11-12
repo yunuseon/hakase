@@ -45,6 +45,8 @@ import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
+import { CONVERTER_DEFAULTS, isConverterKind, timingCurve } from '../converters.ts';
+import { dayOf } from '../lib/day.ts';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 
@@ -100,6 +102,8 @@ type StoreKey =
     | 'kit$'
     | 'pedal$'
     | 'gate$'
+    | 'converter$'
+    | 'converted$'
     | 'bits$'
     | 'box$'
     | 'image$'
@@ -130,6 +134,7 @@ export const scopedOf = ({
     drums$,
     pedals$,
     gates$,
+    converters$,
     boxes$,
     linked$,
     library$,
@@ -416,6 +421,47 @@ export const scopedOf = ({
         return made;
     };
 
+    const converterIn = (store: StoreId) =>
+        combineLatest([converters$, stores$]).pipe(
+            map(([all, stores]) => {
+                const owner = ownerOf({ stores }, store);
+
+                return (
+                    all.get(store) ??
+                    (owner !== null && isConverterKind(owner)
+                        ? CONVERTER_DEFAULTS[owner]
+                        : CONVERTER_DEFAULTS.timing)
+                );
+            }),
+            distinctUntilChanged(),
+        );
+
+    const today$ = wallClock$.pipe(
+        map(dayOf),
+        distinctUntilChanged(),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    const convertedIn = (store: StoreId): Observable<Driver | null> =>
+        converterIn(store).pipe(
+            switchMap(converter => {
+                switch (converter.kind) {
+                    case 'timing':
+                        return linkIn(store, 'in').pipe(
+                            switchMap(binding =>
+                                binding?.kind === 'agenda'
+                                    ? combineLatest([agendaIn(binding.store), today$]).pipe(
+                                          map(([agenda, day]) =>
+                                              timingCurve(agenda, day, converter.choice),
+                                          ),
+                                      )
+                                    : of(null),
+                            ),
+                        );
+                }
+            }),
+        );
+
     const gateIn = (store: StoreId) =>
         combineLatest([gates$, stores$]).pipe(
             map(([all, stores]) => {
@@ -454,14 +500,16 @@ export const scopedOf = ({
                 ? combineLatest([kitIn(binding.store), pace$]).pipe(
                       map(([kit, { seconds }]) => kitCurve(kit, seconds)),
                   )
-                : isGateKind(binding.kind)
-                  ? pace$.pipe(
-                        switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
-                        map(table => table.get(binding.store) ?? null),
-                        distinctUntilChanged(),
-                        map(row => (row === null ? null : bitCurve(row))),
-                    )
-                  : of(null);
+                : isConverterKind(binding.kind)
+                  ? convertedIn(binding.store)
+                  : isGateKind(binding.kind)
+                    ? pace$.pipe(
+                          switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
+                          map(table => table.get(binding.store) ?? null),
+                          distinctUntilChanged(),
+                          map(row => (row === null ? null : bitCurve(row))),
+                      )
+                    : of(null);
 
     const nowOn = (binding: Follow, clock: StoreId): Observable<Driver | null> => {
         const clock$ = playbackIn(clock).pipe(shareReplay({ bufferSize: 1, refCount: true }));
@@ -715,6 +763,8 @@ export const scopedOf = ({
             kit$: narrowed(kitIn),
             pedal$: narrowed(pedalIn),
             gate$: narrowed(gateIn),
+            converter$: narrowed(converterIn),
+            converted$: narrowed(convertedIn),
             bits$: combineLatest([store$, pace$]).pipe(
                 switchMap(([store, { ticks, seconds }]) =>
                     tableOf(ticks, seconds).pipe(

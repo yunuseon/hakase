@@ -25,6 +25,7 @@ import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
 import type { DrumsCommand, Kit } from './components/drums/drums.ts';
 import type { Pedal, PedalCommand } from './pedals.ts';
 import type { Gate, GateCommand } from './gates.ts';
+import type { Converter, ConverterCommand } from './converters.ts';
 import type { BoxCommand, BoxReading } from './boxes.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
 import type { StateCommand } from './shared/connections.ts';
@@ -65,6 +66,7 @@ export const PROGRAM_IDS = [
     'pin-in',
     'pin-out',
     'box',
+    'timing',
     'blueprints',
     'tasks',
     'tickets',
@@ -122,6 +124,7 @@ export type AppInput =
     | { readonly kind: 'drums'; readonly command: DrumsCommand }
     | { readonly kind: 'pedal'; readonly command: PedalCommand }
     | { readonly kind: 'gate'; readonly command: GateCommand }
+    | { readonly kind: 'converter'; readonly command: ConverterCommand }
     | { readonly kind: 'box'; readonly command: BoxCommand }
     | { readonly kind: 'unbox' }
     | {
@@ -187,6 +190,8 @@ export type AppState = {
     readonly kit$: Observable<Kit>;
     readonly pedal$: Observable<Pedal>;
     readonly gate$: Observable<Gate>;
+    readonly converter$: Observable<Converter>;
+    readonly converted$: Observable<Driver | null>;
     readonly bits$: Observable<Uint8Array>;
     readonly box$: Observable<BoxReading>;
     readonly linkedPicture$: (param: string) => Observable<Sheet | null>;
@@ -273,6 +278,11 @@ export const CATEGORIES = [
         id: 'logic',
         title: 'Logic',
         icon: 'M4 6 H11 A6 6 0 0 1 11 18 H4 Z M17 12 H21 M1 9 H4 M1 15 H4',
+    },
+    {
+        id: 'convert',
+        title: 'Convert',
+        icon: 'M4 8 H15 M12 5 L15 8 L12 11 M20 16 H9 M12 13 L9 16 L12 19',
     },
     {
         id: 'plan',

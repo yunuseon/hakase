@@ -123,3 +123,20 @@ describe('store-owned inputs', () => {
         expect(storeInputCommand(inputs, { kind: 'unfollow', input: 'constructor' })).toBeNull();
     });
 });
+
+describe('a playback set aside', () => {
+    it('names the clock a read-on link shows the window on, on its playback row only', () => {
+        const linked = new Map([
+            ['signal', { ...defaultSignal, sources: { ...defaultSignal.sources, time: 'other' } }],
+        ]);
+        const shown = groups(process, linked);
+
+        expect(shown.find(group => group.input === 'playback')?.setAside).toBe('Other');
+        expect(
+            shown
+                .filter(group => group.input !== 'playback')
+                .every(group => group.setAside === null),
+        ).toBe(true);
+        expect(groups(process).every(group => group.setAside === null)).toBe(true);
+    });
+});

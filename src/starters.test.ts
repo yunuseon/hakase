@@ -28,6 +28,7 @@ const scene = (): Documents => ({
     focusLinks: new Map(),
     pedals: new Map(),
     gates: new Map(),
+    converters: new Map(),
     boxes: new Map(),
     sketchLinks: new Map(),
     library: emptyLibrary,

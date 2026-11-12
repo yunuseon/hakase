@@ -246,22 +246,29 @@ const FollowOptions = (state: FollowRender) =>
                                 .find(option => option.current);
                         const open = () => state.expanded === input;
                         const label = () => groups()[0]?.label ?? input;
+                        const setAside = () =>
+                            groups().find(group => group.setAside !== null)?.setAside ?? null;
                         return html`<button
                                 type="button"
                                 class="input-line"
+                                data-set-aside=${ifDefined(setAside() === null ? undefined : '')}
                                 data-expand=${ifDefined(input)}
                                 aria-expanded=${ifDefined(open())}
                                 title=${ifDefined(open() ? 'close the list' : `choose what ${label()} follows`)}
                             >
                                 <span class="direction" aria-hidden="true">←</span
                                 ><span class="input-name">${label()}</span
+                                ><span class="type">${groups()[0]?.type ?? ''}</span
                                 ><span
                                     class="dot"
                                     data-none=${ifDefined(current() === undefined ? '' : undefined)}
                                     style=${styleMap({ '--store': current()?.colour ?? '' })}
                                 ></span
                                 ><span class="option-name">${current()?.name ?? 'None'}</span
-                                ><span class="chevron" aria-hidden="true"></span></button
+                                >${when(setAside() !== null, () => html`<span class="aside">read on ${setAside()}</span>`)}<span
+                                    class="chevron"
+                                    aria-hidden="true"
+                                ></span></button
                             >${when(
                                 open(),
                                 () =>

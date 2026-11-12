@@ -102,10 +102,15 @@ const SocketRow = (props: { readonly socket: Socket }) =>
             type="button"
             class="jack"
             data-jack=${ifDefined(props.socket.key)}
-            aria-label=${ifDefined(`connect ${props.socket.title}`)}
+            data-type=${ifDefined(props.socket.type ?? undefined)}
+            aria-label=${ifDefined(`connect ${props.socket.title}${props.socket.type === null ? '' : `, a ${props.socket.type}`}`)}
             title=${ifDefined(`drag to connect ${props.socket.title}`)}
         ></button
-        ><span>${props.socket.title}</span
+        ><span
+            >${props.socket.title}${when(
+                props.socket.type !== null,
+                () => html`<small class="type">${props.socket.type}</small>`,
+            )}</span
         ><button
             type="button"
             class="selector"

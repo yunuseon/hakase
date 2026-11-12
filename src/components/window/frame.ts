@@ -41,7 +41,9 @@ export type FollowGroup = {
     readonly optional: boolean;
     readonly source: string;
     readonly title: string;
+    readonly type: string;
     readonly options: readonly StoreOption[];
+    readonly setAside: string | null;
 };
 
 export type SwitchItem = {

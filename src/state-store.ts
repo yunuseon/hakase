@@ -38,6 +38,7 @@ import type { InputsFor } from './inputs.ts';
 import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { GATE_DEFAULTS, parseGate, type Gate } from './gates.ts';
+import { parseConverter, type Converter } from './converters.ts';
 import { parseBox, type Box } from './boxes.ts';
 import {
     isSketchParam,
@@ -78,6 +79,7 @@ export type Snapshot = {
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
     readonly gates: ReadonlyMap<StoreId, Gate>;
+    readonly converters: ReadonlyMap<StoreId, Converter>;
     readonly boxes: ReadonlyMap<StoreId, Box>;
     readonly focusLinks: ReadonlyMap<StoreId, FocusLink>;
     readonly sketchLinks: ReadonlyMap<StoreId, SketchLink>;
@@ -195,6 +197,7 @@ const fresh: Restored = {
     sketchLinks: new Map(),
     pedals: new Map(),
     gates: new Map(),
+    converters: new Map(),
     boxes: new Map(),
     library: emptyLibrary,
     blueprints: emptyBlueprints,
@@ -339,6 +342,12 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
                 ([id, gate]): [StoreId, Gate][] => (gate === null ? [] : [[id, gate]]),
             ),
         ]),
+        converters: new Map(
+            [...byStore(field(stored, 'converters'), 'converters', parseConverter)].flatMap(
+                ([id, converter]): [StoreId, Converter][] =>
+                    converter === null ? [] : [[id, converter]],
+            ),
+        ),
         boxes: new Map(
             [
                 ...byStore(field(stored, 'boxes'), 'boxes', value => parseBox(value, inputsFor)),
@@ -399,6 +408,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         sketchLinks: saved(snapshot.sketchLinks),
         pedals: saved(snapshot.pedals),
         gates: saved(snapshot.gates),
+        converters: saved(snapshot.converters),
         boxes: saved(snapshot.boxes),
         library: snapshot.library,
         blueprints: snapshot.blueprints,

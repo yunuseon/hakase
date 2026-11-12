@@ -227,6 +227,8 @@ export const wiringOf = (
                       width,
                       menu: menuAt(outputAt(0).y),
                       title: 'Output',
+                      type:
+                          SOURCES.find(source => source.program === process.program)?.makes ?? null,
                       colour: colourOf(process.store),
                       end: {
                           kind: 'store',
@@ -279,6 +281,7 @@ export const wiringOf = (
                 width: width - indent,
                 menu: menuAt(at.y),
                 title: label ?? options[0]?.label ?? name,
+                type: definition?.takes ?? null,
                 colour: current?.colour ?? 'var(--muted)',
                 end: {
                     kind: 'port',
@@ -335,6 +338,7 @@ export const wiringOf = (
                 width,
                 menu: menuAt(outputAt(output.length + index).y),
                 title: nameOf(pin),
+                type: 'bit',
                 colour: colourOf(pin),
                 end: { kind: 'store', id: pin, program: 'pin-out', feeds: 'pin-out' },
                 receiver: null,

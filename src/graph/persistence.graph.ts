@@ -28,6 +28,7 @@ type Saved = Pick<
     | 'drums$'
     | 'pedals$'
     | 'gates$'
+    | 'converters$'
     | 'boxes$'
     | 'focusLinks$'
     | 'sketchLinks$'
@@ -58,6 +59,7 @@ export const persisted$ = ({
     drums$,
     pedals$,
     gates$,
+    converters$,
     boxes$,
     focusLinks$,
     sketchLinks$,
@@ -90,6 +92,7 @@ export const persisted$ = ({
             drums: drums$,
             pedals: pedals$,
             gates: gates$,
+            converters: converters$,
             boxes: boxes$,
             focusLinks: focusLinks$,
             sketchLinks: sketchLinks$,

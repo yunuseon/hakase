@@ -32,11 +32,13 @@ export const mountChrome = () => {
     const canvas = new HksCanvas();
     document.body.append(canvas);
 
-    const toolbar = new HksToolbar().categories(categoriesOf(programList));
+    const categories = categoriesOf(programList);
+    const toolbar = new HksToolbar().categories(categories);
     toolbar.slot = 'launcher';
 
     const navigator = new HksNavigator();
     navigator.slot = 'chrome';
+    navigator.style.setProperty('--launcher-keys', String(categories.length));
     navigator.append(toolbar);
     canvas.append(navigator);
 

@@ -93,6 +93,10 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ pedals }) => pedals),
         distinctUntilChanged(),
     );
+    const converters$ = documents$.pipe(
+        map(({ converters }) => converters),
+        distinctUntilChanged(),
+    );
     const gates$ = documents$.pipe(
         map(({ gates }) => gates),
         distinctUntilChanged(),
@@ -114,6 +118,7 @@ export const projectionsOf = (history$: Observable<History>) => {
                 a.drums === b.drums &&
                 a.pedals === b.pedals &&
                 a.gates === b.gates &&
+                a.converters === b.converters &&
                 a.boxes === b.boxes &&
                 a.focusLinks === b.focusLinks &&
                 a.sketchLinks === b.sketchLinks,
@@ -195,6 +200,7 @@ export const projectionsOf = (history$: Observable<History>) => {
         drums$,
         pedals$,
         gates$,
+        converters$,
         boxes$,
         links$,
         linked$,

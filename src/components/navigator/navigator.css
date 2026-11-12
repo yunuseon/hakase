@@ -241,13 +241,16 @@
     inset-inline-start: var(--space-2);
 }
 :host([data-launcher]) {
-    inline-size: min(var(--control-lg) * 4 + var(--spacing) * 48, calc(100% - var(--space-10)));
+    inline-size: min(
+        var(--control-lg) * var(--launcher-keys, 4) + var(--spacing) * 48,
+        calc(100% - var(--space-10))
+    );
 }
 :host([data-launcher][data-open]) {
     inline-size: min(var(--spacing) * 86, calc(100% - var(--space-10)));
 }
 :host([data-launcher]) .state-mode {
-    inset-inline-start: calc(var(--control-lg) * 4 + var(--space-5));
+    inset-inline-start: calc(var(--control-lg) * var(--launcher-keys, 4) + var(--space-5));
 }
 
 :host(:not([data-open])) .navigator {

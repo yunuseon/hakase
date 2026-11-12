@@ -13,6 +13,16 @@ brevity, and feature count:
 If a change would make the app better but the orchestration less reactive, that
 is a bad trade here. Say so and propose the reactive version instead.
 
+## The backlog
+
+`backlog.md` holds work that is decided but not done, in order, each item with
+what done looks like. Read it before starting anything sizeable: the next step
+is usually already planned there, and work that contradicts it needs that plan
+changed first, not quietly worked around. When an item lands, delete it from
+the backlog and describe the result here, in the section it belongs to; this
+file says how the app is, the backlog says what is next. A new decision about
+future work goes into the backlog in the same change that makes it.
+
 ## Rendering
 
 A sketch is drawn by the shared engine (see "Image cables") from its store's
@@ -537,8 +547,8 @@ chrome knows nothing of the workspace.
 
 **The launcher and navigator are one piece of chrome.** `mountChrome` puts one
 `HksToolbar` in `HksNavigator`'s `launcher` slot; only the navigator occupies the
-canvas's chrome slot. The launcher owns the Make, Plan and System category
-menus and emits program ids. The navigator owns their position alongside State,
+canvas's chrome slot. The launcher owns the category menus (Make, Logic,
+Convert, Plan, System) and emits program ids. The navigator owns their position alongside State,
 zoom and the live map. Neither component imports the other. `categoriesOf` in
 `program-categories.ts` derives the menu contents from program definitions for
 both the app and Storybook, so previews cannot silently omit programs.
@@ -552,9 +562,14 @@ two rows. There is no separate edge toolbar, hide tab or position menu.
 compact row's areas (launcher, State, thumbnail, zoom) let a larger control push
 its neighbours along, and the thumbnail and its toggle share one cell. The
 expanded card still pins its groups to corners, so every offset there that clears
-a control is written from `--control-lg` (`calc(var(--control-lg) * 3 +
-var(--space-5))` for State beside the launcher's three keys), never a literal:
-a literal was what put State on top of the launcher once touch sizes grew it.
+a control is written from `--control-lg` (`calc(var(--control-lg) *
+var(--launcher-keys) + var(--space-5))` for State beside the launcher's keys),
+never a literal: a literal was what put State on top of the launcher once touch
+sizes grew it. The key count is `--launcher-keys`, which `mountChrome` sets on
+the navigator from the same `categoriesOf` it hands the launcher, because the
+navigator cannot count what is slotted into it; the card's compact width reads
+it too. A literal 4 there wrapped the fifth key, Convert, onto a second row at
+every width.
 
 Category menus use native details with a manual top-layer popover. They prefer
 the space above the card, clamp to the viewport and scroll when necessary;
@@ -1955,6 +1970,53 @@ delay.
 Still open: a voice's or drum machine's inputs take signals only (they are
 resolved through `waveOf`), so a bit cannot gate a sound yet.
 
+## Typed ports and converters
+
+**Every port has a type the user can see.** `PORT_TYPES` in `src/port-types.ts`
+is the closed list (clock, level, bit, picture, sheet, sound, schedule, timer,
+tasks, reading). Each source kind says what it `makes` and each input definition
+what it `takes`, on the definition itself, so a new input cannot leave its type
+out. In state mode a jack keeps its state's colour and its **shape** is its type
+(a circle for level, a square for bit, a ring with a dot for clock, a rounded
+square for picture and sheet, a double ring for sound, a diamond for the plan
+types), and every label names the type; the state menu names it beside each
+input. `Socket.type` and `FollowGroup.type` carry it as plain strings, so the
+components still know nothing of the list.
+
+**Only a conversion with nothing to choose may stay implicit.** `CONVERSIONS`
+lists every one an input still accepts: bit to level (0 or 1), the three plan
+documents to a reading (their own summary, for the progress bar), and sound to
+level, flagged `retires` because a voice's loudness and a kit's mix are choices
+that belong in converters. `port-types.test.ts` checks that every input of
+every program takes only its own type or one listed there, so a new hidden
+coercion fails a test rather than slipping into `driverIn`. A conversion that
+chooses is a **converter**: a program on the canvas whose choice is its setting,
+so two followers that want two readings of one source use two converters, and
+links stay bare store ids.
+
+**A converter is a row of a table.** `CONVERTERS` in `src/converters.ts` gives
+each kind its title, summary, icon, the type it takes and makes, its choices and
+its size; `converterProgram(kind)` makes the program, under the launcher's
+**Convert** category; `converterInputs(kind)` gives it `in` (any source that
+makes the type it takes) and **read on** (`time`), so a converter read on a day
+clock is one value like a signal. Every converter's document lives in one
+`Documents.converters` map (`Converter`: kind, choice, `sources`), a private
+`stage` store like a pedal's, so saving, forking, pruning, undo, blueprints and
+`linkedOf` handle them all once. `CONVERTER_DEFAULTS` is one object per kind,
+for the pedal defaults' reason. A converter's output is a source of the type it
+makes (`CONVERTER_SOURCES`), and `convertedIn` in `app-state.graph.ts` has one
+case per kind: what it reads through `in` and how its choice makes a `Driver`.
+`hks-converter` shows the summary, the curve over the window's loop, the moment
+and its value, and the choices; it takes a plain `ConverterView` from
+`converterView`, rendered in one pass so nothing combines two paths.
+
+**Timing** is the first: an agenda read over today as _in a block_ (1 while
+one runs), _through a block_ (0 to 1 across each) or _before a block_ (0 to 1
+over the hour before the next starts, 0 inside one), all from `timingCurve`. An
+agenda is not a drive source by itself: a knob that wants your schedule follows
+a Timing that follows the agenda. The remaining converters, and what typed
+ports make possible next, are in `backlog.md`.
+
 ## Blueprints
 
 A **blueprint** is a creation kept to be placed again: selected programs, saved from the selection bar's **Save as blueprint**, listed in the
@@ -2881,6 +2943,11 @@ a signal read on the day marks the time of day and a gate steps on it, whatever
 its own playback input says; letting go of the link hands the window back to
 that input. Every reader of the window's clock (playhead, pace, ticks) follows
 from that one choice.
+
+**The state menu says when a playback is set aside.** `inputGroups` names the
+read-on clock in `FollowGroup.setAside` on a window's playback rows only, and
+the window strikes the binding through and adds "read on Store 1", so the menu
+never claims a clock the window is not showing.
 
 ## Themes
 

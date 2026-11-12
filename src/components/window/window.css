@@ -641,10 +641,32 @@ input.option-name:focus-visible {
     letter-spacing: 0.04em;
 }
 
+.input-line .type {
+    flex: none;
+    font: var(--text-2xs) var(--font-mono);
+    color: var(--muted);
+}
+
 .input-line .option-name {
     flex: 1;
     min-inline-size: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.input-line[data-set-aside] .option-name {
+    flex: 0 1 auto;
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.input-line .aside {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    font-size: var(--text-xs);
+    color: var(--accent);
     text-overflow: ellipsis;
     white-space: nowrap;
 }

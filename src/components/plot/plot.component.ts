@@ -8,7 +8,7 @@ import { styleMap } from 'lit-html/directives/style-map.js';
 
 import { renderView, type RenderView } from '../../lib/lit.ts';
 import { combineLatest, merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, share, tap } from 'rxjs/operators';
+import { distinctUntilChanged, map, mergeMap, share, shareReplay, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$, type Phase } from '../../shared/drag.ts';
@@ -180,7 +180,8 @@ export class HksPlot extends HTMLElement {
 
                 this.rendering.update({ lanes, layout });
             }),
-            share(),
+            // Replayed: the moment subscribes after the plot, and traces that arrive at once would never reach it.
+            shareReplay({ bufferSize: 1, refCount: true }),
         );
 
         const moment$ = combineLatest([plotted$, t$]).pipe(

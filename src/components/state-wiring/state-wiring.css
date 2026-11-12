@@ -88,6 +88,44 @@ path.shared {
     box-shadow: 0 0 0 3px var(--wiring-panel);
 }
 
+.socket .type {
+    margin-inline-start: var(--space-1);
+    font-weight: 400;
+    text-transform: lowercase;
+    color: var(--muted);
+}
+
+.jack[data-type='bit'] {
+    border-radius: 2px;
+}
+
+.jack[data-type='clock'] {
+    background-image: radial-gradient(circle, var(--store) 0 1.5px, transparent 2px);
+}
+
+.output .jack[data-type='clock'] {
+    background-image: radial-gradient(circle, var(--wiring-panel) 0 1.5px, transparent 2px);
+}
+
+.jack[data-type='picture'],
+.jack[data-type='sheet'] {
+    border-radius: var(--radius-sm);
+}
+
+.jack[data-type='sound'] {
+    border-style: double;
+    border-width: 3px;
+}
+
+.jack[data-type='schedule'],
+.jack[data-type='timer'],
+.jack[data-type='tasks'],
+.jack[data-type='reading'] {
+    border-radius: 2px;
+    rotate: 45deg;
+    scale: 0.85;
+}
+
 .output .jack {
     inset-inline-start: auto;
     inset-inline-end: calc(var(--spacing) * 0.75);

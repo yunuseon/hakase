@@ -17,6 +17,9 @@ import { penProgram } from '../programs/pen.program.ts';
 import { blueprintsProgram } from '../programs/blueprints.program.ts';
 import { progressProgram } from '../programs/progress.program.ts';
 import { plotProgram } from '../programs/plot.program.ts';
+import { converterProgram } from '../programs/converter.program.ts';
+
+const timingProgram = converterProgram('timing');
 import { signalProgram } from '../programs/signal.program.ts';
 import { sketchProgram } from '../programs/sketch.program.ts';
 import { tasksProgram } from '../programs/tasks.program.ts';
@@ -39,6 +42,7 @@ export const specimenPrograms: readonly Program[] = [
     themeProgram,
     signalProgram,
     plotProgram,
+    timingProgram,
     paintProgram,
     penProgram,
     sketchProgram,
@@ -157,6 +161,14 @@ const specs: readonly Spec[] = [
         title: 'Signal editor',
         elements: ['hks-signal'],
         description: 'Wave shapes, parameter controls and a live waveform.',
+        variants: normal,
+    },
+    {
+        program: timingProgram,
+        title: 'Timing',
+        elements: ['hks-converter'],
+        description:
+            'A converter: an agenda read as a level over the day, with the reading as its choice.',
         variants: normal,
     },
     {

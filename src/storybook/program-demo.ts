@@ -1,4 +1,13 @@
 import { GATE_DEFAULTS } from '../gates.ts';
+import { CONVERTER_DEFAULTS, timingCurve } from '../converters.ts';
+import { reduceAgenda, emptyAgenda } from '../components/agenda/agenda.ts';
+
+const DEMO_DAY = '2026-01-01';
+const DEMO_AGENDA = [
+    { kind: 'add', id: 'block-1', day: DEMO_DAY, start: 9 * 60, end: 11 * 60 },
+    { kind: 'add', id: 'block-2', day: DEMO_DAY, start: 14 * 60, end: 17 * 60 },
+] satisfies Parameters<typeof reduceAgenda>[1][];
+const demoAgenda = DEMO_AGENDA.reduce(reduceAgenda, emptyAgenda);
 import { defaultPedal } from '../pedals.ts';
 import { NONE, type Image } from '../image.ts';
 import { asSketch } from '../settings.ts';
@@ -154,6 +163,8 @@ export const programDemo = (
         ),
         gate$: of(GATE_DEFAULTS.switch),
         bits$: of(new Uint8Array(16)),
+        converter$: of(CONVERTER_DEFAULTS.timing),
+        converted$: of(timingCurve(demoAgenda, DEMO_DAY, CONVERTER_DEFAULTS.timing.choice)),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),
         followedSignal$: input =>
