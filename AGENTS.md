@@ -15,9 +15,11 @@ is a bad trade here. Say so and propose the reactive version instead.
 
 ## Rendering
 
-A sketch draws itself in its own window, and the same GL code also draws a
-sketch's store into the shared engine whenever an image cable reads it (see
-"Image cables"). Everything below holds for both.
+A sketch is drawn by the shared engine (see "Image cables") from its store's
+recipe, whether its own window shows it, a pedal reads it, or its strip or an
+export samples it: a sketch window holds no WebGL context, and there is one
+definition of what a sketch looks like at a moment. Everything below is that
+drawing.
 
 The sketch renders with **WebGL2**, not canvas2d. A formula is GLSL, the lattice
 loop is the vertex shader, and `gl_VertexID` derives each cell's coordinates —
@@ -126,8 +128,9 @@ the cursor, which `aim()` handles; and nearness is the dolly too, not
 **Trails** fade the last frame into the backdrop instead of clearing it: a third
 pass, `PASS_FADE`, draws one viewport-covering triangle of the ramp's first
 colour at `1 - trails` alpha, with the depth test off so last frame's depth
-cannot keep it from covering. It needs `preserveDrawingBuffer`, set on every
-canvas, or the browser may hand back a cleared buffer. `prepare` clears the
+cannot keep it from covering. It needs the last frame kept: the engine draws
+into a target of its own that persists, and an offscreen canvas has
+`preserveDrawingBuffer`, or the browser may hand back a cleared buffer. `prepare` clears the
 colour, so changing a setting starts the trails afresh.
 
 **Dot size has two parts that must stay apart.** Zoom scales a dot in
@@ -271,8 +274,9 @@ equation) and `coral` (Gray-Scott) are the worked examples.
   about 3,800 steps in a third of a second; a loop restart is a few steps.
 - **The state textures are a resource keyed by formula and lattice size**
   (`simulated$`): kept across every other change, so a knob or a camera drag
-  never resets the simulation, and released when either changes. The live
-  sketch, the thumbnails and an export each own their own, in their own context.
+  never resets the simulation, and released when either changes. The engine
+  keeps one per store, shared by everyone drawing that store at the same
+  moment; the thumbnails and an export still own their own.
 - **Thumbnails replay once per render**, left to right, drawing each tile as the
   replay passes its moment. Because that can cost a third of a second, a sketch
   that evolves renders its strip once things settle (250 ms), not on every frame
@@ -330,9 +334,9 @@ singleton:
   `transport`, `source`, `diagnostic` — and `main.ts` folds whatever the running
   set happens to produce. That is why two editors drive the same formula and two
   sketches follow the same playhead.
-- What genuinely is per-process stays per-process: a sketch compiles `source$`
-  into **its own** GL context, so `compiled$` lives in `sketch.program.ts` and
-  never in `AppState`.
+- What genuinely is per-process stays per-process: a sketch window's size,
+  pointer and pixel ratio make its moment in `sketch.program.ts`, never in
+  `AppState`; the recipe it draws is its store's, shared by every reader.
 
 **A formula is a document; a sketch is a viewer of one.** Each sketch picks a
 formula by name in its own panel, and `AppState` exposes the text as a _selector_,
@@ -1104,16 +1108,16 @@ pointer moves in screen pixels and the frame is in world units, and doing it in
 `getBoundingClientRect`, which already includes the transform, so they work at any
 zoom; their layout reads `offsetWidth`, which does not, and that is also right.
 
-A sketch renders at `devicePixelRatio * zoom`, stepped to 0.25 by `steppedRatio`
-so a wheel zoom does not reallocate the drawing buffer on every tick, and capped
-at 2048px a side by `cappedRatio`. The program passes in the stepped ratio and the
-component applies the cap, because the size already reaches the component
-through `params$` — passing it in again would be a second path into one
-`combineLatest`. Stepping alone was not enough: a ctrl+wheel zoom still crossed a
-step every few ticks, and at the cap each reallocation took 50 ms. So `ratio$`
-waits until the zoom has settled for `SETTLE_MS` (150 ms) before it emits, and in
-the meantime CSS scales the old buffer; the first value applies at once, or a
-sketch would open late.
+A sketch window renders at `devicePixelRatio * zoom`, stepped to 0.25 by
+`steppedRatio` so a wheel zoom does not reallocate a target on every tick, and
+capped at 2048px a side (`pixelsOf` in `engine/moment.ts`). Stepping alone was
+not enough: a ctrl+wheel zoom still crossed a step every few ticks, and at the
+cap each reallocation took 50 ms. So `viewRatio$` waits until the zoom has
+settled for `SETTLE_MS` (150 ms) before it emits, and in the meantime CSS
+scales the last picture; the first value applies at once, or a sketch would
+open late. The window's moment (`windowMoment$`) carries its **scale**, pixels
+per sketch unit, so the engine sizes its dots as the window would; a pedal's
+moment carries none, and the engine frames the sketch at the reference side.
 
 Windows drag by their title bar, resize from any edge or corner, and raise on
 click. `HksWindow` adds the eight handles itself, so the frame is described
@@ -2870,19 +2874,12 @@ looks it up — a `<select>` can hold anything, so it is checked rather than cas
 echoes the user's own typing back into the textarea — only preset selections —
 because writing the value back would reset the caret on every keystroke.
 
-Compilation is the middle stage of `inputs -> formula -> render`, so it is a free
-function — `compileFormula$(gl, source$)` in `components/sketch/compile.ts` — and not a
-method on the canvas element. It _produces_ app state rather than displaying it,
-which is the line: `connect$` connects app state to the UI, and anything that
-derives state instead is a pipeline stage. The element owns the canvas and
-exposes its `gl` for the stage to compile into. Failure is a value, not an
-exception. **Each sketch compiles for itself**, into its own GL context, from the
-formula it picked — so failures are per formula, not per app. Because a failure
-means the sketch's program stream simply does not emit, `combineLatest` keeps the
-last shader that linked and the canvas never blanks. Preserve that property. `connect$` also deletes each superseded `WebGLProgram`
-once a newer one has replaced it, so editing does not leak GPU resources — that
-cleanup belongs inside `connect$` rather than in a method of its own, because a
-view's whole public surface is `changes$` out and `connect$` in.
+Compilation happens in the engine, which keeps one program per store and
+replaces it only when a new text links: a failure leaves the last program that
+linked, so the picture never blanks. Preserve that property. What a window
+needs to know about its formula, the compiler's message and which knobs it
+reads, comes from `checked$`, a cached check in the same engine
+(`checkFormula`), and failure is a value there, not an exception.
 
 The textarea is highlighted by painting a Prism-tokenised `<pre>` behind it and
 making the textarea's own text transparent. That keeps a real `<textarea>`, so
@@ -3075,10 +3072,14 @@ the view does not stall it. With four clocks playing, script per frame went
 from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
 
 The other limit is the browser's: a page keeps at most **16 WebGL contexts**
-and silently loses the oldest past that (measured). Every sketch window, pen
-window and open frame strip holds one, besides the engine's, and nothing yet
-handles a lost context, so around 13 sketches the oldest goes blank. Drawing
-sketches through the shared engine, as pedals already are, would lift it.
+and silently loses the oldest past that (measured). That is why sketch windows
+draw through the one engine. What still holds a context of its own: a pen
+window, a sketch's frame strip while its Animation tab is open, and an export
+while it runs. **The engine recovers from a lost context**: `engine$`
+completes when its canvas reports the loss and `repeat` makes a fresh one, and
+because every picture is a recipe and time is replayed, every window simply
+draws again, simulations included. Forcing the loss with sixteen throwaway
+contexts left every window drawing.
 
 **Many windows stay cheap because nothing per window scans every window.**
 Logic gates are tiny windows, so the canvas must hold hundreds. A drag move at
