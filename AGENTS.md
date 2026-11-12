@@ -1347,7 +1347,7 @@ are the same one with a different default binding at launch.
 - **Programs never learn stores exist.** `liveProcess$` stamps every input with
   the window's binding as it leaves (`withLatestFrom(self.store$)`, which
   subscribes to the binding first, so nothing emitted on launch is lost), the
-  document folds are `perStore$` maps, and `scoped` hands each program an
+  documents fold keeps each document as a map by store, and `scoped` hands each program an
   `AppState` already narrowed to its store with a `switchMap`. Rebinding swaps
   the stream, and the components already update in place by id. Global state
   stays global: playhead, transport, look, formulas, themes, library, tasks.

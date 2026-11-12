@@ -109,3 +109,37 @@ button.bit:focus-visible {
 .name {
     font: var(--text-xs) var(--font-mono);
 }
+
+.count {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    block-size: var(--control-xs);
+    padding-inline: var(--space-1-5);
+    background: var(--well);
+    border-radius: var(--radius-full);
+    cursor: text;
+}
+
+.count:focus-within {
+    outline: 1px solid var(--rule);
+}
+
+.count input {
+    inline-size: 2ch;
+    padding: 0;
+    font: var(--text-xs) var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    outline: none;
+    appearance: textfield;
+}
+
+.count input::-webkit-inner-spin-button,
+.count input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}

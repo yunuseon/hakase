@@ -1,43 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { colourOf, keptStores, pruned, reduceStores, withMain, type StoreEntry } from './stores.ts';
+import { colourOf, keptStores, pruned, storeEvent, withMain, type StoreEntry } from './stores.ts';
 
-const count = reduceStores((total: number, step: number) => total + step, 0);
-
-describe('reduceStores', () => {
-    it('folds each store apart, starting from empty', () => {
-        const all = [
-            { kind: 'command' as const, store: 'a', command: 2 },
-            { kind: 'command' as const, store: 'b', command: 5 },
-            { kind: 'command' as const, store: 'a', command: 1 },
-        ].reduce(count, new Map<string, number>());
-
-        expect([...all]).toEqual([
-            ['a', 3],
-            ['b', 5],
-        ]);
-    });
-
+describe('storeEvent', () => {
     it('copies once, into a store with nothing in it yet', () => {
         const all = new Map([
             ['a', 3],
             ['b', 9],
         ]);
 
-        expect(count(all, { kind: 'copy', from: 'a', to: 'c' }).get('c')).toBe(3);
-        expect(count(all, { kind: 'copy', from: 'a', to: 'b' }).get('b')).toBe(9);
-        expect(count(all, { kind: 'copy', from: 'x', to: 'c' })).toBe(all);
+        expect(storeEvent(all, { kind: 'copy', from: 'a', to: 'c' }).get('c')).toBe(3);
+        expect(storeEvent(all, { kind: 'copy', from: 'a', to: 'b' }).get('b')).toBe(9);
+        expect(storeEvent(all, { kind: 'copy', from: 'x', to: 'c' })).toBe(all);
     });
-});
 
-describe('keep', () => {
-    it('drops every store outside the set, and changes nothing when all are kept', () => {
+    it('keeps only the stores in the set, and changes nothing when all are kept', () => {
         const all = new Map([
             ['a', 1],
             ['b', 2],
         ]);
 
-        expect([...count(all, { kind: 'keep', stores: new Set(['b']) }).keys()]).toEqual(['b']);
-        expect(count(all, { kind: 'keep', stores: new Set(['a', 'b', 'c']) })).toBe(all);
+        expect([...storeEvent(all, { kind: 'keep', stores: new Set(['b']) }).keys()]).toEqual([
+            'b',
+        ]);
+        expect(storeEvent(all, { kind: 'keep', stores: new Set(['a', 'b', 'c']) })).toBe(all);
     });
 });
 

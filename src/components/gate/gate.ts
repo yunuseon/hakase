@@ -15,6 +15,7 @@ export type GateView = {
 export type GateChange =
     | { readonly kind: 'toggle' }
     | { readonly kind: 'step'; readonly index: number; readonly value: Bit }
+    | { readonly kind: 'steps'; readonly count: number }
     | { readonly kind: 'threshold'; readonly threshold: number }
     | { readonly kind: 'rename'; readonly name: string };
 

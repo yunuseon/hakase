@@ -1,5 +1,5 @@
-import { merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, scan, shareReplay, startWith } from 'rxjs/operators';
+import type { Observable } from 'rxjs';
+import { distinctUntilChanged, map } from 'rxjs/operators';
 import { isProgramId, type ProgramId } from './program.ts';
 
 export type StoreId = string;
@@ -133,8 +133,6 @@ export type StoreEvent =
     | ({ readonly kind: 'copy' } & Copy)
     | { readonly kind: 'keep'; readonly stores: ReadonlySet<StoreId> };
 
-export type StoreAction<C> = ({ readonly kind: 'command' } & Stamped<C>) | StoreEvent;
-
 export const storeEvent = <S>(
     all: ReadonlyMap<StoreId, S>,
     event: StoreEvent,
@@ -150,30 +148,6 @@ export const storeEvent = <S>(
     // Only into an empty store: undoing and redoing a split must not overwrite what was done since.
     return source === undefined || all.has(event.to) ? all : new Map(all).set(event.to, source);
 };
-
-export const reduceStores =
-    <S, C>(reduce: (state: S, command: C) => S, empty: S) =>
-    (all: ReadonlyMap<StoreId, S>, action: StoreAction<C>): ReadonlyMap<StoreId, S> =>
-        action.kind === 'command'
-            ? new Map(all).set(action.store, reduce(all.get(action.store) ?? empty, action.command))
-            : storeEvent(all, action);
-
-// Not refCount: a store outlives every window bound to it, and a rebind must not reset it.
-export const perStore$ = <S, C>(
-    commands$: Observable<Stamped<C>>,
-    events$: Observable<StoreEvent>,
-    reduce: (state: S, command: C) => S,
-    empty: S,
-    initial: ReadonlyMap<StoreId, S>,
-): Observable<ReadonlyMap<StoreId, S>> =>
-    merge(
-        commands$.pipe(map((stamped): StoreAction<C> => ({ kind: 'command', ...stamped }))),
-        events$,
-    ).pipe(
-        scan(reduceStores(reduce, empty), initial),
-        startWith(initial),
-        shareReplay({ bufferSize: 1, refCount: false }),
-    );
 
 export const inStore =
     <S>(all$: Observable<ReadonlyMap<StoreId, S>>, empty: S) =>

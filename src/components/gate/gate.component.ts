@@ -6,7 +6,7 @@ import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import type { Bit } from '../../gates.ts';
+import { MAX_STEPS, MIN_STEPS, type Bit } from '../../gates.ts';
 import type { GateChange, GateView } from './gate.ts';
 import css from './gate.css?inline';
 
@@ -34,17 +34,30 @@ const Row = (view: GateView) =>
 
 const Steps = (steps: readonly Bit[], now: number) =>
     html`<div class="steps" role="group" aria-label="steps">
-        ${steps.map(
-            (bit, index) =>
-                html`<button
-                    type="button"
-                    data-step=${index}
-                    ?data-now=${index === now}
-                    aria-pressed=${bit === 1 ? 'true' : 'false'}
-                    aria-label=${`step ${index + 1}`}
-                ></button>`,
-        )}
-    </div>`;
+            ${steps.map(
+                (bit, index) =>
+                    html`<button
+                        type="button"
+                        data-step=${index}
+                        ?data-now=${index === now}
+                        aria-pressed=${bit === 1 ? 'true' : 'false'}
+                        aria-label=${`step ${index + 1}`}
+                    ></button>`,
+            )}
+        </div>
+        <label class="count" title="steps in the pattern"
+            ><input
+                type="number"
+                min=${MIN_STEPS}
+                max=${MAX_STEPS}
+                step="1"
+                aria-label="number of steps"
+                ${ref(element => {
+                    if (element instanceof HTMLInputElement) {
+                        displayValue(element, String(steps.length));
+                    }
+                })}
+        /></label>`;
 
 const TEMPLATE = (view: GateView) =>
     html`<div class="face" title=${view.summary}>
@@ -154,7 +167,11 @@ export class HksGate extends HTMLElement {
                 mergeMap(({ target }): GateChange[] =>
                     target instanceof HTMLInputElement && target.type === 'text'
                         ? [{ kind: 'rename', name: target.value }]
-                        : [],
+                        : target instanceof HTMLInputElement &&
+                            target.type === 'number' &&
+                            Number.isFinite(target.valueAsNumber)
+                          ? [{ kind: 'steps', count: target.valueAsNumber }]
+                          : [],
                 ),
             ),
         ).pipe(filter(change => change.kind !== 'threshold' || Number.isFinite(change.threshold)));
