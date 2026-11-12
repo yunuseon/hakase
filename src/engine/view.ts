@@ -5,7 +5,7 @@ import {
     Observable,
     type ObservableInput,
 } from 'rxjs';
-import { auditTime, concatMap, map, shareReplay, switchMap } from 'rxjs/operators';
+import { auditTime, concatMap, map, repeat, shareReplay, switchMap } from 'rxjs/operators';
 import type { Image } from '../image.ts';
 import {
     checkFormula,
@@ -23,12 +23,21 @@ export type View =
     | { readonly kind: 'frame'; readonly bitmap: ImageBitmap }
     | { readonly kind: 'failed'; readonly message: string };
 
+const RECREATE_MS = 100;
+
+// A lost context completes this engine and repeat makes a fresh one; every picture is a recipe, so it simply draws again.
 export const engine$ = new Observable<Engine | Error>(subscriber => {
     try {
         const engine = createEngine();
+        const lost = (event: Event) => {
+            event.preventDefault();
+            subscriber.complete();
+        };
+        engine.canvas.addEventListener('webglcontextlost', lost);
         subscriber.next(engine);
 
         return () => {
+            engine.canvas.removeEventListener('webglcontextlost', lost);
             releaseEngine(engine);
         };
     } catch (error) {
@@ -36,7 +45,7 @@ export const engine$ = new Observable<Engine | Error>(subscriber => {
 
         return undefined;
     }
-}).pipe(shareReplay({ bufferSize: 1, refCount: true }));
+}).pipe(repeat({ delay: RECREATE_MS }), shareReplay({ bufferSize: 1, refCount: true }));
 
 const failed = (error: unknown): View => ({
     kind: 'failed',
