@@ -1,9 +1,10 @@
 import { currentBlock, DAY_MINUTES, nextBlock, type Agenda } from './components/agenda/agenda.ts';
 import { DRUM_LABELS, DRUMS } from './components/drums/drums.ts';
+import type { FocusView } from './components/focus/focus.ts';
 import type { PortType } from './port-types.ts';
 import { curveOf, type Curve } from './shared/curve.ts';
 
-export const CONVERTER_KINDS = ['timing', 'envelope', 'kit'] as const;
+export const CONVERTER_KINDS = ['timing', 'envelope', 'kit', 'phase'] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
 export const isConverterKind = (value: string): value is ConverterKind =>
@@ -63,6 +64,21 @@ export const CONVERTERS = {
         choices: DRUMS.map(drum => ({ id: drum, title: DRUM_LABELS[drum] })),
         size: { width: 300, height: 240 },
     },
+    phase: {
+        title: 'Phase',
+        summary:
+            'A focus timer as a level, as it stands now: how far through its phase or block, how much is left, or whether you are focusing.',
+        icon: 'M12 4 A8 8 0 1 0 20 12 M12 4 V12 L17 15',
+        takes: 'timer',
+        reads: null,
+        makes: 'level',
+        choices: [
+            { id: 'through', title: 'through' },
+            { id: 'left', title: 'left' },
+            { id: 'focusing', title: 'focusing' },
+        ],
+        size: { width: 280, height: 220 },
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const CONVERTER_PARAMS = ['in', 'time'] as const;
@@ -87,6 +103,7 @@ export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     timing: made('timing'),
     envelope: made('envelope'),
     kit: made('kit'),
+    phase: made('phase'),
 };
 
 export type ConverterCommand =
@@ -165,3 +182,14 @@ const timingAt = (agenda: Agenda, day: string, choice: string, minute: number): 
 
 export const timingCurve = (agenda: Agenda, day: string, choice: string): Curve =>
     curveOf(t => timingAt(agenda, day, choice, t * DAY_MINUTES));
+
+export const phaseLevel = ({ phase, progress }: FocusView, choice: string): number => {
+    switch (choice) {
+        case 'left':
+            return 1 - progress;
+        case 'focusing':
+            return phase === 'work' ? 1 : 0;
+        default:
+            return progress;
+    }
+};

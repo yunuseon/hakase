@@ -54,16 +54,14 @@ there, so a new hidden coercion cannot slip in.
 
 ### Converters, one at a time
 
-The types, `CONVERSIONS`, the converter table, Timing, Envelope and Kit are in (see
+The types, `CONVERSIONS`, the converter table, Timing, Envelope, Kit and Phase are in (see
 "Typed ports and converters" in `AGENTS.md`).
 
 Each one: the table entry, its window, its story, a test of its reading, the
 implicit conversion it replaces removed from every input's sources, and old
 saved links migrated (or none, where the conversion never shipped).
 
-1. **Phase** (timer → level): how far through the focus timer's phase, or
-   the block it follows. New: nothing implicit to retire.
-2. **Done** (tasks → level): how much of a ticket list is done. A converter
+1. **Done** (tasks → level): how much of a ticket list is done. A converter
    takes one type, so this is not folded into Phase.
 
 ### What typed ports make possible

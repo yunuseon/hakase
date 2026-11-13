@@ -20,7 +20,7 @@ import {
     kitOf,
     sameKit,
 } from '../components/drums/drums.ts';
-import { initialFocus } from '../components/focus/focus.ts';
+import { focusView, initialFocus } from '../components/focus/focus.ts';
 import { emptyHabits } from '../components/habits/habits.ts';
 import { emptyNotes } from '../components/note/note.ts';
 import { defaultPen, drawingOf, sameDrawing, strokeOf } from '../components/pen/pen.ts';
@@ -58,7 +58,7 @@ import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
-import { CONVERTER_DEFAULTS, isConverterKind, timingCurve } from '../converters.ts';
+import { CONVERTER_DEFAULTS, isConverterKind, phaseLevel, timingCurve } from '../converters.ts';
 import { dayOf } from '../lib/day.ts';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
@@ -459,6 +459,25 @@ export const scopedOf = ({
         converterIn(store).pipe(
             switchMap(converter => {
                 switch (converter.kind) {
+                    case 'phase':
+                        return linkIn(store, 'in').pipe(
+                            switchMap(binding =>
+                                binding?.kind === 'focus'
+                                    ? combineLatest([
+                                          timerIn(binding.store),
+                                          planIn(binding.store),
+                                      ]).pipe(
+                                          map(([focus, plan]) =>
+                                              phaseLevel(focusView(focus, plan), converter.choice),
+                                          ),
+                                          distinctUntilChanged(),
+                                          map((level): Driver => ({
+                                              samples: Float32Array.of(level),
+                                          })),
+                                      )
+                                    : of(null),
+                            ),
+                        );
                     case 'kit': {
                         const drum = converter.choice;
 

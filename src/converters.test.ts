@@ -5,7 +5,14 @@ import {
     reduceAgenda,
     type AgendaCommand,
 } from './components/agenda/agenda.ts';
-import { CONVERTER_DEFAULTS, parseConverter, reduceConverter, timingCurve } from './converters.ts';
+import { focusView, initialFocus, type Focus } from './components/focus/focus.ts';
+import {
+    CONVERTER_DEFAULTS,
+    parseConverter,
+    phaseLevel,
+    reduceConverter,
+    timingCurve,
+} from './converters.ts';
 import { converterInputs } from './inputs.ts';
 import { driverAt } from './shared/curve.ts';
 
@@ -80,5 +87,29 @@ describe('a kit converter', () => {
 
         expect(reads('kit')).toEqual(['drums']);
         expect(reads('envelope')).toEqual(['voice', 'drums']);
+    });
+});
+
+describe('a phase converter', () => {
+    const quarter: Focus = { ...initialFocus, remaining: initialFocus.remaining * 0.75 };
+    const view = focusView(quarter, null);
+    const resting = focusView({ ...quarter, phase: 'short' }, null);
+    const planned = focusView(initialFocus, {
+        id: 'block-1',
+        title: 'Write',
+        elapsed: 30,
+        length: 60,
+    });
+
+    it('reads how far through the phase it is, or how much is left', () => {
+        expect(phaseLevel(view, 'through')).toBeCloseTo(0.25);
+        expect(phaseLevel(view, 'left')).toBeCloseTo(0.75);
+        expect(phaseLevel(planned, 'through')).toBeCloseTo(0.5);
+    });
+
+    it('reads 1 while focusing, in a focus phase or an agenda block, and 0 on a break', () => {
+        expect(phaseLevel(view, 'focusing')).toBe(1);
+        expect(phaseLevel(planned, 'focusing')).toBe(1);
+        expect(phaseLevel(resting, 'focusing')).toBe(0);
     });
 });

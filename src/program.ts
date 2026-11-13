@@ -69,6 +69,7 @@ export const PROGRAM_IDS = [
     'timing',
     'envelope',
     'kit',
+    'phase',
     'blueprints',
     'tasks',
     'tickets',

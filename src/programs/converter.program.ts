@@ -12,6 +12,7 @@ const EMPTY_TEXT: Readonly<Record<ConverterKind, string>> = {
     envelope:
         'Plug a voice or drum machine into in: drag a wire in state mode (hold W), or pick one in the state menu.',
     kit: 'Plug a drum machine into in: drag a wire in state mode (hold W), or pick one in the state menu.',
+    phase: 'Plug a focus timer into in: drag a wire in state mode (hold W), or pick one in the state menu.',
 };
 
 export const converterProgram = <K extends ConverterKind>(kind: K) => {

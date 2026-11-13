@@ -181,6 +181,7 @@ export const CONVERTER_SOURCES = [
     converterSource('timing'),
     converterSource('envelope'),
     converterSource('kit'),
+    converterSource('phase'),
 ] as const;
 
 export const SOURCES = [
@@ -566,6 +567,7 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'timing':
         case 'envelope':
         case 'kit':
+        case 'phase':
             return kind;
     }
 };
@@ -614,6 +616,7 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'timing':
         case 'envelope':
         case 'kit':
+        case 'phase':
             return { kind, store };
         default:
             return null;

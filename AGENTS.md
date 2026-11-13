@@ -2035,7 +2035,16 @@ of that drum's hits at the hit's own velocity, falling away by its own decay
 high as a kick. `kitLevelAt` and `drumCurve` share `drumLevelAt`, so the mix and
 a single drum cannot decay differently. A voice makes sound too but has no
 drums, so a converter's `reads` can narrow its `in` below its type: Kit reads
-only drum machines, and `null` (Timing, Envelope) reads everything of the type. The remaining converters, and what
+only drum machines, and `null` (Timing, Envelope) reads everything of the type.
+
+**Phase** reads a focus timer, which runs on wall time rather than a playhead,
+so it is a level **as it stands now**: one value over the follower's whole loop,
+a one-sample curve, the shape a "read on" link gives. _through_ is how far
+through the phase (or the agenda block the timer follows) it is, _left_ the
+rest, _focusing_ 1 in a focus phase or block and 0 on a break; all three come
+from `phaseLevel` over the timer's own `focusView`, so the window and the
+converter cannot disagree about where the timer is. It moves on each timer tick
+and is deduplicated by value, so a paused timer redraws nothing. The remaining converters, and what
 typed ports make possible next, are in `backlog.md`.
 
 ## Blueprints
