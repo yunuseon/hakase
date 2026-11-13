@@ -9,6 +9,8 @@ import { styleSheet } from '../../lib/dom.ts';
 import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { connectChoices$ } from '../../shared/ui/choices.component.ts';
+import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
+import { connectSelects$, HksSelect } from '../../shared/select/select.component.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { HEIGHT, WIDTH, type BitsView, type ConverterView, type ShapeView } from './converter.ts';
 import css from './converter.css?inline';
@@ -30,6 +32,8 @@ const empty: ConverterView = {
     shape: null,
     bits: null,
 };
+
+export type Picks = { readonly items: readonly SelectChoice[]; readonly item: string };
 
 export type ShapeChange = {
     readonly group: 'shape' | 'bits';
@@ -205,6 +209,11 @@ const shapeOf = (target: EventTarget | null): ShapeChange[] => {
 export class HksConverter extends HTMLElement {
     readonly choices$: Observable<string>;
     readonly shapes$: Observable<ShapeChange>;
+    readonly items$: Observable<string>;
+
+    private readonly pick: HTMLElement;
+    private readonly picker: HksSelect;
+    private readonly choicesView: RenderView<readonly SelectChoice[]>;
 
     private readonly shadow: ShadowRoot;
     private readonly rendering: RenderView<ConverterView>;
@@ -217,8 +226,22 @@ export class HksConverter extends HTMLElement {
         shadow.adoptedStyleSheets = [controlsSheet, sheet];
         const root = document.createElement('div');
         root.className = 'converter';
+        const pick = document.createElement('label');
+        pick.className = 'item';
+        pick.hidden = true;
+        pick.append(Object.assign(document.createElement('span'), { textContent: 'of' }));
+        this.picker = new HksSelect();
+        this.picker.className = 'ui-field';
+        this.picker.setAttribute('aria-label', 'which one to read');
+        pick.append(this.picker);
+        const view = document.createElement('div');
+        view.className = 'view';
+        root.append(pick, view);
         shadow.append(root);
-        this.rendering = renderView(root, empty, TEMPLATE);
+        this.pick = pick;
+        this.choicesView = renderOptions(this.picker);
+        this.rendering = renderView(view, empty, TEMPLATE);
+        this.items$ = fromElementEvent$(this.picker, 'change').pipe(map(() => this.picker.value));
 
         this.choices$ = fromElementEvent$(root, 'click').pipe(
             mergeMap(({ target }) => {
@@ -249,13 +272,23 @@ export class HksConverter extends HTMLElement {
         );
     }
 
-    connect$(view$: Observable<ConverterView>): Observable<void> {
+    connect$(view$: Observable<ConverterView>, picks$: Observable<Picks>): Observable<void> {
         return merge(
             this.rendering.lifetime$,
+            this.choicesView.lifetime$,
             connectChoices$(this.shadow),
+            connectSelects$(this.shadow),
             view$.pipe(
                 tap(view => {
                     this.rendering.update(view);
+                }),
+                map(() => undefined),
+            ),
+            picks$.pipe(
+                tap(({ items, item }) => {
+                    this.pick.hidden = items.length === 0;
+                    this.choicesView.update(items);
+                    this.picker.value = item;
                 }),
                 map(() => undefined),
             ),

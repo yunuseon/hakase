@@ -76,6 +76,12 @@ export const PROGRAM_IDS = [
     'timer-bit',
     'tasks-bit',
     'sound-bit',
+    'clock-level',
+    'clock-bit',
+    'zones-level',
+    'zones-bit',
+    'habits-level',
+    'habits-bit',
     'blueprints',
     'tasks',
     'tickets',
@@ -306,7 +312,6 @@ export type Program<K extends ProgramId = ProgramId> = {
     readonly id: K;
     readonly title: string;
     readonly category: CategoryId;
-    // Path data on a 24x24 viewBox: the program's face in the dock and on the desktop.
     readonly icon: string;
     readonly size: Size;
     // The smallest window its content still lays out in; the workspace clamps every resize to it.

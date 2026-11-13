@@ -11,7 +11,7 @@ import {
 } from 'rxjs/operators';
 import { emptyAgenda } from '../components/agenda/agenda.ts';
 import { defaultBookmarks } from '../components/bookmarks/bookmarks.ts';
-import { defaultClocks } from '../components/clocks/clocks.ts';
+import { cityOf, defaultClocks, offsetMinutes } from '../components/clocks/clocks.ts';
 import {
     defaultDrums,
     drumCurve,
@@ -60,6 +60,8 @@ import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, GATES, isGateKind, sourceOfGate, type Gate } from '../gates.ts';
 import {
     bitShaped,
+    clockBit,
+    clockLevel,
     CONVERTER_DEFAULTS,
     CONVERTERS,
     doneLevel,
@@ -71,6 +73,11 @@ import {
     thresholded,
     timerBit,
     timingCurve,
+    habitsBit,
+    habitsLevel,
+    zoneCurve,
+    type ConverterItem,
+    type ConverterKind,
     type Conversion,
     type Converter,
 } from '../converters.ts';
@@ -632,17 +639,117 @@ export const scopedOf = ({
                                 loudness === null ? null : soundBits(loudness, choice),
                             ),
                         );
+                    case 'clock-level':
+                    case 'clock-bit':
+                        return binding.kind === 'playback'
+                            ? nowAs(
+                                  playbackIn(binding.store).pipe(
+                                      map(clock =>
+                                          kind === 'clock-bit'
+                                              ? clockBit(clock, choice)
+                                              : clockLevel(clock, choice),
+                                      ),
+                                  ),
+                              )
+                            : of(null);
+                    case 'zones-level':
+                    case 'zones-bit':
+                    case 'habits-level':
+                    case 'habits-bit':
+                        return of(null);
                 }
             }),
         );
+
+    type Read = { readonly driver: Driver | null; readonly items: readonly ConverterItem[] };
+    const LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // The items a converter can pick between come from what it reads, so they arrive with its driver.
+    const pickedIn = (store: StoreId, { kind, choice, item }: Converter): Observable<Read> =>
+        linkIn(store, 'in').pipe(
+            switchMap((binding): Observable<Read> => {
+                if (binding?.kind === 'clocks') {
+                    return combineLatest([clocksIn(binding.store), wallClock$]).pipe(
+                        map(([{ zones }, now]) => {
+                            const zone = zones.find(each => each === item) ?? zones[0];
+
+                            return {
+                                zone,
+                                ahead:
+                                    zone === undefined
+                                        ? 0
+                                        : offsetMinutes(now, zone) - offsetMinutes(now, LOCAL),
+                                zones,
+                            };
+                        }),
+                        distinctUntilChanged(
+                            (a, b) =>
+                                a.zone === b.zone && a.ahead === b.ahead && a.zones === b.zones,
+                        ),
+                        map(({ zone, ahead, zones }) => ({
+                            driver: zone === undefined ? null : zoneCurve(ahead, choice),
+                            items: zones.map(each => ({ id: each, title: cityOf(each) })),
+                        })),
+                    );
+                }
+
+                if (binding?.kind === 'habits') {
+                    return combineLatest([habitsIn(binding.store), today$]).pipe(
+                        map(([habits, today]) => {
+                            const value =
+                                kind === 'habits-bit'
+                                    ? habitsBit(habits, item, today)
+                                    : habitsLevel(habits, item, today, choice);
+
+                            return {
+                                value,
+                                items: [
+                                    { id: '', title: 'all habits' },
+                                    ...habits.items.map(({ id, name }) => ({ id, title: name })),
+                                ],
+                            };
+                        }),
+                        distinctUntilChanged(
+                            (a, b) =>
+                                a.value === b.value &&
+                                a.items.length === b.items.length &&
+                                a.items.every(
+                                    (each, index) =>
+                                        each.id === b.items[index]?.id &&
+                                        each.title === b.items[index]?.title,
+                                ),
+                        ),
+                        map(({ value, items }) => ({
+                            driver: { samples: Float32Array.of(value) },
+                            items,
+                        })),
+                    );
+                }
+
+                return of({ driver: null, items: [] });
+            }),
+        );
+
+    const PICKED: readonly ConverterKind[] = [
+        'zones-level',
+        'zones-bit',
+        'habits-level',
+        'habits-bit',
+    ];
 
     // One stream for both: a window that combined the document with its driver would fire twice per edit.
     const conversionIn = (store: StoreId, pace$: Observable<Pace>): Observable<Conversion> =>
         converterIn(store).pipe(
             switchMap(converter =>
-                readingIn(store, converter, pace$).pipe(
-                    map(driver => ({
+                (PICKED.includes(converter.kind)
+                    ? pickedIn(store, converter)
+                    : readingIn(store, converter, pace$).pipe(
+                          map((driver): Read => ({ driver, items: [] })),
+                      )
+                ).pipe(
+                    map(({ driver, items }) => ({
                         converter,
+                        items,
                         driver:
                             driver === null
                                 ? null

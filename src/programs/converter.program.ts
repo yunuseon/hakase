@@ -1,5 +1,5 @@
 import { combineLatest, merge } from 'rxjs';
-import { ignoreElements, map, mergeMap } from 'rxjs/operators';
+import { distinctUntilChanged, ignoreElements, map, mergeMap } from 'rxjs/operators';
 import { HksConverter } from '../components/converter/converter.component.ts';
 import { converterView } from '../components/converter/converter.ts';
 import {
@@ -76,8 +76,33 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
                                         }),
                                     ),
                                 ),
+                                conversion$.pipe(
+                                    map(({ converter: document, items }) => ({
+                                        items: items.map(({ id, title }) => ({
+                                            value: id,
+                                            label: title,
+                                        })),
+                                        item: document.item ?? items[0]?.id ?? '',
+                                    })),
+                                    distinctUntilChanged(
+                                        (a, b) =>
+                                            a.item === b.item &&
+                                            a.items.length === b.items.length &&
+                                            a.items.every(
+                                                (each, index) =>
+                                                    each.value === b.items[index]?.value &&
+                                                    each.label === b.items[index]?.label,
+                                            ),
+                                    ),
+                                ),
                             )
                             .pipe(ignoreElements()),
+                        converter.items$.pipe(
+                            map((item): AppInput => ({
+                                kind: 'converter',
+                                command: { kind: 'item', item: item === '' ? null : item },
+                            })),
+                        ),
                         converter.choices$.pipe(
                             map((choice): AppInput => ({
                                 kind: 'converter',

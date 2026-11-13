@@ -1987,8 +1987,7 @@ input. `Socket.type` and `FollowGroup.type` carry it as plain strings, so the
 components still know nothing of the list.
 
 **Every program that keeps state names its output's type**, read by `madeBy`:
-a source's `makes`, or for the programs nothing else reads (world clocks,
-notes, habits, bookmarks, the formula and theme editors, a component's own box)
+a source's `makes`, or for the programs nothing else reads (notes, bookmarks, the formula and theme editors, a component's own box)
 an entry in `OWN_TYPES`. Their output jack only binds another window of the same
 program to that state, and no input takes these types yet, but an unmarked jack
 read as "anything" when it meant "only its own kind"; they share one shape, a
@@ -2079,6 +2078,25 @@ end), both in the document's `bits` beside invert and hold and shown only for it
 `timer → bit` _focusing_ or _running_ and `tasks → bit` _all done_ or _any in
 progress_, as they stand now; `sound → bit` _sounding_ (loudness at or above
 0.05) or _hit_ (a pulse a 64th of the loop long at each rise of loudness).
+
+**Clocks, cities and habits convert too.** `clock → level` reads a clock as it
+stands now (its _position_, or the _tick_ it is on as a step) and `clock → bit`
+whether it is _playing_ or in the first half of a tick (_beat_), so one window
+can follow another clock's moment. World clocks and habits are sources now
+(making `zones` and `habits`), so `zones → level` reads a city's _time of day_
+or _daylight_ and `zones → bit` _day there_ or _office hours_, both as curves
+over **your own day** shifted by how far ahead the city is (`zoneCurve`), like
+`schedule → level`: unplugged from any clock the loop plays your day, read on a
+day clock it is now there. `habits → level` reads the share _done today_ or the
+_streak_ (the shortest, over all), `habits → bit` whether they are done today.
+
+**An item picks which one.** A world clock list holds several cities and a habit
+list several habits, so a converter keeps an `item` (a zone, a habit id, or
+none: the first city, or all habits) and its window shows a picker of what its
+input holds. `pickedIn` reads those pairs, returning the driver and the item
+list together as one value, so the window never hears its input by two paths;
+the picker is an `hks-select` in a fixed row above the per-frame view, filled by
+`renderOptions` and hidden while there is nothing to pick.
 
 **A gate reads a converter's bit through the circuit table.** `circuitTable`
 takes `outside`, a driver per non-gate store, and `readAt` reads it at

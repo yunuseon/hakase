@@ -64,14 +64,13 @@ brings **modifiers** every converter making that type shares. Not one program
 whose output type is a setting: a jack's type is known from its kind, which is
 what state mode's compatible drops and the port test rely on.
 
-Pairs, readings, the level modifiers, Shape and the bit converters are in (see "Typed ports and
+Pairs, readings, the level modifiers, Shape, the bit converters and the clock, city and habit converters are in (see "Typed ports and
 converters" in `AGENTS.md`).
 
-**Phase C: more sources.** `clock → level` (the loop as a ramp, the tick as
-steps), `clock → bit` (a pulse every N ticks), `zones → level` (time of day in a
-city, daylight) and `→ bit` (day there, office hours), `habits → level` (share
-done today, streak) and `→ bit` (done today). `picture → level` (brightness, a
-colour channel) needs a read-back from the engine and comes last.
+**Still to come: `picture → level`** (brightness, or a colour channel, of a
+sketch's or a pedal's picture). It needs a read-back from the engine, which is
+GPU work and the one main-thread cost measured so far (`convertToBlob`), so it
+should read a small mip of the picture, not the whole of it.
 
 Not planned: `level → clock` (a moving tempo breaks exact replay) and anything
 into picture or sound, which sketches, pedals and voices already make.

@@ -26,6 +26,8 @@ export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId }
 export type PedalBinding = { readonly kind: PedalKind; readonly store: StoreId };
 export type GateBinding = { readonly kind: GateKind; readonly store: StoreId };
 export type ConverterBinding = { readonly kind: ConverterKind; readonly store: StoreId };
+export type ClocksBinding = { readonly kind: 'clocks'; readonly store: StoreId };
+export type HabitsBinding = { readonly kind: 'habits'; readonly store: StoreId };
 export type Follow =
     | PlaybackBinding
     | FocusBinding
@@ -39,7 +41,9 @@ export type Follow =
     | SketchBinding
     | PedalBinding
     | GateBinding
-    | ConverterBinding;
+    | ConverterBinding
+    | ClocksBinding
+    | HabitsBinding;
 
 export type InputSources = {
     readonly focus$: (store: StoreId) => Observable<Focus>;
@@ -89,6 +93,22 @@ const ticketsSource = {
     access: 'read',
     read: (store: StoreId, sources: InputSources): Observable<Reading> =>
         sources.tickets$(store).pipe(map(ticketsReading)),
+} as const;
+
+const clocksSource = {
+    kind: 'clocks',
+    makes: 'zones',
+    program: 'clocks',
+    title: 'Clocks',
+    access: 'read',
+} as const;
+
+const habitsSource = {
+    kind: 'habits',
+    makes: 'habits',
+    program: 'habits',
+    title: 'Habits',
+    access: 'read',
 } as const;
 
 const signalSource = {
@@ -188,6 +208,12 @@ export const CONVERTER_SOURCES = [
     converterSource('timer-bit'),
     converterSource('tasks-bit'),
     converterSource('sound-bit'),
+    converterSource('clock-level'),
+    converterSource('clock-bit'),
+    converterSource('zones-level'),
+    converterSource('zones-bit'),
+    converterSource('habits-level'),
+    converterSource('habits-bit'),
 ] as const;
 
 export const SOURCES = [
@@ -195,6 +221,8 @@ export const SOURCES = [
     focusSource,
     agendaSource,
     ticketsSource,
+    clocksSource,
+    habitsSource,
     signalSource,
     paintSource,
     penSource,
@@ -208,9 +236,7 @@ export const SOURCES = [
 type Source = (typeof SOURCES)[number];
 
 const OWN_TYPES = {
-    clocks: 'zones',
     note: 'notes',
-    habits: 'habits',
     bookmarks: 'bookmarks',
     formula: 'formula',
     theme: 'theme',
@@ -556,6 +582,10 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return agendaSource.program;
         case 'tickets':
             return ticketsSource.program;
+        case 'clocks':
+            return clocksSource.program;
+        case 'habits':
+            return habitsSource.program;
         case 'signal':
             return signalSource.program;
         case 'paint':
@@ -592,6 +622,12 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'timer-bit':
         case 'tasks-bit':
         case 'sound-bit':
+        case 'clock-level':
+        case 'clock-bit':
+        case 'zones-level':
+        case 'zones-bit':
+        case 'habits-level':
+        case 'habits-bit':
             return kind;
     }
 };
@@ -605,6 +641,10 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'agenda':
             return { kind, store };
         case 'tickets':
+            return { kind, store };
+        case 'clocks':
+            return { kind, store };
+        case 'habits':
             return { kind, store };
         case 'todo':
             return { kind: 'tickets' as const, store };
@@ -646,6 +686,12 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'timer-bit':
         case 'tasks-bit':
         case 'sound-bit':
+        case 'clock-level':
+        case 'clock-bit':
+        case 'zones-level':
+        case 'zones-bit':
+        case 'habits-level':
+        case 'habits-bit':
             return { kind, store };
         default:
             return null;

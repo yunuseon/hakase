@@ -166,6 +166,7 @@ export const programDemo = (
         conversion$: of({
             converter: CONVERTER_DEFAULTS['schedule-level'],
             driver: timingCurve(demoAgenda, DEMO_DAY, CONVERTER_DEFAULTS['schedule-level'].choice),
+            items: [],
         }),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),

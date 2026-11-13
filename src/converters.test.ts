@@ -7,8 +7,12 @@ import {
 } from './components/agenda/agenda.ts';
 import { focusView, initialFocus, type Focus } from './components/focus/focus.ts';
 import { defaultTickets, reduceTickets, type TicketCommand } from './shared/tickets.ts';
+import type { Habits } from './components/habits/habits.ts';
+import { initialClock, type Clock } from './shared/playhead.ts';
 import {
     bitShaped,
+    clockBit,
+    clockLevel,
     CONVERTER_DEFAULTS,
     converterTitle,
     doneLevel,
@@ -22,6 +26,9 @@ import {
     thresholded,
     timerBit,
     timingCurve,
+    habitsBit,
+    habitsLevel,
+    zoneCurve,
     UNSHAPED,
     type ConverterCommand,
     type Shape,
@@ -272,5 +279,71 @@ describe('converters that make a bit', () => {
 
         expect(converter.bits).toEqual({ invert: false, hold: 0.5, threshold: 0.3, band: 0 });
         expect(parseConverter(JSON.parse(JSON.stringify(converter)))).toEqual(converter);
+    });
+});
+
+describe('converters reading clocks, cities and habits', () => {
+    const clock: Clock = { ...initialClock, at: 0.6, ticks: 4, playing: true };
+
+    it('read a clock as it stands: its position, its tick, playing, and the beat', () => {
+        expect(clockLevel(clock, 'position')).toBe(0.6);
+        expect(clockLevel(clock, 'tick')).toBe(0.5);
+        expect(clockBit(clock, 'playing')).toBe(1);
+        expect(clockBit({ ...clock, held: true }, 'playing')).toBe(0);
+        expect(clockBit(clock, 'beat')).toBe(1);
+        expect(clockBit({ ...clock, at: 0.7 }, 'beat')).toBe(0);
+    });
+
+    it("read a city's day over yours, shifted by how far ahead it is", () => {
+        const noonHere = 0.5;
+
+        expect(driverAt(zoneCurve(0, 'time'), noonHere)).toBeCloseTo(0.5, 2);
+        expect(driverAt(zoneCurve(9 * 60, 'time'), noonHere)).toBeCloseTo(21 / 24, 2);
+        expect(driverAt(zoneCurve(0, 'daylight'), noonHere)).toBeCloseTo(1, 2);
+        expect(driverAt(zoneCurve(12 * 60, 'daylight'), noonHere)).toBe(0);
+        expect(driverAt(zoneCurve(0, 'day'), noonHere)).toBe(1);
+        expect(driverAt(zoneCurve(-4 * 60, 'office'), noonHere)).toBe(0);
+    });
+
+    it('read habits as done today or as a streak, for one or for all', () => {
+        const today = '2026-11-13';
+        const habits: Habits = {
+            made: 2,
+            items: [
+                { id: 'habit-1', name: 'run', done: ['2026-11-12', today] },
+                { id: 'habit-2', name: 'read', done: ['2026-11-12'] },
+            ],
+        };
+
+        expect(habitsLevel(habits, null, today, 'today')).toBe(0.5);
+        expect(habitsLevel(habits, 'habit-1', today, 'today')).toBe(1);
+        expect(habitsLevel(habits, 'habit-1', today, 'streak')).toBe(2);
+        expect(habitsLevel(habits, null, today, 'streak')).toBe(1);
+        expect(habitsBit(habits, null, today)).toBe(0);
+        expect(habitsBit(habits, 'habit-1', today)).toBe(1);
+        expect(habitsLevel(habits, 'gone', today, 'today')).toBe(0);
+    });
+
+    it('keep which item they read through storage', () => {
+        const picked = reduceConverter(CONVERTER_DEFAULTS['zones-level'], {
+            kind: 'item',
+            item: 'Asia/Tokyo',
+        });
+
+        expect(picked.item).toBe('Asia/Tokyo');
+        expect(parseConverter(JSON.parse(JSON.stringify(picked)))).toEqual(picked);
+        expect(parseConverter({ kind: 'habits-bit', item: 3 })?.item).toBeNull();
+    });
+
+    it('plug into a world clock list and a habit list, which are sources now', () => {
+        expect(
+            converterInputs('zones-level')['in']?.sources.map(({ kind: source }) => source),
+        ).toEqual(['clocks']);
+        expect(
+            converterInputs('habits-bit')['in']?.sources.map(({ kind: source }) => source),
+        ).toEqual(['habits']);
+        expect(
+            converterInputs('clock-level')['in']?.sources.map(({ kind: source }) => source),
+        ).toEqual(['playback']);
     });
 });

@@ -4,6 +4,9 @@ import type { FocusView } from './components/focus/focus.ts';
 import { clamp } from './lib/math.ts';
 import type { PortType } from './port-types.ts';
 import { curveOf, driverAt, type Curve, type Driver } from './shared/curve.ts';
+import type { Habits } from './components/habits/habits.ts';
+import { streakOf } from './components/habits/habits.ts';
+import type { Clock } from './shared/playhead.ts';
 import type { Stage, Tickets } from './shared/tickets.ts';
 
 export const CONVERTER_KINDS = [
@@ -17,6 +20,12 @@ export const CONVERTER_KINDS = [
     'timer-bit',
     'tasks-bit',
     'sound-bit',
+    'clock-level',
+    'clock-bit',
+    'zones-level',
+    'zones-bit',
+    'habits-level',
+    'habits-bit',
 ] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
@@ -154,6 +163,73 @@ export const CONVERTERS = {
         ],
         size: SIZE,
     },
+    'clock-level': {
+        summary: 'A clock as it stands now: how far through its loop, or the tick it is on.',
+        icon: 'M12 4 A8 8 0 1 0 12.01 4 M12 12 L17 9',
+        takes: 'clock',
+        makes: 'level',
+        choices: [
+            { id: 'position', title: 'position' },
+            { id: 'tick', title: 'tick' },
+        ],
+        size: SIZE,
+    },
+    'clock-bit': {
+        summary:
+            'A clock as a bit, as it stands now: on while it plays, or in the first half of each tick.',
+        icon: 'M12 4 A8 8 0 1 0 12.01 4 M9 14 H12 V10 H15',
+        takes: 'clock',
+        makes: 'bit',
+        choices: [
+            { id: 'playing', title: 'playing' },
+            { id: 'beat', title: 'beat' },
+        ],
+        size: SIZE,
+    },
+    'zones-level': {
+        summary: 'A city of a world clock over your day: the time of day there, or its daylight.',
+        icon: 'M12 4 A8 8 0 1 0 12.01 4 M4 12 H20 M12 4 C 8 8, 8 16, 12 20 M12 4 C 16 8, 16 16, 12 20',
+        takes: 'zones',
+        makes: 'level',
+        choices: [
+            { id: 'time', title: 'time of day' },
+            { id: 'daylight', title: 'daylight' },
+        ],
+        size: SIZE,
+    },
+    'zones-bit': {
+        summary:
+            'A city of a world clock over your day as a bit: on while it is day there, or office hours.',
+        icon: 'M12 4 A8 8 0 1 0 12.01 4 M4 12 H20 M9 16 H12 V12 H15',
+        takes: 'zones',
+        makes: 'bit',
+        choices: [
+            { id: 'day', title: 'day there' },
+            { id: 'office', title: 'office hours' },
+        ],
+        size: SIZE,
+    },
+    'habits-level': {
+        summary:
+            'Habits as they stand today: the share of them done, or the streak, of one habit or all.',
+        icon: 'M5 6 H19 V18 H5 Z M8 10 L10 12 L14 8 M8 15 H16',
+        takes: 'habits',
+        makes: 'level',
+        choices: [
+            { id: 'today', title: 'done today' },
+            { id: 'streak', title: 'streak' },
+        ],
+        size: SIZE,
+    },
+    'habits-bit': {
+        summary:
+            'Habits as a bit, as they stand today: on once one habit, or all of them, are done.',
+        icon: 'M5 6 H19 V18 H5 Z M8 12 L10 14 L16 8',
+        takes: 'habits',
+        makes: 'bit',
+        choices: [{ id: 'today', title: 'done today' }],
+        size: SIZE,
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const converterTitle = (kind: ConverterKind): string =>
@@ -253,14 +329,18 @@ export type Converter = {
     readonly choice: string;
     readonly shape: Shape;
     readonly bits: BitShape;
+    readonly item: string | null;
     readonly sources: Readonly<Record<ConverterParam, string | null>>;
 };
+
+export type ConverterItem = { readonly id: string; readonly title: string };
 
 const made = (kind: ConverterKind): Converter => ({
     kind,
     choice: CONVERTERS[kind].choices[0]?.id ?? '',
     shape: UNSHAPED,
     bits: PLAIN_BITS,
+    item: null,
     sources: { in: null, time: null },
 });
 
@@ -276,14 +356,25 @@ export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     'timer-bit': made('timer-bit'),
     'tasks-bit': made('tasks-bit'),
     'sound-bit': made('sound-bit'),
+    'clock-level': made('clock-level'),
+    'clock-bit': made('clock-bit'),
+    'zones-level': made('zones-level'),
+    'zones-bit': made('zones-bit'),
+    'habits-level': made('habits-level'),
+    'habits-bit': made('habits-bit'),
 };
 
-export type Conversion = { readonly converter: Converter; readonly driver: Driver | null };
+export type Conversion = {
+    readonly converter: Converter;
+    readonly driver: Driver | null;
+    readonly items: readonly ConverterItem[];
+};
 
 export type ConverterCommand =
     | { readonly kind: 'choose'; readonly choice: string }
     | { readonly kind: 'shape'; readonly field: ShapeField; readonly value: number }
     | { readonly kind: 'bits'; readonly field: BitField; readonly value: number }
+    | { readonly kind: 'item'; readonly item: string | null }
     | { readonly kind: 'source'; readonly param: ConverterParam; readonly source: string | null };
 
 const choosable = (kind: ConverterKind, choice: string) =>
@@ -305,6 +396,10 @@ export const reduceConverter = (converter: Converter, command: ConverterCommand)
 
             return sameBits(bits, converter.bits) ? converter : { ...converter, bits };
         }
+        case 'item':
+            return converter.item === command.item
+                ? converter
+                : { ...converter, item: command.item };
         case 'source':
             return converter.sources[command.param] === command.source
                 ? converter
@@ -353,6 +448,7 @@ export const parseConverter = (value: unknown): Converter | null => {
     }
 
     const choice = field(value, 'choice');
+    const item = field(value, 'item');
     const sources = field(value, 'sources');
     const source = (param: ConverterParam) => {
         const id =
@@ -381,6 +477,7 @@ export const parseConverter = (value: unknown): Converter | null => {
                 : CONVERTER_DEFAULTS[kind].choice,
         shape: sameShape(shape, UNSHAPED) ? UNSHAPED : shape,
         bits: sameBits(bits, PLAIN_BITS) ? PLAIN_BITS : bits,
+        item: typeof item === 'string' ? item : null,
         sources: { in: source('in'), time: source('time') },
     };
 };
@@ -554,4 +651,52 @@ export const bitShaped = (driver: Driver, bits: BitShape): Driver => {
     );
 
     return asBits(index => held[index] !== bits.invert, samples.length);
+};
+
+export const clockLevel = ({ at, ticks }: Clock, choice: string): number =>
+    choice === 'tick' ? Math.floor(at * ticks) / ticks : at;
+
+export const clockBit = ({ at, ticks, playing, held }: Clock, choice: string): number =>
+    choice === 'beat' ? Number((at * ticks) % 1 < 0.5) : Number(playing && !held);
+
+export const zoneCurve = (ahead: number, choice: string): Curve =>
+    curveOf(t => {
+        const hour = ((((t * DAY_MINUTES + ahead) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES) / 60;
+
+        switch (choice) {
+            case 'daylight':
+                return Math.max(0, Math.sin((Math.PI * (hour - 6)) / 12));
+            case 'day':
+                return Number(hour >= 7 && hour < 19);
+            case 'office':
+                return Number(hour >= 9 && hour < 17);
+            default:
+                return hour / 24;
+        }
+    });
+
+const chosen = ({ items }: Habits, item: string | null) =>
+    item === null ? items : items.filter(({ id }) => id === item);
+
+export const habitsLevel = (
+    habits: Habits,
+    item: string | null,
+    today: string,
+    choice: string,
+): number => {
+    const picked = chosen(habits, item);
+
+    if (picked.length === 0) {
+        return 0;
+    }
+
+    return choice === 'streak'
+        ? Math.min(...picked.map(({ done }) => streakOf(done, today)))
+        : picked.filter(({ done }) => done.includes(today)).length / picked.length;
+};
+
+export const habitsBit = (habits: Habits, item: string | null, today: string): number => {
+    const picked = chosen(habits, item);
+
+    return Number(picked.length > 0 && picked.every(({ done }) => done.includes(today)));
 };
