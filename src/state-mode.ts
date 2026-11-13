@@ -1,5 +1,5 @@
 import { inputGroups } from './input-connections.ts';
-import { definitionOf, SOURCES, type InputsFor } from './inputs.ts';
+import { definitionOf, madeBy, SOURCES, type InputsFor } from './inputs.ts';
 import {
     groupKey,
     windowOfGroup,
@@ -227,8 +227,7 @@ export const wiringOf = (
                       width,
                       menu: menuAt(outputAt(0).y),
                       title: 'Output',
-                      type:
-                          SOURCES.find(source => source.program === process.program)?.makes ?? null,
+                      type: madeBy(process.program),
                       colour: colourOf(process.store),
                       end: {
                           kind: 'store',

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { inputsFor } from './inputs.fixture.ts';
+import { madeBy } from './inputs.ts';
+import { HOLDING } from './stores.ts';
 import { PROGRAM_IDS } from './program.ts';
 import { CONVERSIONS, converts } from './port-types.ts';
 
@@ -22,5 +24,13 @@ describe('typed ports', () => {
         const keys = CONVERSIONS.map(({ from, to }) => `${from}>${to}`);
 
         expect(new Set(keys).size).toBe(keys.length);
+    });
+});
+
+describe('outputs', () => {
+    it('name a type for every program that keeps state, so no jack is left unmarked', () => {
+        expect(
+            PROGRAM_IDS.filter(program => HOLDING[program] !== null && madeBy(program) === null),
+        ).toEqual([]);
     });
 });

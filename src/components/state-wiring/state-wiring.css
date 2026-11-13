@@ -126,6 +126,18 @@ path.shared {
     scale: 0.85;
 }
 
+.jack:is(
+    [data-type='zones'],
+    [data-type='notes'],
+    [data-type='habits'],
+    [data-type='bookmarks'],
+    [data-type='formula'],
+    [data-type='theme'],
+    [data-type='component']
+) {
+    border-radius: 50% 50% 2px 2px;
+}
+
 .output .jack {
     inset-inline-start: auto;
     inset-inline-end: calc(var(--spacing) * 0.75);

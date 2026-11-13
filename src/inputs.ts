@@ -202,6 +202,21 @@ export const SOURCES = [
 
 type Source = (typeof SOURCES)[number];
 
+const OWN_TYPES = {
+    clocks: 'zones',
+    note: 'notes',
+    habits: 'habits',
+    bookmarks: 'bookmarks',
+    formula: 'formula',
+    theme: 'theme',
+    box: 'component',
+} as const satisfies Partial<Record<ProgramId, PortType>>;
+
+export const madeBy = (program: ProgramId): PortType | null =>
+    SOURCES.find(source => source.program === program)?.makes ??
+    Object.entries(OWN_TYPES).find(([id]) => id === program)?.[1] ??
+    null;
+
 export type FollowedInput = {
     readonly title: string;
     readonly takes: PortType;

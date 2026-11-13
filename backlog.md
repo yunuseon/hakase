@@ -25,18 +25,19 @@ hidden coercions.
 
 ### The types
 
-| Type     | Made by                              | Read by                                                |
-| -------- | ------------------------------------ | ------------------------------------------------------ |
-| clock    | timeline                             | every playback input, read on                          |
-| level    | signal, converters                   | knobs, scene inputs, pedal knobs, compare, wave params |
-| bit      | gates                                | gate inputs                                            |
-| picture  | sketch, pedals                       | pedals, Output                                         |
-| sheet    | paint, pen                           | a sketch's paint input                                 |
-| sound    | voice, drums                         | converters                                             |
-| schedule | agenda                               | a focus timer, converters                              |
-| timer    | focus                                | progress, converters                                   |
-| tasks    | tickets                              | progress, converters                                   |
-| reading  | (implicitly: timer, schedule, tasks) | progress                                               |
+| Type                                                       | Made by                              | Read by                                                |
+| ---------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------ |
+| clock                                                      | timeline                             | every playback input, read on                          |
+| level                                                      | signal, converters                   | knobs, scene inputs, pedal knobs, compare, wave params |
+| bit                                                        | gates                                | gate inputs                                            |
+| picture                                                    | sketch, pedals                       | pedals, Output                                         |
+| sheet                                                      | paint, pen                           | a sketch's paint input                                 |
+| sound                                                      | voice, drums                         | converters                                             |
+| schedule                                                   | agenda                               | a focus timer, converters                              |
+| timer                                                      | focus                                | progress, converters                                   |
+| tasks                                                      | tickets                              | progress, converters                                   |
+| reading                                                    | (implicitly: timer, schedule, tasks) | progress                                               |
+| zones, notes, habits, bookmarks, formula, theme, component | their own program                    | only their own windows (shared state)                  |
 
 **Conversions.** Only a conversion with no choice in it may stay implicit.
 `CONVERSIONS` lists every implicit one with a flag for whether it is meant to

@@ -9,6 +9,13 @@ export const PORT_TYPES = [
     'timer',
     'tasks',
     'reading',
+    'zones',
+    'notes',
+    'habits',
+    'bookmarks',
+    'formula',
+    'theme',
+    'component',
 ] as const;
 
 export type PortType = (typeof PORT_TYPES)[number];

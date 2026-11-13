@@ -1976,7 +1976,8 @@ resolved through `waveOf`), so a bit cannot gate a sound yet.
 
 **Every port has a type the user can see.** `PORT_TYPES` in `src/port-types.ts`
 is the closed list (clock, level, bit, picture, sheet, sound, schedule, timer,
-tasks, reading). Each source kind says what it `makes` and each input definition
+tasks, reading, and the documents only their own program reads: zones, notes,
+habits, bookmarks, formula, theme, component). Each source kind says what it `makes` and each input definition
 what it `takes`, on the definition itself, so a new input cannot leave its type
 out. In state mode a jack keeps its state's colour and its **shape** is its type
 (a circle for level, a square for bit, a ring with a dot for clock, a rounded
@@ -1984,6 +1985,16 @@ square for picture and sheet, a double ring for sound, a diamond for the plan
 types), and every label names the type; the state menu names it beside each
 input. `Socket.type` and `FollowGroup.type` carry it as plain strings, so the
 components still know nothing of the list.
+
+**Every program that keeps state names its output's type**, read by `madeBy`:
+a source's `makes`, or for the programs nothing else reads (world clocks,
+notes, habits, bookmarks, the formula and theme editors, a component's own box)
+an entry in `OWN_TYPES`. Their output jack only binds another window of the same
+program to that state, and no input takes these types yet, but an unmarked jack
+read as "anything" when it meant "only its own kind"; they share one shape, a
+tab, and `port-types.test.ts` fails if a program with a `HOLDING` has no type.
+Each is also where a future converter plugs in, such as a time zone read as a
+level.
 
 **Only a conversion with nothing to choose may stay implicit.** `CONVERSIONS`
 lists every one an input still accepts: bit to level (0 or 1), the three plan
