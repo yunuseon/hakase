@@ -71,6 +71,11 @@ export const PROGRAM_IDS = [
     'timer-level',
     'tasks-level',
     'level-level',
+    'level-bit',
+    'schedule-bit',
+    'timer-bit',
+    'tasks-bit',
+    'sound-bit',
     'blueprints',
     'tasks',
     'tickets',
@@ -91,7 +96,6 @@ export type ProgramId = (typeof PROGRAM_IDS)[number];
 export const isProgramId = (value: string): value is ProgramId =>
     PROGRAM_IDS.some(id => id === value);
 
-// One running instance. Several processes may share one ProgramId.
 export type ProcessId = string;
 
 // Collected from whichever processes run, so feeding app state needs no singleton.

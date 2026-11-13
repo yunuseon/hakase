@@ -32,6 +32,7 @@ export const circuitTable = (
     gates: ReadonlyMap<string, Gate>,
     ticks: number,
     drivers: ReadonlyMap<string, Driver> = new Map(),
+    outside: ReadonlyMap<string, Driver> = new Map(),
 ): Table => {
     const ids = [...gates.keys()];
     const index = new Map(ids.map((id, at) => [id, at]));
@@ -68,15 +69,27 @@ export const circuitTable = (
     }
 
     const rows = all.map(() => new Uint8Array(ticks));
+    const readAt = (gate: Gate, param: string, tick: number): Bit => {
+        const source = sourceOfGate(gate, param);
+        const at = source === null ? -1 : (index.get(source) ?? -1);
+        const driver = source === null || at >= 0 ? undefined : outside.get(source);
+
+        return at >= 0
+            ? rows[at]?.[tick] === 1
+                ? 1
+                : 0
+            : driver !== undefined && driverAt(driver, tick / ticks) >= 0.5
+              ? 1
+              : 0;
+    };
 
     for (let tick = 0; tick < ticks; tick += 1) {
         all.forEach((gate, at) => {
             if (gate.kind === 'delay') {
-                const source = inputOf(gate, 'in');
                 const row = rows[at];
 
                 if (row !== undefined) {
-                    row[tick] = tick === 0 || source < 0 ? 0 : (rows[source]?.[tick - 1] ?? 0);
+                    row[tick] = tick === 0 ? 0 : readAt(gate, 'in', tick - 1);
                 }
             }
         });
@@ -88,11 +101,7 @@ export const circuitTable = (
                 return;
             }
 
-            const bitAt = (param: string): Bit => {
-                const source = inputOf(gate, param);
-
-                return source >= 0 && rows[source]?.[tick] === 1 ? 1 : 0;
-            };
+            const bitAt = (param: string): Bit => readAt(gate, param, tick);
 
             row[tick] = evaluated(gate, tick, ticks, bitAt, drivers.get(ids[at] ?? '') ?? null);
         });

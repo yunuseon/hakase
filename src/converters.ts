@@ -12,6 +12,11 @@ export const CONVERTER_KINDS = [
     'timer-level',
     'tasks-level',
     'level-level',
+    'level-bit',
+    'schedule-bit',
+    'timer-bit',
+    'tasks-bit',
+    'sound-bit',
 ] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
@@ -92,6 +97,63 @@ export const CONVERTERS = {
         choices: [{ id: 'shape', title: 'shape' }],
         size: SIZE,
     },
+    'level-bit': {
+        summary: 'A level as a bit: on while it is above its threshold, or below it.',
+        icon: 'M3 15 C 7 15, 8 6, 12 6 S 17 15, 21 15 M3 11 H21',
+        takes: 'level',
+        makes: 'bit',
+        choices: [
+            { id: 'above', title: 'above' },
+            { id: 'below', title: 'below' },
+        ],
+        size: SIZE,
+    },
+    'schedule-bit': {
+        summary: 'An agenda over today as a bit: on in a block, or in the hour before one.',
+        icon: 'M4 6 H20 V18 H4 Z M8 6 V18 M11 14 H14 V10 H18',
+        takes: 'schedule',
+        makes: 'bit',
+        choices: [
+            { id: 'in', title: 'in a block' },
+            { id: 'before', title: 'before a block' },
+        ],
+        size: SIZE,
+    },
+    'timer-bit': {
+        summary: 'A focus timer as a bit, as it stands now: on while focusing, or while it runs.',
+        icon: 'M12 4 A8 8 0 1 0 20 12 M9 12 H12 V8 H15',
+        takes: 'timer',
+        makes: 'bit',
+        choices: [
+            { id: 'focusing', title: 'focusing' },
+            { id: 'running', title: 'running' },
+        ],
+        size: SIZE,
+    },
+    'tasks-bit': {
+        summary:
+            'A ticket list as a bit, as it stands now: on when all are done, or while any is in progress.',
+        icon: 'M4 6 H20 M4 12 H12 M4 18 H12 M15 15 H17 V11 H21',
+        takes: 'tasks',
+        makes: 'bit',
+        choices: [
+            { id: 'done', title: 'all done' },
+            { id: 'active', title: 'any in progress' },
+        ],
+        size: SIZE,
+    },
+    'sound-bit': {
+        summary:
+            'A voice or drum machine as a bit: on while it sounds, or for a moment at each hit.',
+        icon: 'M3 18 L7 6 L10 13 L13 9 L21 18 M14 4 V8 H18',
+        takes: 'sound',
+        makes: 'bit',
+        choices: [
+            { id: 'sounding', title: 'sounding' },
+            { id: 'hit', title: 'hit' },
+        ],
+        size: SIZE,
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const converterTitle = (kind: ConverterKind): string =>
@@ -152,10 +214,45 @@ const shapeWith = (shape: Shape, field: ShapeField, value: number): Shape => {
     }
 };
 
+export type BitShape = {
+    readonly invert: boolean;
+    readonly hold: number;
+    readonly threshold: number;
+    readonly band: number;
+};
+
+export const BIT_FIELDS = ['invert', 'hold', 'threshold', 'band'] as const;
+export type BitField = (typeof BIT_FIELDS)[number];
+export const isBitField = (value: string): value is BitField =>
+    BIT_FIELDS.some(field => field === value);
+
+export const PLAIN_BITS: BitShape = { invert: false, hold: 0, threshold: 0.5, band: 0 };
+
+export const sameBits = (a: BitShape, b: BitShape): boolean =>
+    a.invert === b.invert && a.hold === b.hold && a.threshold === b.threshold && a.band === b.band;
+
+const bitsWith = (bits: BitShape, field: BitField, value: number): BitShape => {
+    if (!Number.isFinite(value)) {
+        return bits;
+    }
+
+    switch (field) {
+        case 'invert':
+            return { ...bits, invert: value !== 0 };
+        case 'hold':
+            return { ...bits, hold: clamp(value, 0, 0.5) };
+        case 'threshold':
+            return { ...bits, threshold: value };
+        case 'band':
+            return { ...bits, band: Math.max(0, value) };
+    }
+};
+
 export type Converter = {
     readonly kind: ConverterKind;
     readonly choice: string;
     readonly shape: Shape;
+    readonly bits: BitShape;
     readonly sources: Readonly<Record<ConverterParam, string | null>>;
 };
 
@@ -163,6 +260,7 @@ const made = (kind: ConverterKind): Converter => ({
     kind,
     choice: CONVERTERS[kind].choices[0]?.id ?? '',
     shape: UNSHAPED,
+    bits: PLAIN_BITS,
     sources: { in: null, time: null },
 });
 
@@ -173,6 +271,11 @@ export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     'timer-level': made('timer-level'),
     'tasks-level': made('tasks-level'),
     'level-level': made('level-level'),
+    'level-bit': made('level-bit'),
+    'schedule-bit': made('schedule-bit'),
+    'timer-bit': made('timer-bit'),
+    'tasks-bit': made('tasks-bit'),
+    'sound-bit': made('sound-bit'),
 };
 
 export type Conversion = { readonly converter: Converter; readonly driver: Driver | null };
@@ -180,6 +283,7 @@ export type Conversion = { readonly converter: Converter; readonly driver: Drive
 export type ConverterCommand =
     | { readonly kind: 'choose'; readonly choice: string }
     | { readonly kind: 'shape'; readonly field: ShapeField; readonly value: number }
+    | { readonly kind: 'bits'; readonly field: BitField; readonly value: number }
     | { readonly kind: 'source'; readonly param: ConverterParam; readonly source: string | null };
 
 const choosable = (kind: ConverterKind, choice: string) =>
@@ -195,6 +299,11 @@ export const reduceConverter = (converter: Converter, command: ConverterCommand)
             const shape = shapeWith(converter.shape, command.field, command.value);
 
             return sameShape(shape, converter.shape) ? converter : { ...converter, shape };
+        }
+        case 'bits': {
+            const bits = bitsWith(converter.bits, command.field, command.value);
+
+            return sameBits(bits, converter.bits) ? converter : { ...converter, bits };
         }
         case 'source':
             return converter.sources[command.param] === command.source
@@ -252,6 +361,17 @@ export const parseConverter = (value: unknown): Converter | null => {
         return typeof id === 'string' ? id : null;
     };
     const shape = shapeFrom(field(value, 'shape'));
+    const savedBits = field(value, 'bits');
+    const bits =
+        typeof savedBits !== 'object' || savedBits === null
+            ? PLAIN_BITS
+            : BIT_FIELDS.reduce((read, name) => {
+                  const saved = field(savedBits, name);
+
+                  return typeof saved === 'number' || typeof saved === 'boolean'
+                      ? bitsWith(read, name, Number(saved))
+                      : read;
+              }, PLAIN_BITS);
 
     return {
         kind,
@@ -260,6 +380,7 @@ export const parseConverter = (value: unknown): Converter | null => {
                 ? choice
                 : CONVERTER_DEFAULTS[kind].choice,
         shape: sameShape(shape, UNSHAPED) ? UNSHAPED : shape,
+        bits: sameBits(bits, PLAIN_BITS) ? PLAIN_BITS : bits,
         sources: { in: source('in'), time: source('time') },
     };
 };
@@ -355,4 +476,82 @@ export const doneLevel = ({ statuses }: Tickets, choice: string): number => {
         default:
             return count('done') / total;
     }
+};
+
+const samplesOf = (driver: Driver) =>
+    'samples' in driver ? driver.samples : curveOf(t => driverAt(driver, t)).samples;
+
+const asBits = (on: (index: number) => boolean, length: number): Curve => ({
+    samples: Float32Array.from({ length }, (_, index) => (on(index) ? 1 : 0)),
+});
+
+export const thresholded = (
+    driver: Driver,
+    below: boolean,
+    threshold: number,
+    band: number,
+): Curve => {
+    const samples = samplesOf(driver);
+    const out = new Float32Array(samples.length);
+    let on = false;
+
+    for (let pass = 0; pass < 2; pass++) {
+        for (let index = 0; index < samples.length; index++) {
+            const value = samples[index] ?? 0;
+            on = on ? value >= threshold - band / 2 : value >= threshold + band / 2;
+            out[index] = on !== below ? 1 : 0;
+        }
+    }
+
+    return { samples: out };
+};
+
+const HIT = 0.1;
+const PULSE = 1 / 64;
+
+export const soundBits = (loudness: Driver, choice: string): Curve => {
+    const samples = samplesOf(loudness);
+    const width = Math.max(1, Math.round(samples.length * PULSE));
+    const rises = Array.from(
+        samples,
+        (value, index) =>
+            value - (samples[(index + samples.length - 1) % samples.length] ?? 0) > HIT,
+    );
+
+    return choice === 'hit'
+        ? asBits(
+              index =>
+                  Array.from({ length: width }, (_, back) => back).some(
+                      back => rises[(index - back + samples.length) % samples.length] === true,
+                  ),
+              samples.length,
+          )
+        : asBits(index => (samples[index] ?? 0) >= 0.05, samples.length);
+};
+
+export const timerBit = ({ phase, running }: FocusView, choice: string): number =>
+    choice === 'running' ? Number(running) : Number(phase === 'work');
+
+export const tasksBit = (tickets: Tickets, choice: string): number =>
+    choice === 'active'
+        ? Number(doneLevel(tickets, 'active') > 0)
+        : Number(
+              tickets.statuses.some(({ tickets: list }) => list.length > 0) &&
+                  doneLevel(tickets, 'left') === 0,
+          );
+
+export const bitShaped = (driver: Driver, bits: BitShape): Driver => {
+    if (!bits.invert && bits.hold === 0) {
+        return driver;
+    }
+
+    const samples = samplesOf(driver);
+    const span = Math.round(bits.hold * samples.length);
+    const held = Array.from(samples, (_, index) =>
+        Array.from({ length: span + 1 }, (_unused, back) => back).some(
+            back => (samples[(index - back + samples.length) % samples.length] ?? 0) >= 0.5,
+        ),
+    );
+
+    return asBits(index => held[index] !== bits.invert, samples.length);
 };

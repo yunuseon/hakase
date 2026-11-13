@@ -12,6 +12,15 @@ export type Shape = {
     readonly smooth: number;
 };
 
+export type Bits = {
+    readonly invert: boolean;
+    readonly hold: number;
+    readonly threshold: number;
+    readonly band: number;
+};
+
+export type BitsView = Bits & { readonly holdText: string; readonly thresholded: boolean };
+
 export type ConverterInput = {
     readonly summary: string;
     readonly choices: readonly Choice[];
@@ -21,6 +30,8 @@ export type ConverterInput = {
     readonly t: number;
     readonly empty: string;
     readonly shape: Shape | null;
+    readonly bits: Bits | null;
+    readonly thresholded: boolean;
 };
 
 export type ShapeView = Shape & {
@@ -41,6 +52,7 @@ export type ConverterView = {
     readonly zero: number;
     readonly empty: string | null;
     readonly shape: ShapeView | null;
+    readonly bits: BitsView | null;
 };
 
 type Bounds = { readonly low: number; readonly high: number };
@@ -85,6 +97,8 @@ export const converterView = ({
     t,
     empty,
     shape,
+    bits,
+    thresholded,
 }: ConverterInput): ConverterView => {
     const bounds = samples === null ? { low: 0, high: 1 } : boundsOf(samples);
 
@@ -100,5 +114,13 @@ export const converterView = ({
         zero: yOf(0, bounds),
         empty: samples === null ? empty : null,
         shape: shape === null ? null : shapeView(shape),
+        bits:
+            bits === null
+                ? null
+                : {
+                      ...bits,
+                      holdText: bits.hold === 0 ? 'off' : `${Math.round(bits.hold * 100)}%`,
+                      thresholded,
+                  },
     };
 };

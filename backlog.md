@@ -64,16 +64,8 @@ brings **modifiers** every converter making that type shares. Not one program
 whose output type is a setting: a jack's type is known from its kind, which is
 what state mode's compatible drops and the port test rely on.
 
-Pairs, readings, the level modifiers and Shape are in (see "Typed ports and
+Pairs, readings, the level modifiers, Shape and the bit converters are in (see "Typed ports and
 converters" in `AGENTS.md`).
-
-**Phase B: bits.** Converters that make a bit, and gates that read them:
-`level → bit` (threshold with hysteresis, beside the compare gate),
-`schedule → bit` (in a block, within N minutes of the next), `timer → bit`
-(focusing, running), `tasks → bit` (all done, any in progress), `sound → bit`
-(note on, a hit). The circuit table reads a converter's bit as a driver per
-tick, as compare reads its level. **Bit modifiers**: invert, hold (on for at
-least N ticks).
 
 **Phase C: more sources.** `clock → level` (the loop as a ramp, the tick as
 steps), `clock → bit` (a pulse every N ticks), `zones → level` (time of day in a

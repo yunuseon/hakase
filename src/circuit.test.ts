@@ -188,3 +188,28 @@ describe('bits and signals', () => {
         expect([0, 0.24, 0.25, 0.99, 1].map(t => tickAt(t, 4))).toEqual([0, 0, 1, 3, 0]);
     });
 });
+
+describe('bits from outside the circuit', () => {
+    const half = { samples: Float32Array.from({ length: 8 }, (_, index) => (index < 4 ? 1 : 0)) };
+
+    it('read a converter bit at each tick, and a tick late through a delay', () => {
+        const table = circuitTable(
+            new Map([
+                ['lamp', gate('lamp', { in: 'outside' })],
+                ['late', gate('delay', { in: 'outside' })],
+            ]),
+            4,
+            new Map(),
+            new Map([['outside', half]]),
+        );
+
+        expect([...(table.get('lamp') ?? [])]).toEqual([1, 1, 0, 0]);
+        expect([...(table.get('late') ?? [])]).toEqual([0, 1, 1, 0]);
+    });
+
+    it('read 0 for a source that is neither a gate nor a converter it was given', () => {
+        const table = circuitTable(new Map([['lamp', gate('lamp', { in: 'nowhere' })]]), 4);
+
+        expect([...(table.get('lamp') ?? [])]).toEqual([0, 0, 0, 0]);
+    });
+});

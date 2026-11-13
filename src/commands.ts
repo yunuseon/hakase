@@ -227,7 +227,6 @@ const workspaceAction = (
     }
 };
 
-// The commands that are workspace actions; launches, jumps and looks go to their own streams.
 export const pickedAction = (picked: Picked, viewport: Extent): WorkspaceAction | null => {
     switch (picked.kind) {
         case 'workspace':

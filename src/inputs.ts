@@ -10,7 +10,7 @@ import { PEDALS, type PedalKind } from './pedals.ts';
 import { GATES, type GateKind } from './gates.ts';
 import { CONVERTERS, converterTitle, type ConverterKind } from './converters.ts';
 import { agendaReading, focusReading, ticketsReading } from './readings.ts';
-import { converts, type PortType } from './port-types.ts';
+import type { PortType } from './port-types.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
@@ -183,6 +183,11 @@ export const CONVERTER_SOURCES = [
     converterSource('timer-level'),
     converterSource('tasks-level'),
     converterSource('level-level'),
+    converterSource('level-bit'),
+    converterSource('schedule-bit'),
+    converterSource('timer-bit'),
+    converterSource('tasks-bit'),
+    converterSource('sound-bit'),
 ] as const;
 
 export const SOURCES = [
@@ -442,7 +447,7 @@ const bitInput = (param: string) =>
         from: 'store',
         param,
         group: null,
-        sources: GATE_SOURCES,
+        sources: [...GATE_SOURCES, ...CONVERTER_SOURCES.filter(({ makes }) => makes === 'bit')],
         initial: null,
     }) satisfies StoreInput;
 
@@ -463,7 +468,8 @@ export const converterInputs = (kind: ConverterKind): Readonly<Record<string, St
         from: 'store',
         param: 'in',
         group: null,
-        sources: SOURCES.filter(({ makes }) => converts(makes, CONVERTERS[kind].takes)),
+        // Its exact type, no implicit conversion: no converter may reach a gate, or the circuit table that reads converter bits would wait on itself.
+        sources: SOURCES.filter(({ makes }) => makes === CONVERTERS[kind].takes),
         initial: null,
     },
     time: timeInput,
@@ -581,6 +587,11 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'timer-level':
         case 'tasks-level':
         case 'level-level':
+        case 'level-bit':
+        case 'schedule-bit':
+        case 'timer-bit':
+        case 'tasks-bit':
+        case 'sound-bit':
             return kind;
     }
 };
@@ -630,6 +641,11 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'timer-level':
         case 'tasks-level':
         case 'level-level':
+        case 'level-bit':
+        case 'schedule-bit':
+        case 'timer-bit':
+        case 'tasks-bit':
+        case 'sound-bit':
             return { kind, store };
         default:
             return null;

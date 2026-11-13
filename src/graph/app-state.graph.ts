@@ -57,13 +57,19 @@ import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind, type Follow } from '../inputs.ts';
-import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
+import { GATE_DEFAULTS, GATES, isGateKind, sourceOfGate, type Gate } from '../gates.ts';
 import {
+    bitShaped,
     CONVERTER_DEFAULTS,
+    CONVERTERS,
     doneLevel,
     isConverterKind,
     phaseLevel,
     shaped,
+    soundBits,
+    tasksBit,
+    thresholded,
+    timerBit,
     timingCurve,
     type Conversion,
     type Converter,
@@ -380,19 +386,32 @@ export const scopedOf = ({
         now$: wallClock$,
     };
 
-    const circuit$ = combineLatest([gates$, stores$]).pipe(
-        map(
-            ([gates, stores]) =>
-                new Map(
-                    stores.flatMap(({ id, program }): [StoreId, Gate][] =>
-                        isGateKind(program) ? [[id, gates.get(id) ?? GATE_DEFAULTS[program]]] : [],
-                    ),
+    // Gates and the converter stores together, so the table never hears the registry by two paths.
+    const circuitWiring$ = combineLatest([gates$, stores$]).pipe(
+        map(([gates, stores]) => ({
+            gates: new Map(
+                stores.flatMap(({ id, program }): [StoreId, Gate][] =>
+                    isGateKind(program) ? [[id, gates.get(id) ?? GATE_DEFAULTS[program]]] : [],
                 ),
+            ),
+            converters: stores
+                .filter(({ program }) => isConverterKind(program))
+                .map(({ id }) => id)
+                .join(' '),
+        })),
+        distinctUntilChanged(
+            (a, b) =>
+                a.converters === b.converters &&
+                a.gates.size === b.gates.size &&
+                [...a.gates].every(([id, gate]) => b.gates.get(id) === gate),
         ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const circuit$ = circuitWiring$.pipe(
+        map(({ gates }) => gates),
         distinctUntilChanged(
             (a, b) => a.size === b.size && [...a].every(([id, gate]) => b.get(id) === gate),
         ),
-        shareReplay({ bufferSize: 1, refCount: true }),
     );
 
     const tables = new Map<string, Observable<Table>>();
@@ -405,35 +424,52 @@ export const scopedOf = ({
         }
 
         const pace$ = of({ seconds, ticks });
-        const made = circuit$.pipe(
-            switchMap(gates => {
+        const found = (
+            pairs: readonly Observable<readonly [StoreId, Driver | null]>[],
+        ): Observable<ReadonlyMap<StoreId, Driver>> =>
+            (pairs.length === 0 ? of([]) : combineLatest(pairs)).pipe(
+                map(
+                    all =>
+                        new Map(
+                            all.flatMap(([id, driver]): [StoreId, Driver][] =>
+                                driver === null ? [] : [[id, driver]],
+                            ),
+                        ),
+                ),
+            );
+        const made = circuitWiring$.pipe(
+            switchMap(({ gates, converters: registered }) => {
                 const compares = [...gates].flatMap(([id, gate]) =>
                     gate.kind === 'compare' ? [id] : [],
                 );
+                const converters = [
+                    ...new Set(
+                        [...gates.values()].flatMap(gate =>
+                            GATES[gate.kind].bits.flatMap(param => {
+                                const source = sourceOfGate(gate, param);
 
-                return (
-                    compares.length === 0
-                        ? of([])
-                        : combineLatest(
-                              compares.map(id =>
-                                  driverIn(id, 'in', pace$).pipe(
-                                      map(driver => [id, driver] as const),
-                                  ),
-                              ),
-                          )
-                ).pipe(
-                    map(drivers =>
-                        circuitTable(
-                            gates,
-                            ticks,
-                            new Map(
-                                drivers.flatMap(([id, driver]): [StoreId, Driver][] =>
-                                    driver === null ? [] : [[id, driver]],
-                                ),
+                                return source !== null && registered.split(' ').includes(source)
+                                    ? [source]
+                                    : [];
+                            }),
+                        ),
+                    ),
+                ];
+
+                return combineLatest([
+                    found(
+                        compares.map(id =>
+                            driverIn(id, 'in', pace$).pipe(map(driver => [id, driver] as const)),
+                        ),
+                    ),
+                    found(
+                        converters.map(id =>
+                            conversionIn(id, pace$).pipe(
+                                map(({ driver }) => [id, driver] as const),
                             ),
                         ),
                     ),
-                );
+                ]).pipe(map(([drivers, outside]) => circuitTable(gates, ticks, drivers, outside)));
             }),
             shareReplay({ bufferSize: 1, refCount: true }),
         );
@@ -469,9 +505,20 @@ export const scopedOf = ({
             map((level): Driver => ({ samples: Float32Array.of(level) })),
         );
 
+    const loudnessIn = (binding: Follow, pace$: Observable<Pace>): Observable<Driver | null> =>
+        binding.kind === 'voice'
+            ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+                  map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
+              )
+            : binding.kind === 'drums'
+              ? combineLatest([kitIn(binding.store), pace$]).pipe(
+                    map(([kit, { seconds }]) => kitCurve(kit, seconds)),
+                )
+              : of(null);
+
     const readingIn = (
         store: StoreId,
-        { kind, choice }: Converter,
+        { kind, choice, bits }: Converter,
         pace$: Observable<Pace>,
     ): Observable<Driver | null> =>
         linkIn(store, 'in').pipe(
@@ -532,6 +579,59 @@ export const scopedOf = ({
                             : of(null);
                     case 'level-level':
                         return driverOf(binding, pace$);
+                    case 'level-bit':
+                        return driverOf(binding, pace$).pipe(
+                            map(driver =>
+                                driver === null
+                                    ? null
+                                    : thresholded(
+                                          driver,
+                                          choice === 'below',
+                                          bits.threshold,
+                                          bits.band,
+                                      ),
+                            ),
+                        );
+                    case 'schedule-bit':
+                        return binding.kind === 'agenda'
+                            ? combineLatest([agendaIn(binding.store), today$]).pipe(
+                                  map(([agenda, day]) =>
+                                      thresholded(
+                                          timingCurve(agenda, day, choice),
+                                          false,
+                                          0.001,
+                                          0,
+                                      ),
+                                  ),
+                              )
+                            : of(null);
+                    case 'timer-bit':
+                        return binding.kind === 'focus'
+                            ? nowAs(
+                                  combineLatest([
+                                      timerIn(binding.store),
+                                      planIn(binding.store),
+                                  ]).pipe(
+                                      map(([focus, plan]) =>
+                                          timerBit(focusView(focus, plan), choice),
+                                      ),
+                                  ),
+                              )
+                            : of(null);
+                    case 'tasks-bit':
+                        return binding.kind === 'tickets'
+                            ? nowAs(
+                                  ticketsIn(binding.store).pipe(
+                                      map(tickets => tasksBit(tickets, choice)),
+                                  ),
+                              )
+                            : of(null);
+                    case 'sound-bit':
+                        return loudnessIn(binding, pace$).pipe(
+                            map(loudness =>
+                                loudness === null ? null : soundBits(loudness, choice),
+                            ),
+                        );
                 }
             }),
         );
@@ -543,7 +643,12 @@ export const scopedOf = ({
                 readingIn(store, converter, pace$).pipe(
                     map(driver => ({
                         converter,
-                        driver: driver === null ? null : shaped(driver, converter.shape),
+                        driver:
+                            driver === null
+                                ? null
+                                : CONVERTERS[converter.kind].makes === 'bit'
+                                  ? bitShaped(driver, converter.bits)
+                                  : shaped(driver, converter.shape),
                     })),
                 ),
             ),

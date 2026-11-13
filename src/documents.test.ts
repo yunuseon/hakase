@@ -350,6 +350,28 @@ describe('links', () => {
         expect(history.present.sketchLinks.get('sketch-2')?.sources.k2 ?? null).toBeNull();
     });
 
+    it('let a gate read a bit converter, and keep gates out of a converter', () => {
+        const before = run(fresh(), [
+            launched('nand'),
+            act({
+                kind: 'launch',
+                program: 'level-bit',
+                size: { width: 300, height: 340 },
+                viewport,
+            }),
+        ]);
+        const bit =
+            before.present.workspace.processes.find(({ program }) => program === 'level-bit')
+                ?.store ?? '';
+        const history = run(before, [
+            { kind: 'link', store: 'nand', param: 'a', source: bit },
+            { kind: 'link', store: bit, param: 'in', source: 'nand' },
+        ]);
+
+        expect(history.present.gates.get('nand')?.sources['a']).toBe(bit);
+        expect(history.present.converters.get(bit)?.sources.in ?? null).toBeNull();
+    });
+
     it('refuse a source of a kind the input does not take', () => {
         const before = run(fresh(), [launched('pen'), launched('focus')]);
         const history = run(before, [{ kind: 'link', store: 'pen', param: 'x', source: 'focus' }]);

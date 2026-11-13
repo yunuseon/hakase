@@ -8,13 +8,19 @@ import {
 import { focusView, initialFocus, type Focus } from './components/focus/focus.ts';
 import { defaultTickets, reduceTickets, type TicketCommand } from './shared/tickets.ts';
 import {
+    bitShaped,
     CONVERTER_DEFAULTS,
     converterTitle,
     doneLevel,
     parseConverter,
     phaseLevel,
+    PLAIN_BITS,
     reduceConverter,
     shaped,
+    soundBits,
+    tasksBit,
+    thresholded,
+    timerBit,
     timingCurve,
     UNSHAPED,
     type ConverterCommand,
@@ -24,7 +30,7 @@ import {
 import { inputsFor } from './inputs.fixture.ts';
 import { converterInputs } from './inputs.ts';
 import { processFrom, storeFrom } from './workspace.ts';
-import { CURVE_SAMPLES, curveOf, driverAt } from './shared/curve.ts';
+import { CURVE_SAMPLES, curveOf, driverAt, type Driver } from './shared/curve.ts';
 
 const DAY = '2026-11-13';
 const commands: readonly AgendaCommand[] = [
@@ -210,5 +216,61 @@ describe('a done converter', () => {
     it('reads 0 for a list with nothing in it', () => {
         expect(doneLevel(defaultTickets, 'done')).toBe(0);
         expect(doneLevel(defaultTickets, 'left')).toBe(0);
+    });
+});
+
+describe('converters that make a bit', () => {
+    const ramp = curveOf(t => t);
+    const on = (driver: Driver) => {
+        const samples = 'samples' in driver ? driver.samples : new Float32Array(1);
+
+        return Array.from(samples).filter(value => value === 1).length / samples.length;
+    };
+
+    it('read a level above or below a threshold, holding through a band', () => {
+        expect(on(thresholded(ramp, false, 0.75, 0))).toBeCloseTo(0.25, 2);
+        expect(on(thresholded(ramp, true, 0.75, 0))).toBeCloseTo(0.75, 2);
+
+        const wobble = curveOf(t => 0.5 + 0.05 * Math.sin(t * Math.PI * 40));
+
+        expect(on(thresholded(wobble, false, 0.5, 0))).toBeCloseTo(0.5, 1);
+        expect([0, 1]).toContain(on(thresholded(wobble, false, 0.5, 0.2)));
+    });
+
+    it('read sound as sounding, or a short pulse at each hit', () => {
+        const struck = curveOf(t => ((t * 4) % 1 < 0.1 ? 1 : 0));
+        const hits = soundBits(struck, 'hit');
+
+        expect(on(soundBits(struck, 'sounding'))).toBeCloseTo(0.1, 1);
+        expect(on(hits)).toBeGreaterThan(0);
+        expect(on(hits)).toBeLessThan(0.1);
+        expect(driverAt(hits, 0.25)).toBe(1);
+        expect(driverAt(hits, 0.4)).toBe(0);
+    });
+
+    it('read a timer and a ticket list as they stand now', () => {
+        expect(timerBit(focusView(initialFocus, null), 'focusing')).toBe(1);
+        expect(timerBit(focusView(initialFocus, null), 'running')).toBe(0);
+        expect(tasksBit(defaultTickets, 'done')).toBe(0);
+    });
+
+    it('invert and hold a bit, and pass a plain one through untouched', () => {
+        const pulse = curveOf(t => (t < 0.1 ? 1 : 0));
+
+        expect(bitShaped(pulse, PLAIN_BITS)).toBe(pulse);
+        expect(on(bitShaped(pulse, { ...PLAIN_BITS, invert: true }))).toBeCloseTo(0.9, 2);
+        expect(on(bitShaped(pulse, { ...PLAIN_BITS, hold: 0.2 }))).toBeCloseTo(0.3, 2);
+    });
+
+    it('keep their bit settings through storage, clamped', () => {
+        const set = [
+            { kind: 'bits', field: 'threshold', value: 0.3 },
+            { kind: 'bits', field: 'band', value: -2 },
+            { kind: 'bits', field: 'hold', value: 0.9 },
+        ] satisfies readonly ConverterCommand[];
+        const converter = set.reduce(reduceConverter, CONVERTER_DEFAULTS['level-bit']);
+
+        expect(converter.bits).toEqual({ invert: false, hold: 0.5, threshold: 0.3, band: 0 });
+        expect(parseConverter(JSON.parse(JSON.stringify(converter)))).toEqual(converter);
     });
 });

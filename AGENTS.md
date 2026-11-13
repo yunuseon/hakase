@@ -2013,8 +2013,9 @@ pair (`schedule-level`, `sound-level`, `timer-level`, `tasks-level`,
 makes, its **readings** (the ways to do that conversion, `choices`) and its
 size; the title is the pair itself (`converterTitle`, `schedule → level`).
 `converterProgram(kind)` makes the program, under the launcher's **Convert**
-category; `converterInputs(kind)` gives it `in` (every source whose type is or
-implicitly converts to the one it takes) and **read on** (`time`), so a
+category; `converterInputs(kind)` gives it `in` (every source of exactly the type
+it takes, no implicit conversion: so no converter's chain can reach a gate, and
+the circuit table that reads converter bits can never wait on itself) and **read on** (`time`), so a
 converter read on a day clock is one value like a signal. It is not one program
 whose output type is a setting: a jack's type is known from its kind, which
 state mode's compatible drops and `port-types.test.ts` rely on. Every
@@ -2064,8 +2065,28 @@ not applied on the way to "12"; the fields keep their draft while focused
 - **tasks → level** reads a ticket list as it stands now: the share _done_,
   _active_ (in progress) or _left_, counted by stage, never by a status's name
   (`doneLevel`); an empty list reads 0.
-- **level → level** (Shape) has the single reading _shape_: any level, a gate's
-  bit included, through the modifiers alone.
+- **level → level** (Shape) has the single reading _shape_: any level through
+  the modifiers alone.
+
+**Converters that make a bit** are pairs like the rest, their output a curve of
+0 and 1, so a knob reads one as a level (bit to level is implicit) and a gate's
+bit input reads one directly. They share **bit modifiers** instead of the shape,
+`bitShaped`: invert, and hold (stay on for at least a share of the loop after
+each on). `level → bit` reads _above_ or _below_ a threshold with a hysteresis
+band (`thresholded`, run round the loop twice so its start is decided by its
+end), both in the document's `bits` beside invert and hold and shown only for it;
+`schedule → bit` reads _in a block_ or _before a block_ (the hour before one);
+`timer → bit` _focusing_ or _running_ and `tasks → bit` _all done_ or _any in
+progress_, as they stand now; `sound → bit` _sounding_ (loudness at or above
+0.05) or _hit_ (a pulse a 64th of the loop long at each rise of loudness).
+
+**A gate reads a converter's bit through the circuit table.** `circuitTable`
+takes `outside`, a driver per non-gate store, and `readAt` reads it at
+`tick / ticks`; a delay reading one takes the tick before, as it does a gate's.
+`tableOf` gathers those drivers from the converters the gates read, and learns
+which stores are converters from `circuitWiring$`, gates and converter stores in
+one stream, since reading the registry again beside `circuit$` would have
+reached the table by two paths.
 
 **Sound was retired from every level input**, and saved links migrate on load:
 `enveloped` (`src/envelopes.ts`) finds every sketch link, pedal source and

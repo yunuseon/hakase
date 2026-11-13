@@ -10,7 +10,7 @@ import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { connectChoices$ } from '../../shared/ui/choices.component.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import { HEIGHT, WIDTH, type ConverterView, type ShapeView } from './converter.ts';
+import { HEIGHT, WIDTH, type BitsView, type ConverterView, type ShapeView } from './converter.ts';
 import css from './converter.css?inline';
 
 const sheet = styleSheet(css);
@@ -28,16 +28,22 @@ const empty: ConverterView = {
     zero: HEIGHT,
     empty: null,
     shape: null,
+    bits: null,
 };
 
-export type ShapeChange = { readonly field: string; readonly value: number };
+export type ShapeChange = {
+    readonly group: 'shape' | 'bits';
+    readonly field: string;
+    readonly value: number;
+};
 
-const bound = (field: 'low' | 'high', value: number, label: string) =>
+const bound = (group: string, field: string, value: number, label: string) =>
     html`<input
         class="ui-field bound"
         type="number"
         step="0.1"
-        data-shape=${field}
+        data-group=${group}
+        data-field=${field}
         aria-label=${label}
         ${ref(element => {
             if (element instanceof HTMLInputElement) {
@@ -47,6 +53,7 @@ const bound = (field: 'low' | 'high', value: number, label: string) =>
     />`;
 
 const slider = (
+    group: string,
     field: string,
     label: string,
     value: number,
@@ -61,7 +68,8 @@ const slider = (
             min=${min}
             max=${max}
             step=${step}
-            data-shape=${field}
+            data-group=${group}
+            data-field=${field}
             .value=${String(value)}
         />
         <output>${text}</output>
@@ -72,7 +80,8 @@ const Shape = (shape: ShapeView) =>
         <div class="row">
             <span class="key">range</span>
             <span class="bounds">
-                ${bound('low', shape.low, 'lowest value')}<span>to</span>${bound(
+                ${bound('shape', 'low', shape.low, 'lowest value')}<span>to</span>${bound(
+                    'shape',
                     'high',
                     shape.high,
                     'highest value',
@@ -81,15 +90,59 @@ const Shape = (shape: ShapeView) =>
         </div>
         <label class="row">
             <span class="key">invert</span>
-            <input class="ui-check" type="checkbox" data-shape="invert" .checked=${shape.invert} />
+            <input
+                class="ui-check"
+                type="checkbox"
+                data-group="shape"
+                data-field="invert"
+                .checked=${shape.invert}
+            />
         </label>
-        ${slider('curve', 'curve', shape.curve, shape.curveText, { min: -1, max: 1, step: 0.05 })}
-        ${slider('steps', 'steps', shape.steps, shape.stepsText, { min: 0, max: 16, step: 1 })}
-        ${slider('smooth', 'smooth', shape.smooth, shape.smoothText, {
+        ${slider('shape', 'curve', 'curve', shape.curve, shape.curveText, {
+            min: -1,
+            max: 1,
+            step: 0.05,
+        })}
+        ${slider('shape', 'steps', 'steps', shape.steps, shape.stepsText, {
+            min: 0,
+            max: 16,
+            step: 1,
+        })}
+        ${slider('shape', 'smooth', 'smooth', shape.smooth, shape.smoothText, {
             min: 0,
             max: 0.99,
             step: 0.01,
         })}
+    </div>`;
+
+const Bits = (bits: BitsView) =>
+    html`<div class="shape" role="group" aria-label="bit">
+        ${
+            bits.thresholded
+                ? html`<div class="row">
+                      <span class="key">threshold</span>
+                      <span class="bounds">
+                          ${bound('bits', 'threshold', bits.threshold, 'threshold')}<span>band</span>${bound(
+                              'bits',
+                              'band',
+                              bits.band,
+                              'hysteresis band',
+                          )}
+                      </span>
+                  </div>`
+                : null
+        }
+        <label class="row">
+            <span class="key">invert</span>
+            <input
+                class="ui-check"
+                type="checkbox"
+                data-group="bits"
+                data-field="invert"
+                .checked=${bits.invert}
+            />
+        </label>
+        ${slider('bits', 'hold', 'hold', bits.hold, bits.holdText, { min: 0, max: 0.5, step: 0.01 })}
     </div>`;
 
 const TEMPLATE = (view: ConverterView) =>
@@ -133,17 +186,20 @@ const TEMPLATE = (view: ConverterView) =>
             </div>
             <output class="value" aria-label="level now">${view.value}</output>
         </div>
-        ${view.shape === null ? null : Shape(view.shape)}`;
+        ${view.shape === null ? null : Shape(view.shape)}
+        ${view.bits === null ? null : Bits(view.bits)}`;
 
 const shapeOf = (target: EventTarget | null): ShapeChange[] => {
     if (!(target instanceof HTMLInputElement)) {
         return [];
     }
 
-    const field = target.dataset['shape'];
+    const { group, field } = target.dataset;
     const value = target.type === 'checkbox' ? Number(target.checked) : target.valueAsNumber;
 
-    return field === undefined || !Number.isFinite(value) ? [] : [{ field, value }];
+    return (group !== 'shape' && group !== 'bits') || field === undefined || !Number.isFinite(value)
+        ? []
+        : [{ group, field, value }];
 };
 
 export class HksConverter extends HTMLElement {

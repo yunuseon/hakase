@@ -2,7 +2,13 @@ import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map, mergeMap } from 'rxjs/operators';
 import { HksConverter } from '../components/converter/converter.component.ts';
 import { converterView } from '../components/converter/converter.ts';
-import { converterTitle, CONVERTERS, isShapeField, type ConverterKind } from '../converters.ts';
+import {
+    converterTitle,
+    CONVERTERS,
+    isBitField,
+    isShapeField,
+    type ConverterKind,
+} from '../converters.ts';
 import { converterInputs, playbackInput } from '../inputs.ts';
 import { CONVERSIONS } from '../port-types.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -65,6 +71,8 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
                                             t,
                                             empty: emptyText(kind),
                                             shape: spec.makes === 'level' ? document.shape : null,
+                                            bits: spec.makes === 'bit' ? document.bits : null,
+                                            thresholded: spec.takes === 'level',
                                         }),
                                     ),
                                 ),
@@ -77,15 +85,22 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
                             })),
                         ),
                         converter.shapes$.pipe(
-                            mergeMap(({ field, value }): AppInput[] =>
-                                isShapeField(field)
+                            mergeMap(({ group, field, value }): AppInput[] =>
+                                group === 'shape' && isShapeField(field)
                                     ? [
                                           {
                                               kind: 'converter',
                                               command: { kind: 'shape', field, value },
                                           },
                                       ]
-                                    : [],
+                                    : group === 'bits' && isBitField(field)
+                                      ? [
+                                            {
+                                                kind: 'converter',
+                                                command: { kind: 'bits', field, value },
+                                            },
+                                        ]
+                                      : [],
                             ),
                         ),
                     ),
