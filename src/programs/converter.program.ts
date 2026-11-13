@@ -1,19 +1,23 @@
 import { combineLatest, merge } from 'rxjs';
-import { ignoreElements, map } from 'rxjs/operators';
+import { ignoreElements, map, mergeMap } from 'rxjs/operators';
 import { HksConverter } from '../components/converter/converter.component.ts';
 import { converterView } from '../components/converter/converter.ts';
-import { CONVERTERS, type ConverterKind } from '../converters.ts';
+import { converterTitle, CONVERTERS, isShapeField, type ConverterKind } from '../converters.ts';
 import { converterInputs, playbackInput } from '../inputs.ts';
+import { CONVERSIONS } from '../port-types.ts';
 import type { AppInput, Program } from '../program.ts';
-import { driverAt } from '../shared/curve.ts';
+import { curveOf, driverAt } from '../shared/curve.ts';
 
-const EMPTY_TEXT: Readonly<Record<ConverterKind, string>> = {
-    timing: 'Plug an agenda into in: drag a wire in state mode (hold W), or pick one in the state menu.',
-    envelope:
-        'Plug a voice or drum machine into in: drag a wire in state mode (hold W), or pick one in the state menu.',
-    kit: 'Plug a drum machine into in: drag a wire in state mode (hold W), or pick one in the state menu.',
-    phase: 'Plug a focus timer into in: drag a wire in state mode (hold W), or pick one in the state menu.',
-    done: 'Plug a ticket list into in: drag a wire in state mode (hold W), or pick one in the state menu.',
+const emptyText = (kind: ConverterKind) => {
+    const { takes } = CONVERTERS[kind];
+    const types = [takes, ...CONVERSIONS.filter(({ to }) => to === takes).map(({ from }) => from)];
+    const sources = converterInputs(kind)['in']?.sources ?? [];
+    const named =
+        sources.length > 0 && sources.length <= 3
+            ? ` (${sources.map(({ title }) => title).join(', ')})`
+            : '';
+
+    return `Nothing plugged into in. It takes a ${types.join(' or a ')}${named}. Drag a wire in state mode (hold W), or pick one in the state menu.`;
 };
 
 export const converterProgram = <K extends ConverterKind>(kind: K) => {
@@ -22,7 +26,7 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
     return {
         id: kind,
         inputs: { playback: playbackInput, ...converterInputs(kind) },
-        title: spec.title.toLowerCase(),
+        title: converterTitle(kind),
         category: 'convert',
         icon: spec.icon,
         size: spec.size,
@@ -32,23 +36,35 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
 
             return {
                 element: converter,
-                run$: ({ converter$, converted$, playhead$ }) =>
+                run$: ({ conversion$, playhead$ }) =>
                     merge(
                         converter
                             .connect$(
-                                combineLatest([converter$, converted$, playhead$]).pipe(
-                                    map(([document, driver, t]) =>
+                                combineLatest([
+                                    conversion$.pipe(
+                                        map(({ converter: document, driver }) => ({
+                                            document,
+                                            driver,
+                                            samples:
+                                                driver === null
+                                                    ? null
+                                                    : 'samples' in driver
+                                                      ? driver.samples
+                                                      : curveOf(t => driverAt(driver, t)).samples,
+                                        })),
+                                    ),
+                                    playhead$,
+                                ]).pipe(
+                                    map(([{ document, driver, samples }, t]) =>
                                         converterView({
                                             summary: spec.summary,
                                             choices: spec.choices,
                                             choice: document.choice,
-                                            samples:
-                                                driver !== null && 'samples' in driver
-                                                    ? driver.samples
-                                                    : null,
+                                            samples,
                                             value: driver === null ? null : driverAt(driver, t),
                                             t,
-                                            empty: EMPTY_TEXT[kind],
+                                            empty: emptyText(kind),
+                                            shape: spec.makes === 'level' ? document.shape : null,
                                         }),
                                     ),
                                 ),
@@ -59,6 +75,18 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
                                 kind: 'converter',
                                 command: { kind: 'choose', choice },
                             })),
+                        ),
+                        converter.shapes$.pipe(
+                            mergeMap(({ field, value }): AppInput[] =>
+                                isShapeField(field)
+                                    ? [
+                                          {
+                                              kind: 'converter',
+                                              command: { kind: 'shape', field, value },
+                                          },
+                                      ]
+                                    : [],
+                            ),
                         ),
                     ),
             };

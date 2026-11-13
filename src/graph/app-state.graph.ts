@@ -63,7 +63,10 @@ import {
     doneLevel,
     isConverterKind,
     phaseLevel,
+    shaped,
     timingCurve,
+    type Conversion,
+    type Converter,
 } from '../converters.ts';
 import { dayOf } from '../lib/day.ts';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
@@ -121,8 +124,7 @@ type StoreKey =
     | 'kit$'
     | 'pedal$'
     | 'gate$'
-    | 'converter$'
-    | 'converted$'
+    | 'conversion$'
     | 'bits$'
     | 'box$'
     | 'image$'
@@ -449,7 +451,7 @@ export const scopedOf = ({
                     all.get(store) ??
                     (owner !== null && isConverterKind(owner)
                         ? CONVERTER_DEFAULTS[owner]
-                        : CONVERTER_DEFAULTS.timing)
+                        : CONVERTER_DEFAULTS['level-level'])
                 );
             }),
             distinctUntilChanged(),
@@ -461,92 +463,90 @@ export const scopedOf = ({
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const convertedIn = (store: StoreId, pace$: Observable<Pace>): Observable<Driver | null> =>
-        converterIn(store).pipe(
-            switchMap(converter => {
-                switch (converter.kind) {
-                    case 'done':
-                        return linkIn(store, 'in').pipe(
-                            switchMap(binding =>
-                                binding?.kind === 'tickets'
-                                    ? ticketsIn(binding.store).pipe(
-                                          map(tickets => doneLevel(tickets, converter.choice)),
-                                          distinctUntilChanged(),
-                                          map((level): Driver => ({
-                                              samples: Float32Array.of(level),
-                                          })),
-                                      )
-                                    : of(null),
-                            ),
-                        );
-                    case 'phase':
-                        return linkIn(store, 'in').pipe(
-                            switchMap(binding =>
-                                binding?.kind === 'focus'
-                                    ? combineLatest([
-                                          timerIn(binding.store),
-                                          planIn(binding.store),
-                                      ]).pipe(
-                                          map(([focus, plan]) =>
-                                              phaseLevel(focusView(focus, plan), converter.choice),
-                                          ),
-                                          distinctUntilChanged(),
-                                          map((level): Driver => ({
-                                              samples: Float32Array.of(level),
-                                          })),
-                                      )
-                                    : of(null),
-                            ),
-                        );
-                    case 'kit': {
-                        const drum = converter.choice;
+    const nowAs = (level$: Observable<number>): Observable<Driver> =>
+        level$.pipe(
+            distinctUntilChanged(),
+            map((level): Driver => ({ samples: Float32Array.of(level) })),
+        );
 
-                        return linkIn(store, 'in').pipe(
-                            switchMap(binding =>
-                                binding?.kind === 'drums' && isDrum(drum)
-                                    ? combineLatest([kitIn(binding.store), pace$]).pipe(
-                                          map(([kit, { seconds }]) =>
-                                              drumCurve(kit, drum, seconds),
-                                          ),
-                                      )
-                                    : of(null),
-                            ),
-                        );
-                    }
-                    case 'envelope':
-                        return linkIn(store, 'in').pipe(
-                            switchMap(binding =>
-                                binding?.kind === 'voice'
-                                    ? converter.choice === 'pitch'
-                                        ? soundingIn(binding.store).pipe(map(pitchCurve))
-                                        : combineLatest([soundingIn(binding.store), pace$]).pipe(
-                                              map(([sounding, { seconds }]) =>
-                                                  voiceCurve(sounding, seconds),
-                                              ),
-                                          )
-                                    : binding?.kind === 'drums'
-                                      ? converter.choice === 'pitch'
-                                          ? of(curveOf(() => 0))
-                                          : combineLatest([kitIn(binding.store), pace$]).pipe(
-                                                map(([kit, { seconds }]) => kitCurve(kit, seconds)),
-                                            )
-                                      : of(null),
-                            ),
-                        );
-                    case 'timing':
-                        return linkIn(store, 'in').pipe(
-                            switchMap(binding =>
-                                binding?.kind === 'agenda'
-                                    ? combineLatest([agendaIn(binding.store), today$]).pipe(
-                                          map(([agenda, day]) =>
-                                              timingCurve(agenda, day, converter.choice),
-                                          ),
-                                      )
-                                    : of(null),
-                            ),
-                        );
+    const readingIn = (
+        store: StoreId,
+        { kind, choice }: Converter,
+        pace$: Observable<Pace>,
+    ): Observable<Driver | null> =>
+        linkIn(store, 'in').pipe(
+            switchMap((binding): Observable<Driver | null> => {
+                if (binding === null) {
+                    return of(null);
+                }
+
+                switch (kind) {
+                    case 'schedule-level':
+                        return binding.kind === 'agenda'
+                            ? combineLatest([agendaIn(binding.store), today$]).pipe(
+                                  map(([agenda, day]) => timingCurve(agenda, day, choice)),
+                              )
+                            : of(null);
+                    case 'sound-level':
+                        return binding.kind === 'voice'
+                            ? choice === 'pitch'
+                                ? soundingIn(binding.store).pipe(map(pitchCurve))
+                                : choice === 'loudness'
+                                  ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+                                        map(([sounding, { seconds }]) =>
+                                            voiceCurve(sounding, seconds),
+                                        ),
+                                    )
+                                  : of(null)
+                            : binding.kind === 'drums'
+                              ? choice === 'pitch'
+                                  ? of(curveOf(() => 0))
+                                  : combineLatest([kitIn(binding.store), pace$]).pipe(
+                                        map(([kit, { seconds }]) =>
+                                            isDrum(choice)
+                                                ? drumCurve(kit, choice, seconds)
+                                                : kitCurve(kit, seconds),
+                                        ),
+                                    )
+                              : of(null);
+                    case 'timer-level':
+                        return binding.kind === 'focus'
+                            ? nowAs(
+                                  combineLatest([
+                                      timerIn(binding.store),
+                                      planIn(binding.store),
+                                  ]).pipe(
+                                      map(([focus, plan]) =>
+                                          phaseLevel(focusView(focus, plan), choice),
+                                      ),
+                                  ),
+                              )
+                            : of(null);
+                    case 'tasks-level':
+                        return binding.kind === 'tickets'
+                            ? nowAs(
+                                  ticketsIn(binding.store).pipe(
+                                      map(tickets => doneLevel(tickets, choice)),
+                                  ),
+                              )
+                            : of(null);
+                    case 'level-level':
+                        return driverOf(binding, pace$);
                 }
             }),
+        );
+
+    // One stream for both: a window that combined the document with its driver would fire twice per edit.
+    const conversionIn = (store: StoreId, pace$: Observable<Pace>): Observable<Conversion> =>
+        converterIn(store).pipe(
+            switchMap(converter =>
+                readingIn(store, converter, pace$).pipe(
+                    map(driver => ({
+                        converter,
+                        driver: driver === null ? null : shaped(driver, converter.shape),
+                    })),
+                ),
+            ),
         );
 
     const gateIn = (store: StoreId) =>
@@ -580,7 +580,7 @@ export const scopedOf = ({
         binding.kind === 'signal'
             ? waveIn(binding.store)
             : isConverterKind(binding.kind)
-              ? convertedIn(binding.store, pace$)
+              ? conversionIn(binding.store, pace$).pipe(map(({ driver }) => driver))
               : isGateKind(binding.kind)
                 ? pace$.pipe(
                       switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
@@ -841,8 +841,7 @@ export const scopedOf = ({
             kit$: narrowed(kitIn),
             pedal$: narrowed(pedalIn),
             gate$: narrowed(gateIn),
-            converter$: narrowed(converterIn),
-            converted$: store$.pipe(switchMap(store => convertedIn(store, pace$))),
+            conversion$: store$.pipe(switchMap(store => conversionIn(store, pace$))),
             bits$: combineLatest([store$, pace$]).pipe(
                 switchMap(([store, { ticks, seconds }]) =>
                     tableOf(ticks, seconds).pipe(

@@ -331,14 +331,14 @@ describe('links', () => {
         const before = run(fresh(), [
             act({
                 kind: 'launch',
-                program: 'timing',
+                program: 'schedule-level',
                 size: { width: 280, height: 220 },
                 viewport,
             }),
         ]);
         const timing =
-            before.present.workspace.processes.find(({ program }) => program === 'timing')?.store ??
-            '';
+            before.present.workspace.processes.find(({ program }) => program === 'schedule-level')
+                ?.store ?? '';
         const history = run(before, [
             { kind: 'link', store: timing, param: 'in', source: 'agenda' },
             { kind: 'link', store: 'sketch-2', param: 'k1', source: timing },

@@ -9,14 +9,22 @@ import { focusView, initialFocus, type Focus } from './components/focus/focus.ts
 import { defaultTickets, reduceTickets, type TicketCommand } from './shared/tickets.ts';
 import {
     CONVERTER_DEFAULTS,
+    converterTitle,
     doneLevel,
     parseConverter,
     phaseLevel,
     reduceConverter,
+    shaped,
     timingCurve,
+    UNSHAPED,
+    type ConverterCommand,
+    type Shape,
+    type ShapeField,
 } from './converters.ts';
+import { inputsFor } from './inputs.fixture.ts';
 import { converterInputs } from './inputs.ts';
-import { driverAt } from './shared/curve.ts';
+import { processFrom, storeFrom } from './workspace.ts';
+import { CURVE_SAMPLES, curveOf, driverAt } from './shared/curve.ts';
 
 const DAY = '2026-11-13';
 const commands: readonly AgendaCommand[] = [
@@ -49,9 +57,9 @@ describe('timing', () => {
 });
 
 describe('a converter document', () => {
-    const timing = CONVERTER_DEFAULTS.timing;
+    const timing = CONVERTER_DEFAULTS['schedule-level'];
 
-    it('takes only its own choices, and keeps what it reads and is read on', () => {
+    it('takes only its own readings, and keeps what it reads and is read on', () => {
         expect(reduceConverter(timing, { kind: 'choose', choice: 'through' }).choice).toBe(
             'through',
         );
@@ -61,34 +69,97 @@ describe('a converter document', () => {
         ).toBe('agenda');
     });
 
-    it('reads back what it saved, and refuses what is not one', () => {
-        const linked = reduceConverter(
-            reduceConverter(timing, { kind: 'choose', choice: 'before' }),
+    it('reads back what it saved, shape and all, and refuses what is not one', () => {
+        const commands: readonly ConverterCommand[] = [
+            { kind: 'choose', choice: 'before' },
             { kind: 'source', param: 'time', source: 'day' },
-        );
+            { kind: 'shape', field: 'high', value: 4 },
+            { kind: 'shape', field: 'invert', value: 1 },
+        ];
+        const linked = commands.reduce(reduceConverter, timing);
 
         expect(parseConverter(JSON.parse(JSON.stringify(linked)))).toEqual(linked);
-        expect(parseConverter({ kind: 'timing', choice: 'nope' })?.choice).toBe(timing.choice);
+        expect(parseConverter({ kind: 'schedule-level', choice: 'nope' })?.choice).toBe(
+            timing.choice,
+        );
         expect(parseConverter({ kind: 'nand' })).toBeNull();
+    });
+
+    it('reads a converter saved under its first name as its pair, reading and all', () => {
+        expect(parseConverter({ kind: 'timing', choice: 'before' })).toMatchObject({
+            kind: 'schedule-level',
+            choice: 'before',
+        });
+        expect(parseConverter({ kind: 'kit', choice: 'hat' })).toMatchObject({
+            kind: 'sound-level',
+            choice: 'hat',
+        });
+        expect(parseConverter({ kind: 'envelope', choice: 'pitch' })?.kind).toBe('sound-level');
+        expect(parseConverter({ kind: 'phase' })?.kind).toBe('timer-level');
+        expect(parseConverter({ kind: 'done', choice: 'left' })?.kind).toBe('tasks-level');
+    });
+
+    it('brings a window and a state saved under a first name back as the pair', () => {
+        const frame = { x: 0, y: 0, z: 0, width: 280, height: 220 };
+
+        expect(
+            processFrom({ id: 'kit-3', program: 'kit', store: 'store-3', frame }, inputsFor),
+        ).toMatchObject({ program: 'sound-level', store: 'store-3' });
+        expect(storeFrom({ id: 'store-3', program: 'timing', name: 'Day' })).toMatchObject([
+            { program: 'schedule-level', name: 'Day' },
+        ]);
+    });
+
+    it('takes every source of its type, so one sound converter reads voices and drums', () => {
+        expect(
+            converterInputs('sound-level')['in']?.sources.map(({ kind: source }) => source),
+        ).toEqual(['voice', 'drums']);
+        expect(converterTitle('sound-level')).toBe('sound → level');
     });
 });
 
-describe('a kit converter', () => {
-    it('starts on the kick and chooses only a drum it has', () => {
-        const kit = CONVERTER_DEFAULTS.kit;
+describe('shaping a level', () => {
+    const ramp = curveOf(t => t);
+    const at = (shape: Partial<Shape>, t: number) =>
+        driverAt(shaped(ramp, { ...UNSHAPED, ...shape }), t);
 
-        expect(kit.choice).toBe('kick');
-        expect(reduceConverter(kit, { kind: 'choose', choice: 'hat' }).choice).toBe('hat');
-        expect(reduceConverter(kit, { kind: 'choose', choice: 'triangle' })).toBe(kit);
-        expect(parseConverter({ kind: 'kit', choice: 'bell' })?.choice).toBe('bell');
+    it('passes a level through untouched when nothing is shaped', () => {
+        expect(shaped(ramp, UNSHAPED)).toBe(ramp);
     });
 
-    it('reads only a drum machine, where an envelope reads any sound', () => {
-        const reads = (kind: 'kit' | 'envelope') =>
-            converterInputs(kind)['in']?.sources.map(({ kind: source }) => source);
+    it('maps it into a range, turned upside down if inverted', () => {
+        expect(at({ low: 2, high: 6 }, 0.5)).toBeCloseTo(4);
+        expect(at({ invert: true }, 0.25)).toBeCloseTo(0.75);
+        expect(at({ invert: true, low: -1, high: 1 }, 1 - 1 / CURVE_SAMPLES)).toBeCloseTo(-1, 1);
+    });
 
-        expect(reads('kit')).toEqual(['drums']);
-        expect(reads('envelope')).toEqual(['voice', 'drums']);
+    it('eases in or out, and steps', () => {
+        expect(at({ curve: 0.5 }, 0.5)).toBeCloseTo(0.25);
+        expect(at({ curve: -0.5 }, 0.25)).toBeCloseTo(0.5);
+        expect(at({ steps: 3 }, 0.3)).toBeCloseTo(0.5);
+        expect(at({ steps: 3 }, 0.2)).toBe(0);
+    });
+
+    it('smooths a jump, round the loop too', () => {
+        const step = curveOf(t => (t < 0.5 ? 0 : 1));
+        const smooth = shaped(step, { ...UNSHAPED, smooth: 0.9 });
+
+        expect(driverAt(smooth, 0.51)).toBeGreaterThan(0);
+        expect(driverAt(smooth, 0.51)).toBeLessThan(1);
+        expect(driverAt(smooth, 0.01)).toBeGreaterThan(0);
+    });
+
+    it('turns a shape command into a clamped field, and refuses nonsense', () => {
+        const timing = CONVERTER_DEFAULTS['schedule-level'];
+        const shape = (field: ShapeField, value: number) =>
+            reduceConverter(timing, { kind: 'shape', field, value }).shape;
+
+        expect(shape('curve', 3).curve).toBe(1);
+        expect(shape('steps', 1).steps).toBe(0);
+        expect(shape('steps', 40).steps).toBe(16);
+        expect(reduceConverter(timing, { kind: 'shape', field: 'low', value: Number.NaN })).toBe(
+            timing,
+        );
     });
 });
 

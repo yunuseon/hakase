@@ -1,4 +1,5 @@
 import { sameArea, unionArea } from './shared/area.ts';
+import { converterTitle, isConverterKind } from './converters.ts';
 import { mergeSections, eraseSections, type Section } from './section-areas.ts';
 export type { Section } from './section-areas.ts';
 import {
@@ -683,7 +684,7 @@ const step = (
                 ? {
                       id: `${action.program}-${tag(launched)}`,
                       program: action.program,
-                      name: `${action.program} ${launched}`,
+                      name: `${isConverterKind(action.program) ? converterTitle(action.program) : action.program} ${launched}`,
                       kept: false,
                       copy: null,
                       clock: null,
@@ -1122,6 +1123,11 @@ const RENAMED: Readonly<Record<string, ProgramId>> = {
     todo: 'tickets',
     board: 'tickets',
     const: 'switch',
+    timing: 'schedule-level',
+    envelope: 'sound-level',
+    kit: 'sound-level',
+    phase: 'timer-level',
+    done: 'tasks-level',
 };
 
 const renamed = (program: string): string =>

@@ -19,7 +19,7 @@ import { progressProgram } from '../programs/progress.program.ts';
 import { plotProgram } from '../programs/plot.program.ts';
 import { converterProgram } from '../programs/converter.program.ts';
 
-const timingProgram = converterProgram('timing');
+const timingProgram = converterProgram('schedule-level');
 import { signalProgram } from '../programs/signal.program.ts';
 import { sketchProgram } from '../programs/sketch.program.ts';
 import { tasksProgram } from '../programs/tasks.program.ts';
@@ -165,10 +165,10 @@ const specs: readonly Spec[] = [
     },
     {
         program: timingProgram,
-        title: 'Timing',
+        title: 'Converter',
         elements: ['hks-converter'],
         description:
-            'A converter: an agenda read as a level over the day, with the reading as its choice.',
+            'A converter turns one type into another: here schedule → level, with its readings and the shape every level converter shares.',
         variants: normal,
     },
     {

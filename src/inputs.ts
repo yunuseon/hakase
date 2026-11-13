@@ -8,9 +8,9 @@ import { dayOf, minuteOfDay } from './lib/day.ts';
 import type { ProgramId } from './program.ts';
 import { PEDALS, type PedalKind } from './pedals.ts';
 import { GATES, type GateKind } from './gates.ts';
-import { CONVERTERS, type ConverterKind } from './converters.ts';
+import { CONVERTERS, converterTitle, type ConverterKind } from './converters.ts';
 import { agendaReading, focusReading, ticketsReading } from './readings.ts';
-import type { PortType } from './port-types.ts';
+import { converts, type PortType } from './port-types.ts';
 import type { StoreId } from './stores.ts';
 
 export type PlaybackBinding = { readonly kind: 'playback'; readonly store: StoreId };
@@ -173,16 +173,16 @@ const converterSource = <K extends ConverterKind>(kind: K) =>
         kind,
         makes: CONVERTERS[kind].makes,
         program: kind,
-        title: CONVERTERS[kind].title,
+        title: converterTitle(kind),
         access: 'read',
     }) as const;
 
 export const CONVERTER_SOURCES = [
-    converterSource('timing'),
-    converterSource('envelope'),
-    converterSource('kit'),
-    converterSource('phase'),
-    converterSource('done'),
+    converterSource('schedule-level'),
+    converterSource('sound-level'),
+    converterSource('timer-level'),
+    converterSource('tasks-level'),
+    converterSource('level-level'),
 ] as const;
 
 export const SOURCES = [
@@ -463,11 +463,7 @@ export const converterInputs = (kind: ConverterKind): Readonly<Record<string, St
         from: 'store',
         param: 'in',
         group: null,
-        sources: SOURCES.filter(
-            ({ kind: source, makes }) =>
-                makes === CONVERTERS[kind].takes &&
-                (CONVERTERS[kind].reads?.some(read => read === source) ?? true),
-        ),
+        sources: SOURCES.filter(({ makes }) => converts(makes, CONVERTERS[kind].takes)),
         initial: null,
     },
     time: timeInput,
@@ -580,11 +576,11 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
-        case 'timing':
-        case 'envelope':
-        case 'kit':
-        case 'phase':
-        case 'done':
+        case 'schedule-level':
+        case 'sound-level':
+        case 'timer-level':
+        case 'tasks-level':
+        case 'level-level':
             return kind;
     }
 };
@@ -599,7 +595,6 @@ export const progressBinding = (kind: string, store: StoreId) => {
             return { kind, store };
         case 'tickets':
             return { kind, store };
-        // Saved under programs since folded into others.
         case 'todo':
             return { kind: 'tickets' as const, store };
         case 'const':
@@ -630,11 +625,11 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'lamp':
         case 'pin-in':
         case 'pin-out':
-        case 'timing':
-        case 'envelope':
-        case 'kit':
-        case 'phase':
-        case 'done':
+        case 'schedule-level':
+        case 'sound-level':
+        case 'timer-level':
+        case 'tasks-level':
+        case 'level-level':
             return { kind, store };
         default:
             return null;

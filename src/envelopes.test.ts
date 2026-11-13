@@ -34,13 +34,13 @@ describe('the Envelope migration', () => {
         expect(after.pedals.get('haze')?.sources['radius']).toBe(envelopeOf('drums'));
         expect(after.gates.get('cmp')?.sources['in']).toBe(envelopeOf('harp'));
         expect(after.converters.get(envelopeOf('harp'))).toMatchObject({
-            kind: 'envelope',
+            kind: 'sound-level',
             choice: 'loudness',
             sources: { in: 'harp', time: null },
         });
-        expect(after.stores.filter(({ program }) => program === 'envelope')).toEqual([
-            entry(envelopeOf('harp'), 'envelope', 'Harp level'),
-            { ...entry(envelopeOf('drums'), 'envelope', 'Main level'), kept: true },
+        expect(after.stores.filter(({ program }) => program === 'sound-level')).toEqual([
+            entry(envelopeOf('harp'), 'sound-level', 'Harp level'),
+            { ...entry(envelopeOf('drums'), 'sound-level', 'Main level'), kept: true },
         ]);
     });
 

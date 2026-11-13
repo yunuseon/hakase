@@ -92,3 +92,64 @@ svg {
     font: var(--text-md) var(--font-mono);
     font-variant-numeric: tabular-nums;
 }
+
+.top,
+.bottom {
+    position: absolute;
+    inset-inline-start: var(--space-1-5);
+    font: var(--text-2xs) var(--font-mono);
+    color: var(--muted);
+}
+
+.top {
+    inset-block-start: var(--space-1);
+}
+
+.bottom {
+    inset-block-end: var(--space-1);
+}
+
+.shape {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-1-5) var(--space-2);
+    align-items: center;
+    padding-block-start: var(--space-2);
+    border-block-start: 1px solid var(--rule);
+}
+
+.shape .row {
+    display: contents;
+}
+
+.shape .key {
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+.shape output {
+    min-inline-size: 5ch;
+    font: var(--text-xs) var(--font-mono);
+    text-align: end;
+    color: var(--label);
+}
+
+.bounds {
+    grid-column: 2 / -1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+.bound {
+    inline-size: 7ch;
+    padding-block: var(--space-0-5);
+    font: var(--text-xs) var(--font-mono);
+}
+
+.shape .ui-check {
+    grid-column: 2 / -1;
+    justify-self: start;
+}

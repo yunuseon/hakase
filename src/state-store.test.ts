@@ -144,7 +144,7 @@ describe('sketch link migration', () => {
         expect(restored?.converters.get('envelope-of-voice')?.sources.in).toBe('voice');
         expect(
             restored?.workspace?.stores.find(({ id }) => id === 'envelope-of-voice')?.program,
-        ).toBe('envelope');
+        ).toBe('sound-level');
         expect(restored?.workspace?.processes[0]?.follows).toEqual({
             playback: { kind: 'playback', store: 'timeline' },
         });

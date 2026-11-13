@@ -163,8 +163,10 @@ export const programDemo = (
         ),
         gate$: of(GATE_DEFAULTS.switch),
         bits$: of(new Uint8Array(16)),
-        converter$: of(CONVERTER_DEFAULTS.timing),
-        converted$: of(timingCurve(demoAgenda, DEMO_DAY, CONVERTER_DEFAULTS.timing.choice)),
+        conversion$: of({
+            converter: CONVERTER_DEFAULTS['schedule-level'],
+            driver: timingCurve(demoAgenda, DEMO_DAY, CONVERTER_DEFAULTS['schedule-level'].choice),
+        }),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),
         followedSignal$: input =>

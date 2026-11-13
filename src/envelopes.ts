@@ -54,7 +54,7 @@ export const enveloped = (wired: Wired): Wired => {
             ...wired.stores,
             ...made.map((sound): StoreEntry => ({
                 id: envelopeOf(sound),
-                program: 'envelope',
+                program: 'sound-level',
                 name: `${wired.stores.find(({ id }) => id === sound)?.name ?? MAIN} level`,
                 kept: true,
                 copy: null,
@@ -76,7 +76,7 @@ export const enveloped = (wired: Wired): Wired => {
             ...wired.converters,
             ...made.map((sound): [StoreId, Converter] => [
                 envelopeOf(sound),
-                { ...CONVERTER_DEFAULTS.envelope, sources: { in: sound, time: null } },
+                { ...CONVERTER_DEFAULTS['sound-level'], sources: { in: sound, time: null } },
             ]),
         ]),
     };

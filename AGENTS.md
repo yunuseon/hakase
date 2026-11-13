@@ -2007,62 +2007,79 @@ chooses is a **converter**: a program on the canvas whose choice is its setting,
 so two followers that want two readings of one source use two converters, and
 links stay bare store ids.
 
-**A converter is a row of a table.** `CONVERTERS` in `src/converters.ts` gives
-each kind its title, summary, icon, the type it takes and makes, its choices and
-its size; `converterProgram(kind)` makes the program, under the launcher's
-**Convert** category; `converterInputs(kind)` gives it `in` (any source that
-makes the type it takes) and **read on** (`time`), so a converter read on a day
-clock is one value like a signal. Every converter's document lives in one
-`Documents.converters` map (`Converter`: kind, choice, `sources`), a private
-`stage` store like a pedal's, so saving, forking, pruning, undo, blueprints and
-`linkedOf` handle them all once. `CONVERTER_DEFAULTS` is one object per kind,
-for the pedal defaults' reason. A converter's output is a source of the type it
-makes (`CONVERTER_SOURCES`), and `convertedIn` in `app-state.graph.ts` has one
-case per kind: what it reads through `in` and how its choice makes a `Driver`.
-`hks-converter` shows the summary, the curve over the window's loop, the moment
-and its value, and the choices; it takes a plain `ConverterView` from
-`converterView`, rendered in one pass so nothing combines two paths.
+**A converter is a type pair.** `CONVERTERS` in `src/converters.ts` is keyed by
+pair (`schedule-level`, `sound-level`, `timer-level`, `tasks-level`,
+`level-level`), and each row gives its summary, icon, the type it takes and
+makes, its **readings** (the ways to do that conversion, `choices`) and its
+size; the title is the pair itself (`converterTitle`, `schedule → level`).
+`converterProgram(kind)` makes the program, under the launcher's **Convert**
+category; `converterInputs(kind)` gives it `in` (every source whose type is or
+implicitly converts to the one it takes) and **read on** (`time`), so a
+converter read on a day clock is one value like a signal. It is not one program
+whose output type is a setting: a jack's type is known from its kind, which
+state mode's compatible drops and `port-types.test.ts` rely on. Every
+converter's document lives in one `Documents.converters` map (`Converter`:
+kind, reading, shape, `sources`), a private `stage` store like a pedal's, so
+saving, forking, pruning, undo, blueprints and `linkedOf` handle them all once.
+`CONVERTER_DEFAULTS` is one object per kind, for the pedal defaults' reason.
 
-**Timing** is the first: an agenda read over today as _in a block_ (1 while
-one runs), _through a block_ (0 to 1 across each) or _before a block_ (0 to 1
-over the hour before the next starts, 0 inside one), all from `timingCurve`. An
-agenda is not a drive source by itself: a knob that wants your schedule follows
-a Timing that follows the agenda.
+**Readings and shape are two stages.** `readingIn` in `app-state.graph.ts` has
+one case per pair, what it reads through `in` and how its reading makes a
+`Driver`; `conversionIn` then applies the document's **shape** with one pure
+`shaped(driver, shape)`, so every converter that makes a level has the same
+modifiers: range (low to high), invert, curve (`2 ** (curve * 2)` as a power,
+ease out below 0 and in above), steps (quantised, off below 2) and smooth (a
+one-pole slew run round the loop twice, so its start has settled from its end).
+An unshaped document passes the driver through untouched, so nothing recooks.
+**`conversion$` carries the document and its driver together**: the window
+combined `converter$` with a `converted$` derived from the same document at
+first, which fired every edit twice, once with a stale driver.
 
-**Envelope** reads sound: a voice's or drum machine's _loudness_ (`voiceCurve`,
-`kitCurve`) or a voice's _pitch_ (`pitchCurve`; a drum machine has none and
-reads 0). Both sample at the **reader's** loop length, so `convertedIn` takes
-the follower's pace, as the hidden conversion did. It retired sound from every
-level input. **Saved links migrate on load**: `enveloped` (`src/envelopes.ts`)
-finds every sketch link, pedal source and compare input that read a voice or
-drums, adds one Envelope store per sound (`envelope-of-<id>`, named after it,
-reading its loudness, kept, with no window), and relinks through it; restore and
-saved blueprints both run it, and `formerStoreFollows` lets an old window follow
-of a sound through so the migration can catch it.
+`hks-converter` shows the summary, the curve fitted to its own bounds (0 and 1
+always in view, labelled top and bottom, a base line at 0), the moment and its
+value, the readings and, for a level, the shape controls; it takes a plain
+`ConverterView` from `converterView`, rendered in one pass. Ranges apply as
+they move; the range's number fields and the invert box on `change`, so "1" is
+not applied on the way to "12"; the fields keep their draft while focused
+(`displayValue`).
 
-**Kit** reads one drum of a drum machine, its choice one of `DRUMS`: up at each
-of that drum's hits at the hit's own velocity, falling away by its own decay
-(`drumCurve`). Unlike the Envelope's mix it is unweighted, so a hat reaches as
-high as a kick. `kitLevelAt` and `drumCurve` share `drumLevelAt`, so the mix and
-a single drum cannot decay differently. A voice makes sound too but has no
-drums, so a converter's `reads` can narrow its `in` below its type: Kit reads
-only drum machines, and `null` (Timing, Envelope) reads everything of the type.
+**The pairs.**
 
-**Phase** reads a focus timer, which runs on wall time rather than a playhead,
-so it is a level **as it stands now**: one value over the follower's whole loop,
-a one-sample curve, the shape a "read on" link gives. _through_ is how far
-through the phase (or the agenda block the timer follows) it is, _left_ the
-rest, _focusing_ 1 in a focus phase or block and 0 on a break; all three come
-from `phaseLevel` over the timer's own `focusView`, so the window and the
-converter cannot disagree about where the timer is. It moves on each timer tick
-and is deduplicated by value, so a paused timer redraws nothing.
+- **schedule → level** reads an agenda over today: _in a block_ (1 while one
+  runs), _through a block_ (0 to 1 across each) or _before a block_ (0 to 1 over
+  the hour before the next starts, 0 inside one), all from `timingCurve`. An
+  agenda is not a drive source by itself.
+- **sound → level** reads a voice's _loudness_ (`voiceCurve`) or _pitch_
+  (`pitchCurve`, octaves above the root), or a drum machine's _loudness_ (the
+  weighted mix, `kitCurve`) or _one drum_ (`drumCurve`, unweighted, so a hat
+  reaches as high as a kick; a voice reads nothing there, a drum machine's pitch
+  reads 0). Loudness samples at the **reader's** loop length, so `conversionIn`
+  takes the follower's pace. `kitLevelAt` and `drumCurve` share `drumLevelAt`,
+  so the mix and one drum cannot decay differently.
+- **timer → level** reads a focus timer, which runs on wall time, as it stands
+  now: one value over the follower's loop, a one-sample curve. _through_ the
+  phase (or the agenda block it follows), _left_, or _focusing_ (1 in focus, 0
+  on a break), all from `phaseLevel` over the timer's own `focusView`;
+  deduplicated by value, so a paused timer redraws nothing.
+- **tasks → level** reads a ticket list as it stands now: the share _done_,
+  _active_ (in progress) or _left_, counted by stage, never by a status's name
+  (`doneLevel`); an empty list reads 0.
+- **level → level** (Shape) has the single reading _shape_: any level, a gate's
+  bit included, through the modifiers alone.
 
-**Done** reads a ticket list the same way, as it stands now: the share of its
-tickets whose status is at the _done_ stage, the _active_ one (in progress), or
-not done yet (_left_), counted by stage and never by a status's name, as
-progress counts them (`doneLevel`). An empty list reads 0 in every choice,
-rather than dividing by nothing. What typed ports make possible next is in
-`backlog.md`.
+**Sound was retired from every level input**, and saved links migrate on load:
+`enveloped` (`src/envelopes.ts`) finds every sketch link, pedal source and
+compare input that read a voice or drums, adds one `sound-level` store per sound
+(`envelope-of-<id>`, named after it, reading its loudness, kept, with no
+window), and relinks through it; restore and saved blueprints both run it, and
+`formerStoreFollows` lets an old window follow of a sound through so the
+migration can catch it.
+
+**The first five converters were named per source** (Timing, Envelope, Kit,
+Phase, Done). `RENAMED` brings their windows and stores back as the pairs and
+`parseConverter` their documents (`formerConverter`); every reading id carried
+over, so a saved choice survives. Phases B and C, converters that make bits and
+more sources, are in `backlog.md`.
 
 ## Blueprints
 

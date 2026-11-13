@@ -53,6 +53,37 @@ there, so a new hidden coercion cannot slip in.
 | sound → level      | Envelope           | only through a converter (done)               |
 | schedule → level   | Timing             | only through a converter (done)               |
 
+### Converters are type pairs
+
+The first five converters were named and built per source program (Timing,
+Envelope, Kit, Phase, Done), which hid that each is one type turned into
+another, and gave each its own little window with nothing shared. A converter
+is a **pair**, `from → to`, generated from a table like pedals and gates: the
+pair offers **readings** (the ways to do that conversion) and the output type
+brings **modifiers** every converter making that type shares. Not one program
+whose output type is a setting: a jack's type is known from its kind, which is
+what state mode's compatible drops and the port test rely on.
+
+Pairs, readings, the level modifiers and Shape are in (see "Typed ports and
+converters" in `AGENTS.md`).
+
+**Phase B: bits.** Converters that make a bit, and gates that read them:
+`level → bit` (threshold with hysteresis, beside the compare gate),
+`schedule → bit` (in a block, within N minutes of the next), `timer → bit`
+(focusing, running), `tasks → bit` (all done, any in progress), `sound → bit`
+(note on, a hit). The circuit table reads a converter's bit as a driver per
+tick, as compare reads its level. **Bit modifiers**: invert, hold (on for at
+least N ticks).
+
+**Phase C: more sources.** `clock → level` (the loop as a ramp, the tick as
+steps), `clock → bit` (a pulse every N ticks), `zones → level` (time of day in a
+city, daylight) and `→ bit` (day there, office hours), `habits → level` (share
+done today, streak) and `→ bit` (done today). `picture → level` (brightness, a
+colour channel) needs a read-back from the engine and comes last.
+
+Not planned: `level → clock` (a moving tempo breaks exact replay) and anything
+into picture or sound, which sketches, pedals and voices already make.
+
 ### What typed ports make possible
 
 - **Wave inputs take any level.** A signal's phase, offset and depth, a pen's
