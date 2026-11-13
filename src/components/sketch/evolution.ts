@@ -48,9 +48,3 @@ export const evolutionTo = (done: Evolved | null, target: number): Evolution => 
 
 export const momentOf = (step: number, seconds: number, steps: number): number =>
     step / Math.max(seconds * steps, 1);
-
-export const evolutionsFor = (targets: readonly number[]): readonly Evolution[] =>
-    targets.reduce<readonly Evolution[]>(
-        (planned, target) => [...planned, evolutionTo(planned.at(-1)?.end ?? null, target)],
-        [],
-    );

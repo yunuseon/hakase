@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inputsFor } from './inputs.fixture.ts';
-import { madeBy } from './inputs.ts';
+import { madeBy, progressBinding, sourceProgram, SOURCES } from './inputs.ts';
 import { HOLDING } from './stores.ts';
 import { PROGRAM_IDS } from './program.ts';
 import { CONVERSIONS, converts } from './port-types.ts';
@@ -32,5 +32,16 @@ describe('outputs', () => {
         expect(
             PROGRAM_IDS.filter(program => HOLDING[program] !== null && madeBy(program) === null),
         ).toEqual([]);
+    });
+});
+
+describe('sources', () => {
+    it('are each known to the binding parser and mapped back to their own program', () => {
+        const lost = SOURCES.filter(
+            ({ kind, program }) =>
+                progressBinding(kind, 'store')?.kind !== kind || sourceProgram(kind) !== program,
+        ).map(({ kind }) => kind);
+
+        expect(lost).toEqual([]);
     });
 });

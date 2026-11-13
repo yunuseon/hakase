@@ -5,10 +5,8 @@ import {
     DRIVES,
     dotsAt,
     focusAt,
-    hasTrails,
     orbitAt,
     trailsAt,
-    withoutTrails,
     type Signals,
 } from './params.ts';
 
@@ -75,12 +73,5 @@ describe('scene drives', () => {
         expect(orbitAt({ signals }, orbit, 0).distance).toBe(30);
         expect(trailsAt({ trails: 0, signals }, 0)).toBeLessThan(1);
         expect(dotsAt({ draw: { mode: 'lines' }, signals }, 0)).toBeNull();
-    });
-
-    it('lets a still drop a driven trail as well as the slider’s', () => {
-        const driven = { trails: 0, signals: { ...none, trails: sine } };
-
-        expect(hasTrails(driven)).toBe(true);
-        expect(hasTrails(withoutTrails(driven))).toBe(false);
     });
 });

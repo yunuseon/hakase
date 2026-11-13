@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evolutionsFor, evolutionTo, momentOf, stepAt } from './evolution.ts';
+import { evolutionTo, momentOf, stepAt } from './evolution.ts';
 
 describe('stepAt', () => {
     it('counts whole steps since the start of the loop', () => {
@@ -50,14 +50,5 @@ describe('evolutionTo', () => {
             to: 7,
             end: { step: 7, front: 0 },
         });
-    });
-});
-
-describe('evolutionsFor', () => {
-    it('chains a run, replaying where the targets go back', () => {
-        const run = evolutionsFor([0, 2, 5, 1]);
-
-        expect(run.map(({ reset }) => reset)).toEqual([true, false, false, true]);
-        expect(run[2]?.start).toBe(run[1]?.end.front);
     });
 });

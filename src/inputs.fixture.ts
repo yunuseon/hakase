@@ -29,30 +29,32 @@ export const inputsFor: InputsFor = program =>
         ? { playback: playbackInput, ...knobInputs, ...sceneInputs, paint: paintInput }
         : program === 'pen'
           ? { playback: playbackInput, ...penInputs }
-          : program === 'voice'
-            ? { playback: playbackInput, ...voiceInputs }
-            : program === 'drums'
-              ? { playback: playbackInput, ...drumsInputs }
-              : isGateKind(program)
-                ? { playback: loosePlaybackInput, ...gateInputs(program) }
-                : isConverterKind(program)
-                  ? { playback: playbackInput, ...converterInputs(program) }
-                  : program === 'box'
-                    ? { playback: loosePlaybackInput }
-                    : isPedalKind(program)
-                      ? { playback: playbackInput, ...pedalInputs(program) }
-                      : program === 'output'
-                        ? { playback: playbackInput, in: imageInput('in') }
-                        : program === 'plot'
-                          ? { playback: playbackInput, ...plotInputs }
-                          : program === 'signal'
-                            ? { playback: playbackInput, ...signalInputs }
-                            : program === 'timeline'
-                              ? { playback: ownPlaybackInput }
-                              : program === 'playhead'
-                                ? { progress: progressInput }
-                                : program === 'progress'
-                                  ? { source: sourceInput }
-                                  : program === 'focus'
-                                    ? { ...focusInputs }
-                                    : {};
+          : program === 'paint'
+            ? { playback: playbackInput }
+            : program === 'voice'
+              ? { playback: playbackInput, ...voiceInputs }
+              : program === 'drums'
+                ? { playback: playbackInput, ...drumsInputs }
+                : isGateKind(program)
+                  ? { playback: loosePlaybackInput, ...gateInputs(program) }
+                  : isConverterKind(program)
+                    ? { playback: playbackInput, ...converterInputs(program) }
+                    : program === 'box'
+                      ? { playback: loosePlaybackInput }
+                      : isPedalKind(program)
+                        ? { playback: playbackInput, ...pedalInputs(program) }
+                        : program === 'output'
+                          ? { playback: playbackInput, in: imageInput('in') }
+                          : program === 'plot'
+                            ? { playback: playbackInput, ...plotInputs }
+                            : program === 'signal'
+                              ? { playback: playbackInput, ...signalInputs }
+                              : program === 'timeline'
+                                ? { playback: ownPlaybackInput }
+                                : program === 'playhead'
+                                  ? { progress: progressInput }
+                                  : program === 'progress'
+                                    ? { source: sourceInput }
+                                    : program === 'focus'
+                                      ? { ...focusInputs }
+                                      : {};

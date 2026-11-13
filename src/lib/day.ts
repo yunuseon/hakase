@@ -47,6 +47,3 @@ export const dayLabel = (day: Day, locale?: string): string =>
 
 export const shortDayLabel = (day: Day, locale?: string): string =>
     new Intl.DateTimeFormat(locale, { weekday: 'narrow' }).format(dateOf(day));
-
-export const daysBetween = (from: Day, to: Day): number =>
-    Math.round((dateOf(to).getTime() - dateOf(from).getTime()) / 86_400_000);

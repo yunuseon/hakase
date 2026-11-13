@@ -17,9 +17,11 @@ jobs:
                   cache: npm
             - run: npm ci
             - run: npm run format:check
+            - run: npm run typecheck
             - run: npm run lint
+            - run: npm test
 
-    # The typecheck runs inside the image build (npm run build).
+    # The image build type-checks again (npm run build); the check job already has, for pull requests too.
     image:
         needs: check
         if: github.event_name != 'pull_request'

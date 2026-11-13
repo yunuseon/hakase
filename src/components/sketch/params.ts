@@ -114,16 +114,6 @@ export const dotsAt = ({ draw, signals }: Pick<PanelParams, 'draw' | 'signals'>,
 export const trailsAt = ({ trails, signals }: Pick<PanelParams, 'trails' | 'signals'>, t: number) =>
     clamp(drivenOr(signals.trails, trails, t), 0, MAX_TRAILS);
 
-export const hasTrails = ({ trails, signals }: Pick<PanelParams, 'trails' | 'signals'>) =>
-    trails > 0 || signals.trails !== null;
-
-// A still has no previous frame to fade: a driven trail must be let go as well as the slider's.
-export const withoutTrails = <P extends Pick<PanelParams, 'trails' | 'signals'>>(params: P) => ({
-    ...params,
-    trails: 0,
-    signals: { ...params.signals, trails: null },
-});
-
 export const knobValue = (
     { knobs, motion, signals }: Pick<PanelParams, 'knobs' | 'motion' | 'signals'>,
     knob: Knob,

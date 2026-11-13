@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayFractionOf, dayOf, daysBetween, isDay, minuteOfDay, shiftDay } from './day.ts';
+import { dayFractionOf, dayOf, isDay, minuteOfDay, shiftDay } from './day.ts';
 
 describe('days', () => {
     it('formats local days and steps across months and years', () => {
@@ -23,7 +23,6 @@ describe('days', () => {
     });
 
     it('counts days and minutes', () => {
-        expect(daysBetween('2026-01-30', '2026-02-02')).toBe(3);
         expect(minuteOfDay(new Date(2026, 0, 1, 9, 30).getTime())).toBe(570);
         expect(dayFractionOf(new Date(2026, 0, 1, 18, 0).getTime())).toBe(0.75);
     });

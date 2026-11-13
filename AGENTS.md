@@ -50,8 +50,8 @@ every mode and none of them knows which one it is in. `DRAW_MODES`' order is the
 `gl_PointSize` and nothing else, so they belong to `dots` alone. `DrawStyle` is a
 union discriminated by `mode`, and only `DotStyle` carries `baseSize` and
 `depthScalar`, so reading them in lines mode is a type error rather than a dead
-slider. The panel follows the type: `draw$` `switchMap`s over the mode, reading a
-mode's own inputs only while it is selected, and `connect$` hides every row whose
+slider. The panel follows the type: `panelParams` builds only the selected mode's
+own `DrawStyle` from the flat `Panel`, and `connect$` hides every row whose
 `data-only` names another mode. The inputs keep their values while hidden, so
 switching back to dots restores the size you left. A new mode-specific knob is a
 field on its member of the union plus a `data-only` row, never an optional field
@@ -86,7 +86,7 @@ orbit is saved with the window like every other setting.
 `orbited()` in `sketch.vert` applies it around the camera's target using the
 camera's **own** `up` as the pole, not world y, so a scripted camera with z up
 (terrain's) orbits the right way, and the default camera with no drag is
-reproduced exactly. `lookAt` falls back to an arbitrary side vector when the
+reproduced exactly. `eyeOf` falls back to an arbitrary side vector when the
 camera looks straight along `up`, rather than producing NaN.
 
 The **axes** switch draws x red, y green, z blue, ticks every 0.5 and the -1..1
@@ -185,9 +185,10 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     rather than the text: the linker drops any uniform nothing reads, so
     `knobsUsed` keeps the knobs whose location is not null. A regex over the source
     would be fooled by comments, by a `k1` that only feeds dead code, and by a
-    local that shadows the uniform. It follows `shader$`, the last program that
-    linked, so a broken edit leaves the rows as they were, and typing `k3` into a
-    formula brings its slider up as soon as the edit compiles. A hidden row keeps
+    local that shadows the uniform. It follows `checked$`, the engine's cached check
+    of the formula, which keeps the last knobs that linked, so a broken edit leaves
+    the rows as they were, and typing `k3` into a formula brings its slider up as
+    soon as the edit compiles. A hidden row keeps
     its value.
 
     **A knob can move by itself.** Each one has a motion, `CYCLES` = still, 1, 2,
@@ -769,7 +770,7 @@ in the way each layout allows:
   already includes it. The node CSS therefore stays px: it is in map units.
 - **The state-mode sockets take it as a `unit`.** They sit in world space beside
   frames that do not scale, so the board trick is not available: `wiringOf`
-  multiplies every offset (`SOCKET_HEIGHT`, `SOCKET_WIDTH`, `INDENT`, the title
+  multiplies every offset (`rowHeight`, `SOCKET_WIDTH`, `INDENT`, the title
   clearance, the menu clamps) by the unit, `anchorOf` and the group rail do the
   same for the jack centres, the view carries `unit` so `sameWiring` sees it
   change, and `state-wiring.css` is on the tokens, so the jacks the CSS draws
@@ -885,10 +886,10 @@ textarea holds and is written only when it differs: that is what keeps the caret
 still, without the formula editor's `from` fold. Delete asks first: one click
 arms it for three seconds, a second deletes, both read from one shared `scan`.
 
-**The focus timer is one clock for the whole app**, like the playhead:
-`createFocus$` folds `toggle`, `reset`, `skip` and `length` commands with
-`reduceFocus`, and every focus window reads it back, so two windows show one
-timer and closing them does not stop it (`refCount: false`). It reads itself
+**A focus timer is a store, like a playback clock**: `createTimers$` folds
+`toggle`, `reset`, `skip` and `length` commands per store with `reduceFocus`, and
+every focus window on that store reads it back, so two windows show one timer
+and closing them does not stop it (`refCount: false`). It reads itself
 through a `defer` to gate its ticks, as the transport does, and for the same
 reason: a phase that runs out pauses on the next one. The ticks are an
 `interval` of wall-clock deltas, **not `animationFrames()`**, which stop in a
@@ -1023,7 +1024,7 @@ Cmd/Ctrl+V enters placement, both left to
 native controls while editing. Copying nothing leaves the previous copy intact.
 The clipboard is local to the running app and is not a saved blueprint.
 
-Copy and Save as blueprint share `blueprintOf(documents, clocks, selectedIds)`.
+Copy and Save as blueprint share `blueprintOf(documents, playback, selected)`.
 Capture uses the selected programs' measured bounds and carries their states,
 follow chains, settings, formulas and connections between selected programs.
 Paste logs the captured snapshot itself, so replay never depends on a changed
@@ -1228,8 +1229,8 @@ and `hakase.appearance`, so an upgrade keeps windows and look.
 What is **not** saved is anything derived or momentary: diagnostics (recompiled),
 measured sizes (re-measured), snap drift, the pointer, and whether playback is
 running — a reload never starts moving on its own. The playhead is saved where it
-last **rested**: `rested$` keeps the position from the last moment playback was
-stopped, so a running clock does not keep the debounce from ever settling.
+last **rested**: `restedClocks` keeps the position from the last moment playback
+was stopped, so a running clock does not keep the debounce from ever settling.
 Settings of closed windows are dropped when written; ids are never reused, so
 nothing could read them.
 
@@ -1345,12 +1346,15 @@ are the same one with a different default binding at launch.
 
 - **`HOLDING` in `stores.ts` is the one table** that says, per program, what its
   store holds and what a new window binds to. A program with a **document**
-  (tickets, notes, focus, agenda, habits, clocks, bookmarks) binds the
-  document and shares the main store, whose id is the program id; its window
-  settings (which note, which day) stay per window, or two windows on one notes
-  store could never show different notes. A program with only **settings**
-  (sketch, formula and theme editors) binds those, and each new window gets a
-  store of its own. Timeline, playhead, tasks and appearance hold nothing: no
+  (the timeline's clock, signals, paint, pen, voice, drums, tickets, notes,
+  focus, agenda, habits, clocks, bookmarks) binds the document and shares the
+  main store, whose id is the program id; its window settings (which note, which
+  day) stay per window, or two windows on one notes store could never show
+  different notes. A **stage** (every pedal, gate, component and converter) holds
+  a document too, but private, so each new window starts its own. A program with
+  only **settings** (sketch, formula and theme editors) binds those, and each new
+  window gets a store of its own. The dial, progress bar, plot, Output, tasks,
+  appearance, blueprints, history, state map and Storybook hold nothing: no
   store, no chip.
 - **The registry is workspace state**: `Workspace.stores` names each store, ids
   `store-<n>` come from a monotone `made`, and binding, splitting, renaming and
@@ -1454,8 +1458,8 @@ inputs (`knobInputs`, optional, accepting a signal, a gate or a converter), so o
 signal can drive knobs in several sketches, and a fork drives another set apart. A signal never reads the
 clock of the window that shows it: the follower evaluates it at its **own**
 playhead, so a sketch on a second clock plays the same wave on its own time.
-`AppState.followedWave$(input)` hands a program the signal its input is bound
-to, or null, with its whole chain already resolved.
+`AppState.followedSignal$(input)` hands a program the signal its input is bound
+to (its name, colour and wave, the chain already resolved), or null.
 
 **A sketch's scene can follow signals too**, and every input takes the signal's
 value **as it is, in its own unit**: a knob gets the raw value (a hand-set knob
@@ -1482,8 +1486,8 @@ those from the same functions the renderer calls, at the window's playhead, and
 the program follows the playhead for it only while something is driven, so an
 undriven sketch does no work per frame for its readouts. **A still must let go of a driven trail too**: thumbnails and a
 saved frame used to drop trails with `trails: 0`, which a driven trail would
-override, so they go through `withoutTrails`, and an export's warm-up loop asks
-`hasTrails`.
+override, so a still goes through `stillOf`, which lets go of both, and an
+export's warm-up loop asks `hasHistory`.
 
 **A signal's phase, offset and depth can follow another signal** (`Signal.sources`),
 so an LFO can swell another's range. The followed value stands in for the
@@ -2290,7 +2294,7 @@ on the left, windows on the right, with two kinds of wire between them. A window
 into its header (a thick wire: what the window reads and writes), and each
 **follow** runs into the jack of the input it binds (what the window only
 reads). Where they meet the chain shows whole: signal 1 edits Signal Main,
-which drives sketch 1's k1. It holds no state and adds no behaviour: `patchOf`
+which drives sketch 1's k1. It holds no state and adds no behaviour: `graphOf`
 in `src/state-graph.ts` derives the graph from the workspace and `inputsFor`,
 `layoutOf` in the component folder places it, and every edit is an action the
 window chrome already sends (`follow`, `unfollow`, `bind-store`), so the
@@ -2465,7 +2469,9 @@ conditional falls back to the constraint and lets every kind through.
 - **The workspace asks, it does not import.** `reduceWorkspace`,
   `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
   an `inputsFor(program)`; `programs.ts` builds it from the program table, and tests
-  use `src/inputs.fixture.ts`, because the program modules pull in the DOM. The
+  use `src/inputs.fixture.ts`, because the program modules pull in the DOM.
+  `inputs.fixture.render.test.ts` loads the real table under Happy DOM and fails
+  when the fixture disagrees with it, which it once did for paint unnoticed. The
   declarations are plain data, so building the table never evaluates the
   reactive cycle early.
 - **A follow is a tagged binding**, `{ kind, store }`, one per followed input,
@@ -2788,8 +2794,8 @@ variables. Concretely, everywhere in `src/`:
 - **Side effects go in `tap`, at the end of a pipe**, and only ever _apply_ a
   value that a pure function already computed. Deriving a value inside a `tap`
   is the smell.
-- **Pure functions carry the logic.** `offsetFor(geometry, value)`,
-  `valueAt(clientX, ...)`, `parseHexColor(hex)` — data in,
+- **Pure functions carry the logic.** `linearValue(offsetX, width)`,
+  `ringOffset(ring, value)`, `parseHexColor(hex)` — data in,
   data out, independently testable. The stream decides _when_; the function
   decides _what_.
 
@@ -2861,9 +2867,9 @@ workspace looks programs up at runtime.
 **No phantom type parameters.** A `<T>` that appears only in a function's return
 type — or in the parameters of a function it returns — has nothing to be inferred
 from at the call site. TypeScript falls back to `unknown` on a good day and `any`
-on a bad one, and `no-unsafe-call` starts firing. `reportFps$` took `<T>` this way
-and now simply takes `Observable<unknown>`, because counting emissions does not
-care about their type.
+on a bad one, and `no-unsafe-call` starts firing. The fps counter took `<T>` this
+way and its `connect$` now simply takes `Observable<unknown>`, because counting
+emissions does not care about their type.
 
 **Equality is exact.** No generic structural comparison — it is untyped, it walks
 string keys, and it silently keeps comparing after someone adds a field. Prefer
@@ -2878,17 +2884,16 @@ must be compared, write a named comparator next to it that names every field, as
 - **`$` marks everything in the stream domain.** Streams, parameters and
   interface members holding one, functions returning one, and operator functions
   meant for `.pipe()`: `playhead$`, `geometry$`, `scrubs$`, `changes$`,
-  `createPlayhead$`, `observeResize$`, `pointerDrag$`, `bind$`, `Slider.connect$`,
-  `reportFps$`, `toVoid$`, `shareLatest$`.
-- **Nothing outside that domain gets it.** `createLinearSlider`, `createSurface`
-  and `createControls` return plain objects; `clamp`, `wrap01`, `shallowEqual`,
-  `offsetFor` and `parseHexColor` are pure helpers.
+  `createClocks$`, `observeResize$`, `pointerDrag$`, `Slider.connect$`.
+- **Nothing outside that domain gets it.** `createSketch` and `panelParams` return
+  plain values; `clamp`, `wrap01`, `linearValue` and `parseHexColor` are pure
+  helpers.
 - **No thin wrappers over RxJS.** If a helper only renames an operator or fixes
   its arguments — `toVoid$ = map(() => undefined)`, `shareLatest$ = () =>
 shareReplay({...})` — write the operator at the call site instead. It costs a
   line, and it keeps `lib/rx.ts` to things that genuinely add something: adapters
   over non-Rx sources (`fromElementEvent$`, `observeResize$`), streams with real
-  behaviour (`devicePixelRatio$`), and pure predicates (`shallowEqual`).
+  behaviour (`devicePixelRatio$`, `wallClock$`).
 - **No barrel files.** No `index.ts` re-exporting a folder; name a module for
   what it contains (`formulas/registry.ts`). Two ESLint rules enforce it — one
   errors on any `index.*` module, the other on any import ending in `index`. This

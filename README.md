@@ -61,18 +61,26 @@ launch programs, jump between painted sections and undo. ⌘K opens a command
 palette. Windows snap together, attach, and remember everything; the whole app
 is saved as one snapshot and every edit is one undoable log.
 
-- **Make** — sketches, the formula and theme editors, signals (LFOs and step
-  sequencers), a plot, paint and pen pictures, a voice synth and a drum machine.
-  Signals can drive a sketch's knobs and camera, draw with a pen, or play a voice,
-  all as pure functions of the playhead.
+- **Make** — sketches, the formula and theme editors, timelines and the playhead
+  dial, signals (LFOs and step sequencers), a plot, paint and pen pictures, a voice
+  synth and a drum machine, pedals and an Output for chaining pictures, and
+  blueprints. Signals can drive a sketch's knobs and camera, draw with a pen, or
+  play a voice, all as pure functions of the playhead.
+- **Logic** — gates built from NAND, delays, switches, patterns and lamps, boxed
+  into components.
+- **Convert** — converters that turn one port type into another (an agenda into
+  a level, a voice into a bit, a city's day into daylight), each with its
+  readings and the modifiers its output type shares.
 - **Plan** — tickets (list and board), notes, a focus timer, an agenda, habits,
   world clocks, bookmarks and progress bars.
-- **System** — timelines and the playhead dial, the task manager, history, the
-  state map, blueprints, appearance and an in-app Storybook.
+- **System** — the task manager, history, the state map, appearance and an
+  in-app Storybook.
 
 Each window is bound to a named **state**. Two windows on one state share it; a
 window can fork its state, switch to another, or follow another window's output
-— a sketch's knob following a signal, a progress bar following an agenda.
+— a sketch's knob following a signal, a progress bar following an agenda. Every
+port has a type (level, bit, clock, picture and so on) shown on its jack, and a
+converter stands between two types that do not match.
 
 ## How it fits together
 

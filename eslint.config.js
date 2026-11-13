@@ -32,6 +32,27 @@ export default tseslint.config(
                 'error',
                 { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
             ],
+            // The rules AGENTS.md states, enforced rather than remembered: `as const` stays allowed.
+            '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+            '@typescript-eslint/no-non-null-assertion': 'error',
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'rxjs',
+                            importNames: [
+                                'Subject',
+                                'BehaviorSubject',
+                                'ReplaySubject',
+                                'AsyncSubject',
+                            ],
+                            message:
+                                'No Subject as an event bus: adapt the source with new Observable or fromEvent, and fold state with scan.',
+                        },
+                    ],
+                },
+            ],
         },
     },
     // The flat config itself is plain JS and lives outside the tsconfig project.
