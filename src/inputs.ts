@@ -177,7 +177,11 @@ const converterSource = <K extends ConverterKind>(kind: K) =>
         access: 'read',
     }) as const;
 
-export const CONVERTER_SOURCES = [converterSource('timing'), converterSource('envelope')] as const;
+export const CONVERTER_SOURCES = [
+    converterSource('timing'),
+    converterSource('envelope'),
+    converterSource('kit'),
+] as const;
 
 export const SOURCES = [
     playbackSource,
@@ -442,7 +446,11 @@ export const converterInputs = (kind: ConverterKind): Readonly<Record<string, St
         from: 'store',
         param: 'in',
         group: null,
-        sources: SOURCES.filter(source => source.makes === CONVERTERS[kind].takes),
+        sources: SOURCES.filter(
+            ({ kind: source, makes }) =>
+                makes === CONVERTERS[kind].takes &&
+                (CONVERTERS[kind].reads?.some(read => read === source) ?? true),
+        ),
         initial: null,
     },
     time: timeInput,
@@ -557,6 +565,7 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'pin-out':
         case 'timing':
         case 'envelope':
+        case 'kit':
             return kind;
     }
 };
@@ -604,6 +613,7 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'pin-out':
         case 'timing':
         case 'envelope':
+        case 'kit':
             return { kind, store };
         default:
             return null;

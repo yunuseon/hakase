@@ -285,28 +285,39 @@ const WEIGHTS: Readonly<Record<Drum, number>> = {
 const lastOf = (hits: readonly Hit[], at: number) =>
     hits.filter(({ from }) => from <= at).at(-1) ?? hits.at(-1);
 
-export const kitLevelAt = (kit: Kit, hits: readonly Hit[], t: number, seconds: number) => {
+const drumLevelAt = (hits: readonly Hit[], drum: Drum, t: number, seconds: number) => {
     const at = ((t % 1) + 1) % 1;
-    const struck = DRUMS.reduce((sum, drum) => {
-        const own = hits.filter(hit => hit.drum === drum);
-        const hit = lastOf(own, at);
+    const hit = lastOf(
+        hits.filter(own => own.drum === drum),
+        at,
+    );
 
-        if (hit === undefined) {
-            return sum;
-        }
+    if (hit === undefined) {
+        return 0;
+    }
 
-        const since = (at - hit.from + (hit.from > at ? 1 : 0)) * seconds;
+    const since = (at - hit.from + (hit.from > at ? 1 : 0)) * seconds;
 
-        return sum + WEIGHTS[drum] * hit.velocity * Math.exp((-3 * since) / DECAYS[drum]);
-    }, 0);
-
-    return swellOf(kit, t) * Math.min(1, struck);
+    return hit.velocity * Math.exp((-3 * since) / DECAYS[drum]);
 };
+
+export const kitLevelAt = (kit: Kit, hits: readonly Hit[], t: number, seconds: number) =>
+    swellOf(kit, t) *
+    Math.min(
+        1,
+        DRUMS.reduce((sum, drum) => sum + WEIGHTS[drum] * drumLevelAt(hits, drum, t, seconds), 0),
+    );
 
 export const kitCurve = (kit: Kit, seconds: number) => {
     const hits = hitsOf(kit.drums);
 
     return curveOf(t => kitLevelAt(kit, hits, t, seconds));
+};
+
+export const drumCurve = (kit: Kit, drum: Drum, seconds: number) => {
+    const hits = hitsOf(kit.drums);
+
+    return curveOf(t => swellOf(kit, t) * drumLevelAt(hits, drum, t, seconds));
 };
 
 const field = (value: object, key: string): unknown =>

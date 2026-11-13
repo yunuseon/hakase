@@ -12,7 +12,14 @@ import {
 import { emptyAgenda } from '../components/agenda/agenda.ts';
 import { defaultBookmarks } from '../components/bookmarks/bookmarks.ts';
 import { defaultClocks } from '../components/clocks/clocks.ts';
-import { defaultDrums, kitCurve, kitOf, sameKit } from '../components/drums/drums.ts';
+import {
+    defaultDrums,
+    drumCurve,
+    isDrum,
+    kitCurve,
+    kitOf,
+    sameKit,
+} from '../components/drums/drums.ts';
 import { initialFocus } from '../components/focus/focus.ts';
 import { emptyHabits } from '../components/habits/habits.ts';
 import { emptyNotes } from '../components/note/note.ts';
@@ -452,6 +459,21 @@ export const scopedOf = ({
         converterIn(store).pipe(
             switchMap(converter => {
                 switch (converter.kind) {
+                    case 'kit': {
+                        const drum = converter.choice;
+
+                        return linkIn(store, 'in').pipe(
+                            switchMap(binding =>
+                                binding?.kind === 'drums' && isDrum(drum)
+                                    ? combineLatest([kitIn(binding.store), pace$]).pipe(
+                                          map(([kit, { seconds }]) =>
+                                              drumCurve(kit, drum, seconds),
+                                          ),
+                                      )
+                                    : of(null),
+                            ),
+                        );
+                    }
                     case 'envelope':
                         return linkIn(store, 'in').pipe(
                             switchMap(binding =>

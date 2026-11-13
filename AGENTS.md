@@ -2027,8 +2027,16 @@ finds every sketch link, pedal source and compare input that read a voice or
 drums, adds one Envelope store per sound (`envelope-of-<id>`, named after it,
 reading its loudness, kept, with no window), and relinks through it; restore and
 saved blueprints both run it, and `formerStoreFollows` lets an old window follow
-of a sound through so the migration can catch it. The remaining converters, and
-what typed ports make possible next, are in `backlog.md`.
+of a sound through so the migration can catch it.
+
+**Kit** reads one drum of a drum machine, its choice one of `DRUMS`: up at each
+of that drum's hits at the hit's own velocity, falling away by its own decay
+(`drumCurve`). Unlike the Envelope's mix it is unweighted, so a hat reaches as
+high as a kick. `kitLevelAt` and `drumCurve` share `drumLevelAt`, so the mix and
+a single drum cannot decay differently. A voice makes sound too but has no
+drums, so a converter's `reads` can narrow its `in` below its type: Kit reads
+only drum machines, and `null` (Timing, Envelope) reads everything of the type. The remaining converters, and what
+typed ports make possible next, are in `backlog.md`.
 
 ## Blueprints
 

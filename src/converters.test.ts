@@ -6,6 +6,7 @@ import {
     type AgendaCommand,
 } from './components/agenda/agenda.ts';
 import { CONVERTER_DEFAULTS, parseConverter, reduceConverter, timingCurve } from './converters.ts';
+import { converterInputs } from './inputs.ts';
 import { driverAt } from './shared/curve.ts';
 
 const DAY = '2026-11-13';
@@ -60,5 +61,24 @@ describe('a converter document', () => {
         expect(parseConverter(JSON.parse(JSON.stringify(linked)))).toEqual(linked);
         expect(parseConverter({ kind: 'timing', choice: 'nope' })?.choice).toBe(timing.choice);
         expect(parseConverter({ kind: 'nand' })).toBeNull();
+    });
+});
+
+describe('a kit converter', () => {
+    it('starts on the kick and chooses only a drum it has', () => {
+        const kit = CONVERTER_DEFAULTS.kit;
+
+        expect(kit.choice).toBe('kick');
+        expect(reduceConverter(kit, { kind: 'choose', choice: 'hat' }).choice).toBe('hat');
+        expect(reduceConverter(kit, { kind: 'choose', choice: 'triangle' })).toBe(kit);
+        expect(parseConverter({ kind: 'kit', choice: 'bell' })?.choice).toBe('bell');
+    });
+
+    it('reads only a drum machine, where an envelope reads any sound', () => {
+        const reads = (kind: 'kit' | 'envelope') =>
+            converterInputs(kind)['in']?.sources.map(({ kind: source }) => source);
+
+        expect(reads('kit')).toEqual(['drums']);
+        expect(reads('envelope')).toEqual(['voice', 'drums']);
     });
 });

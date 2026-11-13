@@ -1,8 +1,9 @@
 import { currentBlock, DAY_MINUTES, nextBlock, type Agenda } from './components/agenda/agenda.ts';
+import { DRUM_LABELS, DRUMS } from './components/drums/drums.ts';
 import type { PortType } from './port-types.ts';
 import { curveOf, type Curve } from './shared/curve.ts';
 
-export const CONVERTER_KINDS = ['timing', 'envelope'] as const;
+export const CONVERTER_KINDS = ['timing', 'envelope', 'kit'] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
 export const isConverterKind = (value: string): value is ConverterKind =>
@@ -15,6 +16,7 @@ export type ConverterSpec = {
     readonly summary: string;
     readonly icon: string;
     readonly takes: PortType;
+    readonly reads: readonly string[] | null;
     readonly makes: PortType;
     readonly choices: readonly ConverterChoice[];
     readonly size: { readonly width: number; readonly height: number };
@@ -27,6 +29,7 @@ export const CONVERTERS = {
             'Your agenda as a level over today: 1 in a block, rising through one, or rising as the next one nears.',
         icon: 'M4 6 H20 V18 H4 Z M8 6 V18 M4 12 H8 M12 15 L15 10 L18 15',
         takes: 'schedule',
+        reads: null,
         makes: 'level',
         choices: [
             { id: 'in', title: 'in a block' },
@@ -41,12 +44,24 @@ export const CONVERTERS = {
             'A voice or drum machine as a level: how loud it is as it plays, or the note a voice is on, in octaves above its root.',
         icon: 'M3 18 L7 6 L10 13 L13 9 L21 18 M3 18 H21',
         takes: 'sound',
+        reads: null,
         makes: 'level',
         choices: [
             { id: 'loudness', title: 'loudness' },
             { id: 'pitch', title: 'pitch' },
         ],
         size: { width: 280, height: 220 },
+    },
+    kit: {
+        title: 'Kit',
+        summary:
+            "One drum of a drum machine as a level: up at each of its hits, falling away as it decays, at the hit's own velocity.",
+        icon: 'M5 9 A7 3 0 0 0 19 9 A7 3 0 0 0 5 9 Z M5 9 V15 A7 3 0 0 0 19 15 V9 M3 4 L9 8 M21 4 L15 8',
+        takes: 'sound',
+        reads: ['drums'],
+        makes: 'level',
+        choices: DRUMS.map(drum => ({ id: drum, title: DRUM_LABELS[drum] })),
+        size: { width: 300, height: 240 },
     },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
@@ -63,7 +78,7 @@ export type Converter = {
 
 const made = (kind: ConverterKind): Converter => ({
     kind,
-    choice: CONVERTERS[kind].choices[0].id,
+    choice: CONVERTERS[kind].choices[0]?.id ?? '',
     sources: { in: null, time: null },
 });
 
@@ -71,6 +86,7 @@ const made = (kind: ConverterKind): Converter => ({
 export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     timing: made('timing'),
     envelope: made('envelope'),
+    kit: made('kit'),
 };
 
 export type ConverterCommand =

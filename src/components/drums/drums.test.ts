@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { driverAt } from '../../shared/curve.ts';
 import {
     ACCENT,
     beatOf,
     between,
     defaultDrums,
+    drumCurve,
     hitsOf,
     kitLevelAt,
     kitOf,
@@ -98,6 +100,22 @@ describe('a drum machine', () => {
         expect(kitLevelAt(kit, hits, 0, 8)).toBeCloseTo(kick.volume);
         expect(kitLevelAt(kit, hits, 0.02, 8)).toBeLessThan(kitLevelAt(kit, hits, 0.005, 8));
         expect(kitLevelAt(kit, hits, 0.999, 1)).toBeLessThan(0.01);
+    });
+
+    it('offers one drum on its own, at its own velocity, and nothing for a drum it lacks', () => {
+        const pair = run([
+            { kind: 'clear' },
+            { kind: 'tap', drum: 'kick', step: 0 },
+            { kind: 'tap', drum: 'hat', step: 8 },
+        ]);
+        const kit = kitOf(pair, new Map());
+        const hat = drumCurve(kit, 'hat', 8);
+
+        expect(driverAt(hat, 0.5)).toBeCloseTo(pair.volume * NORMAL);
+        expect(driverAt(hat, 0.52)).toBeLessThan(driverAt(hat, 0.505));
+        expect(driverAt(hat, 0.01)).toBe(0);
+        expect(driverAt(drumCurve(kit, 'kick', 8), 0)).toBeCloseTo(pair.volume * NORMAL);
+        expect(driverAt(drumCurve(kit, 'tom', 8), 0.3)).toBe(0);
     });
 
     it('reads a broken save as the default, field by field', () => {
