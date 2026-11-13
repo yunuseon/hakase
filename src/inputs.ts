@@ -177,7 +177,7 @@ const converterSource = <K extends ConverterKind>(kind: K) =>
         access: 'read',
     }) as const;
 
-export const CONVERTER_SOURCES = [converterSource('timing')] as const;
+export const CONVERTER_SOURCES = [converterSource('timing'), converterSource('envelope')] as const;
 
 export const SOURCES = [
     playbackSource,
@@ -275,7 +275,7 @@ const driveInput = (title: string, param: string, group: string) =>
         from: 'store',
         param,
         group,
-        sources: [signalSource, voiceSource, drumsSource, ...GATE_SOURCES, ...CONVERTER_SOURCES],
+        sources: [signalSource, ...GATE_SOURCES, ...CONVERTER_SOURCES],
         initial: null,
     }) satisfies StoreInput;
 
@@ -287,7 +287,7 @@ const levelInput = (param: string) =>
         from: 'store',
         param,
         group: null,
-        sources: [signalSource, voiceSource, drumsSource, ...CONVERTER_SOURCES],
+        sources: [signalSource, ...CONVERTER_SOURCES],
         initial: null,
     }) satisfies StoreInput;
 
@@ -556,6 +556,7 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'pin-in':
         case 'pin-out':
         case 'timing':
+        case 'envelope':
             return kind;
     }
 };
@@ -602,6 +603,7 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'pin-in':
         case 'pin-out':
         case 'timing':
+        case 'envelope':
             return { kind, store };
         default:
             return null;

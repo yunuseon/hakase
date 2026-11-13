@@ -6,6 +6,7 @@ import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
 import { defaultPedal, type Pedal, type PedalKind } from './pedals.ts';
 import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
+import { CONVERTER_DEFAULTS, type Converter } from './converters.ts';
 import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
@@ -51,6 +52,11 @@ const opened = (
     frame: { x, y, z: 0, width, height },
     measured: { width, height },
     settings,
+});
+
+const envelope = (sound: StoreId): Converter => ({
+    ...CONVERTER_DEFAULTS.envelope,
+    sources: { in: sound, time: null },
 });
 
 const own = (id: StoreId, program: ProgramId, name: string): StoreEntry => ({
@@ -276,7 +282,7 @@ export const STARTERS: readonly Starter[] = [
         name: 'Canon in D',
         summary:
             "Pachelbel's Canon on a loop: the ground bass, a harp arpeggio that follows it, two violins a turn apart, drums, and a sketch that plays along. Press play, then Listen on each instrument.",
-        size: { width: 1832, height: 984 },
+        size: { width: 1832, height: 1220 },
         windows: [
             opened('timeline', 'timeline', 'song', { x: 24, y: 48, width: 520, height: 120 }),
             opened('sketch', 'sketch', 'canon', { x: 24, y: 184, width: 520, height: 776 }, SONG, {
@@ -318,6 +324,27 @@ export const STARTERS: readonly Starter[] = [
                 SONG,
             ),
             opened('beat', 'drums', 'beat', { x: 560, y: 660, width: 440, height: 300 }, SONG),
+            opened(
+                'bass-level',
+                'envelope',
+                'bass-level',
+                { x: 24, y: 976, width: 300, height: 220 },
+                SONG,
+            ),
+            opened(
+                'harp-level',
+                'envelope',
+                'harp-level',
+                { x: 340, y: 976, width: 300, height: 220 },
+                SONG,
+            ),
+            opened(
+                'beat-level',
+                'envelope',
+                'beat-level',
+                { x: 656, y: 976, width: 300, height: 220 },
+                SONG,
+            ),
             opened('sway', 'signal', 'sway', { x: 1016, y: 660, width: 220, height: 300 }, SONG),
             opened(
                 'plot',
@@ -347,6 +374,9 @@ export const STARTERS: readonly Starter[] = [
             own('line-2', 'signal', 'Violin II line'),
             own('sway', 'signal', 'Sway'),
             own('beat', 'drums', 'Beat'),
+            own('bass-level', 'envelope', 'Bass level'),
+            own('harp-level', 'envelope', 'Harp level'),
+            own('beat-level', 'envelope', 'Beat level'),
         ],
         held: {
             ...held,
@@ -356,13 +386,18 @@ export const STARTERS: readonly Starter[] = [
                     {
                         sources: {
                             ...unlinkedSketch.sources,
-                            k1: 'bass',
-                            k2: 'harp',
+                            k1: 'bass-level',
+                            k2: 'harp-level',
                             k3: 'line-1',
-                            k4: 'beat',
+                            k4: 'beat-level',
                         },
                     },
                 ],
+            ],
+            converters: [
+                ['bass-level', envelope('bass')],
+                ['harp-level', envelope('harp')],
+                ['beat-level', envelope('beat')],
             ],
             signals: [
                 ['ground', tune(GROUND, 2)],
@@ -566,6 +601,7 @@ export const STARTERS: readonly Starter[] = [
             opened('haze', 'blur', 'haze', { x: 400, y: 768, width: 300, height: 452 }, SHOW),
             opened('pulse', 'drums', 'pulse', { x: 716, y: 768, width: 440, height: 300 }, SHOW),
             opened('strobe', 'pattern', 'strobe', { x: 1172, y: 768, ...GATES.pattern.size }, SHOW),
+            opened('kick', 'envelope', 'kick', { x: 1172, y: 848, width: 280, height: 220 }, SHOW),
         ],
         stores: [
             {
@@ -585,6 +621,7 @@ export const STARTERS: readonly Starter[] = [
             own('grade', 'colourmap', 'Grade'),
             own('pulse', 'drums', 'Pulse'),
             own('strobe', 'pattern', 'Strobe'),
+            own('kick', 'envelope', 'Kick'),
         ],
         held: {
             ...held,
@@ -602,13 +639,14 @@ export const STARTERS: readonly Starter[] = [
                 ['pulse', { ...defaultDrums, volume: 0.6, pattern: PRESETS['four on the floor'] }],
             ],
             gates: [['strobe', gate('pattern', {}, { steps: bits('1111111111110101') })]],
+            converters: [['kick', envelope('pulse')]],
             pedals: [
                 ['fold', pedal('kaleido', { segments: 8 }, { in: 'knot', rotate: 'spin' })],
                 [
                     'echo',
                     pedal('feedback', { decay: 0.9, zoom: 1.025 }, { in: 'fold', rotate: 'drift' }),
                 ],
-                ['haze', pedal('blur', {}, { in: 'swirl', radius: 'pulse' })],
+                ['haze', pedal('blur', {}, { in: 'swirl', radius: 'kick' })],
                 ['blend', pedal('mix', {}, { a: 'echo', b: 'haze', amount: 'swell' }, 'screen')],
                 [
                     'grade',

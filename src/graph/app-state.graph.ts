@@ -19,7 +19,13 @@ import { emptyNotes } from '../components/note/note.ts';
 import { defaultPen, drawingOf, sameDrawing, strokeOf } from '../components/pen/pen.ts';
 import type { Reading } from '../components/progress-bar/progress-bar.ts';
 import { themes, type ThemeName } from '../components/sketch/themes/registry.ts';
-import { defaultVoice, sameSounding, soundingOf, voiceCurve } from '../components/voice/voice.ts';
+import {
+    defaultVoice,
+    pitchCurve,
+    sameSounding,
+    soundingOf,
+    voiceCurve,
+} from '../components/voice/voice.ts';
 import {
     followedBy,
     progressBinding,
@@ -37,7 +43,7 @@ import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
 import type { AppState, ProgramId, Task } from '../program.ts';
 import { inputsFor, programOf } from '../programs.ts';
-import { driverAt, type Driver } from '../shared/curve.ts';
+import { curveOf, driverAt, type Driver } from '../shared/curve.ts';
 import { defaultPicture } from '../shared/picture.ts';
 import { defaultSignal, sameWave, TIME, waveOf } from '../shared/signal.ts';
 import { defaultTickets } from '../shared/tickets.ts';
@@ -442,10 +448,30 @@ export const scopedOf = ({
         shareReplay({ bufferSize: 1, refCount: true }),
     );
 
-    const convertedIn = (store: StoreId): Observable<Driver | null> =>
+    const convertedIn = (store: StoreId, pace$: Observable<Pace>): Observable<Driver | null> =>
         converterIn(store).pipe(
             switchMap(converter => {
                 switch (converter.kind) {
+                    case 'envelope':
+                        return linkIn(store, 'in').pipe(
+                            switchMap(binding =>
+                                binding?.kind === 'voice'
+                                    ? converter.choice === 'pitch'
+                                        ? soundingIn(binding.store).pipe(map(pitchCurve))
+                                        : combineLatest([soundingIn(binding.store), pace$]).pipe(
+                                              map(([sounding, { seconds }]) =>
+                                                  voiceCurve(sounding, seconds),
+                                              ),
+                                          )
+                                    : binding?.kind === 'drums'
+                                      ? converter.choice === 'pitch'
+                                          ? of(curveOf(() => 0))
+                                          : combineLatest([kitIn(binding.store), pace$]).pipe(
+                                                map(([kit, { seconds }]) => kitCurve(kit, seconds)),
+                                            )
+                                      : of(null),
+                            ),
+                        );
                     case 'timing':
                         return linkIn(store, 'in').pipe(
                             switchMap(binding =>
@@ -492,24 +518,16 @@ export const scopedOf = ({
     const driverOf = (binding: Follow, pace$: Observable<Pace>): Observable<Driver | null> =>
         binding.kind === 'signal'
             ? waveIn(binding.store)
-            : binding.kind === 'voice'
-              ? combineLatest([soundingIn(binding.store), pace$]).pipe(
-                    map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
-                )
-              : binding.kind === 'drums'
-                ? combineLatest([kitIn(binding.store), pace$]).pipe(
-                      map(([kit, { seconds }]) => kitCurve(kit, seconds)),
+            : isConverterKind(binding.kind)
+              ? convertedIn(binding.store, pace$)
+              : isGateKind(binding.kind)
+                ? pace$.pipe(
+                      switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
+                      map(table => table.get(binding.store) ?? null),
+                      distinctUntilChanged(),
+                      map(row => (row === null ? null : bitCurve(row))),
                   )
-                : isConverterKind(binding.kind)
-                  ? convertedIn(binding.store)
-                  : isGateKind(binding.kind)
-                    ? pace$.pipe(
-                          switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
-                          map(table => table.get(binding.store) ?? null),
-                          distinctUntilChanged(),
-                          map(row => (row === null ? null : bitCurve(row))),
-                      )
-                    : of(null);
+                : of(null);
 
     const nowOn = (binding: Follow, clock: StoreId): Observable<Driver | null> => {
         const clock$ = playbackIn(clock).pipe(shareReplay({ bufferSize: 1, refCount: true }));
@@ -702,7 +720,6 @@ export const scopedOf = ({
             shareReplay({ bufferSize: 1, refCount: true }),
         );
 
-        // The follower's own loop: a voice's envelope is in seconds, and a window on another clock plays it on its own time.
         const pace$ = clock$.pipe(
             switchMap(binding =>
                 binding === null
@@ -764,7 +781,7 @@ export const scopedOf = ({
             pedal$: narrowed(pedalIn),
             gate$: narrowed(gateIn),
             converter$: narrowed(converterIn),
-            converted$: narrowed(convertedIn),
+            converted$: store$.pipe(switchMap(store => convertedIn(store, pace$))),
             bits$: combineLatest([store$, pace$]).pipe(
                 switchMap(([store, { ticks, seconds }]) =>
                     tableOf(ticks, seconds).pipe(

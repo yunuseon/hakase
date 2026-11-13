@@ -32,7 +32,7 @@ hidden coercions.
 | bit      | gates                                | gate inputs                                            |
 | picture  | sketch, pedals                       | pedals, Output                                         |
 | sheet    | paint, pen                           | a sketch's paint input                                 |
-| sound    | voice, drums                         | (nothing yet but converters)                           |
+| sound    | voice, drums                         | converters                                             |
 | schedule | agenda                               | a focus timer, converters                              |
 | timer    | focus                                | progress, converters                                   |
 | tasks    | tickets                              | progress, converters                                   |
@@ -43,33 +43,29 @@ hidden coercions.
 retire; a test pins that every input accepts only its own type or one listed
 there, so a new hidden coercion cannot slip in.
 
-| From → to          | Today                    | Plan                                          |
-| ------------------ | ------------------------ | --------------------------------------------- |
-| bit → level        | `bitCurve`, 0 or 1       | stays implicit: nothing to choose             |
-| timer → reading    | `focusReading`           | stays implicit: it is the timer's own summary |
-| schedule → reading | `agendaReading`          | stays implicit, for the progress bar          |
-| tasks → reading    | `ticketsReading`         | stays implicit, for the progress bar          |
-| sound → level      | `voiceCurve`, `kitCurve` | retires into the Envelope and Kit converters  |
-| schedule → level   | Timing                   | only through a converter (done)               |
+| From → to          | Today              | Plan                                          |
+| ------------------ | ------------------ | --------------------------------------------- |
+| bit → level        | `bitCurve`, 0 or 1 | stays implicit: nothing to choose             |
+| timer → reading    | `focusReading`     | stays implicit: it is the timer's own summary |
+| schedule → reading | `agendaReading`    | stays implicit, for the progress bar          |
+| tasks → reading    | `ticketsReading`   | stays implicit, for the progress bar          |
+| sound → level      | Envelope           | only through a converter (done)               |
+| schedule → level   | Timing             | only through a converter (done)               |
 
 ### Converters, one at a time
 
-The types, `CONVERSIONS`, the converter table and Timing are in (see
+The types, `CONVERSIONS`, the converter table, Timing and Envelope are in (see
 "Typed ports and converters" in `AGENTS.md`).
 
 Each one: the table entry, its window, its story, a test of its reading, the
 implicit conversion it replaces removed from every input's sources, and old
 saved links migrated (or none, where the conversion never shipped).
 
-1. **Envelope** (sound → level, voice). _Loudness_ (today's `voiceCurve`) or
-   _pitch_ (the note, in octaves above the root). Retires voice from
-   `driveInput` and `levelInput`; saved links from a knob to a voice are
-   migrated by placing an Envelope beside the voice and relinking through it.
-2. **Kit** (sound → level, drums). _Mix_ (today's `kitCurve`) or _one drum_.
-   Retires drums the same way.
-3. **Phase** (timer → level): how far through the focus timer's phase, or
+1. **Kit** (sound → level, drums): one drum's hits as a level, where Envelope
+   reads the whole kit's mix. Nothing implicit left to retire.
+2. **Phase** (timer → level): how far through the focus timer's phase, or
    the block it follows. New: nothing implicit to retire.
-4. **Done** (tasks → level): how much of a ticket list is done. A converter
+3. **Done** (tasks → level): how much of a ticket list is done. A converter
    takes one type, so this is not folded into Phase.
 
 ### What typed ports make possible

@@ -38,6 +38,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     switch: stage,
     pattern: stage,
     timing: stage,
+    envelope: stage,
     compare: stage,
     lamp: stage,
     'pin-in': stage,

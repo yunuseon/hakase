@@ -39,6 +39,7 @@ import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { GATE_DEFAULTS, parseGate, type Gate } from './gates.ts';
 import { parseConverter, type Converter } from './converters.ts';
+import { enveloped } from './envelopes.ts';
 import { parseBox, type Box } from './boxes.ts';
 import {
     isSketchParam,
@@ -290,12 +291,28 @@ const sketchLinksFrom = (
     );
 };
 
-// Takes what programs read from other programs, so a saved follow is kept only where it still fits.
-export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored | null => {
-    if (field(stored, 'version') !== VERSION) {
-        return null;
+const withEnvelopes = (restored: Restored): Restored => {
+    if (restored.workspace === null) {
+        return restored;
     }
 
+    const wired = enveloped({ ...restored, stores: restored.workspace.stores });
+
+    return {
+        ...restored,
+        workspace: { ...restored.workspace, stores: wired.stores },
+        sketchLinks: wired.sketchLinks,
+        pedals: wired.pedals,
+        gates: wired.gates,
+        converters: wired.converters,
+    };
+};
+
+// Takes what programs read from other programs, so a saved follow is kept only where it still fits.
+export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored | null =>
+    field(stored, 'version') !== VERSION ? null : withEnvelopes(parsedSnapshot(stored, inputsFor));
+
+const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
     return {
         workspace: withBoard(
             parseWorkspace(field(stored, 'workspace'), inputsFor),

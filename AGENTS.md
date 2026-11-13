@@ -1450,7 +1450,7 @@ another signal.
 
 A signal window shows its wave and marks the moment of the clock it follows
 (it takes `playbackInput` like a sketch). A sketch's four knobs are store
-inputs (`knobInputs`, optional, accepting `signal`, `voice` or `drums`), so one
+inputs (`knobInputs`, optional, accepting a signal, a gate or a converter), so one
 signal can drive knobs in several sketches, and a fork drives another set apart. A signal never reads the
 clock of the window that shows it: the follower evaluates it at its **own**
 playhead, so a sketch on a second clock plays the same wave on its own time.
@@ -1721,9 +1721,9 @@ through a high and a band pass for the hats, a falling sine for the tom, two
 squares at 540 and 800 Hz for the cowbell. The bus has a compressor, so hits
 struck together do not clip, and the gains come from offline renders, to a
 drum machine's balance rather than one loudness: the kick leads, snare, clap
-and tom sit a step under, hats and cowbell light. A sketch can follow a kit
-like a voice (`kitCurve`): each drum's hit decaying by its own time, weighted
-so the kick leads and the hats only shimmer.
+and tom sit a step under, hats and cowbell light. An Envelope reads a kit's
+loudness (`kitCurve`): each drum's hit decaying by its own time, weighted so the
+kick leads and the hats only shimmer.
 
 **A stroke paints, and is one step.** A press cycles its cell (off, hit,
 accent); dragging gives every cell it crosses that first cell's new value, as
@@ -1737,14 +1737,16 @@ the press left the stroke as two undo steps. Making a raise spare a step its
 own press had opened was tried in the log and broke window drags, which look
 the same there.
 
-**A sketch can follow a voice.** Its knob and scene inputs accept a voice as
-well as a signal (`driveInput`), and read its **level**: how loud it is at each
-moment, so a struck note flares and fades exactly as it sounds. The envelope is
+**A sketch can follow a voice, through an Envelope.** A voice is sound, and a
+knob takes a level, so an **Envelope** converter stands between them (see
+"Typed ports and converters") and reads the voice's **loudness**: how loud it
+is at each moment, so a struck note flares and fades exactly as it sounds. The envelope is
 in seconds, so the level is sampled over the loop at the follower's own loop
 length into a `Curve` (`voiceCurve`, `shared/curve.ts`), and the sketch's
 drives became `Driver`s, a wave or a curve, read by `driverAt`: still a pure
 function of the playhead, so thumbnails and exports flare on the same frames.
-The pitch is the signal the voice follows, plugged into another knob. A driven
+The Envelope's **pitch** reads the note instead (`pitchCurve`, octaves above
+the root); the signal the voice follows still works on a knob directly. A driven
 row reads **follows** now, since it may not be a signal. **Chladni**, in the
 library, is the worked example: the melody picks the plate's mode, so each note
 has its own figure, and the level shakes the plate and lights it on each strike.
@@ -1878,7 +1880,7 @@ starter is the worked example: Ripple folded by a kaleidoscope a saw signal
 turns, recoloured Ember, into an Output.
 **Light show** is the showcase, every pedal kind in one graph: a trefoil
 turned by a saw, folded and fed back, and a vortex blurred by a kick drum's
-level, screened together by a mix a sine swells, graded by a colour map whose
+level (an Envelope on the drum machine), screened together by a mix a sine swells, graded by a colour map whose
 offset a saw cycles and whose amount a pattern gate strobes. Its plot draws the
 four signals that move it.
 
@@ -1927,7 +1929,7 @@ graph with every delay's input edge cut, and the reducer and the state menus
 (`inputGroups`) check against it; and `readsTickBefore` skips the check
 outright for a link **into** a delay. The state map still checks the plain
 chain, so it does not light a drop that would close a loop through a delay.
-A compare's level input takes a signal, voice or drums (`levelInput`), never a
+A compare's level input takes a signal or a converter (`levelInput`), never a
 gate: the table reads it while it is being made, so a gate there would wait on
 itself.
 
@@ -1985,9 +1987,9 @@ components still know nothing of the list.
 
 **Only a conversion with nothing to choose may stay implicit.** `CONVERSIONS`
 lists every one an input still accepts: bit to level (0 or 1), the three plan
-documents to a reading (their own summary, for the progress bar), and sound to
-level, flagged `retires` because a voice's loudness and a kit's mix are choices
-that belong in converters. `port-types.test.ts` checks that every input of
+documents to a reading (their own summary, for the progress bar). Sound to level
+was the last to retire: a voice's loudness and a kit's mix were choices, so they
+moved into the Envelope converter. `port-types.test.ts` checks that every input of
 every program takes only its own type or one listed there, so a new hidden
 coercion fails a test rather than slipping into `driverIn`. A conversion that
 chooses is a **converter**: a program on the canvas whose choice is its setting,
@@ -2014,8 +2016,19 @@ and its value, and the choices; it takes a plain `ConverterView` from
 one runs), _through a block_ (0 to 1 across each) or _before a block_ (0 to 1
 over the hour before the next starts, 0 inside one), all from `timingCurve`. An
 agenda is not a drive source by itself: a knob that wants your schedule follows
-a Timing that follows the agenda. The remaining converters, and what typed
-ports make possible next, are in `backlog.md`.
+a Timing that follows the agenda.
+
+**Envelope** reads sound: a voice's or drum machine's _loudness_ (`voiceCurve`,
+`kitCurve`) or a voice's _pitch_ (`pitchCurve`; a drum machine has none and
+reads 0). Both sample at the **reader's** loop length, so `convertedIn` takes
+the follower's pace, as the hidden conversion did. It retired sound from every
+level input. **Saved links migrate on load**: `enveloped` (`src/envelopes.ts`)
+finds every sketch link, pedal source and compare input that read a voice or
+drums, adds one Envelope store per sound (`envelope-of-<id>`, named after it,
+reading its loudness, kept, with no window), and relinks through it; restore and
+saved blueprints both run it, and `formerStoreFollows` lets an old window follow
+of a sound through so the migration can catch it. The remaining converters, and
+what typed ports make possible next, are in `backlog.md`.
 
 ## Blueprints
 
@@ -2087,7 +2100,8 @@ same tune a turn of the ground later, in tenths below the first. `tune` turns a
 table of semitones into a signal whose value is octaves above the voice's root.
 Every voice is in D major, so the pitch snaps to the key. Its sketch is the
 `canon` formula, a Chladni plate whose figure the melody picks, shaken by the
-harp and bass levels and the drum kit. `starters.test.ts` checks the notes each
+harp and bass levels and the drum kit, each through an Envelope window under
+the sketch. `starters.test.ts` checks the notes each
 voice actually plays, through `notesOf`.
 
 **A starter may work on the main stores instead of copies.** A window on a

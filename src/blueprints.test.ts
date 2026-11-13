@@ -125,7 +125,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         converters: new Map(),
         boxes: new Map(),
         sketchLinks: new Map([
-            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'voice', k2: 'store-a' } }],
+            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'store-b', k2: 'store-a' } }],
         ]),
         library: { items: [{ id: 'custom-1', label: 'Chladni', source: 'vec4 formula' }], made: 1 },
         blueprints: emptyBlueprints,
@@ -186,7 +186,7 @@ describe('a blueprint', () => {
         expect(after.workspace.processes).toHaveLength(windows.length * 2);
         expect(sketch?.follows).toEqual({ playback: { kind: 'playback', store: 'timeline' } });
         expect(after.sketchLinks.get(ids.get('sketch-1') ?? '')?.sources).toMatchObject({
-            k1: ids.get('voice'),
+            k1: ids.get('store-b'),
             k2: ids.get('store-a'),
         });
         expect(sketch?.frame).toMatchObject({ x: 2390, y: 460 });
@@ -416,7 +416,7 @@ describe('blueprints saved before sketch links', () => {
                                 frame: { x: 0, y: 0, z: 0, width: 400, height: 400 },
                                 follows: {
                                     playback: { kind: 'playback', store: 'timeline' },
-                                    k1: { kind: 'drums', store: 'beat' },
+                                    k1: { kind: 'signal', store: 'wave' },
                                 },
                             },
                         ],
@@ -432,7 +432,7 @@ describe('blueprints saved before sketch links', () => {
         const [blueprint] = parsed.items;
 
         expect(blueprint?.held.sketchLinks).toEqual([
-            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'beat' } }],
+            ['sketch-1', { sources: { ...unlinkedSketch.sources, k1: 'wave' } }],
         ]);
         expect(blueprint?.windows[0]?.follows).toEqual({
             playback: { kind: 'playback', store: 'timeline' },

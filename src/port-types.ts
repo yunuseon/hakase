@@ -24,7 +24,6 @@ export const CONVERSIONS = [
     { from: 'timer', to: 'reading', retires: false },
     { from: 'schedule', to: 'reading', retires: false },
     { from: 'tasks', to: 'reading', retires: false },
-    { from: 'sound', to: 'level', retires: true },
 ] as const satisfies readonly Conversion[];
 
 export const converts = (from: PortType, to: PortType): boolean =>

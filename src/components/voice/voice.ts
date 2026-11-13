@@ -349,6 +349,8 @@ export const voiceCurve = (sounding: Sounding, seconds: number) => {
     return curveOf(t => heardAt(sounding, notes, t, seconds));
 };
 
+export const pitchCurve = (sounding: Sounding) => curveOf(t => semitonesAt(sounding, t) / 12);
+
 export type Heard = { readonly sounding: Sounding; readonly notes: readonly Note[] };
 
 export type Played = {

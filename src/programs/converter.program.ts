@@ -9,6 +9,8 @@ import { driverAt } from '../shared/curve.ts';
 
 const EMPTY_TEXT: Readonly<Record<ConverterKind, string>> = {
     timing: 'Plug an agenda into in: drag a wire in state mode (hold W), or pick one in the state menu.',
+    envelope:
+        'Plug a voice or drum machine into in: drag a wire in state mode (hold W), or pick one in the state menu.',
 };
 
 export const converterProgram = <K extends ConverterKind>(kind: K) => {

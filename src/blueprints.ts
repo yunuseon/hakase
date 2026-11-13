@@ -13,6 +13,7 @@ import type { Documents } from './documents.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { parseGate, type Gate } from './gates.ts';
 import { parseConverter, type Converter } from './converters.ts';
+import { enveloped } from './envelopes.ts';
 import { parseBox, type Box } from './boxes.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
@@ -624,6 +625,35 @@ export const parseBlueprints = (value: unknown, inputsFor: InputsFor): Blueprint
     const items = typeof value === 'object' && value !== null ? field(value, 'items') : undefined;
 
     return Array.isArray(items)
-        ? { items: items.flatMap((item: unknown) => blueprintFrom(item, inputsFor)) }
+        ? {
+              items: items.flatMap((item: unknown) =>
+                  blueprintFrom(item, inputsFor).map(withEnvelopes),
+              ),
+          }
         : emptyBlueprints;
+};
+
+const withEnvelopes = (blueprint: Blueprint): Blueprint => {
+    const { held } = blueprint;
+    const wired = enveloped({
+        stores: blueprint.stores,
+        sketchLinks: new Map(held.sketchLinks),
+        pedals: new Map(held.pedals),
+        gates: new Map(held.gates),
+        converters: new Map(held.converters),
+    });
+
+    return wired.stores === blueprint.stores
+        ? blueprint
+        : {
+              ...blueprint,
+              stores: wired.stores,
+              held: {
+                  ...held,
+                  sketchLinks: [...wired.sketchLinks],
+                  pedals: [...wired.pedals],
+                  gates: [...wired.gates],
+                  converters: [...wired.converters],
+              },
+          };
 };

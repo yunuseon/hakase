@@ -137,10 +137,14 @@ describe('sketch link migration', () => {
         expect(restored?.sketchLinks.get('sketch-2')?.sources).toMatchObject({
             k1: null,
             k2: 'signal',
-            colour: 'voice',
+            colour: 'envelope-of-voice',
             paint: 'pen',
             k3: null,
         });
+        expect(restored?.converters.get('envelope-of-voice')?.sources.in).toBe('voice');
+        expect(
+            restored?.workspace?.stores.find(({ id }) => id === 'envelope-of-voice')?.program,
+        ).toBe('envelope');
         expect(restored?.workspace?.processes[0]?.follows).toEqual({
             playback: { kind: 'playback', store: 'timeline' },
         });

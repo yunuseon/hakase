@@ -1,3 +1,4 @@
+import { driverAt } from '../../shared/curve.ts';
 import { describe, expect, it } from 'vitest';
 import { defaultSignal, type Signal } from '../../shared/signal.ts';
 import {
@@ -10,6 +11,8 @@ import {
     parseVoice,
     reduceVoice,
     semitonesOf,
+    pitchCurve,
+    semitonesAt,
     soundingOf,
     voiceCurve,
     type Voice,
@@ -151,6 +154,17 @@ describe('a voice', () => {
             shape: 'sawtooth',
             decay: 2,
             sources: { pitch: 'a', volume: null, filter: null, pan: null },
+        });
+    });
+});
+
+describe('an Envelope reading a voice', () => {
+    it('reads the note the voice is on, in octaves above its root', () => {
+        const sounding = playing();
+        const curve = pitchCurve(sounding);
+
+        [0.1, 0.3, 0.6, 0.9].forEach(t => {
+            expect(driverAt(curve, t)).toBeCloseTo(semitonesAt(sounding, t) / 12, 5);
         });
     });
 });

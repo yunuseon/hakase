@@ -2,7 +2,7 @@ import { currentBlock, DAY_MINUTES, nextBlock, type Agenda } from './components/
 import type { PortType } from './port-types.ts';
 import { curveOf, type Curve } from './shared/curve.ts';
 
-export const CONVERTER_KINDS = ['timing'] as const;
+export const CONVERTER_KINDS = ['timing', 'envelope'] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
 export const isConverterKind = (value: string): value is ConverterKind =>
@@ -35,6 +35,19 @@ export const CONVERTERS = {
         ],
         size: { width: 280, height: 220 },
     },
+    envelope: {
+        title: 'Envelope',
+        summary:
+            'A voice or drum machine as a level: how loud it is as it plays, or the note a voice is on, in octaves above its root.',
+        icon: 'M3 18 L7 6 L10 13 L13 9 L21 18 M3 18 H21',
+        takes: 'sound',
+        makes: 'level',
+        choices: [
+            { id: 'loudness', title: 'loudness' },
+            { id: 'pitch', title: 'pitch' },
+        ],
+        size: { width: 280, height: 220 },
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const CONVERTER_PARAMS = ['in', 'time'] as const;
@@ -57,6 +70,7 @@ const made = (kind: ConverterKind): Converter => ({
 // One object per kind: a fresh default on every read would look like an edit downstream.
 export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     timing: made('timing'),
+    envelope: made('envelope'),
 };
 
 export type ConverterCommand =

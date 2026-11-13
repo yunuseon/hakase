@@ -202,8 +202,9 @@ describe('starter blueprints', () => {
         expect(after.pedals.get(id('Echo'))?.sources).toMatchObject({ in: id('Fold') });
         expect(after.pedals.get(id('Haze'))?.sources).toMatchObject({
             in: id('Swirl'),
-            radius: id('Pulse'),
+            radius: id('Kick'),
         });
+        expect(after.converters.get(id('Kick'))?.sources.in).toBe(id('Pulse'));
         expect(after.pedals.get(id('Blend'))).toMatchObject({
             choice: 'screen',
             sources: { a: id('Echo'), b: id('Haze'), amount: id('Swell') },

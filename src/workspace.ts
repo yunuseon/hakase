@@ -1203,12 +1203,16 @@ export const formerStoreFollows = (
 
     return Object.entries(saved).flatMap(([name, entry]) =>
         followFrom(entry)
-            .filter(
-                binding =>
-                    storeInputOf(inputs, name)?.sources.some(
-                        ({ kind }) => kind === binding.kind,
-                    ) === true,
-            )
+            .filter(binding => {
+                const definition = storeInputOf(inputs, name);
+
+                return (
+                    definition?.sources.some(({ kind }) => kind === binding.kind) === true ||
+                    // Not dropped: the Envelope migration that runs next puts a converter between them.
+                    (definition?.takes === 'level' &&
+                        (binding.kind === 'voice' || binding.kind === 'drums'))
+                );
+            })
             .map(binding => [draft.store, name, binding.store] as const),
     );
 };
