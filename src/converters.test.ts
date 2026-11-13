@@ -6,8 +6,10 @@ import {
     type AgendaCommand,
 } from './components/agenda/agenda.ts';
 import { focusView, initialFocus, type Focus } from './components/focus/focus.ts';
+import { defaultTickets, reduceTickets, type TicketCommand } from './shared/tickets.ts';
 import {
     CONVERTER_DEFAULTS,
+    doneLevel,
     parseConverter,
     phaseLevel,
     reduceConverter,
@@ -111,5 +113,31 @@ describe('a phase converter', () => {
         expect(phaseLevel(view, 'focusing')).toBe(1);
         expect(phaseLevel(planned, 'focusing')).toBe(1);
         expect(phaseLevel(resting, 'focusing')).toBe(0);
+    });
+});
+
+describe('a done converter', () => {
+    const added = (status: string, title: string): TicketCommand => ({
+        kind: 'add',
+        status,
+        title,
+        parent: null,
+    });
+    const tickets = [
+        added('status-1', 'plan'),
+        added('status-2', 'build'),
+        added('status-3', 'ship'),
+        added('status-3', 'celebrate'),
+    ].reduce((all, command) => reduceTickets(all, command), defaultTickets);
+
+    it('reads the share of tickets done, in progress, or left, by stage', () => {
+        expect(doneLevel(tickets, 'done')).toBe(0.5);
+        expect(doneLevel(tickets, 'active')).toBe(0.25);
+        expect(doneLevel(tickets, 'left')).toBe(0.5);
+    });
+
+    it('reads 0 for a list with nothing in it', () => {
+        expect(doneLevel(defaultTickets, 'done')).toBe(0);
+        expect(doneLevel(defaultTickets, 'left')).toBe(0);
     });
 });

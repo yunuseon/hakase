@@ -58,7 +58,13 @@ import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, type StoreId } from '../stores.ts';
 import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate } from '../gates.ts';
-import { CONVERTER_DEFAULTS, isConverterKind, phaseLevel, timingCurve } from '../converters.ts';
+import {
+    CONVERTER_DEFAULTS,
+    doneLevel,
+    isConverterKind,
+    phaseLevel,
+    timingCurve,
+} from '../converters.ts';
 import { dayOf } from '../lib/day.ts';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
@@ -459,6 +465,20 @@ export const scopedOf = ({
         converterIn(store).pipe(
             switchMap(converter => {
                 switch (converter.kind) {
+                    case 'done':
+                        return linkIn(store, 'in').pipe(
+                            switchMap(binding =>
+                                binding?.kind === 'tickets'
+                                    ? ticketsIn(binding.store).pipe(
+                                          map(tickets => doneLevel(tickets, converter.choice)),
+                                          distinctUntilChanged(),
+                                          map((level): Driver => ({
+                                              samples: Float32Array.of(level),
+                                          })),
+                                      )
+                                    : of(null),
+                            ),
+                        );
                     case 'phase':
                         return linkIn(store, 'in').pipe(
                             switchMap(binding =>

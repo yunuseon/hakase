@@ -62,6 +62,7 @@ export const programs = {
     envelope: converterProgram('envelope'),
     kit: converterProgram('kit'),
     phase: converterProgram('phase'),
+    done: converterProgram('done'),
     box: boxProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,

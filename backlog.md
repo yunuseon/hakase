@@ -52,18 +52,6 @@ there, so a new hidden coercion cannot slip in.
 | sound → level      | Envelope           | only through a converter (done)               |
 | schedule → level   | Timing             | only through a converter (done)               |
 
-### Converters, one at a time
-
-The types, `CONVERSIONS`, the converter table, Timing, Envelope, Kit and Phase are in (see
-"Typed ports and converters" in `AGENTS.md`).
-
-Each one: the table entry, its window, its story, a test of its reading, the
-implicit conversion it replaces removed from every input's sources, and old
-saved links migrated (or none, where the conversion never shipped).
-
-1. **Done** (tasks → level): how much of a ticket list is done. A converter
-   takes one type, so this is not folded into Phase.
-
 ### What typed ports make possible
 
 - **Wave inputs take any level.** A signal's phase, offset and depth, a pen's

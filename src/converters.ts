@@ -2,9 +2,10 @@ import { currentBlock, DAY_MINUTES, nextBlock, type Agenda } from './components/
 import { DRUM_LABELS, DRUMS } from './components/drums/drums.ts';
 import type { FocusView } from './components/focus/focus.ts';
 import type { PortType } from './port-types.ts';
+import type { Stage, Tickets } from './shared/tickets.ts';
 import { curveOf, type Curve } from './shared/curve.ts';
 
-export const CONVERTER_KINDS = ['timing', 'envelope', 'kit', 'phase'] as const;
+export const CONVERTER_KINDS = ['timing', 'envelope', 'kit', 'phase', 'done'] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
 export const isConverterKind = (value: string): value is ConverterKind =>
@@ -79,6 +80,21 @@ export const CONVERTERS = {
         ],
         size: { width: 280, height: 220 },
     },
+    done: {
+        title: 'Done',
+        summary:
+            'A ticket list as a level, as it stands now: the share of its tickets that are done, in progress, or not done yet.',
+        icon: 'M4 6 H20 M4 12 H20 M4 18 H12 M15 17 L17 19 L21 15',
+        takes: 'tasks',
+        reads: null,
+        makes: 'level',
+        choices: [
+            { id: 'done', title: 'done' },
+            { id: 'active', title: 'in progress' },
+            { id: 'left', title: 'left' },
+        ],
+        size: { width: 280, height: 220 },
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const CONVERTER_PARAMS = ['in', 'time'] as const;
@@ -104,6 +120,7 @@ export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     envelope: made('envelope'),
     kit: made('kit'),
     phase: made('phase'),
+    done: made('done'),
 };
 
 export type ConverterCommand =
@@ -191,5 +208,26 @@ export const phaseLevel = ({ phase, progress }: FocusView, choice: string): numb
             return phase === 'work' ? 1 : 0;
         default:
             return progress;
+    }
+};
+
+export const doneLevel = ({ statuses }: Tickets, choice: string): number => {
+    const count = (stage: Stage | null) =>
+        statuses
+            .filter(status => stage === null || status.stage === stage)
+            .reduce((sum, { tickets }) => sum + tickets.length, 0);
+    const total = count(null);
+
+    if (total === 0) {
+        return 0;
+    }
+
+    switch (choice) {
+        case 'active':
+            return count('active') / total;
+        case 'left':
+            return 1 - count('done') / total;
+        default:
+            return count('done') / total;
     }
 };

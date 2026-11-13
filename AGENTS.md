@@ -2044,8 +2044,14 @@ through the phase (or the agenda block the timer follows) it is, _left_ the
 rest, _focusing_ 1 in a focus phase or block and 0 on a break; all three come
 from `phaseLevel` over the timer's own `focusView`, so the window and the
 converter cannot disagree about where the timer is. It moves on each timer tick
-and is deduplicated by value, so a paused timer redraws nothing. The remaining converters, and what
-typed ports make possible next, are in `backlog.md`.
+and is deduplicated by value, so a paused timer redraws nothing.
+
+**Done** reads a ticket list the same way, as it stands now: the share of its
+tickets whose status is at the _done_ stage, the _active_ one (in progress), or
+not done yet (_left_), counted by stage and never by a status's name, as
+progress counts them (`doneLevel`). An empty list reads 0 in every choice,
+rather than dividing by nothing. What typed ports make possible next is in
+`backlog.md`.
 
 ## Blueprints
 

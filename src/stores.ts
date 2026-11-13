@@ -41,6 +41,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     envelope: stage,
     kit: stage,
     phase: stage,
+    done: stage,
     compare: stage,
     lamp: stage,
     'pin-in': stage,
