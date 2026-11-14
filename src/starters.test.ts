@@ -218,6 +218,38 @@ describe('starter blueprints', () => {
         expect(output?.follows).toMatchObject({ in: { kind: 'colourmap', store: id('Grade') } });
     });
 
+    it('places a Light organ that plays its picture: brightness on pitch, motion on volume', () => {
+        const before = scene();
+        const after = placed(before, starter('starter-light-organ'), view, 300, inputsFor);
+        const id = (name: string) =>
+            after.workspace.stores.find(
+                store => store.name === name && store.id.startsWith('store-300'),
+            )?.id ?? '';
+        const scope = after.workspace.processes.find(({ program }) => program === 'plot');
+
+        expect(after.sketchLinks.get(id('Lights'))?.sources.distance).toBe(id('Breath'));
+        expect(after.converters.get(id('Glow'))).toMatchObject({
+            kind: 'picture-level',
+            choice: 'brightness',
+            sources: { in: id('Lights') },
+        });
+        expect(after.converters.get(id('Stir'))).toMatchObject({
+            choice: 'motion',
+            sources: { in: id('Lights') },
+        });
+        expect(after.voices.get(id('Pipes'))?.sources).toMatchObject({
+            pitch: id('Glow'),
+            volume: id('Stir'),
+            filter: id('Shimmer'),
+        });
+        expect(after.signals.get(id('Shimmer'))?.sources.depth).toBe(id('Stir'));
+        expect(after.drums.get(id('Beat'))?.sources.volume).toBe(id('Cut'));
+        expect(scope?.follows).toMatchObject({
+            a: { kind: 'picture-level', store: id('Glow') },
+            d: { kind: 'pattern', store: id('Cut') },
+        });
+    });
+
     it('places a Logic primer whose half adder adds and whose counter counts', () => {
         const before = scene();
         const after = placed(before, starter('starter-logic'), view, 300, inputsFor);

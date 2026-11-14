@@ -6,7 +6,7 @@ import { defaultPanel } from './components/sketch/params.ts';
 import { unlinkedSketch } from './components/sketch/links.ts';
 import { defaultPedal, type Pedal, type PedalKind } from './pedals.ts';
 import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
-import { CONVERTER_DEFAULTS, type Converter } from './converters.ts';
+import { CONVERTER_DEFAULTS, UNSHAPED, type Converter, type Shape } from './converters.ts';
 import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
 import type { Size } from './components/window/frame.ts';
@@ -109,6 +109,15 @@ const LOOP = { playback: { kind: 'playback', store: 'loop' } } as const;
 const TICK = { playback: { kind: 'playback', store: 'tick' } } as const;
 
 const SHOW = { playback: { kind: 'playback', store: 'show' } } as const;
+
+const ORGAN = { playback: { kind: 'playback', store: 'organ' } } as const;
+
+const reading = (picture: StoreId, choice: string, shape: Partial<Shape>): Converter => ({
+    ...CONVERTER_DEFAULTS['picture-level'],
+    choice,
+    shape: { ...UNSHAPED, ...shape },
+    sources: { in: picture, time: null },
+});
 
 const bits = (marks: string): readonly Bit[] => [...marks].map(mark => (mark === '1' ? 1 : 0));
 
@@ -664,6 +673,132 @@ export const STARTERS: readonly Starter[] = [
                     ),
                 ],
             ],
+        },
+        formulas: [],
+        links: [],
+    },
+    {
+        id: 'starter-light-organ',
+        name: 'Light organ',
+        summary:
+            'A sketch played as an organ: its brightness picks the note and its motion swells the sound, both read off the picture by two converters, while a signal that follows the motion wobbles the tone and a pattern gate cuts the kick in and out. Press play, then Listen on the organ and the drums.',
+        size: { width: 1592, height: 1100 },
+        windows: [
+            opened('organ', 'timeline', 'organ', { x: 24, y: 48, width: 360, height: 120 }),
+            opened('breath', 'signal', 'breath', { x: 400, y: 48, width: 300, height: 236 }, ORGAN),
+            opened(
+                'shimmer',
+                'signal',
+                'shimmer',
+                { x: 716, y: 48, width: 300, height: 236 },
+                ORGAN,
+            ),
+            opened(
+                'scope',
+                'plot',
+                'scope',
+                { x: 1032, y: 48, width: 536, height: 236 },
+                {
+                    ...ORGAN,
+                    a: { kind: 'picture-level', store: 'glow' },
+                    b: { kind: 'picture-level', store: 'stir' },
+                    c: { kind: 'signal', store: 'shimmer' },
+                    d: { kind: 'pattern', store: 'cut' },
+                },
+                { ...defaultPlot, layout: 'lanes' },
+            ),
+            opened(
+                'lights',
+                'sketch',
+                'lights',
+                { x: 24, y: 300, width: 360, height: 452 },
+                ORGAN,
+                {
+                    ...defaultSketch,
+                    formula: 'ripple',
+                    theme: 'ember',
+                    panel: { ...defaultPanel, mode: 'surface', dimension: 72 },
+                },
+            ),
+            opened(
+                'glow',
+                'picture-level',
+                'glow',
+                { x: 400, y: 300, width: 300, height: 340 },
+                ORGAN,
+            ),
+            opened(
+                'stir',
+                'picture-level',
+                'stir',
+                { x: 716, y: 300, width: 300, height: 340 },
+                ORGAN,
+            ),
+            opened('pipes', 'voice', 'pipes', { x: 1032, y: 300, width: 400, height: 360 }, ORGAN),
+            opened('beat', 'drums', 'beat', { x: 400, y: 656, width: 560, height: 400 }, ORGAN),
+            opened('cut', 'pattern', 'cut', { x: 976, y: 676, ...GATES.pattern.size }, ORGAN),
+        ],
+        stores: [
+            {
+                ...own('organ', 'timeline', 'Light organ'),
+                clock: { duration: 8, looping: true, ticks: 16 },
+            },
+            own('breath', 'signal', 'Breath'),
+            own('shimmer', 'signal', 'Shimmer'),
+            own('lights', 'sketch', 'Lights'),
+            own('glow', 'picture-level', 'Glow'),
+            own('stir', 'picture-level', 'Stir'),
+            own('pipes', 'voice', 'Pipes'),
+            own('beat', 'drums', 'Beat'),
+            own('cut', 'pattern', 'Cut'),
+        ],
+        held: {
+            ...held,
+            signals: [
+                ['breath', { ...defaultSignal, shape: 'sine', rate: 1, offset: 7, depth: 5 }],
+                [
+                    'shimmer',
+                    {
+                        ...defaultSignal,
+                        shape: 'sine',
+                        rate: 8,
+                        offset: 0.55,
+                        depth: 0.1,
+                        sources: { ...defaultSignal.sources, depth: 'stir' },
+                    },
+                ],
+            ],
+            sketchLinks: [
+                ['lights', { sources: { ...unlinkedSketch.sources, distance: 'breath' } }],
+            ],
+            converters: [
+                ['glow', reading('lights', 'brightness', { low: -2, high: 10 })],
+                ['stir', reading('lights', 'motion', { low: 0, high: 15, smooth: 0.3 })],
+            ],
+            voices: [
+                [
+                    'pipes',
+                    voice({
+                        instrument: 'organ',
+                        scale: 'pentatonic',
+                        root: 48,
+                        volume: 0.6,
+                        sources: sources({ pitch: 'glow', volume: 'stir', filter: 'shimmer' }),
+                    }),
+                ],
+            ],
+            drums: [
+                [
+                    'beat',
+                    {
+                        ...defaultDrums,
+                        volume: 0.5,
+                        pattern: PRESETS['four on the floor'],
+                        sources: { ...defaultDrums.sources, volume: 'cut' },
+                    },
+                ],
+            ],
+            gates: [['cut', gate('pattern', {}, { steps: bits('1111000011110011') })]],
         },
         formulas: [],
         links: [],

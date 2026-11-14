@@ -2251,6 +2251,19 @@ harp and bass levels and the drum kit, each through an Envelope window under
 the sketch. `starters.test.ts` checks the notes each
 voice actually plays, through `notesOf`.
 
+**Light organ is the starter that plays a picture**, and the worked example of
+the conversions that only recently became possible. A Ripple surface on
+_ember_ breathes in and out (a sine on its camera distance), two picture →
+level converters read its brightness (onto the organ's pitch, snapped to the
+pentatonic scale) and its motion (onto its volume, smoothed), a signal whose
+depth follows the motion wobbles the filter, and a pattern gate's bit sets the
+kick's volume. The converters' ranges come from measured readings, not
+guesses: dots on _dusk_ barely moved the brightness (0.17 to 0.23), so the
+sketch is a surface on _ember_ (0.16 to 0.36, motion up to 0.06), mapped by
+−2 to 10 octaves and 0 to 15. Played, the organ walks between C3 and E5 over
+its eight seconds. A browser starts audio only from a click, so its summary
+says to press Listen as well as play.
+
 **A starter may work on the main stores instead of copies.** A window on a
 store the blueprint does not list keeps that id when placed, so Today shows
 your todo list rather than an empty one; only what should start fresh (the
