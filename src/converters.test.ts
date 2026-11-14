@@ -142,6 +142,20 @@ describe('shaping a level', () => {
         expect(shaped(ramp, UNSHAPED)).toBe(ramp);
     });
 
+    it('samples it on a grid and holds each value until the next, even from a coarse curve', () => {
+        const coarse = { samples: Float32Array.from({ length: 8 }, (_, index) => index / 8) };
+        const held = (t: number) => driverAt(shaped(coarse, { ...UNSHAPED, grid: 4 }), t);
+
+        expect([0.01, 0.2, 0.26, 0.49, 0.51, 0.74].map(t => Number(held(t).toFixed(3)))).toEqual([
+            0, 0, 0.25, 0.25, 0.5, 0.5,
+        ]);
+        const shape = CONVERTER_DEFAULTS['level-level'];
+        const gridded = (value: number) =>
+            reduceConverter(shape, { kind: 'shape', field: 'grid', value }).shape.grid;
+
+        expect([1, 16, 200].map(gridded)).toEqual([0, 16, 64]);
+    });
+
     it('maps it into a range, turned upside down if inverted', () => {
         expect(at({ low: 2, high: 6 }, 0.5)).toBeCloseTo(4);
         expect(at({ invert: true }, 0.25)).toBeCloseTo(0.75);

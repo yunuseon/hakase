@@ -54,7 +54,6 @@ export const planOf = (agenda: Agenda, day: string, minute: number): Plan | null
           };
 };
 
-// Every timer that follows an agenda with a block running now, keyed by the timer's store.
 export const plansOf = (
     links: ReadonlyMap<string, FocusLink>,
     agendas: ReadonlyMap<string, Agenda>,

@@ -10,6 +10,7 @@ export type Shape = {
     readonly curve: number;
     readonly steps: number;
     readonly smooth: number;
+    readonly grid: number;
 };
 
 export type Bits = {
@@ -38,6 +39,7 @@ export type ShapeView = Shape & {
     readonly curveText: string;
     readonly stepsText: string;
     readonly smoothText: string;
+    readonly gridText: string;
 };
 
 export type ConverterView = {
@@ -86,6 +88,7 @@ export const shapeView = (shape: Shape): ShapeView => ({
             : `${shape.curve < 0 ? 'out' : 'in'} ${number(Math.abs(shape.curve))}`,
     stepsText: shape.steps < 2 ? 'off' : String(shape.steps),
     smoothText: shape.smooth === 0 ? 'off' : number(shape.smooth),
+    gridText: shape.grid === 0 ? 'off' : `${shape.grid} a loop`,
 });
 
 export const converterView = ({

@@ -2063,8 +2063,15 @@ one case per pair, what it reads through `in` and how its reading makes a
 `Driver`; `conversionIn` then applies the document's **shape** with one pure
 `shaped(driver, shape)`, so every converter that makes a level has the same
 modifiers: range (low to high), invert, curve (`2 ** (curve * 2)` as a power,
-ease out below 0 and in above), steps (quantised, off below 2) and smooth (a
-one-pole slew run round the loop twice, so its start has settled from its end).
+ease out below 0 and in above), steps (quantised, off below 2), smooth (a
+one-pole slew run round the loop twice, so its start has settled from its end)
+and **grid** (sample and hold: sampled N times a loop, 2 to 64, each value held
+until the next, after the slew). A grid resamples to full resolution first,
+because `curveAt` reads between samples and a 64-sample picture curve would
+otherwise ramp across each slot instead of jumping at its start. It is what
+makes a level play in time: a voice strikes a new note whenever its pitch
+crosses a semitone, so a free-running pitch struck notes all over the beat,
+and gridded to the rhythm's slots its changes land on the gate's own onsets.
 An unshaped document passes the driver through untouched, so nothing recooks.
 **`conversion$` carries the document and its driver together**: the window
 combined `converter$` with a `converted$` derived from the same document at
@@ -2251,18 +2258,24 @@ harp and bass levels and the drum kit, each through an Envelope window under
 the sketch. `starters.test.ts` checks the notes each
 voice actually plays, through `notesOf`.
 
-**Light organ is the starter that plays a picture**, and the worked example of
-the conversions that only recently became possible. A Ripple surface on
-_ember_ breathes in and out (a sine on its camera distance), two picture →
-level converters read its brightness (onto the organ's pitch, snapped to the
-pentatonic scale) and its motion (onto its volume, smoothed), a signal whose
-depth follows the motion wobbles the filter, and a pattern gate's bit sets the
-kick's volume. The converters' ranges come from measured readings, not
-guesses: dots on _dusk_ barely moved the brightness (0.17 to 0.23), so the
-sketch is a surface on _ember_ (0.16 to 0.36, motion up to 0.06), mapped by
-−2 to 10 octaves and 0 to 15. Played, the organ walks between C3 and E5 over
-its eight seconds. A browser starts audio only from a click, so its summary
-says to press Listen as well as play.
+**Light band is the starter where a picture plays a band**, and the worked
+example of the recent conversions together. Rhythm and harmony are fixed, and
+the picture decides what is played on them: a steps signal turns Am, F, C, G
+a bar each at 120 bpm; the bass follows it, re-struck 3-3-2 by a pattern
+gate; a marimba is plucked by a syncopated gate, its note picked by the
+brightness of a breathing Ripple surface (picture → level, gridded to the
+rhythm's 32 slots, on a C pentatonic that sits over all four chords); the pad
+holds the chord root and swells with the picture's motion; a signal whose
+depth follows the motion pans the marimba; and a level → bit converter on the
+motion lets the drums in only while the picture really moves, so the picture
+arranges the song. It replaced Light organ, whose pitch followed the
+brightness freely: notes struck wherever it crossed a semitone, so nothing
+sat on the beat, which is why grid exists. Two traps it found: a rhythm
+pattern needs a rest before every hit (`11` is one held note, struck again
+only if its pitch changes), and the ranges came from measured readings (dots
+on _dusk_ moved the brightness 0.17 to 0.23; a surface on _ember_ moves it
+0.16 to 0.36). `starters.test.ts` checks that the marimba strikes exactly its
+rhythm's hits and that the bass plays the four roots three times a bar.
 
 **A starter may work on the main stores instead of copies.** A window on a
 store the blueprint does not list keeps that id when placed, so Today shows

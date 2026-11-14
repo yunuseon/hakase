@@ -101,7 +101,7 @@ export const CONVERTERS = {
         size: SIZE,
     },
     'level-level': {
-        summary: 'Any level reshaped: its range, direction, curve, steps and smoothness.',
+        summary: 'Any level reshaped: its range, direction, curve, steps, smoothness and grid.',
         icon: 'M4 18 C 9 18, 10 6, 20 6 M4 12 H8 M16 12 H20',
         takes: 'level',
         makes: 'level',
@@ -264,16 +264,27 @@ export type Shape = {
     readonly curve: number;
     readonly steps: number;
     readonly smooth: number;
+    readonly grid: number;
 };
 
-export const SHAPE_FIELDS = ['low', 'high', 'invert', 'curve', 'steps', 'smooth'] as const;
+export const SHAPE_FIELDS = ['low', 'high', 'invert', 'curve', 'steps', 'smooth', 'grid'] as const;
 export type ShapeField = (typeof SHAPE_FIELDS)[number];
 export const isShapeField = (value: string): value is ShapeField =>
     SHAPE_FIELDS.some(field => field === value);
 
 export const MAX_STEPS = 16;
 
-export const UNSHAPED: Shape = { low: 0, high: 1, invert: false, curve: 0, steps: 0, smooth: 0 };
+export const MAX_GRID = 64;
+
+export const UNSHAPED: Shape = {
+    low: 0,
+    high: 1,
+    invert: false,
+    curve: 0,
+    steps: 0,
+    smooth: 0,
+    grid: 0,
+};
 
 export const sameShape = (a: Shape, b: Shape): boolean =>
     a.low === b.low &&
@@ -281,7 +292,8 @@ export const sameShape = (a: Shape, b: Shape): boolean =>
     a.invert === b.invert &&
     a.curve === b.curve &&
     a.steps === b.steps &&
-    a.smooth === b.smooth;
+    a.smooth === b.smooth &&
+    a.grid === b.grid;
 
 const shapeWith = (shape: Shape, field: ShapeField, value: number): Shape => {
     if (!Number.isFinite(value)) {
@@ -304,6 +316,11 @@ const shapeWith = (shape: Shape, field: ShapeField, value: number): Shape => {
         }
         case 'smooth':
             return { ...shape, smooth: clamp(value, 0, 1) };
+        case 'grid': {
+            const grid = Math.round(value);
+
+            return { ...shape, grid: grid < 2 ? 0 : Math.min(grid, MAX_GRID) };
+        }
     }
 };
 
@@ -527,17 +544,29 @@ export const shapedValue = (value: number, shape: Shape): number => {
     return shape.low + (shape.high - shape.low) * stepped(eased(flipped, shape.curve), shape.steps);
 };
 
+const held = (samples: Float32Array, grid: number): Float32Array =>
+    samples.map(
+        (_, index) =>
+            samples[
+                Math.floor((Math.floor((index * grid) / samples.length) * samples.length) / grid)
+            ] ?? 0,
+    );
+
 export const shaped = (driver: Driver, shape: Shape): Driver => {
     if (sameShape(shape, UNSHAPED)) {
         return driver;
     }
 
+    // Held at full resolution: on a coarse curve, reading between samples would ramp across each slot instead of jumping at its start.
     const samples =
-        'samples' in driver ? driver.samples : curveOf(t => driverAt(driver, t)).samples;
+        'samples' in driver && shape.grid === 0
+            ? driver.samples
+            : curveOf(t => driverAt(driver, t)).samples;
     const smoothed =
         shape.smooth > 0 && samples.length > 1 ? slewed(samples, shape.smooth) : samples;
+    const gridded = shape.grid > 0 ? held(smoothed, shape.grid) : smoothed;
 
-    return { samples: smoothed.map(value => shapedValue(value, shape)) };
+    return { samples: gridded.map(value => shapedValue(value, shape)) };
 };
 
 const LEAD_MINUTES = 60;

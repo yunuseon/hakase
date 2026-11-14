@@ -99,7 +99,6 @@ export type ToolbarState =
     | { readonly kind: 'floating'; readonly frame: Frame; readonly lastEdge: Edge };
 
 export type Workspace = {
-    // Back to front: a process's index in here is its z-order.
     readonly processes: readonly Process[];
     // Monotone, so a relaunch never reuses a dead process's id.
     readonly launched: number;

@@ -117,6 +117,11 @@ const Shape = (shape: ShapeView) =>
             max: 0.99,
             step: 0.01,
         })}
+        ${slider('shape', 'grid', 'grid', shape.grid, shape.gridText, {
+            min: 0,
+            max: 64,
+            step: 1,
+        })}
     </div>`;
 
 const Bits = (bits: BitsView) =>

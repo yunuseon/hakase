@@ -4,10 +4,13 @@ import type { Documents } from './documents.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { emptyLibrary } from './library.ts';
 import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
-import { blueprintIn, STARTERS } from './starters.ts';
-import { circuitTable } from './circuit.ts';
+import { blueprintIn, RHYTHM, STARTERS } from './starters.ts';
+import { bitCurve, circuitTable } from './circuit.ts';
 import { defaultWorkspace } from './workspace.ts';
 import { notesOf, soundingOf } from './components/voice/voice.ts';
+import { shaped } from './converters.ts';
+import { curveAt, curveOf } from './shared/curve.ts';
+import { waveOf } from './shared/signal.ts';
 
 const tickets = parseTickets({ items: [{ id: 'todo-1', text: 'Mine', done: false }], made: 1 });
 
@@ -218,36 +221,83 @@ describe('starter blueprints', () => {
         expect(output?.follows).toMatchObject({ in: { kind: 'colourmap', store: id('Grade') } });
     });
 
-    it('places a Light organ that plays its picture: brightness on pitch, motion on volume', () => {
+    it('places a Light band whose picture plays every part', () => {
         const before = scene();
-        const after = placed(before, starter('starter-light-organ'), view, 300, inputsFor);
+        const after = placed(before, starter('starter-light-band'), view, 300, inputsFor);
         const id = (name: string) =>
             after.workspace.stores.find(
                 store => store.name === name && store.id.startsWith('store-300'),
             )?.id ?? '';
-        const scope = after.workspace.processes.find(({ program }) => program === 'plot');
 
         expect(after.sketchLinks.get(id('Lights'))?.sources.distance).toBe(id('Breath'));
         expect(after.converters.get(id('Glow'))).toMatchObject({
-            kind: 'picture-level',
             choice: 'brightness',
             sources: { in: id('Lights') },
         });
-        expect(after.converters.get(id('Stir'))).toMatchObject({
-            choice: 'motion',
-            sources: { in: id('Lights') },
-        });
-        expect(after.voices.get(id('Pipes'))?.sources).toMatchObject({
+        expect(after.converters.get(id('Stir'))?.sources.in).toBe(id('Lights'));
+        expect(after.converters.get(id('Busy'))?.sources.in).toBe(id('Stir'));
+        expect(after.voices.get(id('Marimba'))?.sources).toMatchObject({
             pitch: id('Glow'),
+            volume: id('Rhythm'),
+            pan: id('Shimmer'),
+        });
+        expect(after.voices.get(id('Bass'))?.sources).toMatchObject({
+            pitch: id('Chords'),
+            volume: id('Groove'),
+        });
+        expect(after.voices.get(id('Pad'))?.sources).toMatchObject({
+            pitch: id('Chords'),
             volume: id('Stir'),
-            filter: id('Shimmer'),
         });
         expect(after.signals.get(id('Shimmer'))?.sources.depth).toBe(id('Stir'));
-        expect(after.drums.get(id('Beat'))?.sources.volume).toBe(id('Cut'));
-        expect(scope?.follows).toMatchObject({
-            a: { kind: 'picture-level', store: id('Glow') },
-            d: { kind: 'pattern', store: id('Cut') },
-        });
+        expect(after.drums.get(id('Kit'))?.sources.volume).toBe(id('Busy'));
+    });
+
+    it('strikes the marimba on its rhythm alone, the picture choosing only the notes', () => {
+        const { held } = starter('starter-light-band');
+        const glow = new Map(held.converters).get('glow');
+        const lead = new Map(held.voices).get('lead');
+        const rhythm = new Map(held.gates).get('rhythm');
+        if (glow === undefined || lead === undefined || rhythm === undefined) {
+            throw new Error('Light band is missing its marimba');
+        }
+        const brightness = curveOf(
+            t => 0.26 + 0.1 * Math.cos(2 * Math.PI * t) * Math.cos(6 * Math.PI * t),
+        );
+        const volume = bitCurve(Uint8Array.from(rhythm.steps));
+        const struck = notesOf({
+            voice: lead,
+            waves: { pitch: shaped(brightness, glow.shape), volume, filter: null, pan: null },
+        }).filter(({ from }) => curveAt(volume, from + 1e-4) > 0.5);
+        const hits = [...RHYTHM].flatMap((mark, index) =>
+            mark === '1' && RHYTHM[index - 1] !== '1' ? [index / RHYTHM.length] : [],
+        );
+
+        expect(struck.map(({ from }) => Number(from.toFixed(4)))).toEqual(
+            hits.map(t => Number(t.toFixed(4))),
+        );
+        expect(new Set(struck.map(({ semitones }) => semitones)).size).toBeGreaterThan(4);
+    });
+
+    it('plays Am, F, C and G on the bass, three strikes a bar', () => {
+        const { held } = starter('starter-light-band');
+        const bass = new Map(held.voices).get('bass');
+        const groove = new Map(held.gates).get('groove');
+        const chords = waveOf(new Map(held.signals), 'chords');
+        if (bass === undefined || groove === undefined) {
+            throw new Error('Light band is missing its bass');
+        }
+        const played = notesOf({
+            voice: bass,
+            waves: {
+                pitch: chords,
+                volume: bitCurve(Uint8Array.from(groove.steps)),
+                filter: null,
+                pan: null,
+            },
+        }).map(({ semitones }) => bass.root + semitones);
+
+        expect(played).toEqual([33, 33, 33, 29, 29, 29, 36, 36, 36, 31, 31, 31]);
     });
 
     it('places a Logic primer whose half adder adds and whose counter counts', () => {
