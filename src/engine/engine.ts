@@ -130,7 +130,7 @@ export type Engine = {
     readonly passes: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample', Pass>>;
     readonly ink: InkPass;
     readonly sheets: Map<string, Sheet>;
-    readonly films: Map<'strip', Film>;
+    readonly films: Map<'strip' | 'level' | 'level-cell', Film>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
     readonly checks: Map<string, FormulaCheck>;
@@ -683,6 +683,79 @@ export const filmFor = (engine: Engine, width: number, height: number, now: numb
     engine.films.set('strip', film);
 
     return film.target;
+};
+
+const filmOf = (engine: Engine, key: 'level' | 'level-cell', side: number, now: number): Target => {
+    const { gl } = engine;
+    const known = engine.films.get(key);
+    const film =
+        known !== undefined && known.target.width === side
+            ? known
+            : { target: createTarget(gl, side, side), used: now };
+
+    if (known !== undefined && film !== known) {
+        releaseTarget(gl, known.target);
+    }
+
+    film.used = now;
+    engine.films.set(key, film);
+
+    return film.target;
+};
+
+// Averaged into a cell of a target of its own, never read from a stage: a read waits for every queued draw, so a curve reads once.
+export const averagedInto = (
+    engine: Engine,
+    picture: Picture | null,
+    at: { readonly x: number; readonly y: number },
+    cell: number,
+    atlas: number,
+    now: number,
+): void => {
+    const { gl } = engine;
+    const shader = engine.passes.downsample;
+    const scratch = filmOf(engine, 'level-cell', cell, now);
+    const into = filmOf(engine, 'level', atlas, now);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.framebuffer);
+    gl.viewport(0, 0, cell, cell);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.useProgram(shader.program);
+    bindInput(engine, 0, picture?.texture ?? engine.blank);
+    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
+    gl.uniform1i(shader.at('uFactor'), Math.max(1, Math.round((picture?.width ?? cell) / cell)));
+    gl.bindVertexArray(engine.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, scratch.framebuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, into.framebuffer);
+    gl.blitFramebuffer(
+        0,
+        0,
+        cell,
+        cell,
+        at.x,
+        at.y,
+        at.x + cell,
+        at.y + cell,
+        gl.COLOR_BUFFER_BIT,
+        gl.NEAREST,
+    );
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+};
+
+export const readAtlas = (engine: Engine, atlas: number, now: number): Uint8Array => {
+    const { gl } = engine;
+    const pixels = new Uint8Array(atlas * atlas * 4);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, filmOf(engine, 'level', atlas, now).framebuffer);
+    gl.readPixels(0, 0, atlas, atlas, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return pixels;
 };
 
 export const drawn = (

@@ -366,6 +366,27 @@ describe('links', () => {
         expect(compared.present.signals.get('signal')?.sources.phase ?? null).toBeNull();
     });
 
+    it('refuse a sketch whose knob would follow its own picture', () => {
+        const before = run(fresh(), [
+            act({
+                kind: 'launch',
+                program: 'picture-level',
+                size: { width: 300, height: 340 },
+                viewport,
+            }),
+        ]);
+        const brightness =
+            before.present.workspace.processes.find(({ program }) => program === 'picture-level')
+                ?.store ?? '';
+        const history = run(before, [
+            { kind: 'link', store: brightness, param: 'in', source: 'sketch-2' },
+            { kind: 'link', store: 'sketch-2', param: 'k1', source: brightness },
+        ]);
+
+        expect(history.present.converters.get(brightness)?.sources.in).toBe('sketch-2');
+        expect(history.present.sketchLinks.get('sketch-2')?.sources.k1 ?? null).toBeNull();
+    });
+
     it('let a knob follow an agenda only through a converter', () => {
         const before = run(fresh(), [
             act({

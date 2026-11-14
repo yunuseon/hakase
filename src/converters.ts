@@ -27,6 +27,7 @@ export const CONVERTER_KINDS = [
     'zones-bit',
     'habits-level',
     'habits-bit',
+    'picture-level',
 ] as const;
 export type ConverterKind = (typeof CONVERTER_KINDS)[number];
 
@@ -231,6 +232,21 @@ export const CONVERTERS = {
         choices: [{ id: 'today', title: 'done today' }],
         size: SIZE,
     },
+    'picture-level': {
+        summary:
+            'A sketch or a pedal: how bright its picture is over the loop, how much of one colour, or how much it moves.',
+        icon: 'M4 5 H20 V19 H4 Z M4 15 L9 10 L13 14 L16 11 L20 15',
+        takes: 'picture',
+        makes: 'level',
+        choices: [
+            { id: 'brightness', title: 'brightness' },
+            { id: 'red', title: 'red' },
+            { id: 'green', title: 'green' },
+            { id: 'blue', title: 'blue' },
+            { id: 'motion', title: 'motion' },
+        ],
+        size: SIZE,
+    },
 } as const satisfies Record<ConverterKind, ConverterSpec>;
 
 export const converterTitle = (kind: ConverterKind): string =>
@@ -363,6 +379,7 @@ export const CONVERTER_DEFAULTS: Readonly<Record<ConverterKind, Converter>> = {
     'zones-bit': made('zones-bit'),
     'habits-level': made('habits-level'),
     'habits-bit': made('habits-bit'),
+    'picture-level': made('picture-level'),
 };
 
 export type Conversion = {
@@ -701,3 +718,32 @@ export const habitsBit = (habits: Habits, item: string | null, today: string): n
 
     return Number(picked.length > 0 && picked.every(({ done }) => done.includes(today)));
 };
+
+const luma = (frame: Uint8Array, at: number) =>
+    (0.2126 * (frame[at] ?? 0) + 0.7152 * (frame[at + 1] ?? 0) + 0.0722 * (frame[at + 2] ?? 0)) /
+    255;
+
+const frameLevel = (frame: Uint8Array, before: Uint8Array, choice: string): number => {
+    const pixels = Math.max(1, Math.floor(frame.length / 4));
+    const channel = choice === 'red' ? 0 : choice === 'green' ? 1 : choice === 'blue' ? 2 : -1;
+    let sum = 0;
+
+    for (let pixel = 0; pixel < pixels; pixel += 1) {
+        const at = pixel * 4;
+
+        sum +=
+            choice === 'motion'
+                ? Math.abs(luma(frame, at) - luma(before, at))
+                : channel >= 0
+                  ? (frame[at + channel] ?? 0) / 255
+                  : luma(frame, at);
+    }
+
+    return sum / pixels;
+};
+
+export const pictureCurve = (frames: readonly Uint8Array[], choice: string): Curve => ({
+    samples: Float32Array.from(frames, (frame, index) =>
+        frameLevel(frame, frames[(index + frames.length - 1) % frames.length] ?? frame, choice),
+    ),
+});

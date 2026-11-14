@@ -74,6 +74,7 @@ export const programs = {
     'zones-bit': converterProgram('zones-bit'),
     'habits-level': converterProgram('habits-level'),
     'habits-bit': converterProgram('habits-bit'),
+    'picture-level': converterProgram('picture-level'),
     box: boxProgram,
     blueprints: blueprintsProgram,
     tasks: tasksProgram,

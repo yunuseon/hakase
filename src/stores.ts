@@ -53,6 +53,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     'zones-bit': stage,
     'habits-level': stage,
     'habits-bit': stage,
+    'picture-level': stage,
     compare: stage,
     lamp: stage,
     'pin-in': stage,

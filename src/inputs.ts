@@ -214,6 +214,7 @@ export const CONVERTER_SOURCES = [
     converterSource('zones-bit'),
     converterSource('habits-level'),
     converterSource('habits-bit'),
+    converterSource('picture-level'),
 ] as const;
 
 export const SOURCES = [
@@ -630,6 +631,7 @@ export const sourceProgram = (kind: Follow['kind']) => {
         case 'zones-bit':
         case 'habits-level':
         case 'habits-bit':
+        case 'picture-level':
             return kind;
     }
 };
@@ -694,6 +696,7 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'zones-bit':
         case 'habits-level':
         case 'habits-bit':
+        case 'picture-level':
             return { kind, store };
         default:
             return null;

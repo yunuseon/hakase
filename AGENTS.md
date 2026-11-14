@@ -1833,7 +1833,7 @@ stages inputs first, each once however many cables lead to it.
 **A stage is a document, not a window.** A chain must keep running with its
 source window closed, so everything a stage follows is a store input:
 `sketchLinks` for a sketch, `Pedal.sources` for a pedal. `imageIn(store)` in
-`app-state.graph.ts` assembles a recipe from the store alone, out of the same
+`levels.graph.ts` assembles a recipe from the store alone, out of the same
 deduplicated streams the windows read (`driverIn`, `sheetIn`, `pedalIn`),
 recursively through pedal inputs with a `seen` set against a loop from storage.
 It is streams, not one pure `imageOf(documents)`: that would rebuild every
@@ -2101,6 +2101,29 @@ not applied on the way to "12"; the fields keep their draft while focused
   (`doneLevel`); an empty list reads 0.
 - **level → level** (Shape) has the single reading _shape_: any level through
   the modifiers alone.
+- **picture → level** reads a sketch's or a pedal's picture over the loop: its
+  _brightness_, how much _red_, _green_ or _blue_, or _motion_ (how much its
+  brightness changed since the moment before, the first against the last).
+  It is a curve, never a live reading, so a follower stays a pure function of
+  the playhead: `pictureFrames$` (`engine/levels.ts`) cooks the recipe at 64
+  moments in order, at 128 px in a lane of its own (`'level'`, so a live
+  simulation is never thrown back), playing the loop once unkept first when
+  the recipe has history (`hasHistory`, now in `image.ts`). Each moment is
+  averaged by the strip's box filter into a 32 px cell of an 8 x 8 atlas
+  (`averagedInto`, through a scratch target and an exact blit, never reading a
+  stage's output), eight moments per animation frame, and the atlas is read
+  **once** at the end (`readAtlas`, `cellsOf`). Both shortcuts were measured
+  and dropped: all 64 draws and reads in one go held the page for 85 to 110 ms,
+  and a read per moment was worse, seven frames of about 60 ms, because every
+  synchronous `readPixels` waits for everything queued, every window's drawing
+  included. Now a read-back raises no long frame at all.
+  `pictureCurve` (pure, in `converters.ts`) turns the frames into the curve,
+  so changing the reading redraws nothing. It runs only when the recipe or
+  the loop length changes, debounced by 250 ms like an evolving strip, never
+  per frame. `main.ts` hands the engine stream to `levelsOf`, which therefore
+  now also assembles pictures (`imageIn`, `pedalIn`, `sheetIn`), with one
+  `seen` set threaded through pictures and levels alike. A sketch whose knob
+  follows its own picture is refused by the reducer, as any loop is.
 
 **Converters that make a bit** are pairs like the rest, their output a curve of
 0 and 1, so a knob reads one as a level (bit to level is implicit) and a gate's
@@ -2152,8 +2175,7 @@ migration can catch it.
 **The first five converters were named per source** (Timing, Envelope, Kit,
 Phase, Done). `RENAMED` brings their windows and stores back as the pairs and
 `parseConverter` their documents (`formerConverter`); every reading id carried
-over, so a saved choice survives. Phases B and C, converters that make bits and
-more sources, are in `backlog.md`.
+over, so a saved choice survives.
 
 ## Blueprints
 
@@ -2788,9 +2810,11 @@ belongs to is read from its name instead of its path:
   (the documents fold and its per-document streams), `timekeeping` (playback
   clocks, focus timers and plans), `selection` (selection, clipboard,
   placement), `navigation` (jumps and camera flights), `state-mode`, `levels`
-  (every level a store makes, resolved through its links: waves, pens, voices,
-  kits, the circuit table and the converters, kept in one module because they
-  read each other recursively), `app-state` (`scopedOf`, the `AppState` each
+  (every level and picture a store makes, resolved through its links: waves,
+  pens, voices, kits, the circuit table, the converters and the picture
+  recipes, kept in one module because they read each other recursively; the
+  engine's `pictureFrames$` comes in as a parameter, so no graph module
+  touches GL), `app-state` (`scopedOf`, the `AppState` each
   window gets, which takes the levels as a parameter), `windows` (one `liveProcess$`
   per process), the two action streams, and `persistence`. A module's parameter
   type is a `Pick` of the records it reads (`Pick<Projections, 'workspace$'>`),

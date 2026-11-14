@@ -9,7 +9,7 @@ import {
 import { messageOf, writer$, type ExportEvent } from '../components/sketch/export/export.ts';
 import { centre } from '../components/sketch/params.ts';
 import type { Size } from '../components/window/frame.ts';
-import { stagesOf, type Image } from '../image.ts';
+import { hasHistory, type Image } from '../image.ts';
 import { cook, createEngine, drawn, releaseEngine, type Engine } from './engine.ts';
 
 export type ImageExport = {
@@ -28,13 +28,6 @@ const ownEngine$ = new Observable<Engine>(subscriber => {
         releaseEngine(engine);
     };
 });
-
-export const hasHistory = (image: Image): boolean =>
-    stagesOf(image).some(stage =>
-        stage.kind === 'pedal'
-            ? stage.pedal.kind === 'feedback'
-            : stage.panel.trails > 0 || stage.drivers.trails !== null,
-    );
 
 const frameAt = (
     engine: Engine,

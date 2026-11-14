@@ -18,6 +18,7 @@ import {
     doneLevel,
     parseConverter,
     phaseLevel,
+    pictureCurve,
     PLAIN_BITS,
     reduceConverter,
     shaped,
@@ -346,5 +347,35 @@ describe('converters reading clocks, cities and habits', () => {
         expect(
             converterInputs('clock-level')['in']?.sources.map(({ kind: source }) => source),
         ).toEqual(['playback']);
+    });
+});
+
+describe('a picture converter', () => {
+    const frame = (r: number, g: number, b: number) =>
+        Uint8Array.from({ length: 16 }, (_, index) => [r, g, b, 255][index % 4] ?? 0);
+    const frames = [frame(0, 0, 0), frame(255, 255, 255), frame(255, 0, 0), frame(0, 0, 255)];
+    const read = (choice: string) =>
+        Array.from(pictureCurve(frames, choice).samples, value => Number(value.toFixed(3)));
+
+    it('reads the brightness of each moment, or one colour of it, as a curve over the loop', () => {
+        expect(read('brightness')).toEqual([0, 1, 0.213, 0.072]);
+        expect(read('red')).toEqual([0, 1, 1, 0]);
+        expect(read('blue')).toEqual([0, 1, 0, 1]);
+    });
+
+    it('reads motion as the change from the moment before, the first from the last', () => {
+        expect(read('motion')).toEqual([0.072, 1, 0.787, 0.14]);
+    });
+
+    it('takes a sketch or a pedal, never a level', () => {
+        expect(converterInputs('picture-level')['in']?.sources.map(({ kind }) => kind)).toEqual([
+            'sketch',
+            'colourmap',
+            'kaleido',
+            'feedback',
+            'mix',
+            'blur',
+        ]);
+        expect(converterTitle('picture-level')).toBe('picture → level');
     });
 });

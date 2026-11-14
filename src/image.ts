@@ -122,3 +122,10 @@ export const stillOf = (image: Image): Image => {
             return { ...image, inputs: image.inputs.map(stillOf) };
     }
 };
+
+export const hasHistory = (image: Image): boolean =>
+    stagesOf(image).some(stage =>
+        stage.kind === 'pedal'
+            ? stage.pedal.kind === 'feedback'
+            : stage.panel.trails > 0 || stage.drivers.trails !== null,
+    );

@@ -14,7 +14,6 @@ const SETTLE_MS = 250;
 const replays = (image: Image): boolean =>
     stagesOf(image).some(stage => stage.kind === 'points' && evolves(stage.source));
 
-// A sketch is framed by its window; a chain by nothing, at the app's aspect.
 export type Framing = { readonly frame: Size | null; readonly shape: Size };
 
 type Scene = {

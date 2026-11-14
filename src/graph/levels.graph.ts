@@ -12,7 +12,7 @@ import {
 } from '../components/drums/drums.ts';
 import { focusView, initialFocus } from '../components/focus/focus.ts';
 import { emptyHabits } from '../components/habits/habits.ts';
-import { defaultPen, sameDrawing, type Drawing } from '../components/pen/pen.ts';
+import { defaultPen, sameDrawing, strokeOf, type Drawing } from '../components/pen/pen.ts';
 import {
     defaultVoice,
     pitchCurve,
@@ -37,6 +37,7 @@ import {
     tasksBit,
     thresholded,
     timerBit,
+    pictureCurve,
     timingCurve,
     zoneCurve,
     type Conversion,
@@ -47,7 +48,16 @@ import {
 import { ownerOf } from '../documents.ts';
 import { GATE_DEFAULTS, GATES, isGateKind, sourceOfGate, type Gate } from '../gates.ts';
 import { sourceIn } from '../input-connections.ts';
-import { progressBinding, SOURCES, type Follow } from '../inputs.ts';
+import { isImageKind, progressBinding, SOURCES, type Follow } from '../inputs.ts';
+import type { PictureFrames } from '../engine/levels.ts';
+import { NONE, sameImage, type Image } from '../image.ts';
+import { sourceOf } from '../library.ts';
+import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
+import { asSketch } from '../settings.ts';
+import { defaultPicture } from '../shared/picture.ts';
+import { samePanel, type Drive } from '../components/sketch/params.ts';
+import { sameOrbit } from '../components/sketch/space.ts';
+import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { dayOf } from '../lib/day.ts';
 import { wallClock$ } from '../lib/rx.ts';
 import { curveOf, type Driver } from '../shared/curve.ts';
@@ -71,6 +81,15 @@ type Seen = ReadonlySet<StoreId>;
 
 export const NONE_SEEN: Seen = new Set();
 
+// One object per kind, not one per read: a fresh default each time would look like an edit to every stage.
+const PEDAL_DEFAULTS: Readonly<Record<PedalKind, Pedal>> = {
+    colourmap: defaultPedal('colourmap'),
+    kaleido: defaultPedal('kaleido'),
+    feedback: defaultPedal('feedback'),
+    mix: defaultPedal('mix'),
+    blur: defaultPedal('blur'),
+};
+
 type Reads = Pick<
     Projections,
     | 'stores$'
@@ -85,8 +104,16 @@ type Reads = Pick<
     | 'gates$'
     | 'converters$'
     | 'linked$'
+    | 'pedals$'
+    | 'paintings$'
+    | 'settings$'
+    | 'edits$'
+    | 'library$'
+    | 'palettes$'
 > &
-    Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'>;
+    Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
+        readonly pictureFrames$: PictureFrames;
+    };
 
 export const levelsOf = ({
     stores$,
@@ -101,9 +128,16 @@ export const levelsOf = ({
     gates$,
     converters$,
     linked$,
+    pedals$,
+    paintings$,
+    settings$,
+    edits$,
+    library$,
+    palettes$,
     timers$,
     planIn,
     playbackIn,
+    pictureFrames$,
 }: Reads) => {
     const ticketsIn = inStore(tickets$, defaultTickets);
     const agendaIn = inStore(agendas$, emptyAgenda);
@@ -429,6 +463,20 @@ export const levelsOf = ({
                                   ),
                               )
                             : of(null);
+                    case 'picture-level':
+                        return isImageKind(binding.kind)
+                            ? pictureFrames$(
+                                  imageIn(binding.store, pace$, below),
+                                  pace$.pipe(
+                                      map(({ seconds }) => seconds),
+                                      distinctUntilChanged(),
+                                  ),
+                              ).pipe(
+                                  map(frames =>
+                                      frames === null ? null : pictureCurve(frames, choice),
+                                  ),
+                              )
+                            : of(null);
                     case 'zones-level':
                     case 'zones-bit':
                     case 'habits-level':
@@ -639,7 +687,153 @@ export const levelsOf = ({
     const driverIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
         drivenIn(store, param, pace$);
 
+    const pictureIn = inStore(paintings$, defaultPicture);
+    const pedalIn = (store: StoreId) =>
+        combineLatest([pedals$, stores$]).pipe(
+            map(([all, stores]) => {
+                const owner = ownerOf({ stores }, store);
+
+                return (
+                    all.get(store) ??
+                    (owner !== null && isPedalKind(owner)
+                        ? PEDAL_DEFAULTS[owner]
+                        : PEDAL_DEFAULTS.mix)
+                );
+            }),
+            distinctUntilChanged(),
+        );
+
+    const sheetIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
+        linkIn(store, param).pipe(
+            switchMap(binding =>
+                binding?.kind === 'paint'
+                    ? pictureIn(binding.store)
+                    : binding?.kind === 'pen'
+                      ? drawingIn(binding.store, pace$).pipe(map(strokeOf))
+                      : of(null),
+            ),
+        );
+
+    const pointsIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen): Observable<Image> => {
+        const sketch$ = settings$.pipe(
+            map(all => asSketch(all.get(store))),
+            distinctUntilChanged(),
+        );
+        const drive = (param: Drive) => drivenIn(store, param, pace$, seen);
+
+        return combineLatest({
+            source: sketch$.pipe(
+                map(({ formula }) => formula),
+                distinctUntilChanged(),
+                switchMap(formula =>
+                    combineLatest([edits$, library$]).pipe(
+                        map(
+                            ([edits, library]) =>
+                                edits.get(formula)?.value ?? sourceOf(formula, library),
+                        ),
+                    ),
+                ),
+                distinctUntilChanged(),
+            ),
+            panel: sketch$.pipe(
+                map(({ panel }) => panel),
+                distinctUntilChanged(samePanel),
+            ),
+            theme: sketch$.pipe(
+                map(({ theme }) => theme),
+                distinctUntilChanged(),
+                switchMap(name => palettes$.pipe(map(all => all.get(name)?.value ?? themes[name]))),
+                distinctUntilChanged(),
+            ),
+            orbit: sketch$.pipe(
+                map(({ orbit }) => orbit),
+                distinctUntilChanged(sameOrbit),
+            ),
+            drivers: combineLatest({
+                k1: drive('k1'),
+                k2: drive('k2'),
+                k3: drive('k3'),
+                k4: drive('k4'),
+                turn: drive('turn'),
+                pitch: drive('pitch'),
+                distance: drive('distance'),
+                focus: drive('focus'),
+                colour: drive('colour'),
+                size: drive('size'),
+                depth: drive('depth'),
+                trails: drive('trails'),
+            }),
+            sheet: sheetIn(store, 'paint', pace$),
+        }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
+    };
+
+    const imageIn = (
+        store: StoreId,
+        pace$: Observable<Pace>,
+        seen: Seen = NONE_SEEN,
+    ): Observable<Image> =>
+        seen.has(store)
+            ? of(NONE)
+            : stores$.pipe(
+                  map(stores => ownerOf({ stores }, store)),
+                  distinctUntilChanged(),
+                  switchMap(owner =>
+                      owner === 'sketch'
+                          ? pointsIn(store, pace$, new Set([...seen, store]))
+                          : owner !== null && isPedalKind(owner)
+                            ? stageIn(store, owner, pace$, new Set([...seen, store]))
+                            : of(NONE),
+                  ),
+                  distinctUntilChanged(sameImage),
+              );
+
+    const stageIn = (
+        store: StoreId,
+        kind: PedalKind,
+        pace$: Observable<Pace>,
+        seen: ReadonlySet<StoreId>,
+    ): Observable<Image> => {
+        const pedal$ = pedalIn(store);
+
+        return combineLatest({
+            pedal: pedal$,
+            theme:
+                kind === 'colourmap'
+                    ? pedal$.pipe(
+                          map(({ choice }) => choice),
+                          distinctUntilChanged(),
+                          switchMap(name =>
+                              isThemeName(name)
+                                  ? palettes$.pipe(map(all => all.get(name)?.value ?? themes[name]))
+                                  : of(themes.paper),
+                          ),
+                          distinctUntilChanged(),
+                      )
+                    : of(null),
+            drivers: combineLatest(
+                Object.fromEntries(
+                    PEDALS[kind].knobs.map(({ name }) => [name, driverIn(store, name, pace$)]),
+                ),
+            ),
+            inputs: combineLatest(
+                PEDALS[kind].inputs.map(input =>
+                    linkIn(store, input).pipe(
+                        switchMap(binding =>
+                            binding !== null && isImageKind(binding.kind)
+                                ? imageIn(binding.store, pace$, seen)
+                                : of(NONE),
+                        ),
+                    ),
+                ),
+            ),
+        }).pipe(map((parts): Image => ({ kind: 'pedal', store, ...parts })));
+    };
+
     return {
+        pictureIn,
+        pedalIn,
+        sheetIn,
+        imageIn,
         ticketsIn,
         agendaIn,
         habitsIn,

@@ -3,6 +3,7 @@ import './styles.css';
 import { chime$ } from './chime.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { levelsOf } from './graph/levels.graph.ts';
+import { pictureFrames$ } from './engine/levels.ts';
 import { connectChrome$, mountChrome } from './graph/chrome.graph.ts';
 import { documentActions$ } from './graph/document-actions.graph.ts';
 import { begunFrom, historyOf } from './graph/history.graph.ts';
@@ -45,7 +46,7 @@ const bootstrap = () => {
     });
     const navigation = navigationOf({ ...chrome, ...intents, ...projected, inputs$ });
     const stateMode = stateModeOf({ ...chrome, ...projected, signals$ });
-    const levels = levelsOf({ ...projected, ...timekeeping });
+    const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$ });
     const scoped = scopedOf({ ...projected, ...timekeeping, ...levels, inputs$ });
     const windows = windowsOf({ ...chrome, ...projected, ...selection, ...stateMode, scoped });
 

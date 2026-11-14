@@ -5,7 +5,7 @@ import { themes } from '../components/sketch/themes/registry.ts';
 import type { Image, PointsImage } from '../image.ts';
 import { defaultPedal } from '../pedals.ts';
 import { defaultSignal } from '../shared/signal.ts';
-import { hasHistory } from './export.ts';
+import { hasHistory } from '../image.ts';
 
 const undriven: Signals = {
     k1: null,
