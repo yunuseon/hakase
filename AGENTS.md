@@ -1514,7 +1514,7 @@ replays exactly. Three choices hold it together:
 level stands in for one; `waveAt` evaluates it through `driverAt`, and
 `sameWave`/`sameDriver` compare by each signal's and curve's reference, so an
 edit elsewhere does not re-prepare a sketch. It is resolved by `waveIn` in
-`app-state.graph.ts`, one `drivenIn` per parameter, and pens, voices and drum
+`levels.graph.ts`, one `drivenIn` per parameter, and pens, voices and drum
 machines are resolved the same way (`drawingIn`, `soundingIn`, `kitIn`), so
 their store inputs take a gate or a converter too, and a bit gates a sound.
 Each link along a chain is followed through `boundIn`, with a `seen` set of the
@@ -2045,7 +2045,7 @@ kind, reading, shape, `sources`), a private `stage` store like a pedal's, so
 saving, forking, pruning, undo, blueprints and `linkedOf` handle them all once.
 `CONVERTER_DEFAULTS` is one object per kind, for the pedal defaults' reason.
 
-**Readings and shape are two stages.** `readingIn` in `app-state.graph.ts` has
+**Readings and shape are two stages.** `readingIn` in `levels.graph.ts` has
 one case per pair, what it reads through `in` and how its reading makes a
 `Driver`; `conversionIn` then applies the document's **shape** with one pure
 `shaped(driver, shape)`, so every converter that makes a level has the same
@@ -2774,8 +2774,11 @@ belongs to is read from its name instead of its path:
   `intents` (what the chrome's controls ask for), `history` and `projections`
   (the documents fold and its per-document streams), `timekeeping` (playback
   clocks, focus timers and plans), `selection` (selection, clipboard,
-  placement), `navigation` (jumps and camera flights), `state-mode`, `app-state`
-  (`scopedOf`, the `AppState` each window gets), `windows` (one `liveProcess$`
+  placement), `navigation` (jumps and camera flights), `state-mode`, `levels`
+  (every level a store makes, resolved through its links: waves, pens, voices,
+  kits, the circuit table and the converters, kept in one module because they
+  read each other recursively), `app-state` (`scopedOf`, the `AppState` each
+  window gets, which takes the levels as a parameter), `windows` (one `liveProcess$`
   per process), the two action streams, and `persistence`. A module's parameter
   type is a `Pick` of the records it reads (`Pick<Projections, 'workspace$'>`),
   so its imports say what it depends on and `main.ts` can pass whole records by
