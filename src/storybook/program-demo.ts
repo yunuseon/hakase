@@ -170,14 +170,14 @@ export const programDemo = (
         }),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),
-        followedSignal$: input =>
+        followedLevel$: input =>
             empty || input !== 'a'
                 ? of(null)
                 : select(state => ({
                       id: 'example',
                       name: 'Sine',
                       colour: 'var(--accent)',
-                      wave: waveOf(new Map([['example', state.signal]]), 'example'),
+                      driver: waveOf(new Map([['example', state.signal]]), 'example'),
                   })),
         inspect$: () => select(state => state.tickets),
         history$: of(

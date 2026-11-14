@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driverAt } from '../../shared/curve.ts';
+import { driverAt } from '../../shared/signal.ts';
 import {
     ACCENT,
     beatOf,

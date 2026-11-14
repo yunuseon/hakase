@@ -1,4 +1,5 @@
-import { samplesOf, waveAt, type Wave } from '../../shared/signal.ts';
+import type { Driver } from '../../shared/curve.ts';
+import { driverAt, samplesOf } from '../../shared/signal.ts';
 
 export const WIDTH = 400;
 export const HEIGHT = 120;
@@ -14,7 +15,7 @@ export type Trace = {
     readonly key: string;
     readonly label: string;
     readonly colour: string;
-    readonly wave: Wave;
+    readonly driver: Driver;
 };
 
 export type Lane = {
@@ -56,7 +57,7 @@ const pathOf = (samples: readonly number[], scale: Scale) =>
         .join(' ');
 
 export const lanesOf = (traces: readonly Trace[], layout: Layout): readonly Lane[] => {
-    const sampled = traces.map(trace => ({ trace, samples: samplesOf(trace.wave, SAMPLES) }));
+    const sampled = traces.map(trace => ({ trace, samples: samplesOf(trace.driver, SAMPLES) }));
     const shared = fitted(sampled.flatMap(({ samples }) => samples));
     const count = layout === 'lanes' ? Math.max(sampled.length, 1) : 1;
     const height = (HEIGHT - LANE_GAP * (count - 1)) / count;
@@ -89,7 +90,7 @@ export const boundsOf = (lanes: readonly Lane[], layout: Layout) =>
 export const readingsAt = (traces: readonly Trace[], lanes: readonly Lane[], t: number) =>
     traces.flatMap(trace => {
         const lane = lanes.find(({ key }) => key === trace.key);
-        const value = waveAt(trace.wave, t);
+        const value = driverAt(trace.driver, t);
 
         return lane === undefined
             ? []

@@ -294,7 +294,16 @@ describe('one log for every document', () => {
 
 describe('links', () => {
     const launched = (
-        program: 'pen' | 'signal' | 'focus' | 'kaleido' | 'colourmap' | 'nand' | 'delay',
+        program:
+            | 'pen'
+            | 'signal'
+            | 'focus'
+            | 'kaleido'
+            | 'colourmap'
+            | 'nand'
+            | 'delay'
+            | 'compare'
+            | 'voice',
     ) => act({ kind: 'launch', program, size: { width: 300, height: 300 }, viewport });
 
     it('set a store input on whichever document owns the store, a signal or a pen', () => {
@@ -325,6 +334,36 @@ describe('links', () => {
         expect(history.present.gates.get('nand')?.sources['time']).toBe('timeline');
         expect(history.present.signals.get('signal')?.sources.depth ?? null).toBeNull();
         expect(history.steps).toHaveLength(before.steps.length + 2);
+    });
+
+    it('let a signal or a voice follow a gate, unless a gate reads it back', () => {
+        const before = run(fresh(), [
+            launched('signal'),
+            launched('voice'),
+            launched('nand'),
+            launched('compare'),
+        ]);
+        const storeOf = (program: string) =>
+            before.present.workspace.processes.find(process => process.program === program)
+                ?.store ?? '';
+        const [nand, compare] = [storeOf('nand'), storeOf('compare')];
+        const followed = run(before, [
+            { kind: 'link', store: 'signal', param: 'phase', source: nand },
+            { kind: 'link', store: 'voice', param: 'volume', source: nand },
+            { kind: 'link', store: compare, param: 'in', source: 'signal' },
+        ]);
+
+        expect(followed.present.signals.get('signal')?.sources.phase).toBe(nand);
+        expect(followed.present.voices.get('voice')?.sources['volume']).toBe(nand);
+        expect(followed.present.gates.get(compare)?.sources['in'] ?? null).toBeNull();
+
+        const compared = run(before, [
+            { kind: 'link', store: compare, param: 'in', source: 'signal' },
+            { kind: 'link', store: 'signal', param: 'phase', source: nand },
+        ]);
+
+        expect(compared.present.gates.get(compare)?.sources['in']).toBe('signal');
+        expect(compared.present.signals.get('signal')?.sources.phase ?? null).toBeNull();
     });
 
     it('let a knob follow an agenda only through a converter', () => {

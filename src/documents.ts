@@ -41,6 +41,7 @@ import type { FocusLink } from './components/focus/focus.ts';
 import { defaultPedal, isPedalKind, reducePedal, type Pedal, type PedalCommand } from './pedals.ts';
 import {
     GATE_DEFAULTS,
+    GATES,
     isGateKind,
     loopEdges,
     readsTickBefore,
@@ -301,6 +302,26 @@ export const loopsOf = (documents: Parameters<typeof linkedOf>[0]) =>
         ...linkedOf(documents),
         ...[...documents.gates].map(([id, gate]): [StoreId, Linked] => [id, loopEdges(gate)]),
     ]);
+
+const waitless = (before: Documents, after: Documents) => (circuitWaits(after) ? before : after);
+
+// The circuit table reads every non-gate source of a gate while it is being made, so none may lead back to a gate.
+export const circuitWaits = (documents: Documents): boolean => {
+    const isGate = (id: string) => {
+        const owner = ownerOf(documents.workspace, id);
+
+        return owner !== null && isGateKind(owner);
+    };
+    const outside = [...documents.gates.values()].flatMap(gate =>
+        [...GATES[gate.kind].bits, ...GATES[gate.kind].drives].flatMap(param => {
+            const source = gate.sources[param] ?? null;
+
+            return source === null || isGate(source) ? [] : [source];
+        }),
+    );
+
+    return [...reachedFrom(linkedOf(documents), outside)].some(isGate);
+};
 
 const linkedSketchIn = (
     documents: Documents,
@@ -713,9 +734,12 @@ export const reduceDocuments =
                             (!readsTickBefore(owner) &&
                                 closesLoop(loopsOf(documents), store, source))))
                     ? documents
-                    : keptSource(
-                          linked(inputsFor, documents, owner, store, param, source, seq),
-                          source,
+                    : waitless(
+                          documents,
+                          keptSource(
+                              linked(inputsFor, documents, owner, store, param, source, seq),
+                              source,
+                          ),
                       );
             }
             case 'library': {

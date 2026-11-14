@@ -1,4 +1,4 @@
-import { curveOf } from '../../shared/curve.ts';
+import { curveOf, type Driver } from '../../shared/curve.ts';
 import {
     scheduled,
     unscheduled,
@@ -14,7 +14,7 @@ import {
     type InstrumentName,
     type Instrument,
 } from './instruments.ts';
-import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
+import { driverAt, sameDriver, type Signal, waveOf } from '../../shared/signal.ts';
 
 export const VOICE_PARAMS = ['pitch', 'volume', 'filter', 'pan'] as const;
 export type VoiceParam = (typeof VOICE_PARAMS)[number];
@@ -127,7 +127,7 @@ export const reduceVoice = (voice: Voice, command: VoiceCommand): Voice => {
     }
 };
 
-export type VoiceWaves = Readonly<Record<VoiceParam, Wave | null>>;
+export type VoiceWaves = Readonly<Record<VoiceParam, Driver | null>>;
 
 export type Sounding = { readonly voice: Voice; readonly waves: VoiceWaves };
 
@@ -155,7 +155,7 @@ export const sameSounding = (a: Sounding, b: Sounding) =>
         const x = a.waves[param];
         const y = b.waves[param];
 
-        return x === null || y === null ? x === y : sameWave(x, y);
+        return sameDriver(x, y);
     });
 
 const DEGREES: Readonly<Record<Exclude<Scale, 'free'>, readonly number[]>> = {
@@ -182,7 +182,7 @@ export const semitonesOf = (octaves: number, scale: Scale) => {
 };
 
 export const semitonesAt = ({ voice, waves }: Sounding, t: number) =>
-    waves.pitch === null ? 0 : semitonesOf(waveAt(waves.pitch, t), voice.scale);
+    waves.pitch === null ? 0 : semitonesOf(driverAt(waves.pitch, t), voice.scale);
 
 export const frequencyOf = (note: number) => 440 * 2 ** ((note - 69) / 12);
 
@@ -207,7 +207,7 @@ export type Note = {
 const GATE = 0.05;
 
 const volumeAt = ({ waves }: Sounding, t: number) =>
-    waves.volume === null ? 1 : waveAt(waves.volume, t);
+    waves.volume === null ? 1 : driverAt(waves.volume, t);
 
 // A note starts where the pitch moves to another semitone, or where the volume rises out of silence: a gate re-strikes a repeated note.
 export const notesOf = (sounding: Sounding): readonly Note[] => {
@@ -270,10 +270,10 @@ const OPEN_FILTER = 0.6;
 const FILTER_OCTAVES = 6;
 
 const brightnessAt = ({ waves }: Sounding, t: number, open: number) =>
-    waves.filter === null ? open : Math.min(1, Math.max(0, waveAt(waves.filter, t)));
+    waves.filter === null ? open : Math.min(1, Math.max(0, driverAt(waves.filter, t)));
 
 const swellAt = ({ waves }: Sounding, t: number) =>
-    waves.volume === null ? 1 : Math.min(1, Math.max(0, waveAt(waves.volume, t)));
+    waves.volume === null ? 1 : Math.min(1, Math.max(0, driverAt(waves.volume, t)));
 
 // What reaches the window's bus: for an instrument only its volume, filter and pan, since each note brings its own envelope.
 export const levelAt = (
@@ -285,7 +285,7 @@ export const levelAt = (
     const { voice, waves } = sounding;
     const frequency = frequencyOf(voice.root + semitonesAt(sounding, t));
     const swell = swellAt(sounding, t);
-    const pan = waves.pan === null ? 0 : Math.min(1, Math.max(-1, waveAt(waves.pan, t)));
+    const pan = waves.pan === null ? 0 : Math.min(1, Math.max(-1, driverAt(waves.pan, t)));
 
     if (voice.instrument !== 'synth') {
         return {

@@ -21,10 +21,10 @@ export const plotProgram = {
 
         return {
             element: plot,
-            run$: ({ followedSignal$, playhead$ }, self) => {
+            run$: ({ followedLevel$, playhead$ }, self) => {
                 const traces$ = combineLatest(
                     INPUTS.map(input =>
-                        followedSignal$(input).pipe(
+                        followedLevel$(input).pipe(
                             map((followed): Trace[] =>
                                 followed === null
                                     ? []
@@ -33,7 +33,7 @@ export const plotProgram = {
                                               key: input,
                                               label: followed.name,
                                               colour: followed.colour,
-                                              wave: followed.wave,
+                                              driver: followed.driver,
                                           },
                                       ],
                             ),

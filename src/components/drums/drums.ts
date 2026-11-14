@@ -1,6 +1,6 @@
-import { curveOf } from '../../shared/curve.ts';
+import { curveOf, type Driver } from '../../shared/curve.ts';
 import type { Span } from '../../shared/schedule.ts';
-import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
+import { driverAt, sameDriver, type Signal, waveOf } from '../../shared/signal.ts';
 
 export const DRUMS = ['kick', 'snare', 'clap', 'hat', 'open', 'tom', 'bell'] as const;
 export type Drum = (typeof DRUMS)[number];
@@ -232,16 +232,14 @@ export const reduceDrums = (drums: Drums, command: DrumsCommand): Drums => {
     }
 };
 
-export type Kit = { readonly drums: Drums; readonly volume: Wave | null };
+export type Kit = { readonly drums: Drums; readonly volume: Driver | null };
 
 export const kitOf = (drums: Drums, signals: ReadonlyMap<string, Signal>): Kit => ({
     drums,
     volume: drums.sources.volume === null ? null : waveOf(signals, drums.sources.volume),
 });
 
-export const sameKit = (a: Kit, b: Kit) =>
-    a.drums === b.drums &&
-    (a.volume === null || b.volume === null ? a.volume === b.volume : sameWave(a.volume, b.volume));
+export const sameKit = (a: Kit, b: Kit) => a.drums === b.drums && sameDriver(a.volume, b.volume);
 
 export type Hit = Span & { readonly drum: Drum; readonly velocity: number };
 
@@ -260,7 +258,7 @@ export const hitsOf = ({ steps, repeat, swing, pattern }: Drums): readonly Hit[]
     ).flat();
 
 export const swellOf = ({ drums, volume }: Kit, t: number) =>
-    drums.volume * (volume === null ? 1 : Math.min(1, Math.max(0, waveAt(volume, t))));
+    drums.volume * (volume === null ? 1 : Math.min(1, Math.max(0, driverAt(volume, t))));
 
 export const DECAYS: Readonly<Record<Drum, number>> = {
     kick: 0.35,

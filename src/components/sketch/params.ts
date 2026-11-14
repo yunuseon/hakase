@@ -8,7 +8,8 @@ import {
     type Space,
 } from './space.ts';
 import type { Theme } from './theme.ts';
-import { driverAt, type Driver } from '../../shared/curve.ts';
+import { type Driver } from '../../shared/curve.ts';
+import { driverAt } from '../../shared/signal.ts';
 import type { Sheet } from '../../shared/stroke.ts';
 import { clamp } from '../../lib/math.ts';
 

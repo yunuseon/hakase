@@ -25,7 +25,7 @@ const groups = (current: Process, signals = new Map([['signal', defaultSignal]])
 
 describe('store-owned inputs', () => {
     it('offers modulation beside playback without putting it in process follows', () => {
-        expect(groups(process).map(({ input }) => input)).toEqual([
+        expect([...new Set(groups(process).map(({ input }) => input))]).toEqual([
             'playback',
             'phase',
             'offset',

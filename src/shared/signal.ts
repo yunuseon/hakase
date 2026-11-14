@@ -1,4 +1,5 @@
 import { clamp, wrap01 } from '../lib/math.ts';
+import { curveAt, type Driver } from './curve.ts';
 
 export const SHAPES = ['sine', 'triangle', 'saw', 'square', 'noise', 'steps'] as const;
 export type Shape = (typeof SHAPES)[number];
@@ -191,7 +192,7 @@ export const signalAt = (signal: Signal, t: number) =>
 
 export type Wave = {
     readonly signal: Signal;
-    readonly mods: Readonly<Record<Param, Wave | null>>;
+    readonly mods: Readonly<Record<Param, Driver | null>>;
 };
 
 // A store already seen up the chain is not followed again: a loop that slipped in through storage stops there.
@@ -215,31 +216,31 @@ export const waveAt = ({ signal, mods }: Wave, t: number): number =>
     signalAt(
         {
             ...signal,
-            phase: mods.phase === null ? signal.phase : waveAt(mods.phase, t),
-            offset: mods.offset === null ? signal.offset : waveAt(mods.offset, t),
-            depth: mods.depth === null ? signal.depth : waveAt(mods.depth, t),
+            phase: mods.phase === null ? signal.phase : driverAt(mods.phase, t),
+            offset: mods.offset === null ? signal.offset : driverAt(mods.offset, t),
+            depth: mods.depth === null ? signal.depth : driverAt(mods.depth, t),
         },
         t,
     );
+
+export const driverAt = (driver: Driver, t: number): number =>
+    'samples' in driver ? curveAt(driver, t) : waveAt(driver, t);
 
 export const stepAt = ({ signal, mods }: Wave, t: number) =>
     signal.shape !== 'steps'
         ? null
         : Math.floor(
               wrap01(
-                  signal.rate * t + (mods.phase === null ? signal.phase : waveAt(mods.phase, t)),
+                  signal.rate * t + (mods.phase === null ? signal.phase : driverAt(mods.phase, t)),
               ) * signal.steps.length,
           ) % signal.steps.length;
 
-// By reference on each signal: the fold makes a new one only when it changed.
+// By reference on each signal and curve: the folds make a new one only when it changed.
 export const sameWave = (a: Wave, b: Wave): boolean =>
-    a.signal === b.signal &&
-    PARAMS.every(param => {
-        const x = a.mods[param];
-        const y = b.mods[param];
+    a.signal === b.signal && PARAMS.every(param => sameDriver(a.mods[param], b.mods[param]));
 
-        return x === null || y === null ? x === y : sameWave(x, y);
-    });
+export const sameDriver = (a: Driver | null, b: Driver | null): boolean =>
+    a === null || b === null || 'samples' in a || 'samples' in b ? a === b : sameWave(a, b);
 
 export type Linked = { readonly sources: Readonly<Record<string, string | null>> };
 
@@ -289,8 +290,8 @@ export const dependentsOf = (
 export const closesLoop = (all: ReadonlyMap<string, Linked>, target: string, source: string) =>
     reachedFrom(all, [source]).has(target);
 
-export const samplesOf = (wave: Wave, count: number) =>
-    Array.from({ length: count + 1 }, (_, index) => waveAt(wave, index / count));
+export const samplesOf = (driver: Driver, count: number) =>
+    Array.from({ length: count + 1 }, (_, index) => driverAt(driver, index / count));
 
 const finiteOr = (value: unknown, fallback: number) =>
     typeof value === 'number' && Number.isFinite(value) ? value : fallback;

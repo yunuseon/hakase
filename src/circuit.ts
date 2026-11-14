@@ -1,5 +1,6 @@
 import { GATES, sourceOfGate, type Bit, type Gate } from './gates.ts';
-import { CURVE_SAMPLES, driverAt, type Curve, type Driver } from './shared/curve.ts';
+import { CURVE_SAMPLES, type Curve, type Driver } from './shared/curve.ts';
+import { driverAt } from './shared/signal.ts';
 
 export type Table = ReadonlyMap<string, Uint8Array>;
 

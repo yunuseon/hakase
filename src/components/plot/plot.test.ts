@@ -6,7 +6,7 @@ const trace = (key: string, signal: Signal): Trace => ({
     key,
     label: key,
     colour: 'red',
-    wave: waveOf(new Map([[key, signal]]), key),
+    driver: waveOf(new Map([[key, signal]]), key),
 });
 const unit = trace('a', defaultSignal);
 const wide = trace('b', { ...defaultSignal, offset: 5, depth: 10 });

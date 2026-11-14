@@ -1458,8 +1458,8 @@ inputs (`knobInputs`, optional, accepting a signal, a gate or a converter), so o
 signal can drive knobs in several sketches, and a fork drives another set apart. A signal never reads the
 clock of the window that shows it: the follower evaluates it at its **own**
 playhead, so a sketch on a second clock plays the same wave on its own time.
-`AppState.followedSignal$(input)` hands a program the signal its input is bound
-to (its name, colour and wave, the chain already resolved), or null.
+`AppState.followedLevel$(input)` hands a program the level its input is bound
+to (its name, colour and driver, the chain already resolved), or null.
 
 **A sketch's scene can follow signals too**, and every input takes the signal's
 value **as it is, in its own unit**: a knob gets the raw value (a hand-set knob
@@ -1489,8 +1489,9 @@ saved frame used to drop trails with `trails: 0`, which a driven trail would
 override, so a still goes through `stillOf`, which lets go of both, and an
 export's warm-up loop asks `hasHistory`.
 
-**A signal's phase, offset and depth can follow another signal** (`Signal.sources`),
-so an LFO can swell another's range. The followed value stands in for the
+**A signal's phase, offset and depth can follow any level** (`Signal.sources`):
+another signal, so an LFO can swell another's range, a gate's bit or a
+converter. The followed value stands in for the
 parameter, evaluated at the same moment, so a chain still loops and still
 replays exactly. Three choices hold it together:
 
@@ -1508,9 +1509,23 @@ replays exactly. Three choices hold it together:
   would change. `waveOf` also stops at a store
   already seen up the chain, for a loop that arrives through storage.
 
-`waveOf` resolves a store into a `Wave`, a signal with its followed parameters
-as waves, and `waveAt` evaluates it; `sameWave` compares by each signal's
-reference, so an edit elsewhere does not re-prepare a sketch. **A prune keeps
+**A wave's parameters are drivers, not waves.** A `Wave` is a signal with a
+`Driver` per followed parameter, a wave or a curve, so anything that makes a
+level stands in for one; `waveAt` evaluates it through `driverAt`, and
+`sameWave`/`sameDriver` compare by each signal's and curve's reference, so an
+edit elsewhere does not re-prepare a sketch. It is resolved by `waveIn` in
+`app-state.graph.ts`, one `drivenIn` per parameter, and pens, voices and drum
+machines are resolved the same way (`drawingIn`, `soundingIn`, `kitIn`), so
+their store inputs take a gate or a converter too, and a bit gates a sound.
+Each link along a chain is followed through `boundIn`, with a `seen` set of the
+stores above it, so a loop that slipped in through storage stops rather than
+recursing; `waveOf` stays as the pure builder the tests and Storybook use.
+
+**A gate must never wait on itself through a level.** The circuit table reads
+a compare's level and every converter a gate reads while it is being made, and
+those can now reach back to a gate (a signal whose phase follows one). So the
+documents reducer refuses any link after which a gate's non-gate source reaches
+a gate (`circuitWaits`), whichever end of the loop is linked last. **A prune keeps
 what kept signals follow**: both the registry step and the folds' `keep` take
 `reachedFrom` the bound stores, or a signal that only feeds another would be
 deleted out from under it.
@@ -1548,8 +1563,9 @@ setting, and a view-only one, so it is not a step. Dragging across the plot
 scrubs its clock like the frame strip does. It keeps no state of its own
 (`HOLDING` is null): inputs in, a picture out.
 
-It reads each input through `followedSignal$`, which hands over the bound
-store's name, colour and wave **together**, read from the one documents fold.
+It draws any level, a gate's bits and a converter's output as well as a
+signal, and reads each input through `followedLevel$`, which hands over the
+bound store's name, colour and driver **together**, in one switch per binding.
 Reading `followedWave$` beside a separate name stream was the first version and
 is the two-paths trap: a rebind changes both, and the legend would show one
 signal's name over another's line for a frame.
@@ -1972,9 +1988,6 @@ stores' own `kept`, since a hidden gate has no window to keep it. The **Logic
 primer** starter is the worked example: two patterns into a half adder of five
 NANDs boxed as a component, two lamps, and a counter that is one NAND and one
 delay.
-
-Still open: a voice's or drum machine's inputs take signals only (they are
-resolved through `waveOf`), so a bit cannot gate a sound yet.
 
 ## Typed ports and converters
 
@@ -3043,8 +3056,8 @@ compression, and put on the day clock itself the sketch would move one
   stands when it is made, as it takes the pointer.
 - **The driver and the moment are chained, not combined**: the clock moves
   both, and a `combineLatest` would fire twice on a change of pace.
-- Only the followed store's own `time` counts. A signal chained into it is
-  evaluated at the same moment as its parent, whatever clock it names.
+- Every store along a chain honours its own `time`: a signal whose depth
+  follows a signal read on the day reads that depth on the day.
 
 **A source is shown on the clock it is read on.** `scoped` takes the window's
 playback binding and its store's `time` link together and prefers the link, so

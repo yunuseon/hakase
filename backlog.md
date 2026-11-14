@@ -77,10 +77,4 @@ into picture or sound, which sketches, pedals and voices already make.
 
 ### What typed ports make possible
 
-- **Wave inputs take any level.** A signal's phase, offset and depth, a pen's
-  x and y, a voice's pitch and the plot take signals only, because `waveOf`
-  chains waves structurally. Letting them take a `Driver` lets a pen follow a
-  Timing or an Envelope.
 - **The state map shows types** on its ports, as state mode does.
-- **Bits gate sound**: a voice or drum machine's volume takes a level, and a
-  bit is a level, once the wave inputs take any level.

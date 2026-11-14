@@ -310,13 +310,15 @@ export const sourceInput = {
     initial: { kind: 'focus', store: 'focus' },
 } as const satisfies FollowedInput;
 
+const LEVEL_SOURCES = [signalSource, ...GATE_SOURCES, ...CONVERTER_SOURCES] as const;
+
 const signalInput = (title: string, group: string) =>
     ({
         title,
         takes: 'level',
         from: 'followed',
         group,
-        sources: [signalSource],
+        sources: LEVEL_SOURCES,
         initial: null,
     }) as const satisfies FollowedInput;
 
@@ -327,7 +329,7 @@ const driveInput = (title: string, param: string, group: string) =>
         from: 'store',
         param,
         group,
-        sources: [signalSource, ...GATE_SOURCES, ...CONVERTER_SOURCES],
+        sources: LEVEL_SOURCES,
         initial: null,
     }) satisfies StoreInput;
 
@@ -350,7 +352,7 @@ const storedSignalInput = (param: string) =>
         from: 'store',
         param,
         group: null,
-        sources: [signalSource],
+        sources: LEVEL_SOURCES,
         initial: null,
     }) satisfies StoreInput;
 

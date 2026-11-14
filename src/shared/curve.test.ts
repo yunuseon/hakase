@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CURVE_SAMPLES, curveAt, curveOf, driverAt } from './curve.ts';
+import { CURVE_SAMPLES, curveAt, curveOf } from './curve.ts';
+import { driverAt } from './signal.ts';
 import { defaultSignal, waveOf } from './signal.ts';
 
 describe('a curve', () => {

@@ -16,6 +16,7 @@ import {
     waveOf,
     type Signal,
 } from './signal.ts';
+import { curveOf } from './curve.ts';
 
 describe('signalAt', () => {
     it('ends every loop where it began, for every shape and rate', () => {
@@ -161,10 +162,23 @@ describe('chains', () => {
         ['fast', fast],
     ]);
 
+    it('takes any level as a parameter, the step curve of a gate included', () => {
+        const gate = curveOf(t => (t < 0.5 ? 0 : 1));
+        const wave = {
+            signal: { ...defaultSignal, shape: 'sine' as const, depth: 1 },
+            mods: { phase: null, offset: gate, depth: null },
+        };
+
+        expect(waveAt(wave, 0.25)).toBeCloseTo(signalAt({ ...wave.signal, offset: 0 }, 0.25));
+        expect(waveAt(wave, 0.75)).toBeCloseTo(signalAt({ ...wave.signal, offset: 1 }, 0.75));
+    });
+
     it('lets a followed signal stand in for a parameter, at the same moment', () => {
         const chained = waveOf(all, 'fast');
 
-        expect(chained.mods.depth?.signal).toBe(slow);
+        const depth = chained.mods.depth;
+
+        expect(depth !== null && 'signal' in depth ? depth.signal : null).toBe(slow);
         expect(waveAt(chained, 0.125)).toBeCloseTo(
             signalAt({ ...fast, depth: signalAt(slow, 0.125) }, 0.125),
         );
@@ -198,7 +212,9 @@ describe('chains', () => {
             ],
         ]);
 
-        expect(waveOf(looped, 'a').mods.phase?.mods.phase).toBeNull();
+        const phase = waveOf(looped, 'a').mods.phase;
+
+        expect(phase !== null && 'mods' in phase ? phase.mods.phase : 'not a wave').toBeNull();
     });
 
     it('reaches every store a chain follows, so a prune keeps them', () => {

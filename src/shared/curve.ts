@@ -1,10 +1,8 @@
-import { waveAt, type Wave } from './signal.ts';
+import type { Wave } from './signal.ts';
 
 export type Curve = { readonly samples: Float32Array };
 
 export type Driver = Wave | Curve;
-
-const isCurve = (driver: Driver): driver is Curve => 'samples' in driver;
 
 export const CURVE_SAMPLES = 960;
 
@@ -21,6 +19,3 @@ export const curveAt = ({ samples }: Curve, t: number) => {
 
     return here + (next - here) * (position - index);
 };
-
-export const driverAt = (driver: Driver, t: number) =>
-    isCurve(driver) ? curveAt(driver, t) : waveAt(driver, t);

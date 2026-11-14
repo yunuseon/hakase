@@ -213,7 +213,7 @@ export type AppState = {
     readonly image$: Observable<Image>;
     readonly linkedName$: (param: string) => Observable<string | null>;
     // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.
-    readonly followedSignal$: (input: string) => Observable<FollowedSignal | null>;
+    readonly followedLevel$: (input: string) => Observable<FollowedLevel | null>;
     readonly bookmarks$: Observable<Bookmarks>;
     // Read-only, for the state map alone: any store or global, which no other program can see.
     readonly inspect$: (target: string) => Observable<unknown>;
@@ -222,11 +222,11 @@ export type AppState = {
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };
 
-export type FollowedSignal = {
+export type FollowedLevel = {
     readonly id: string;
     readonly name: string;
     readonly colour: string;
-    readonly wave: Wave;
+    readonly driver: Driver;
 };
 
 export type Written<T> = {

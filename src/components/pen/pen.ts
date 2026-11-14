@@ -1,5 +1,6 @@
 import { copiesOf, isSymmetry, type Point, type Symmetry } from '../../shared/brush.ts';
-import { sameWave, waveAt, waveOf, type Signal, type Wave } from '../../shared/signal.ts';
+import { driverAt, sameDriver, type Signal, waveOf } from '../../shared/signal.ts';
+import type { Driver } from '../../shared/curve.ts';
 import { INK_SIDE, type Stroke } from '../../shared/stroke.ts';
 
 export const PEN_PARAMS = ['x', 'y', 'size', 'ink'] as const;
@@ -54,7 +55,7 @@ export const reducePen = (pen: Pen, command: PenCommand): Pen => {
     }
 };
 
-export type PenWaves = Readonly<Record<PenParam, Wave | null>>;
+export type PenWaves = Readonly<Record<PenParam, Driver | null>>;
 
 export type Drawing = { readonly pen: Pen; readonly waves: PenWaves };
 
@@ -77,12 +78,12 @@ export const sameDrawing = (a: Drawing, b: Drawing) =>
         const x = a.waves[param];
         const y = b.waves[param];
 
-        return x === null || y === null ? x === y : sameWave(x, y);
+        return sameDriver(x, y);
     });
 
 export const penAt = ({ waves }: Drawing, t: number) => ({
-    x: waves.x === null ? 0.5 + 0.35 * Math.cos(2 * Math.PI * t) : waveAt(waves.x, t),
-    y: 1 - (waves.y === null ? 0.5 + 0.35 * Math.sin(2 * Math.PI * t) : waveAt(waves.y, t)),
+    x: waves.x === null ? 0.5 + 0.35 * Math.cos(2 * Math.PI * t) : driverAt(waves.x, t),
+    y: 1 - (waves.y === null ? 0.5 + 0.35 * Math.sin(2 * Math.PI * t) : driverAt(waves.y, t)),
 });
 
 export const SAMPLES = 720;
@@ -131,9 +132,9 @@ export const strokeOf = (drawing: Drawing): Stroke => {
             at: penAt(drawing, t),
             t,
             radius:
-                ((size === null ? weight : weight * Math.max(0, waveAt(size, t))) * WEIGHT_UNIT) /
+                ((size === null ? weight : weight * Math.max(0, driverAt(size, t))) * WEIGHT_UNIT) /
                 2,
-            flow: ink === null ? 1 : Math.min(1, Math.max(0, waveAt(ink, t))),
+            flow: ink === null ? 1 : Math.min(1, Math.max(0, driverAt(ink, t))),
         };
     });
     const { chunks } = samples.reduce<{

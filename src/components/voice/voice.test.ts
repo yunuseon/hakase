@@ -1,4 +1,4 @@
-import { driverAt } from '../../shared/curve.ts';
+import { driverAt } from '../../shared/signal.ts';
 import { describe, expect, it } from 'vitest';
 import { defaultSignal, type Signal } from '../../shared/signal.ts';
 import {

@@ -2,7 +2,8 @@ import { DRIVES, samePanel, type Panel, type Signals } from './components/sketch
 import { sameOrbit, type Orbit } from './components/sketch/space.ts';
 import { sameTheme, type Theme } from './components/sketch/theme.ts';
 import { PEDALS, valueOf, type Pedal } from './pedals.ts';
-import { driverAt, type Driver } from './shared/curve.ts';
+import { type Driver } from './shared/curve.ts';
+import { driverAt } from './shared/signal.ts';
 import { sameWave } from './shared/signal.ts';
 import type { Sheet } from './shared/stroke.ts';
 

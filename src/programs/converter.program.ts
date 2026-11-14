@@ -12,7 +12,8 @@ import {
 import { converterInputs, playbackInput } from '../inputs.ts';
 import { CONVERSIONS } from '../port-types.ts';
 import type { AppInput, Program } from '../program.ts';
-import { curveOf, driverAt } from '../shared/curve.ts';
+import { curveOf } from '../shared/curve.ts';
+import { driverAt } from '../shared/signal.ts';
 
 const emptyText = (kind: ConverterKind) => {
     const { takes } = CONVERTERS[kind];

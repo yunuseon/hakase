@@ -37,7 +37,8 @@ import {
 import { inputsFor } from './inputs.fixture.ts';
 import { converterInputs } from './inputs.ts';
 import { processFrom, storeFrom } from './workspace.ts';
-import { CURVE_SAMPLES, curveOf, driverAt, type Driver } from './shared/curve.ts';
+import { CURVE_SAMPLES, curveOf, type Driver } from './shared/curve.ts';
+import { driverAt } from './shared/signal.ts';
 
 const DAY = '2026-11-13';
 const commands: readonly AgendaCommand[] = [

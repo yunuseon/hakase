@@ -17,21 +17,21 @@ import {
     drumCurve,
     isDrum,
     kitCurve,
-    kitOf,
     sameKit,
+    type Kit,
 } from '../components/drums/drums.ts';
 import { focusView, initialFocus } from '../components/focus/focus.ts';
 import { emptyHabits } from '../components/habits/habits.ts';
 import { emptyNotes } from '../components/note/note.ts';
-import { defaultPen, drawingOf, sameDrawing, strokeOf } from '../components/pen/pen.ts';
+import { defaultPen, sameDrawing, strokeOf, type Drawing } from '../components/pen/pen.ts';
 import type { Reading } from '../components/progress-bar/progress-bar.ts';
 import { themes, type ThemeName } from '../components/sketch/themes/registry.ts';
 import {
     defaultVoice,
     pitchCurve,
     sameSounding,
-    soundingOf,
     voiceCurve,
+    type Sounding,
 } from '../components/voice/voice.ts';
 import {
     followedBy,
@@ -50,12 +50,19 @@ import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
 import type { AppState, ProgramId, Task } from '../program.ts';
 import { inputsFor, programOf } from '../programs.ts';
-import { curveOf, driverAt, type Driver } from '../shared/curve.ts';
+import { curveOf, type Driver } from '../shared/curve.ts';
 import { defaultPicture } from '../shared/picture.ts';
-import { defaultSignal, sameWave, TIME, waveOf } from '../shared/signal.ts';
+import {
+    defaultSignal,
+    driverAt,
+    sameDriver,
+    sameWave,
+    TIME,
+    type Wave,
+} from '../shared/signal.ts';
 import { defaultTickets } from '../shared/tickets.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
-import { colourOf, inStore, type StoreId } from '../stores.ts';
+import { colourOf, inStore, MAIN, type StoreId } from '../stores.ts';
 import { isImageKind, type Follow } from '../inputs.ts';
 import { GATE_DEFAULTS, GATES, isGateKind, sourceOfGate, type Gate } from '../gates.ts';
 import {
@@ -88,6 +95,9 @@ import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 type Pace = { readonly seconds: number; readonly ticks: number };
 
 const STILL: Pace = { seconds: 1, ticks: 1 };
+
+type Seen = ReadonlySet<StoreId>;
+const NONE_SEEN: Seen = new Set();
 import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
 import { isThemeName } from '../components/sketch/themes/registry.ts';
 import { NONE, sameImage, type Image } from '../image.ts';
@@ -128,7 +138,7 @@ type StoreKey =
     | 'signal$'
     | 'wave$'
     | 'linkedDriver$'
-    | 'followedSignal$'
+    | 'followedLevel$'
     | 'picture$'
     | 'linkedPicture$'
     | 'followedImage$'
@@ -150,7 +160,6 @@ type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
 
 export const scopedOf = ({
     history$,
-    documents$,
     workspace$,
     stores$,
     camera$,
@@ -289,28 +298,54 @@ export const scopedOf = ({
     const clocksIn = inStore(clocks$, defaultClocks);
     const bookmarksIn = inStore(bookmarks$, defaultBookmarks);
     const signalIn = inStore(waves$, defaultSignal);
-    const waveIn = (store: StoreId) =>
-        waves$.pipe(
-            map(all => waveOf(all, store)),
+    const penIn = inStore(pens$, defaultPen);
+    const voiceIn = inStore(voices$, defaultVoice);
+    const drumsIn = inStore(drums$, defaultDrums);
+    const waveIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen = NONE_SEEN) =>
+        combineLatest({
+            signal: signalIn(store),
+            phase: drivenIn(store, 'phase', pace$, seen),
+            offset: drivenIn(store, 'offset', pace$, seen),
+            depth: drivenIn(store, 'depth', pace$, seen),
+        }).pipe(
+            map(({ signal, phase, offset, depth }): Wave => ({
+                signal,
+                mods: { phase, offset, depth },
+            })),
             distinctUntilChanged(sameWave),
         );
     const timerIn = inStore(timers$, initialFocus);
     const pictureIn = inStore(paintings$, defaultPicture);
-    const drawingIn = (store: StoreId) =>
-        documents$.pipe(
-            map(({ pens, signals }) => drawingOf(pens.get(store) ?? defaultPen, signals)),
+    const drawingIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen = NONE_SEEN) =>
+        combineLatest({
+            pen: penIn(store),
+            x: drivenIn(store, 'x', pace$, seen),
+            y: drivenIn(store, 'y', pace$, seen),
+            size: drivenIn(store, 'size', pace$, seen),
+            ink: drivenIn(store, 'ink', pace$, seen),
+        }).pipe(
+            map(({ pen, ...waves }): Drawing => ({ pen, waves })),
             distinctUntilChanged(sameDrawing),
         );
 
-    const soundingIn = (store: StoreId) =>
-        documents$.pipe(
-            map(({ voices, signals }) => soundingOf(voices.get(store) ?? defaultVoice, signals)),
+    const soundingIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen = NONE_SEEN) =>
+        combineLatest({
+            voice: voiceIn(store),
+            pitch: drivenIn(store, 'pitch', pace$, seen),
+            volume: drivenIn(store, 'volume', pace$, seen),
+            filter: drivenIn(store, 'filter', pace$, seen),
+            pan: drivenIn(store, 'pan', pace$, seen),
+        }).pipe(
+            map(({ voice, ...waves }): Sounding => ({ voice, waves })),
             distinctUntilChanged(sameSounding),
         );
 
-    const kitIn = (store: StoreId) =>
-        documents$.pipe(
-            map(({ drums, signals }) => kitOf(drums.get(store) ?? defaultDrums, signals)),
+    const kitIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen = NONE_SEEN) =>
+        combineLatest({
+            drums: drumsIn(store),
+            volume: drivenIn(store, 'volume', pace$, seen),
+        }).pipe(
+            map(({ drums, volume }): Kit => ({ drums, volume })),
             distinctUntilChanged(sameKit),
         );
 
@@ -341,9 +376,9 @@ export const scopedOf = ({
         bookmarks: bookmarksIn,
         signal: signalIn,
         paint: pictureIn,
-        pen: drawingIn,
-        voice: soundingIn,
-        drums: kitIn,
+        pen: penIn,
+        voice: voiceIn,
+        drums: drumsIn,
         colourmap: pedalIn,
         kaleido: pedalIn,
         feedback: pedalIn,
@@ -512,13 +547,17 @@ export const scopedOf = ({
             map((level): Driver => ({ samples: Float32Array.of(level) })),
         );
 
-    const loudnessIn = (binding: Follow, pace$: Observable<Pace>): Observable<Driver | null> =>
+    const loudnessIn = (
+        binding: Follow,
+        pace$: Observable<Pace>,
+        seen: Seen,
+    ): Observable<Driver | null> =>
         binding.kind === 'voice'
-            ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+            ? combineLatest([soundingIn(binding.store, pace$, seen), pace$]).pipe(
                   map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
               )
             : binding.kind === 'drums'
-              ? combineLatest([kitIn(binding.store), pace$]).pipe(
+              ? combineLatest([kitIn(binding.store, pace$, seen), pace$]).pipe(
                     map(([kit, { seconds }]) => kitCurve(kit, seconds)),
                 )
               : of(null);
@@ -527,12 +566,15 @@ export const scopedOf = ({
         store: StoreId,
         { kind, choice, bits }: Converter,
         pace$: Observable<Pace>,
+        seen: Seen,
     ): Observable<Driver | null> =>
         linkIn(store, 'in').pipe(
             switchMap((binding): Observable<Driver | null> => {
-                if (binding === null) {
+                if (binding === null || seen.has(binding.store)) {
                     return of(null);
                 }
+
+                const below = new Set([...seen, store]);
 
                 switch (kind) {
                     case 'schedule-level':
@@ -544,9 +586,12 @@ export const scopedOf = ({
                     case 'sound-level':
                         return binding.kind === 'voice'
                             ? choice === 'pitch'
-                                ? soundingIn(binding.store).pipe(map(pitchCurve))
+                                ? soundingIn(binding.store, pace$, below).pipe(map(pitchCurve))
                                 : choice === 'loudness'
-                                  ? combineLatest([soundingIn(binding.store), pace$]).pipe(
+                                  ? combineLatest([
+                                        soundingIn(binding.store, pace$, below),
+                                        pace$,
+                                    ]).pipe(
                                         map(([sounding, { seconds }]) =>
                                             voiceCurve(sounding, seconds),
                                         ),
@@ -555,7 +600,7 @@ export const scopedOf = ({
                             : binding.kind === 'drums'
                               ? choice === 'pitch'
                                   ? of(curveOf(() => 0))
-                                  : combineLatest([kitIn(binding.store), pace$]).pipe(
+                                  : combineLatest([kitIn(binding.store, pace$, below), pace$]).pipe(
                                         map(([kit, { seconds }]) =>
                                             isDrum(choice)
                                                 ? drumCurve(kit, choice, seconds)
@@ -585,9 +630,9 @@ export const scopedOf = ({
                               )
                             : of(null);
                     case 'level-level':
-                        return driverOf(binding, pace$);
+                        return boundIn(binding, pace$, below);
                     case 'level-bit':
-                        return driverOf(binding, pace$).pipe(
+                        return boundIn(binding, pace$, below).pipe(
                             map(driver =>
                                 driver === null
                                     ? null
@@ -634,7 +679,7 @@ export const scopedOf = ({
                               )
                             : of(null);
                     case 'sound-bit':
-                        return loudnessIn(binding, pace$).pipe(
+                        return loudnessIn(binding, pace$, below).pipe(
                             map(loudness =>
                                 loudness === null ? null : soundBits(loudness, choice),
                             ),
@@ -738,12 +783,16 @@ export const scopedOf = ({
     ];
 
     // One stream for both: a window that combined the document with its driver would fire twice per edit.
-    const conversionIn = (store: StoreId, pace$: Observable<Pace>): Observable<Conversion> =>
+    const conversionIn = (
+        store: StoreId,
+        pace$: Observable<Pace>,
+        seen: Seen = NONE_SEEN,
+    ): Observable<Conversion> =>
         converterIn(store).pipe(
             switchMap(converter =>
                 (PICKED.includes(converter.kind)
                     ? pickedIn(store, converter)
-                    : readingIn(store, converter, pace$).pipe(
+                    : readingIn(store, converter, pace$, seen).pipe(
                           map((driver): Read => ({ driver, items: [] })),
                       )
                 ).pipe(
@@ -788,11 +837,15 @@ export const scopedOf = ({
             distinctUntilChanged((a, b) => a?.kind === b?.kind && a?.store === b?.store),
         );
 
-    const driverOf = (binding: Follow, pace$: Observable<Pace>): Observable<Driver | null> =>
+    const driverOf = (
+        binding: Follow,
+        pace$: Observable<Pace>,
+        seen: Seen,
+    ): Observable<Driver | null> =>
         binding.kind === 'signal'
-            ? waveIn(binding.store)
+            ? waveIn(binding.store, pace$, seen)
             : isConverterKind(binding.kind)
-              ? conversionIn(binding.store, pace$).pipe(map(({ driver }) => driver))
+              ? conversionIn(binding.store, pace$, seen).pipe(map(({ driver }) => driver))
               : isGateKind(binding.kind)
                 ? pace$.pipe(
                       switchMap(({ ticks, seconds }) => tableOf(ticks, seconds)),
@@ -802,7 +855,7 @@ export const scopedOf = ({
                   )
                 : of(null);
 
-    const nowOn = (binding: Follow, clock: StoreId): Observable<Driver | null> => {
+    const nowOn = (binding: Follow, clock: StoreId, seen: Seen): Observable<Driver | null> => {
         const clock$ = playbackIn(clock).pipe(shareReplay({ bufferSize: 1, refCount: true }));
         const pace$ = clock$.pipe(
             map((now): Pace => ({ seconds: secondsOf(now), ticks: now.ticks })),
@@ -810,7 +863,7 @@ export const scopedOf = ({
         );
 
         // Chained, not combined: the clock moves both the driver and the moment, and must not fire twice.
-        return driverOf(binding, pace$).pipe(
+        return driverOf(binding, pace$, seen).pipe(
             switchMap(driver =>
                 driver === null
                     ? of(null)
@@ -823,28 +876,44 @@ export const scopedOf = ({
         );
     };
 
-    const driverIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
+    const boundIn = (
+        binding: Follow,
+        pace$: Observable<Pace>,
+        seen: Seen,
+    ): Observable<Driver | null> =>
+        seen.has(binding.store)
+            ? of(null)
+            : linkIn(binding.store, TIME).pipe(
+                  switchMap(time =>
+                      time?.kind === 'playback'
+                          ? nowOn(binding, time.store, seen)
+                          : driverOf(binding, pace$, seen),
+                  ),
+              );
+
+    const drivenIn = (
+        store: StoreId,
+        param: string,
+        pace$: Observable<Pace>,
+        seen: Seen = NONE_SEEN,
+    ): Observable<Driver | null> =>
         linkIn(store, param).pipe(
             switchMap(binding =>
-                binding === null
-                    ? of(null)
-                    : linkIn(binding.store, TIME).pipe(
-                          switchMap(time =>
-                              time?.kind === 'playback'
-                                  ? nowOn(binding, time.store)
-                                  : driverOf(binding, pace$),
-                          ),
-                      ),
+                binding === null ? of(null) : boundIn(binding, pace$, new Set([...seen, store])),
             ),
+            distinctUntilChanged(sameDriver),
         );
 
-    const sheetIn = (store: StoreId, param: string) =>
+    const driverIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
+        drivenIn(store, param, pace$);
+
+    const sheetIn = (store: StoreId, param: string, pace$: Observable<Pace>) =>
         linkIn(store, param).pipe(
             switchMap(binding =>
                 binding?.kind === 'paint'
                     ? pictureIn(binding.store)
                     : binding?.kind === 'pen'
-                      ? drawingIn(binding.store).pipe(map(strokeOf))
+                      ? drawingIn(binding.store, pace$).pipe(map(strokeOf))
                       : of(null),
             ),
         );
@@ -898,7 +967,7 @@ export const scopedOf = ({
                 depth: drive('depth'),
                 trails: drive('trails'),
             }),
-            sheet: sheetIn(store, 'paint'),
+            sheet: sheetIn(store, 'paint', pace$),
         }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
     };
 
@@ -1045,12 +1114,12 @@ export const scopedOf = ({
             clocks$: narrowed(clocksIn),
             bookmarks$: narrowed(bookmarksIn),
             signal$: narrowed(signalIn),
-            wave$: narrowed(waveIn),
+            wave$: store$.pipe(switchMap(store => waveIn(store, pace$))),
             linkedDriver$: param => store$.pipe(switchMap(store => driverIn(store, param, pace$))),
             picture$: narrowed(pictureIn),
-            drawing$: narrowed(drawingIn),
-            sounding$: narrowed(soundingIn),
-            kit$: narrowed(kitIn),
+            drawing$: store$.pipe(switchMap(store => drawingIn(store, pace$))),
+            sounding$: store$.pipe(switchMap(store => soundingIn(store, pace$))),
+            kit$: store$.pipe(switchMap(store => kitIn(store, pace$))),
             pedal$: narrowed(pedalIn),
             gate$: narrowed(gateIn),
             conversion$: store$.pipe(switchMap(store => conversionIn(store, pace$))),
@@ -1091,7 +1160,7 @@ export const scopedOf = ({
                     ),
                     distinctUntilChanged(),
                 ),
-            linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param))),
+            linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param, pace$))),
             followedImage$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
@@ -1100,22 +1169,31 @@ export const scopedOf = ({
                             : of(NONE),
                     ),
                 ),
-            followedSignal$: input =>
+            followedLevel$: input =>
                 followed$(input).pipe(
                     switchMap(binding =>
-                        binding?.kind !== 'signal'
+                        binding === null
                             ? of(null)
-                            : documents$.pipe(
-                                  map(({ workspace, signals }) => ({
-                                      id: binding.store,
-                                      name:
-                                          workspace.stores.find(({ id }) => id === binding.store)
-                                              ?.name ?? 'Main',
-                                      colour: colourOf(binding.store),
-                                      wave: waveOf(signals, binding.store),
-                                  })),
-                                  distinctUntilChanged(
-                                      (a, b) => a.name === b.name && sameWave(a.wave, b.wave),
+                            : combineLatest([
+                                  stores$.pipe(
+                                      map(
+                                          stores =>
+                                              stores.find(({ id }) => id === binding.store)?.name ??
+                                              MAIN,
+                                      ),
+                                      distinctUntilChanged(),
+                                  ),
+                                  boundIn(binding, pace$, NONE_SEEN),
+                              ]).pipe(
+                                  map(([name, driver]) =>
+                                      driver === null
+                                          ? null
+                                          : {
+                                                id: binding.store,
+                                                name,
+                                                colour: colourOf(binding.store),
+                                                driver,
+                                            },
                                   ),
                               ),
                     ),
