@@ -1,8 +1,6 @@
 import { ownPlaybackInput } from '../inputs.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { HksLinearSlider } from '../components/slider/linear/linear-slider.component.ts';
-import { HksTransport } from '../components/transport/transport.component.ts';
 import type { AppInput, Program } from '../program.ts';
 import { elapsedLabel, timeOfDayLabel } from '../shared/playhead.ts';
 
@@ -14,7 +12,11 @@ export const timelineProgram = {
     icon: 'M3 12 H21 M7.5 9.5 V14.5 M12 8 V16 M16.5 9.5 V14.5',
     size: { width: 340, height: 136 },
     minimum: { width: 240, height: 110 },
-    launch: () => {
+    launch: async () => {
+        const [{ HksLinearSlider }, { HksTransport }] = await Promise.all([
+            import('../components/slider/linear/linear-slider.component.ts'),
+            import('../components/transport/transport.component.ts'),
+        ]);
         const slider = new HksLinearSlider();
         const transport = new HksTransport();
         transport.slot = 'controls';

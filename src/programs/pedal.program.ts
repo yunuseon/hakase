@@ -1,7 +1,5 @@
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
-import { HksImageView } from '../components/image-view/image-view.component.ts';
-import { HksPedal } from '../components/pedal/pedal.component.ts';
 import type { PedalView } from '../components/pedal/pedal.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$ } from '../engine/view.ts';
@@ -21,7 +19,11 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
         icon: spec.icon,
         size: { width: 300, height: 380 },
         minimum: { width: 200, height: 280 },
-        launch: () => {
+        launch: async () => {
+            const [{ HksImageView }, { HksPedal }] = await Promise.all([
+                import('../components/image-view/image-view.component.ts'),
+                import('../components/pedal/pedal.component.ts'),
+            ]);
             const view = new HksImageView();
             const pedal = new HksPedal();
             pedal.slot = 'controls';

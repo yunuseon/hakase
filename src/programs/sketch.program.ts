@@ -15,20 +15,15 @@ import {
     takeUntil,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
 import { optionsOf } from '../library.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
-import { HksSketch } from '../components/sketch/sketch.component.ts';
 import type { AppInput, Program } from '../program.ts';
-import { HksSketchControls } from '../components/sketch/controls/sketch-controls.component.ts';
 import { liveReadouts } from '../components/sketch/controls/controls.ts';
-import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
 import { filmstrip$ } from '../engine/thumbnails.ts';
-import {
-    HksExportPanel,
-    type ExportStatus,
-    type SavedFile,
+import type {
+    ExportStatus,
+    SavedFile,
 } from '../components/sketch/export/export-panel.component.ts';
 import { statusOf } from '../components/sketch/export/export.ts';
 import { imageExport$, imageStill$ } from '../engine/export.ts';
@@ -70,7 +65,20 @@ export const sketchProgram = {
     icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
     size: { width: 640, height: 820 },
     minimum: { width: 320, height: 420 },
-    launch: () => {
+    launch: async () => {
+        const [
+            { HksFpsCounter },
+            { HksSketch },
+            { HksSketchControls },
+            { HksFrameStrip },
+            { HksExportPanel },
+        ] = await Promise.all([
+            import('../components/fps-counter/fps-counter.component.ts'),
+            import('../components/sketch/sketch.component.ts'),
+            import('../components/sketch/controls/sketch-controls.component.ts'),
+            import('../components/sketch/strip/frame-strip.component.ts'),
+            import('../components/sketch/export/export-panel.component.ts'),
+        ]);
         const sketch = new HksSketch();
 
         const fpsCounter = new HksFpsCounter();

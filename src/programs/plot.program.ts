@@ -1,6 +1,5 @@
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, shareReplay } from 'rxjs/operators';
-import { HksPlot } from '../components/plot/plot.component.ts';
 import type { Trace } from '../components/plot/plot.ts';
 import { playbackInput, plotInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -16,7 +15,8 @@ export const plotProgram = {
     icon: 'M4 4 V20 H20 M7 15 C10 5, 12 5, 14 11 S 18 18, 20 8',
     size: { width: 440, height: 280 },
     minimum: { width: 260, height: 180 },
-    launch: () => {
+    launch: async () => {
+        const { HksPlot } = await import('../components/plot/plot.component.ts');
         const plot = new HksPlot();
 
         return {

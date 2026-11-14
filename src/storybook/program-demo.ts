@@ -13,7 +13,7 @@ import { NONE, type Image } from '../image.ts';
 import { asSketch } from '../settings.ts';
 import { emptyLibrary } from '../library.ts';
 import { UNDRIVEN } from '../components/sketch/params.ts';
-import { animationFrames, defer, EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
+import { animationFrames, defer, EMPTY, from, fromEvent, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     finalize,
@@ -26,6 +26,7 @@ import {
     startWith,
     switchMap,
     takeUntil,
+    tap,
 } from 'rxjs/operators';
 import { appearances } from '../appearances.ts';
 import { themes } from '../components/sketch/themes/registry.ts';
@@ -44,7 +45,10 @@ export const programDemo = (
     settings: Settings | undefined,
     empty = false,
 ): Demo => {
-    const process = program.launch();
+    const launching = program.launch();
+    const host = document.createElement('div');
+    host.style.display = 'grid';
+    host.style.blockSize = '100%';
     const lifetime = new AbortController();
     const end$ = fromEvent(lifetime.signal, 'abort');
     const seed = sandboxSeed(settings, empty);
@@ -241,9 +245,16 @@ export const programDemo = (
         clock$: of(null),
         settings$: select(state => state.settings),
     };
-    const inputs$: Observable<AppInput> = process.run$(app, self).pipe(takeUntil(end$), share());
+    const inputs$: Observable<AppInput> = from(launching).pipe(
+        tap(view => {
+            host.append(view.element);
+        }),
+        switchMap(view => view.run$(app, self)),
+        takeUntil(end$),
+        share(),
+    );
     return {
-        element: process.element,
+        element: host,
         run$: state$.pipe(
             ignoreElements(),
             finalize(() => {

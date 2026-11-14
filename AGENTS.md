@@ -328,7 +328,8 @@ that the first two never learn about each other:
    is a decision neither component could make.
 4. **Process** — a _running instance_ of a program. A program is inert data; a
    process is a live subscription. `liveProcess$` is the whole of it: subscribing
-   calls `program.launch()`, opens a window around the result and starts it;
+   opens a window, calls `program.launch()`, mounts the result when it arrives
+   and starts it;
    unsubscribing closes the window and takes every listener, rAF loop and GL
    context with it.
 
@@ -338,6 +339,18 @@ singleton:
 - `Program.launch()` is a **factory**, not an element. Two processes need two
   elements, and one element cannot be in two windows. A module-level
   `export const sketch = new HksSketch()` is exactly the bug this shape prevents.
+- **It is async, and that is the code split.** A program's definition (inputs,
+  title, icon, sizes) is eager, because the workspace, the menus and the
+  parser read it, but its components are not: `launch` awaits a dynamic
+  `import()` of each `.component.ts` it builds, so a program's component is
+  its own chunk, loaded when its first window opens. A program file imports a
+  component **class** only through that `await`, and its types with
+  `import type`; a static value import puts the component back in the main
+  chunk, silently. The window frame comes up at once and its content is
+  appended by a `tap` in `liveProcess$` when the module arrives; an
+  unsubscribe before then appends nothing. The main chunk went from 851 kB to
+  501 kB (241 to 155 kB gzipped) and is now the app's core: the reducers, the
+  workspace, the window chrome and the engine.
 - State keyed by `ProgramId` would collide, so `Workspace` is keyed by `ProcessId`,
   named from the log's sequence (see "Undo"), so a relaunch never reuses a dead id.
   Its `processes` array is ordered back to front, so a process's **index is its
@@ -3284,7 +3297,10 @@ appearance overrides and event history are local to each Storybook window.
 workspace snapshot.
 
 `program-demo.ts` runs existing program compositions against an isolated
-`AppState`, backed by the pure reducer in `sandbox.ts`. It has no reference to
+`AppState`, backed by the pure reducer in `sandbox.ts`. Its element is a host
+the program's own element is appended to once its launch resolves, so a render
+test waits for the program's DOM (`vi.waitFor`) and must wait for a real
+element: `expect(undefined).not.toBe(null)` passes before anything mounted. It has no reference to
 the real workspace's documents or command sink. Document/settings commands
 update the fixture; workspace actions are logged only. The feedback stream is
 bounded by an AbortController lifetime, so its internal subscriptions cannot

@@ -1,4 +1,4 @@
-import { combineLatest, defer, EMPTY, merge, type Observable } from 'rxjs';
+import { combineLatest, defer, EMPTY, from, merge, type Observable } from 'rxjs';
 import {
     filter,
     finalize,
@@ -11,6 +11,7 @@ import {
     take,
     takeUntil,
     switchMap,
+    tap,
 } from 'rxjs/operators';
 import type {
     FollowGroup,
@@ -56,9 +57,7 @@ export const liveProcess$ = (
     closing$: Observable<unknown> = EMPTY,
 ): Observable<ProcessSignal> =>
     defer(() => {
-        const view = program.launch();
         const element = new HksWindow().label(program.title, program.icon);
-        element.append(view.element);
         host.append(element);
         const removed$ = closing$.pipe(take(1), shareReplay({ bufferSize: 1, refCount: true }));
 
@@ -110,7 +109,11 @@ export const liveProcess$ = (
             element.selectionToggles$.pipe(
                 map((): ProcessSignal => ({ to: 'toggle-selection', id: self.id })),
             ),
-            view.run$(state, self).pipe(
+            from(program.launch()).pipe(
+                tap(view => {
+                    element.append(view.element);
+                }),
+                switchMap(view => view.run$(state, self)),
                 withLatestFrom(self.store$, self.clock$),
                 map(([input, store, clock]): ProcessSignal => ({
                     to: 'app',

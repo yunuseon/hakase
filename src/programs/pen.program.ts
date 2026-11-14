@@ -3,7 +3,6 @@ import { distinctUntilChanged, ignoreElements, map, shareReplay, switchMap } fro
 import { sheet$ } from '../engine/view.ts';
 import { parseHexColor } from '../lib/color.ts';
 import { dabsAt } from '../shared/stroke.ts';
-import { HksPen } from '../components/pen/pen.component.ts';
 import { strokeOf } from '../components/pen/pen.ts';
 import { penInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -18,7 +17,8 @@ export const penProgram = {
     icon: 'M4 20 C8 8 12 16 15 9 S 19 6 20 4 M17 3 L21 7',
     size: { width: 380, height: 480 },
     minimum: { width: 280, height: 360 },
-    launch: () => {
+    launch: async () => {
+        const { HksPen } = await import('../components/pen/pen.component.ts');
         const pen = new HksPen();
 
         return {

@@ -13,7 +13,6 @@ import {
 } from 'rxjs/operators';
 import { applyVolume, drumBus$, type DrumBus } from '../components/drums/audio/bus.ts';
 import { hit } from '../components/drums/audio/hit.ts';
-import { HksDrums } from '../components/drums/drums.component.ts';
 import { hitsOf, swellOf, type Hit } from '../components/drums/drums.ts';
 import { drumsInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
@@ -30,7 +29,8 @@ export const drumsProgram = {
     size: { width: 560, height: 400 },
     minimum: { width: 260, height: 300 },
     audible: true,
-    launch: () => {
+    launch: async () => {
+        const { HksDrums } = await import('../components/drums/drums.component.ts');
         const drums = new HksDrums();
 
         return {

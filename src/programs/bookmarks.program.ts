@@ -1,6 +1,5 @@
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { HksBookmarks } from '../components/bookmarks/bookmarks.component.ts';
 import type { AppInput, Program } from '../program.ts';
 
 export const bookmarksProgram = {
@@ -11,7 +10,8 @@ export const bookmarksProgram = {
     icon: 'M7 3.5 H17 V20.5 L12 16.5 L7 20.5 Z',
     size: { width: 320, height: 380 },
     minimum: { width: 240, height: 200 },
-    launch: () => {
+    launch: async () => {
+        const { HksBookmarks } = await import('../components/bookmarks/bookmarks.component.ts');
         const bookmarks = new HksBookmarks();
 
         return {

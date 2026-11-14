@@ -1,5 +1,4 @@
 import { ignoreElements, map } from 'rxjs/operators';
-import { HksProgressBar } from '../components/progress-bar/progress-bar.component.ts';
 import { barView } from '../components/progress-bar/progress-bar.ts';
 import { sourceInput } from '../inputs.ts';
 import type { Program } from '../program.ts';
@@ -12,7 +11,9 @@ export const progressProgram = {
     icon: 'M3.5 9 H20.5 V15 H3.5 Z M3.5 12 H13',
     size: { width: 300, height: 130 },
     minimum: { width: 180, height: 110 },
-    launch: () => {
+    launch: async () => {
+        const { HksProgressBar } =
+            await import('../components/progress-bar/progress-bar.component.ts');
         const bar = new HksProgressBar();
 
         return {

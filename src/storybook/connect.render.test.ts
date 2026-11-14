@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { HksStorybook } from '../components/storybook/storybook.component.ts';
 import { HksSelect } from '../shared/select/select.component.ts';
@@ -41,7 +41,7 @@ describe('storybook integration', () => {
         running.unsubscribe();
         expect(root.querySelector('.frame')).toBe(null);
     });
-    it('resets a running program fixture after a document edit', () => {
+    it('resets a running program fixture after a document edit', async () => {
         const story = programStories.find(story => story.id === 'tickets');
         if (story === undefined) {
             throw new Error('Tickets fixture missing');
@@ -51,6 +51,9 @@ describe('storybook integration', () => {
         const running = connectBook$(book, appearance, [story]).subscribe();
         const root = book.shadowRoot ?? book;
         const ticketRoot = () => requireChild(root, '.sample hks-tickets').shadowRoot ?? root;
+        await vi.waitFor(() =>
+            requireElement(ticketRoot(), '[data-toggle="ticket-4"]', HTMLInputElement),
+        );
         requireElement(ticketRoot(), '[data-toggle="ticket-4"]', HTMLInputElement).dispatchEvent(
             new Event('change', { bubbles: true }),
         );
@@ -58,9 +61,11 @@ describe('storybook integration', () => {
             requireElement(ticketRoot(), '[data-toggle="ticket-4"]', HTMLInputElement).checked,
         ).toBe(true);
         requireChild(root, '[data-action="reset"]').click();
-        expect(
-            requireElement(ticketRoot(), '[data-toggle="ticket-4"]', HTMLInputElement).checked,
-        ).toBe(false);
+        await vi.waitFor(() =>
+            expect(
+                requireElement(ticketRoot(), '[data-toggle="ticket-4"]', HTMLInputElement).checked,
+            ).toBe(false),
+        );
         expect(requireChild(root, '.events').textContent).not.toContain('toggle');
         running.unsubscribe();
     });

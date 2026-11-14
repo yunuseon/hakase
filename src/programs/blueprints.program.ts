@@ -1,6 +1,5 @@
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { HksBlueprints } from '../components/blueprints/blueprints.component.ts';
 import type { BlueprintCard } from '../components/blueprints/blueprints.ts';
 import type { Blueprint } from '../blueprints.ts';
 import { STARTERS } from '../starters.ts';
@@ -27,7 +26,8 @@ export const blueprintsProgram = {
     icon: 'M4 5 H11 V12 H4 Z M13 5 H20 V9 H13 Z M13 11 H20 V19 H13 Z M4 14 H11 V19 H4 Z',
     size: { width: 360, height: 420 },
     minimum: { width: 260, height: 220 },
-    launch: () => {
+    launch: async () => {
+        const { HksBlueprints } = await import('../components/blueprints/blueprints.component.ts');
         const blueprints = new HksBlueprints();
 
         return {

@@ -1,6 +1,5 @@
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { HksTaskManager } from '../components/task-manager/task-manager.component.ts';
 import type { TaskRow } from '../components/task-manager/task-manager.ts';
 import type { AppInput, Program } from '../program.ts';
 
@@ -12,7 +11,9 @@ export const tasksProgram = {
     icon: 'M4 6 H4.01 M8 6 H20 M4 12 H4.01 M8 12 H20 M4 18 H4.01 M8 18 H20',
     size: { width: 260, height: 300 },
     minimum: { width: 200, height: 160 },
-    launch: () => {
+    launch: async () => {
+        const { HksTaskManager } =
+            await import('../components/task-manager/task-manager.component.ts');
         const manager = new HksTaskManager();
 
         return {

@@ -13,7 +13,6 @@ import {
     takeUntil,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksImageView } from '../components/image-view/image-view.component.ts';
 import type { Shown } from '../shared/shown.ts';
 import {
     aspectSize,
@@ -30,13 +29,11 @@ import {
     zoomedStrip,
     type ZoomGesture,
 } from '../components/sketch/animation.ts';
-import { HksFrameStrip } from '../components/sketch/strip/frame-strip.component.ts';
 import { filmstrip$ } from '../engine/thumbnails.ts';
 import { statusOf } from '../components/sketch/export/export.ts';
-import {
-    HksExportPanel,
-    type ExportStatus,
-    type SavedFile,
+import type {
+    ExportStatus,
+    SavedFile,
 } from '../components/sketch/export/export-panel.component.ts';
 import { imageExport$, imageStill$ } from '../engine/export.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
@@ -63,7 +60,12 @@ export const outputProgram = {
     icon: 'M3 5h18v12H3zM8 21h8M12 17v4',
     size: { width: 480, height: 620 },
     minimum: { width: 260, height: 460 },
-    launch: () => {
+    launch: async () => {
+        const [{ HksImageView }, { HksFrameStrip }, { HksExportPanel }] = await Promise.all([
+            import('../components/image-view/image-view.component.ts'),
+            import('../components/sketch/strip/frame-strip.component.ts'),
+            import('../components/sketch/export/export-panel.component.ts'),
+        ]);
         const view = new HksImageView();
         const strip = new HksFrameStrip();
         const exporter = new HksExportPanel();

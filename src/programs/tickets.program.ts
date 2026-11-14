@@ -11,10 +11,7 @@ import {
     startWith,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksTickets } from '../components/tickets/tickets.component.ts';
 import { commandInView, sameTickets, ticketView } from '../shared/tickets.ts';
-import { HksSearchPicker } from '../components/search-picker/search-picker.component.ts';
-import { HksTicketCreator } from '../components/ticket-creator/ticket-creator.component.ts';
 import {
     closedCreation,
     creationCommand,
@@ -34,7 +31,12 @@ export const ticketsProgram = {
     icon: 'M4 6.5 H20 V10 A2 2 0 0 0 20 14 V17.5 H4 V14 A2 2 0 0 0 4 10 Z M9.5 6.5 V17.5',
     size: { width: 360, height: 420 },
     minimum: { width: 240, height: 220 },
-    launch: () => {
+    launch: async () => {
+        const [{ HksTickets }, { HksSearchPicker }, { HksTicketCreator }] = await Promise.all([
+            import('../components/tickets/tickets.component.ts'),
+            import('../components/search-picker/search-picker.component.ts'),
+            import('../components/ticket-creator/ticket-creator.component.ts'),
+        ]);
         const tickets = new HksTickets();
         const creator = new HksTicketCreator();
         creator.slot = 'creator';

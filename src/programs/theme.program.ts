@@ -11,7 +11,6 @@ import {
 } from 'rxjs/operators';
 import type { Theme } from '../components/sketch/theme.ts';
 import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
-import { HksThemeEditor } from '../components/theme-editor/theme-editor.component.ts';
 import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
 import { asThemeEditor } from '../settings.ts';
 
@@ -28,7 +27,9 @@ export const themeProgram = {
     icon: 'M4 6 H20 V18 H4 Z M10 6 V18 M15 6 V18',
     size: { width: 300, height: 260 },
     minimum: { width: 240, height: 200 },
-    launch: () => {
+    launch: async () => {
+        const { HksThemeEditor } =
+            await import('../components/theme-editor/theme-editor.component.ts');
         const editor = new HksThemeEditor().presets(options);
 
         return {

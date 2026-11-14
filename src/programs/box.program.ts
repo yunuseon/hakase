@@ -2,7 +2,6 @@ import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import { tickAt } from '../circuit.ts';
 import type { Pin } from '../boxes.ts';
-import { HksBox } from '../components/box/box.component.ts';
 import type { BoxView, PinView } from '../components/box/box.ts';
 import type { Bit } from '../gates.ts';
 import { loosePlaybackInput } from '../inputs.ts';
@@ -25,7 +24,8 @@ export const boxProgram = {
     icon: 'M4 6h16v12H4zM2 10h2M2 14h2M20 12h2M8 10h8M8 14h5',
     size: { width: 240, height: 192 },
     minimum: { width: 200, height: 150 },
-    launch: () => {
+    launch: async () => {
+        const { HksBox } = await import('../components/box/box.component.ts');
         const box = new HksBox();
 
         return {

@@ -6,7 +6,6 @@ import {
     shareReplay,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksAgenda } from '../components/agenda/agenda.component.ts';
 import { laidOut, nextBlockId } from '../components/agenda/agenda.ts';
 import { dayLabel, dayOf, minuteOfDay, shiftDay } from '../lib/day.ts';
 import { wallClock$ } from '../lib/rx.ts';
@@ -26,7 +25,8 @@ export const agendaProgram = {
     icon: 'M4 6 H20 V20 H4 Z M4 10 H20 M8 3.5 V7.5 M16 3.5 V7.5 M7.5 13 H12.5 V17 H7.5 Z',
     size: { width: 320, height: 460 },
     minimum: { width: 220, height: 260 },
-    launch: () => {
+    launch: async () => {
+        const { HksAgenda } = await import('../components/agenda/agenda.component.ts');
         const agenda = new HksAgenda();
 
         return {

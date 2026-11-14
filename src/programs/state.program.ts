@@ -13,7 +13,6 @@ import {
     throttleTime,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksStateMap } from '../components/state-map/state-map.component.ts';
 import { displayable, rowsOf, toggled, type Plain } from '../components/state-map/rows.ts';
 import {
     focusedStores,
@@ -38,7 +37,8 @@ export const stateProgram = {
     icon: 'M5 6 h3 M5 12 h3 M5 18 h3 M16 6 h3 M16 12 h3 M16 18 h3 M8 6 C 12 6, 12 12, 16 12 M8 18 C 12 18, 12 6, 16 6',
     size: { width: 520, height: 560 },
     minimum: { width: 240, height: 260 },
-    launch: () => {
+    launch: async () => {
+        const { HksStateMap } = await import('../components/state-map/state-map.component.ts');
         const stateMap = new HksStateMap();
 
         return {

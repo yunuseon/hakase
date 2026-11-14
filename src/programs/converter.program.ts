@@ -1,6 +1,5 @@
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, mergeMap } from 'rxjs/operators';
-import { HksConverter } from '../components/converter/converter.component.ts';
 import { converterView } from '../components/converter/converter.ts';
 import {
     converterTitle,
@@ -38,7 +37,8 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
         icon: spec.icon,
         size: spec.size,
         minimum: { width: 220, height: 180 },
-        launch: () => {
+        launch: async () => {
+            const { HksConverter } = await import('../components/converter/converter.component.ts');
             const converter = new HksConverter();
 
             return {

@@ -8,7 +8,6 @@ import {
     take,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksNote } from '../components/note/note.component.ts';
 import { countOf, nextNoteId, shownNote, titleOf, type Notes } from '../components/note/note.ts';
 import type { AppInput, Program } from '../program.ts';
 import { asNote } from '../settings.ts';
@@ -32,7 +31,8 @@ export const noteProgram = {
     icon: 'M5 4 H19 V14 L14 20 H5 Z M14 20 V14 H19 M8.5 9 H15.5 M8.5 12.5 H12.5',
     size: { width: 300, height: 320 },
     minimum: { width: 200, height: 180 },
-    launch: () => {
+    launch: async () => {
+        const { HksNote } = await import('../components/note/note.component.ts');
         const note = new HksNote();
 
         return {

@@ -13,7 +13,6 @@ import {
 import { applyLevel, voiceGraph$, type VoiceGraph } from '../components/voice/audio/graph.ts';
 import { strike } from '../components/voice/audio/strike.ts';
 import { frameOf } from '../shared/schedule.ts';
-import { HksVoice } from '../components/voice/voice.component.ts';
 import {
     notesOf,
     plannedNotes,
@@ -34,7 +33,8 @@ export const voiceProgram = {
     size: { width: 400, height: 360 },
     minimum: { width: 300, height: 300 },
     audible: true,
-    launch: () => {
+    launch: async () => {
+        const { HksVoice } = await import('../components/voice/voice.component.ts');
         const voice = new HksVoice();
 
         return {

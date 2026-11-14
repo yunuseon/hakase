@@ -7,7 +7,6 @@ import {
     shareReplay,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksPaint } from '../components/paint/paint.component.ts';
 import type { PaintView } from '../components/paint/paint.ts';
 import { playbackInput } from '../inputs.ts';
 import { paintInputsOf, workingFrame } from '../painting.ts';
@@ -23,7 +22,8 @@ export const paintProgram = {
     icon: 'M5 19 C5 15 8 14 10 14 L18 6 L20 8 L12 16 C12 18 10 20 5 19 Z',
     size: { width: 460, height: 580 },
     minimum: { width: 320, height: 420 },
-    launch: () => {
+    launch: async () => {
+        const { HksPaint } = await import('../components/paint/paint.component.ts');
         const paint = new HksPaint();
 
         return {

@@ -1,7 +1,6 @@
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import { tickAt } from '../circuit.ts';
-import { HksGate } from '../components/gate/gate.component.ts';
 import { gateView } from '../components/gate/gate.ts';
 import { GATES, type GateKind } from '../gates.ts';
 import { gateInputs, loosePlaybackInput } from '../inputs.ts';
@@ -18,7 +17,8 @@ export const gateProgram = <K extends GateKind>(kind: K) => {
         icon: spec.icon,
         size: spec.size,
         minimum: { width: Math.min(spec.size.width, 104), height: spec.size.height },
-        launch: () => {
+        launch: async () => {
+            const { HksGate } = await import('../components/gate/gate.component.ts');
             const gate = new HksGate();
 
             return {

@@ -9,7 +9,6 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import { HksFormulaEditor } from '../components/formula-editor/formula-editor.component.ts';
 import { FORMULA_GUIDE } from '../components/sketch/formulas/formula.ts';
 import {
     isCustomId,
@@ -32,7 +31,9 @@ export const formulaProgram = {
     icon: 'M9.5 8 L5.5 12 L9.5 16 M14.5 8 L18.5 12 L14.5 16',
     size: { width: 340, height: 480 },
     minimum: { width: 260, height: 260 },
-    launch: () => {
+    launch: async () => {
+        const { HksFormulaEditor } =
+            await import('../components/formula-editor/formula-editor.component.ts');
         const editor = new HksFormulaEditor().guide(FORMULA_GUIDE);
 
         return {
