@@ -74,3 +74,13 @@ should read a small mip of the picture, not the whole of it.
 
 Not planned: `level → clock` (a moving tempo breaks exact replay) and anything
 into picture or sound, which sketches, pedals and voices already make.
+
+## Tooling
+
+**TypeScript 7, once typescript-eslint takes it.** TypeScript 7 is out, but
+typescript-eslint 8.72 accepts `typescript <6.1.0`, and 7's programmatic API is
+still `unstable/*`, which typed linting is built on. Done looks like:
+`typescript@^7` with typescript-eslint's typed rules still running, typecheck,
+lint and tests green. Its minimatch advisory (moderate, dev-only) should clear
+with the same typescript-eslint release. `@types/node` stays on 24 while
+`.nvmrc` does.
