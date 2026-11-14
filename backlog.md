@@ -74,7 +74,3 @@ should read a small mip of the picture, not the whole of it.
 
 Not planned: `level → clock` (a moving tempo breaks exact replay) and anything
 into picture or sound, which sketches, pedals and voices already make.
-
-### What typed ports make possible
-
-- **The state map shows types** on its ports, as state mode does.

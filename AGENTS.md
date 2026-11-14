@@ -2000,7 +2000,12 @@ out. In state mode a jack keeps its state's colour and its **shape** is its type
 (a circle for level, a square for bit, a ring with a dot for clock, a rounded
 square for picture and sheet, a double ring for sound, a diamond for the plan
 types), and every label names the type; the state menu names it beside each
-input. `Socket.type` and `FollowGroup.type` carry it as plain strings, so the
+input. The state map draws the same shapes and names the type on every store,
+window head and port (`type` on `GraphStore`, `GraphWindow` and `GraphPort`).
+The shapes are one shared primitive, `ui-jack` with `data-type`, in the
+controls sheet: not under `:where`, because a shape must beat its owner's round
+base, and an owner sets `background-color`, never `background`, or the
+shorthand wipes the clock's dot (`--jack-dot`). `Socket.type` and `FollowGroup.type` carry it as plain strings, so the
 components still know nothing of the list.
 
 **Every program that keeps state names its output's type**, read by `madeBy`:

@@ -366,3 +366,48 @@
         flex-wrap: wrap;
     }
 }
+
+/* Not :where: a jack's shape must beat its owner's round base. Owners set background-color, never background, or the clock's dot is lost. */
+.ui-jack[data-type='bit'] {
+    border-radius: 2px;
+}
+
+.ui-jack[data-type='clock'] {
+    background-image: radial-gradient(
+        circle,
+        var(--jack-dot, currentColor) 0 1.5px,
+        transparent 2px
+    );
+}
+
+.ui-jack:is([data-type='picture'], [data-type='sheet']) {
+    border-radius: var(--radius-sm);
+}
+
+.ui-jack[data-type='sound'] {
+    border-style: double;
+    border-width: 3px;
+}
+
+.ui-jack:is(
+    [data-type='schedule'],
+    [data-type='timer'],
+    [data-type='tasks'],
+    [data-type='reading']
+) {
+    border-radius: 2px;
+    rotate: 45deg;
+    scale: 0.85;
+}
+
+.ui-jack:is(
+    [data-type='zones'],
+    [data-type='notes'],
+    [data-type='habits'],
+    [data-type='bookmarks'],
+    [data-type='formula'],
+    [data-type='theme'],
+    [data-type='component']
+) {
+    border-radius: 50% 50% 2px 2px;
+}

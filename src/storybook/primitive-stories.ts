@@ -87,6 +87,15 @@ const specs = [
         height: 190,
     },
     {
+        id: 'jacks',
+        title: 'Port jacks',
+        description:
+            'A jack is shaped by the type of its port, the same in state mode and on the state map. Its owner sets its size and colours.',
+        elements: ['.ui-jack', 'PORT_TYPES'],
+        controls: [],
+        height: 300,
+    },
+    {
         id: 'empty',
         title: 'Empty states',
         description: 'Quiet empty-state copy with an inline creation action.',

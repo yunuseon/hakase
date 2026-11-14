@@ -88,3 +88,14 @@ code {
     align-self: center;
     padding-block: var(--space-5);
 }
+
+:where(.jacks) .jack {
+    --jack-dot: var(--accent);
+    box-sizing: border-box;
+    inline-size: var(--space-3-5);
+    block-size: var(--space-3-5);
+    margin-block: var(--space-1);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    background-color: var(--panel);
+}

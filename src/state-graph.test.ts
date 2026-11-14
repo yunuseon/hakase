@@ -16,6 +16,19 @@ const windowOf = (actions: readonly WorkspaceAction[], id: string) =>
     graph(actions).windows.find(window => window.id === id);
 
 describe('graphOf', () => {
+    it('types every jack: what a store makes, what a port takes', () => {
+        const { stores, windows } = graph();
+        const sketch = stores.find(({ id }) => id === 'sketch-2');
+
+        expect(stores.find(({ id }) => id === 'timeline')?.type).toBe('clock');
+        expect(sketch?.ports.find(({ input }) => input === 'k1')?.type).toBe('level');
+        expect(sketch?.ports.find(({ input }) => input === 'paint')?.type).toBe('sheet');
+        expect(windows.find(({ id }) => id === 'timeline-3')?.type).toBe('clock');
+        expect(windows.find(({ id }) => id === 'sketch-2')?.ports.map(({ type }) => type)).toEqual([
+            'clock',
+        ]);
+    });
+
     it('lists every window that keeps or follows state, with a port per input', () => {
         const { windows } = graph();
 

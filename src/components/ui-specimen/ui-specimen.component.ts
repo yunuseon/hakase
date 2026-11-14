@@ -11,6 +11,7 @@ import { ICONS } from '../../shared/ui/icons.ts';
 import { connectChoices$ } from '../../shared/ui/choices.component.ts';
 import { SymmetryIcon } from '../../shared/brush-icon.component.ts';
 import { SYMMETRIES } from '../../shared/brush.ts';
+import { PORT_TYPES } from '../../port-types.ts';
 import { initialSpecimen, type SpecimenChange, type SpecimenView } from './ui-specimen.ts';
 import css from './ui-specimen.css?inline';
 
@@ -236,6 +237,10 @@ const template = (view: SpecimenView) => {
         case 'symmetry':
             return html`<div class="icons symmetry">
                 ${SYMMETRIES.map(symmetry => html`<div>${SymmetryIcon({ symmetry })}<code>${symmetry}</code></div>`)}
+            </div>`;
+        case 'jacks':
+            return html`<div class="icons jacks">
+                ${PORT_TYPES.map(type => html`<div><span class="jack ui-jack" data-type=${type}></span><code>${type}</code></div>`)}
             </div>`;
         case 'empty':
             return html`<div class="ui-empty">

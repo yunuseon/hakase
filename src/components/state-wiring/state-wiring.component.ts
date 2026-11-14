@@ -100,7 +100,7 @@ const SocketRow = (props: { readonly socket: Socket }) =>
     >
         <button
             type="button"
-            class="jack"
+            class="jack ui-jack"
             data-jack=${ifDefined(props.socket.key)}
             data-type=${ifDefined(props.socket.type ?? undefined)}
             aria-label=${ifDefined(`connect ${props.socket.title}${props.socket.type === null ? '' : `, a ${props.socket.type}`}`)}

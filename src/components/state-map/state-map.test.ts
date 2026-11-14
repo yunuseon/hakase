@@ -21,6 +21,7 @@ const view: StateGraph = {
             title: 'sketch',
             name: 'sketch 2',
             colour: 'green',
+            type: null,
             ports: [],
         },
         {
@@ -32,6 +33,7 @@ const view: StateGraph = {
             title: 'Playback',
             name: 'Main',
             colour: 'red',
+            type: null,
             ports: [],
         },
         {
@@ -43,6 +45,7 @@ const view: StateGraph = {
             title: 'Signal',
             name: 'Main',
             colour: 'blue',
+            type: null,
             ports: [],
         },
     ],
@@ -52,6 +55,7 @@ const view: StateGraph = {
             program: 'signal',
             label: 'signal 1',
             icon: '',
+            type: null,
             own: 'signal',
             ports: [],
         },
@@ -60,17 +64,33 @@ const view: StateGraph = {
             program: 'sketch',
             label: 'sketch 1',
             icon: '',
+            type: null,
             own: 'sketch-2',
             ports: [
                 {
                     input: 'playback',
                     title: 'Playback',
+                    type: 'clock',
                     accepts: ['playback'],
                     optional: false,
                     bound: 'timeline',
                 },
-                { input: 'k1', title: 'k1', accepts: ['signal'], optional: true, bound: 'signal' },
-                { input: 'k2', title: 'k2', accepts: ['signal'], optional: true, bound: null },
+                {
+                    input: 'k1',
+                    title: 'k1',
+                    type: 'level',
+                    accepts: ['signal'],
+                    optional: true,
+                    bound: 'signal',
+                },
+                {
+                    input: 'k2',
+                    title: 'k2',
+                    type: 'level',
+                    accepts: ['signal'],
+                    optional: true,
+                    bound: null,
+                },
             ],
         },
     ],
@@ -169,6 +189,7 @@ describe('unusedOf', () => {
                     title: 'sketch',
                     name: 'spare',
                     colour: 'grey',
+                    type: null,
                     ports: [],
                 },
                 {
@@ -180,6 +201,7 @@ describe('unusedOf', () => {
                     title: 'app',
                     name: 'library',
                     colour: 'grey',
+                    type: null,
                     ports: [],
                 },
             ],
@@ -199,7 +221,17 @@ describe('chains in the map', () => {
         title: 'Signal',
         name: id,
         colour: id,
-        ports: [{ input: 'depth', title: 'depth', accepts: ['signal'], optional: true, bound }],
+        type: 'level',
+        ports: [
+            {
+                input: 'depth',
+                title: 'depth',
+                type: 'level',
+                accepts: ['signal'],
+                optional: true,
+                bound,
+            },
+        ],
     });
     const chain: StateGraph = {
         stores: [signalStore('slow', null), signalStore('fast', 'slow')],
@@ -209,11 +241,13 @@ describe('chains in the map', () => {
                 program: 'sketch',
                 label: 'sketch 1',
                 icon: '',
+                type: null,
                 own: null,
                 ports: [
                     {
                         input: 'k1',
                         title: 'k1',
+                        type: 'level',
                         accepts: ['signal'],
                         optional: true,
                         bound: 'fast',
@@ -295,6 +329,7 @@ describe('closesLoop', () => {
                     title: 'Signal',
                     name: 'slow',
                     colour: 'red',
+                    type: null,
                     ports: [],
                 },
                 {
@@ -306,10 +341,12 @@ describe('closesLoop', () => {
                     title: 'Signal',
                     name: 'fast',
                     colour: 'blue',
+                    type: null,
                     ports: [
                         {
                             input: 'depth',
                             title: 'depth',
+                            type: 'level',
                             accepts: ['signal'],
                             optional: true,
                             bound: 'slow',

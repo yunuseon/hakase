@@ -10,12 +10,14 @@ export type GraphStore = {
     readonly title: string;
     readonly name: string;
     readonly colour: string;
+    readonly type: string | null;
     readonly ports: readonly GraphPort[];
 };
 
 export type GraphPort = {
     readonly input: string;
     readonly title: string;
+    readonly type: string;
     readonly accepts: readonly string[];
     readonly optional: boolean;
     readonly bound: string | null;
@@ -26,6 +28,7 @@ export type GraphWindow = {
     readonly program: string;
     readonly label: string;
     readonly icon: string;
+    readonly type: string | null;
     readonly own: string | null;
     readonly ports: readonly GraphPort[];
 };

@@ -308,6 +308,16 @@
     color: var(--muted);
 }
 
+.type {
+    margin-inline-start: auto;
+    font: 10px var(--font-mono);
+    color: var(--muted);
+}
+
+.store-head > .label {
+    flex: 1;
+}
+
 .name {
     overflow: hidden;
     color: var(--ink);
@@ -316,17 +326,19 @@
 }
 
 .jack {
+    --jack-dot: var(--muted);
     position: absolute;
     cursor: grab;
     inline-size: 10px;
     block-size: 10px;
-    background: var(--panel);
+    background-color: var(--panel);
     border: 2px solid var(--muted);
     border-radius: 50%;
     box-sizing: border-box;
 }
 
 .store-head .jack {
+    --jack-dot: var(--store);
     inset-inline-end: -6px;
     inset-block-start: calc(50% - 5px);
     border-color: var(--store);
@@ -346,9 +358,10 @@
 }
 
 .head .jack {
+    --jack-dot: var(--panel);
     inset-inline-start: -6px;
     inset-block-start: 10px;
-    background: var(--ink);
+    background-color: var(--ink);
     border-color: var(--ink);
 }
 
@@ -386,7 +399,8 @@
 }
 
 .port[data-bound] .jack {
-    background: var(--muted);
+    --jack-dot: var(--panel);
+    background-color: var(--muted);
 }
 
 .port:not([data-bound]) .title {

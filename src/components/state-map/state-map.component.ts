@@ -157,8 +157,9 @@ const PortRow = (props: {
         data-bound=${ifDefined(props.port.bound !== null ? '' : undefined)}
         data-cuttable=${ifDefined(props.port.optional && props.port.bound !== null ? '' : undefined)}
     >
-        <span class="jack"></span
+        <span class="jack ui-jack" data-type=${ifDefined(props.port.type)}></span
         ><span class="title">${props.port.title}</span
+        ><small class="type">${props.port.type}</small
         >${when(props.port.optional && props.port.bound !== null, () => html`<button type="button" class="cut" data-cut="" aria-label=${ifDefined(`stop ${props.port.title} following`)}>×</button>`)}
     </div>`;
 const StoreNode = (props: { readonly store: PlacedStore }) =>
@@ -185,7 +186,10 @@ const StoreNode = (props: { readonly store: PlacedStore }) =>
             ><span class="label"
                 ><span class="kind">${props.store.title}</span
                 ><span class="name">${props.store.name}</span></span
-            ><span class="jack"></span>
+            >${withValue(props.store.type, type => html`<small class="type">${type}</small>`)}<span
+                class="jack ui-jack"
+                data-type=${ifDefined(props.store.type ?? undefined)}
+            ></span>
         </div>
         ${repeat(
             props.store.ports.map(port => port.input),
@@ -213,7 +217,7 @@ const WindowNode = (props: { readonly window: PlacedWindow }) =>
             data-program=${ifDefined(props.window.own !== null ? props.window.program : undefined)}
             data-current=${ifDefined(props.window.own ?? undefined)}
         >
-            ${when(props.window.own !== null, () => html`<span class="jack"></span>`)}<svg
+            ${when(props.window.own !== null, () => html`<span class="jack ui-jack" data-type=${ifDefined(props.window.type ?? undefined)}></span>`)}<svg
                 class="icon"
                 viewBox="0 0 24 24"
                 aria-hidden="true"

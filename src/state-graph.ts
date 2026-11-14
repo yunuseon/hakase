@@ -4,7 +4,7 @@ import type {
     StateGraph,
     GraphWindow,
 } from './components/state-map/state-map.ts';
-import { followedBy, followedStores, SOURCES, type InputsFor } from './inputs.ts';
+import { followedBy, followedStores, madeBy, SOURCES, type InputsFor } from './inputs.ts';
 import { GLOBALS, targetId } from './inventory.ts';
 import type { Linked } from './shared/signal.ts';
 import { sourceIn } from './input-connections.ts';
@@ -49,12 +49,14 @@ export const graphOf = (
             title: sourceOf(store.program)?.title ?? titles(store.program).title,
             name: store.name,
             colour: colourOf(store.id),
+            type: madeBy(store.program),
             ports: Object.entries(inputsFor(store.program)).flatMap(([input, definition]) =>
                 definition.from === 'store'
                     ? [
                           {
                               input,
                               title: definition.title,
+                              type: definition.takes,
                               accepts: definition.sources.map(source => source.kind),
                               optional: true,
                               bound: sourceIn(signals, store.id, definition.param),
@@ -73,6 +75,7 @@ export const graphOf = (
         title: 'app',
         name,
         colour: 'var(--muted)',
+        type: null,
         ports: [],
     }));
 
@@ -89,6 +92,7 @@ export const graphOf = (
                     {
                         input,
                         title: definition.title,
+                        type: definition.takes,
                         accepts: definition.sources.map(({ kind }) => kind),
                         optional: definition.initial === null,
                         bound: binding?.store ?? null,
@@ -107,6 +111,7 @@ export const graphOf = (
                       program: process.program,
                       label: `${title} ${ordinal}`,
                       icon,
+                      type: own === null ? null : madeBy(process.program),
                       own,
                       ports,
                   },
@@ -125,11 +130,13 @@ const sameStore = (a: GraphStore, b: GraphStore) =>
     a.title === b.title &&
     a.name === b.name &&
     a.colour === b.colour &&
+    a.type === b.type &&
     samePorts(a.ports, b.ports);
 
 const samePort = (a: GraphPort, b: GraphPort) =>
     a.input === b.input &&
     a.title === b.title &&
+    a.type === b.type &&
     a.optional === b.optional &&
     a.bound === b.bound &&
     a.accepts.join() === b.accepts.join();
@@ -147,6 +154,7 @@ const sameWindow = (a: GraphWindow, b: GraphWindow) =>
     a.program === b.program &&
     a.label === b.label &&
     a.icon === b.icon &&
+    a.type === b.type &&
     a.own === b.own &&
     samePorts(a.ports, b.ports);
 

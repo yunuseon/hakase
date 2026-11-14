@@ -81,7 +81,7 @@ path.shared {
     padding: 0;
     border: 2px solid var(--store);
     border-radius: 50%;
-    background: var(--wiring-panel);
+    background-color: var(--wiring-panel);
     cursor: crosshair;
     touch-action: none;
     pointer-events: auto;
@@ -95,53 +95,18 @@ path.shared {
     color: var(--muted);
 }
 
-.jack[data-type='bit'] {
-    border-radius: 2px;
+.jack {
+    --jack-dot: var(--store);
 }
 
-.jack[data-type='clock'] {
-    background-image: radial-gradient(circle, var(--store) 0 1.5px, transparent 2px);
-}
-
-.output .jack[data-type='clock'] {
-    background-image: radial-gradient(circle, var(--wiring-panel) 0 1.5px, transparent 2px);
-}
-
-.jack[data-type='picture'],
-.jack[data-type='sheet'] {
-    border-radius: var(--radius-sm);
-}
-
-.jack[data-type='sound'] {
-    border-style: double;
-    border-width: 3px;
-}
-
-.jack[data-type='schedule'],
-.jack[data-type='timer'],
-.jack[data-type='tasks'],
-.jack[data-type='reading'] {
-    border-radius: 2px;
-    rotate: 45deg;
-    scale: 0.85;
-}
-
-.jack:is(
-    [data-type='zones'],
-    [data-type='notes'],
-    [data-type='habits'],
-    [data-type='bookmarks'],
-    [data-type='formula'],
-    [data-type='theme'],
-    [data-type='component']
-) {
-    border-radius: 50% 50% 2px 2px;
+.output .jack {
+    --jack-dot: var(--wiring-panel);
 }
 
 .output .jack {
     inset-inline-start: auto;
     inset-inline-end: calc(var(--spacing) * 0.75);
-    background: var(--store);
+    background-color: var(--store);
 }
 
 .output span {
