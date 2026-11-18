@@ -52,8 +52,8 @@
 }
 .trigger:focus-visible,
 :host(:focus-within) .editor {
-    outline: 2px solid var(--highlight);
-    outline-offset: 3px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
     border-radius: var(--radius-sm);
 }
 :host([disabled]) {
@@ -63,18 +63,7 @@
     cursor: default;
 }
 .panel {
-    position: fixed;
-    inset: auto;
-    box-sizing: border-box;
-    margin: 0;
-    padding: var(--space-1-5);
     overflow: hidden;
-    color: var(--ink);
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--shadow) 16%, transparent);
-    font: var(--text-sm)/1.4 var(--font-ui);
 }
 .panel:popover-open {
     display: flex;

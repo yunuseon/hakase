@@ -107,7 +107,7 @@ export class HksSelect extends HTMLElement {
                         )}
                     />
                     <div
-                        class="panel"
+                        class="panel ui-glass"
                         popover="manual"
                         style=${styleMap({
                             left: `${view.placement.left}px`,

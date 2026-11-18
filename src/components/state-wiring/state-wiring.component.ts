@@ -1,10 +1,9 @@
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import { html, svg } from 'lit-html';
+import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { when } from 'lit-html/directives/when.js';
-import { classMap } from 'lit-html/directives/class-map.js';
 import { withValue } from '../../lib/lit.ts';
 
 import { renderView, type RenderView } from '../../lib/lit.ts';
@@ -90,10 +89,12 @@ const SocketRow = (props: { readonly socket: Socket }) =>
     html`<div
         class=${ifDefined(`socket ${props.socket.end.kind === 'store' ? 'output' : 'input'}`)}
         data-socket=${ifDefined(props.socket.key)}
+        data-side=${ifDefined(props.socket.side)}
         data-member=${ifDefined(props.socket.group !== null ? '' : undefined)}
         style=${styleMap({
             left: `${props.socket.x}px`,
             top: `${props.socket.y}px`,
+            'z-index': String(props.socket.z),
             '--socket-width': `${props.socket.width}px`,
             '--store': props.socket.colour,
         })}
@@ -158,10 +159,12 @@ const GroupPill = (props: { readonly group: GroupRow }) =>
         type="button"
         class="group"
         data-group=${ifDefined(props.group.key)}
+        data-side=${ifDefined(props.group.side)}
         data-bound=${ifDefined(props.group.bound > 0 ? '' : undefined)}
         style=${styleMap({
             left: `${props.group.x}px`,
             top: `${props.group.y}px`,
+            'z-index': String(props.group.z),
             '--socket-width': `${props.group.width}px`,
             '--store': props.group.colour,
         })}
@@ -178,6 +181,7 @@ const GroupPill = (props: { readonly group: GroupRow }) =>
 
 export class HksStateWiring extends HTMLElement {
     readonly changes$: Observable<WiringEvent>;
+    readonly hovered$: Observable<string | null>;
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
     private readonly opened$: Observable<string | null>;
@@ -193,14 +197,7 @@ export class HksStateWiring extends HTMLElement {
             shadow,
             { view: null, rows: [] },
             state =>
-                html`<svg class="wires" aria-hidden="true">
-                        ${repeat(
-                            state.view?.wires ?? [],
-                            item => item,
-                            wire =>
-                                svg`<path d=${ifDefined(wire.path)} style=${styleMap({ '--store': wire.colour })} class=${classMap({ shared: wire.shared })}></path>`,
-                        )}</svg
-                    ><svg class="rubber" aria-hidden="true"><path></path></svg>
+                html`<svg class="rubber" aria-hidden="true"><path></path></svg>
                     <div class="ports">
                         ${repeat(
                             state.rows.map(row => row.key),
@@ -215,7 +212,8 @@ export class HksStateWiring extends HTMLElement {
                                                 html`<div
                                                     class="rail"
                                                     style=${styleMap({
-                                                        left: `${group.x + 10 * (state.view?.unit ?? 1)}px`,
+                                                        'z-index': String(group.z),
+                                                        left: `${group.side === 'left' ? group.x + group.width - 10 * (state.view?.unit ?? 1) : group.x + 10 * (state.view?.unit ?? 1)}px`,
                                                         top: `${group.y + (state.view?.rowHeight ?? 28) / 2}px`,
                                                         height: `${
                                                             (state.view?.sockets
@@ -267,6 +265,12 @@ export class HksStateWiring extends HTMLElement {
             ),
             share(),
         );
+        this.hovered$ = merge(
+            fromElementEvent$(ports, 'pointerover').pipe(
+                map(({ target }) => closestData(target, 'socket')),
+            ),
+            fromElementEvent$(ports, 'pointerleave').pipe(map(() => null)),
+        ).pipe(distinctUntilChanged());
         this.choices$ = fromElementEvent$(ports, 'click').pipe(
             mergeMap(({ target }) => {
                 const option = target instanceof Element ? target.closest('[data-choice]') : null;
@@ -380,6 +384,7 @@ export class HksStateWiring extends HTMLElement {
         const drawn$ = view$.pipe(
             tap(view => {
                 this.hidden = view === null;
+                this.toggleAttribute('data-all', view?.all === true);
                 this.style.setProperty('--socket-height', `${view?.rowHeight ?? 28}px`);
 
                 const focused = focusedIn(shadow);

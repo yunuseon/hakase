@@ -105,6 +105,7 @@ export const programDemo = (
         error$: () => of(null),
         look$: select(state => state.look),
         aspect$: select(state => state.aspect),
+        wires$: select(state => state.wires),
         previewSide$: of(512),
         library$: select(state => state.library),
         blueprints$: of({ items: [] }),

@@ -45,6 +45,7 @@ export class HksCanvas extends HTMLElement {
     readonly clipboard$: Observable<'copy' | 'paste'>;
     readonly steps$: Observable<KeyStep>;
     readonly selects$: Observable<PointerPhase>;
+    readonly grounds$: Observable<void>;
 
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
@@ -87,6 +88,7 @@ export class HksCanvas extends HTMLElement {
         this.ground = requireChild(shadow, '.ground');
         this.world = requireChild(shadow, '.world');
         this.selects$ = pointerGesture$(this.ground, event => notTouch(event) && event.shiftKey);
+        this.grounds$ = fromElementEvent$(this.ground, 'pointerdown').pipe(map(() => undefined));
 
         this.gestures$ = merge(
             pointerDelta$(this.ground, event => notTouch(event) && !event.shiftKey).pipe(

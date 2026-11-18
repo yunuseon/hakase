@@ -30,8 +30,8 @@
 }
 
 .toggle:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 2px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .loop[aria-pressed='true'],
@@ -106,7 +106,7 @@
 }
 
 .field:focus-within {
-    outline: 1px solid var(--rule);
+    outline: var(--focus-ring);
 }
 
 .field input {

@@ -27,8 +27,8 @@
 }
 
 .pick:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 /* Visually hidden, still a real radio: arrow keys, focus and the change event all keep working. */
@@ -210,8 +210,8 @@
 
 .reset:focus-visible,
 .view:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .reset svg,

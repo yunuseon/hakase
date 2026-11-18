@@ -47,6 +47,7 @@ const started = (): Documents => ({
     looks: new Map(),
     look: 'paper',
     aspect: '1:1',
+    wires: 'curves',
 });
 
 const reduce = reduceHistory(documentsKit(inputsFor));

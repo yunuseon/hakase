@@ -46,6 +46,7 @@ const started = (): Documents => ({
     looks: new Map(),
     look: 'paper',
     aspect: '1:1',
+    wires: 'curves',
 });
 
 const reduce = reduceHistory(documentsKit(inputsFor));
@@ -289,6 +290,19 @@ describe('one log for every document', () => {
         };
 
         expect(seqFloor(documents)).toBe(40);
+    });
+});
+
+describe('the wire style', () => {
+    it('is one undoable step, labelled, and a repeat of the same style is no step', () => {
+        const history = run(fresh(), [
+            { kind: 'wires', wires: 'traces' },
+            { kind: 'wires', wires: 'traces' },
+        ]);
+
+        expect(history.present.wires).toBe('traces');
+        expect(labels(history).at(-1)).toBe('Drew wires as traces');
+        expect(history.steps).toHaveLength(1);
     });
 });
 

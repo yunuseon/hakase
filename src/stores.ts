@@ -105,7 +105,6 @@ const STORES_RENAMED: Readonly<Record<string, StoreId>> = { todo: 'tickets' };
 export const renamedStore = (store: StoreId): StoreId =>
     Object.entries(STORES_RENAMED).find(([old]) => old === store)?.[1] ?? store;
 
-// A program whose store holds settings keys them by store; any other keys them by window.
 export const settingsKey = (program: ProgramId, store: StoreId, window: string): string =>
     HOLDING[program]?.holds === 'settings' ? store : window;
 

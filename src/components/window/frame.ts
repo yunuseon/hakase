@@ -23,6 +23,7 @@ export type WindowView = {
     readonly frame: Frame;
     readonly focused: boolean;
     readonly selected?: boolean;
+    readonly receded?: boolean;
 };
 
 export type StoreOption = {
@@ -104,6 +105,18 @@ export const moved = (frame: Frame, dx: number, dy: number): Frame => ({
 
 // West and north shift `x`/`y` by the size the clamp allowed, not the raw delta.
 export const MINIMUM: Size = { width: MIN_WIDTH, height: MIN_HEIGHT };
+
+export const READABLE = 0.75;
+
+export const tooSmall = (shown: number, laid: number) => laid > 0 && shown / laid < READABLE;
+
+export const opensAbove = (
+    menu: { readonly top: number; readonly bottom: number },
+    owner: { readonly top: number },
+    viewport: { readonly top: number; readonly height: number },
+) =>
+    menu.bottom > viewport.top + viewport.height &&
+    owner.top - viewport.top > viewport.top + viewport.height - menu.top;
 
 export const resized = (
     frame: Frame,

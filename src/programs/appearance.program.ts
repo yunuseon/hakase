@@ -11,6 +11,7 @@ import {
 import { appearanceFrom, sameAppearance, tokenValues, TOKENS } from '../appearance.ts';
 import { appearances, isAppearanceName } from '../appearances.ts';
 import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
+import { isWireStyle } from '../shared/connections.ts';
 
 const options = Object.keys(appearances).map(value => ({ value, label: value }));
 
@@ -29,7 +30,7 @@ export const appearanceProgram = {
 
         return {
             element: editor,
-            run$: ({ look$, appearance$ }, self) => {
+            run$: ({ look$, appearance$, wires$ }, self) => {
                 // Our own edits are skipped, or a picker being dragged is rewritten under it.
                 const shown$ = look$.pipe(
                     switchMap(name =>
@@ -42,7 +43,14 @@ export const appearanceProgram = {
                 );
 
                 return merge(
-                    editor.connect$(look$, shown$.pipe(map(tokenValues))).pipe(ignoreElements()),
+                    editor
+                        .connect$(look$, shown$.pipe(map(tokenValues)), wires$)
+                        .pipe(ignoreElements()),
+                    editor.wires$.pipe(
+                        mergeMap((wires): Observable<AppInput> =>
+                            isWireStyle(wires) ? of({ kind: 'wires', wires }) : EMPTY,
+                        ),
+                    ),
                     editor.selections$.pipe(
                         mergeMap((name): Observable<AppInput> =>
                             isAppearanceName(name) ? of({ kind: 'look', name }) : EMPTY,

@@ -231,7 +231,7 @@ hks-select:focus-visible {
 }
 
 :host([data-view='board']) .ticket {
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+    box-shadow: var(--elevation-control);
 }
 
 .ticket[data-dragging] {
@@ -347,7 +347,7 @@ hks-select:focus-visible {
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-2xl);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 25%, transparent);
+    box-shadow: var(--elevation-raised);
 }
 
 .detail[hidden] {
@@ -497,15 +497,15 @@ hks-select:focus-visible {
 }
 
 .ticket-search:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: var(--focus-ring);
 }
 
 .icon-action {
     opacity: 0.7;
     transition:
-        color 120ms ease,
-        background-color 120ms ease,
-        opacity 120ms ease;
+        color var(--duration-quick) var(--ease-out),
+        background-color var(--duration-quick) var(--ease-out),
+        opacity var(--duration-quick) var(--ease-out);
 }
 
 .icon-action:hover:not(:disabled),
@@ -539,12 +539,6 @@ hks-select:focus-visible {
 
 .delete-ticket:hover {
     color: var(--accent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .icon-action {
-        transition: none;
-    }
 }
 
 .bar-actions,

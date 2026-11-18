@@ -30,6 +30,7 @@ export type ProcessSignal =
     | { readonly to: 'state-mode'; readonly id: ProcessId }
     | { readonly to: 'toggle-selection'; readonly id: ProcessId }
     | { readonly to: 'state-busy'; readonly id: ProcessId; readonly busy: boolean }
+    | { readonly to: 'hover'; readonly id: ProcessId; readonly over: boolean }
     // Stamped here so a process can tell its own edits from everyone else's.
     | {
           readonly to: 'app';
@@ -54,6 +55,7 @@ export const liveProcess$ = (
     follows$: Observable<readonly FollowGroup[] | null>,
     manage$: Observable<boolean>,
     selected$: Observable<boolean>,
+    receded$: Observable<boolean>,
     closing$: Observable<unknown> = EMPTY,
 ): Observable<ProcessSignal> =>
     defer(() => {
@@ -71,12 +73,13 @@ export const liveProcess$ = (
             startWith(false),
             distinctUntilChanged(),
         );
-        const view$ = combineLatest([self.slot$, selected$]).pipe(
-            map(([{ frame, focused }, selected]): WindowView => ({
+        const view$ = combineLatest([self.slot$, selected$, receded$]).pipe(
+            map(([{ frame, focused }, selected, receded]): WindowView => ({
                 kind: 'floating',
                 frame,
                 focused,
                 selected,
+                receded,
             })),
         );
 
@@ -105,7 +108,29 @@ export const liveProcess$ = (
                 }),
             ),
             held$.pipe(map((busy): ProcessSignal => ({ to: 'state-busy', id: self.id, busy }))),
+            // Its menu hangs inside its frame, so a window in front would cover it.
+            manage$.pipe(
+                filter(open => open),
+                map((): ProcessSignal => ({
+                    to: 'workspace',
+                    action: { kind: 'raise', id: self.id },
+                })),
+            ),
             element.stateModes$.pipe(map((): ProcessSignal => ({ to: 'state-mode', id: self.id }))),
+            element.approaches$.pipe(
+                withLatestFrom(self.store$, self.clock$),
+                map(([, store, clock]): ProcessSignal => ({
+                    to: 'app',
+                    from: self.id,
+                    store,
+                    clock,
+                    program: program.id,
+                    input: { kind: 'locate', id: self.id },
+                })),
+            ),
+            element.hovers$.pipe(
+                map((over): ProcessSignal => ({ to: 'hover', id: self.id, over })),
+            ),
             element.selectionToggles$.pipe(
                 map((): ProcessSignal => ({ to: 'toggle-selection', id: self.id })),
             ),

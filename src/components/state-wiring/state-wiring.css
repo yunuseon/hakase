@@ -3,7 +3,6 @@
     inset: 0 auto auto 0;
     inline-size: 1px;
     block-size: 1px;
-    z-index: 99999;
     pointer-events: none;
     font: 500 var(--text-xs) var(--font-ui);
     color: var(--wiring-ink);
@@ -35,6 +34,10 @@ path.shared {
     stroke-dasharray: 3 5;
 }
 
+.rubber {
+    z-index: 99998;
+}
+
 .rubber path {
     stroke-width: 2.5;
     opacity: 1;
@@ -62,7 +65,7 @@ path.shared {
     padding: var(--space-0-5) var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--wiring-panel);
-    box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    box-shadow: var(--elevation-control);
     font: 600 var(--text-2xs) var(--font-mono);
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -124,7 +127,7 @@ path.shared {
 .socket[data-open] {
     background: var(--wiring-panel);
     border-color: var(--wiring-edge);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--shadow) 8%, transparent);
+    box-shadow: var(--elevation-control);
     pointer-events: auto;
 }
 
@@ -177,8 +180,8 @@ path.shared {
 .jack:focus-visible,
 .selector:focus-visible,
 .manage:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 :host([data-dragging]) .jack {
@@ -195,7 +198,7 @@ path.shared {
 }
 
 .socket[data-open] {
-    z-index: 2;
+    z-index: 99998 !important;
 }
 
 .selector {
@@ -217,7 +220,7 @@ path.shared {
     border-radius: var(--radius-xl);
     background: var(--wiring-panel);
     pointer-events: auto;
-    box-shadow: 0 3px 12px color-mix(in srgb, var(--shadow) 14%, transparent);
+    box-shadow: var(--elevation-raised);
 }
 
 .choices[data-above] {
@@ -323,7 +326,7 @@ path.shared {
     padding: var(--space-0-5) var(--space-1) var(--space-0-5) calc(var(--spacing) * 1.25);
     border-radius: var(--radius-sm);
     background: var(--wiring-panel);
-    box-shadow: 0 1px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    box-shadow: var(--elevation-control);
     font: 600 var(--text-2xs) var(--font-mono);
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -367,7 +370,7 @@ path.shared {
     inline-size: var(--socket-width);
     background: var(--wiring-panel);
     border-color: var(--wiring-edge);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--shadow) 8%, transparent);
+    box-shadow: var(--elevation-control);
     outline: none;
 }
 
@@ -430,4 +433,76 @@ path.shared {
         block-size: var(--control-xl);
         translate: -50% -50%;
     }
+}
+
+/* Tabs: the jack sits on the frame's edge and everything else runs outward, away from the window. */
+.socket,
+.group {
+    translate: 0 0;
+    transition: translate var(--duration-base) var(--ease-out);
+}
+
+@starting-style {
+    .socket[data-side='left'],
+    .group[data-side='left'] {
+        translate: var(--space-3) 0;
+    }
+
+    .socket[data-side='right'] {
+        translate: calc(var(--space-3) * -1) 0;
+    }
+}
+
+.socket[data-side='left'] {
+    flex-direction: row-reverse;
+    padding-inline: calc(var(--spacing) * 1.25) var(--space-6);
+}
+
+.socket[data-side='left'] .jack {
+    inset-inline: auto calc(var(--spacing) * 0.75);
+}
+
+.socket[data-side='left'] span {
+    inset-inline: auto var(--space-6);
+}
+
+.socket[data-side='right'] {
+    padding-inline: var(--space-6) calc(var(--spacing) * 1.25);
+}
+
+.socket[data-side='right'] .jack {
+    inset-inline: calc(var(--spacing) * 0.75) auto;
+}
+
+.socket[data-side='right'] span {
+    inset-inline: var(--space-6) auto;
+}
+
+.group[data-side='left'] {
+    inline-size: var(--socket-width);
+    flex-direction: row-reverse;
+    padding-inline: var(--space-1-5) var(--space-7);
+}
+
+.group[data-side='left'] .hub {
+    inset-inline: auto calc(var(--spacing) * 0.75);
+}
+
+/* Quiet until wanted: a tab's label shows on hover, while a wire could land on it, or everywhere in state mode. */
+.socket span,
+.group .pill {
+    opacity: 0;
+    transition: opacity var(--duration-quick) var(--ease-out);
+}
+
+:host([data-all]) .socket span,
+:host([data-all]) .group .pill,
+.socket:hover span,
+.socket:focus-within span,
+.socket[data-compatible] span,
+.socket[data-open] span,
+.group:hover .pill,
+.group:focus-visible .pill,
+.group[data-compatible] .pill {
+    opacity: 1;
 }

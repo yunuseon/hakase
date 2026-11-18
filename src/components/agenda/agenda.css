@@ -145,7 +145,7 @@
 }
 
 .title:focus-visible {
-    outline: 1px solid var(--rule);
+    outline: var(--focus-ring);
 }
 
 .remove {
@@ -234,8 +234,8 @@
 
 .bar button:focus-visible,
 .remove:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .bar {

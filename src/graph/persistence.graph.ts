@@ -11,6 +11,7 @@ type Saved = Pick<
     | 'workspace$'
     | 'look$'
     | 'aspect$'
+    | 'wires$'
     | 'looks$'
     | 'edits$'
     | 'palettes$'
@@ -42,6 +43,7 @@ export const persisted$ = ({
     workspace$,
     look$,
     aspect$,
+    wires$,
     looks$,
     edits$,
     palettes$,
@@ -73,6 +75,7 @@ export const persisted$ = ({
             workspace: workspace$,
             look: look$,
             aspect: aspect$,
+            wires: wires$,
             looks: looks$.pipe(map(valuesOf)),
             formulas: edits$.pipe(map(valuesOf)),
             themes: palettes$.pipe(map(valuesOf)),

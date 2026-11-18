@@ -27,6 +27,7 @@ import {
 } from '../components/section-drawing/section-drawing.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
+import { HksStateTraces } from '../components/state-traces/state-traces.component.ts';
 import { wiresOf, type WiringView } from '../components/state-wiring/wiring.ts';
 import { categoriesOf } from '../program-categories.ts';
 import { programs } from '../programs.ts';
@@ -470,119 +471,123 @@ export const chromeStories: readonly Story[] = [
         title: 'State sockets & wires',
         group: 'Workspace',
         description:
-            'State-mode jacks and compact store selection in their distinct wiring appearance. Touch keeps selectors visible and uses taller rows; geometry follows the root font size.',
-        elements: ['hks-state-wiring'],
+            'State-mode jacks and compact store selection, over the traces that run beneath the boards: right-angled, soft-cornered, lit while a jack they join is hovered. Touch keeps selectors visible and uses taller rows; geometry follows the root font size.',
+        elements: ['hks-state-wiring', 'hks-state-traces'],
         variants: normal,
         controls: [],
         defaults,
         height: 270,
         action: null,
-        code: 'const wiring = new HksStateWiring();\nconst lifetime$ = wiring.connect$(wiringView$);\nconst requests$ = wiring.changes$;',
+        code: '// Traces beneath the windows, jacks above them, from one view.\nconst traces = new HksStateTraces();\nconst wiring = new HksStateWiring();\nconst lifetime$ = merge(\n  traces.connect$(wiringView$, wiring.hovered$),\n  wiring.connect$(wiringView$),\n);\nconst requests$ = wiring.changes$;',
         create: () => {
-            const element = new HksStateWiring();
+            const element = document.createElement('div');
+            const traces = new HksStateTraces();
+            const wiring = new HksStateWiring();
+            element.style.position = 'relative';
+            element.style.blockSize = '100%';
+            element.append(traces, wiring);
+            const view$ = combineLatest([
+                of({
+                    all: true,
+                    unit: 1,
+                    rowHeight: 28,
+                    groups: [],
+                    sockets: [
+                        {
+                            key: 'output',
+                            window: 'source',
+                            z: 3,
+                            side: 'right',
+                            x: 20,
+                            y: 50,
+                            width: 150,
+                            menu: { above: false, height: 90 },
+                            title: 'Signal',
+                            type: 'level',
+                            colour: 'var(--accent)',
+                            end: {
+                                kind: 'store',
+                                id: 'signal-example',
+                                program: 'signal',
+                                feeds: 'signal',
+                            },
+                            receiver: null,
+                            current: 'signal-example',
+                            optional: false,
+                            options: [
+                                {
+                                    id: 'signal-example',
+                                    name: 'Sine',
+                                    colour: 'var(--accent)',
+                                    source: 'signal',
+                                },
+                            ],
+                            group: null,
+                            hidden: false,
+                        },
+                        {
+                            key: 'input',
+                            window: 'sink',
+                            z: 5,
+                            side: 'left',
+                            x: 250,
+                            y: 140,
+                            width: 150,
+                            menu: { above: false, height: 90 },
+                            title: 'Knob 1',
+                            type: 'level',
+                            colour: 'var(--accent)',
+                            end: {
+                                kind: 'port',
+                                owner: 'window',
+                                sink: 'sketch-example',
+                                input: 'k1',
+                                accepts: ['signal'],
+                                cuttable: true,
+                            },
+                            receiver: null,
+                            current: 'signal-example',
+                            optional: true,
+                            options: [
+                                {
+                                    id: 'signal-example',
+                                    name: 'Sine',
+                                    colour: 'var(--accent)',
+                                    source: 'signal',
+                                },
+                            ],
+                            group: null,
+                            hidden: false,
+                        },
+                    ],
+                    wires: [],
+                } satisfies WiringView),
+                remScale$,
+                coarsePointer$,
+            ]).pipe(
+                map(([view, unit, touch]) => {
+                    const rowHeight = (touch ? 44 : 28) * unit;
+                    const sockets = view.sockets.map(socket => ({
+                        ...socket,
+                        x: socket.x * unit,
+                        y: socket.y * unit,
+                        width: socket.width * unit,
+                        menu: { ...socket.menu, height: socket.menu.height * unit },
+                    }));
+                    return {
+                        all: true,
+                        unit,
+                        rowHeight,
+                        groups: [],
+                        sockets,
+                        wires: wiresOf(sockets, unit, rowHeight),
+                    };
+                }),
+            );
             return {
                 element,
-                run$: element.connect$(
-                    combineLatest([
-                        of({
-                            unit: 1,
-                            rowHeight: 28,
-                            groups: [],
-                            sockets: [
-                                {
-                                    key: 'output',
-                                    window: 'source',
-                                    x: 20,
-                                    y: 50,
-                                    width: 150,
-                                    menu: { above: false, height: 90 },
-                                    title: 'Signal',
-                                    type: 'level',
-                                    colour: 'var(--accent)',
-                                    end: {
-                                        kind: 'store',
-                                        id: 'signal-example',
-                                        program: 'signal',
-                                        feeds: 'signal',
-                                    },
-                                    receiver: null,
-                                    current: 'signal-example',
-                                    optional: false,
-                                    options: [
-                                        {
-                                            id: 'signal-example',
-                                            name: 'Sine',
-                                            colour: 'var(--accent)',
-                                            source: 'signal',
-                                        },
-                                    ],
-                                    group: null,
-                                    hidden: false,
-                                },
-                                {
-                                    key: 'input',
-                                    window: 'sink',
-                                    x: 250,
-                                    y: 140,
-                                    width: 150,
-                                    menu: { above: false, height: 90 },
-                                    title: 'Knob 1',
-                                    type: 'level',
-                                    colour: 'var(--accent)',
-                                    end: {
-                                        kind: 'port',
-                                        owner: 'window',
-                                        sink: 'sketch-example',
-                                        input: 'k1',
-                                        accepts: ['signal'],
-                                        cuttable: true,
-                                    },
-                                    receiver: null,
-                                    current: 'signal-example',
-                                    optional: true,
-                                    options: [
-                                        {
-                                            id: 'signal-example',
-                                            name: 'Sine',
-                                            colour: 'var(--accent)',
-                                            source: 'signal',
-                                        },
-                                    ],
-                                    group: null,
-                                    hidden: false,
-                                },
-                            ],
-                            wires: [
-                                {
-                                    path: 'M160 64 C210 64 210 154 260 154',
-                                    colour: 'var(--accent)',
-                                    shared: false,
-                                },
-                            ],
-                        } satisfies WiringView),
-                        remScale$,
-                        coarsePointer$,
-                    ]).pipe(
-                        map(([view, unit, touch]) => {
-                            const rowHeight = (touch ? 44 : 28) * unit;
-                            const sockets = view.sockets.map(socket => ({
-                                ...socket,
-                                x: socket.x * unit,
-                                y: socket.y * unit,
-                                width: socket.width * unit,
-                                menu: { ...socket.menu, height: socket.menu.height * unit },
-                            }));
-                            return {
-                                unit,
-                                rowHeight,
-                                groups: [],
-                                sockets,
-                                wires: wiresOf(sockets, unit, rowHeight),
-                            };
-                        }),
-                    ),
-                ),
-                events$: element.changes$.pipe(map(event => recorded(event.kind, event))),
+                run$: merge(traces.connect$(view$, wiring.hovered$), wiring.connect$(view$)),
+                events$: wiring.changes$.pipe(map(event => recorded(event.kind, event))),
             };
         },
     },

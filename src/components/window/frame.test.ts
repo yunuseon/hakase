@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameFrom, MINIMUM, resized } from './frame.ts';
+import { frameFrom, MINIMUM, opensAbove, resized, tooSmall } from './frame.ts';
 
 const frame = { x: 100, y: 100, z: 0, width: 300, height: 200 };
 
@@ -31,5 +31,30 @@ describe('a saved frame', () => {
         expect(frameFrom(frame)).toEqual(frame);
         expect(frameFrom({ ...frame, width: Number.NaN })).toBeNull();
         expect(frameFrom({ x: 1, y: 2 })).toBeNull();
+    });
+});
+
+describe('reading distance', () => {
+    it('calls a window too small to read below three quarters of its laid-out size', () => {
+        expect(tooSmall(123, 300)).toBe(true);
+        expect(tooSmall(240, 300)).toBe(false);
+        expect(tooSmall(600, 300)).toBe(false);
+        expect(tooSmall(0, 0)).toBe(false);
+    });
+});
+
+describe('opensAbove', () => {
+    const viewport = { top: 0, height: 600 };
+
+    it('opens below while it fits', () => {
+        expect(opensAbove({ top: 100, bottom: 400 }, { top: 60 }, viewport)).toBe(false);
+    });
+
+    it('opens above when it runs off the bottom and there is more room above', () => {
+        expect(opensAbove({ top: 500, bottom: 800 }, { top: 460 }, viewport)).toBe(true);
+    });
+
+    it('stays below when there is even less room above', () => {
+        expect(opensAbove({ top: 120, bottom: 700 }, { top: 80 }, viewport)).toBe(false);
     });
 });

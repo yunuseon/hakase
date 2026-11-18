@@ -73,8 +73,8 @@ input {
 input:focus-visible,
 button:focus-visible,
 hks-select:focus-within {
-    outline: 2px solid var(--highlight);
-    outline-offset: 2px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .catalogue {
@@ -239,7 +239,7 @@ svg {
     color: var(--ink);
     background: var(--panel);
     overflow: auto;
-    transition: inline-size 0.15s;
+    transition: inline-size var(--duration-base) var(--ease-out);
 }
 
 .sample {
@@ -326,12 +326,6 @@ pre {
 
 [hidden] {
     display: none !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .preview {
-        transition: none;
-    }
 }
 
 @container (max-width:37.5rem) {

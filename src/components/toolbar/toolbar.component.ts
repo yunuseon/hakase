@@ -29,7 +29,12 @@ const template = (categories: readonly ToolbarCategory[]) =>
                     >
                         ${Icon(category.icon)}
                     </summary>
-                    <div class="places" popover="manual" role="menu" aria-label=${category.title}>
+                    <div
+                        class="places ui-glass"
+                        popover="manual"
+                        role="menu"
+                        aria-label=${category.title}
+                    >
                         <p class="places-title">${category.title}</p>
                         ${repeat(
                             category.items,

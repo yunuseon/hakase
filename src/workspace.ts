@@ -481,7 +481,6 @@ const movedGroup = (
 
 type Side = 'n' | 'e' | 's' | 'w';
 
-// Which side of `box` the other window is attached to, judged as seams are.
 const sideOf = (box: Rect, other: Rect): Side | null => {
     const rows = overlap(box.y, box.y + box.height, other.y, other.y + other.height);
     const columns = overlap(box.x, box.x + box.width, other.x, other.x + other.width);
@@ -1113,7 +1112,6 @@ const sizeFrom = (value: unknown): Size | null => {
     return width === null || height === null ? null : { width, height };
 };
 
-// Programs that grew into others: their open windows come back as the program that replaced them.
 const RENAMED: Readonly<Record<string, ProgramId>> = {
     links: 'bookmarks',
     patch: 'state',

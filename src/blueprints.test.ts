@@ -134,6 +134,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         looks: new Map(),
         look: 'paper',
         aspect: '1:1',
+        wires: 'curves',
     };
 };
 

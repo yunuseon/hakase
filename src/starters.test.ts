@@ -41,6 +41,7 @@ const scene = (): Documents => ({
     looks: new Map(),
     look: 'paper',
     aspect: '1:1',
+    wires: 'curves',
 });
 
 const view = { x: 0, y: 0, width: 1400, height: 900 };

@@ -30,6 +30,6 @@
     background: var(--panel);
     border: 3px solid var(--accent);
     border-radius: 100%;
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--shadow) 20%, transparent);
+    box-shadow: var(--elevation-control);
     pointer-events: none;
 }

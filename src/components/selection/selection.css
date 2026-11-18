@@ -23,7 +23,7 @@
     border: 1px solid var(--edge);
     border-radius: var(--radius-3xl);
     background: var(--panel);
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--shadow) 15%, transparent);
+    box-shadow: var(--elevation-raised);
     pointer-events: auto;
 }
 .actions[hidden] {

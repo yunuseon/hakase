@@ -1,3 +1,4 @@
+import { isWireStyle, WIRE_STYLES, type WireStyle } from './shared/connections.ts';
 import { boundsOf, areaContains } from './shared/area.ts';
 import { appearances, isAppearanceName, type AppearanceName } from './appearances.ts';
 import type { Command } from './components/palette/palette.ts';
@@ -24,6 +25,7 @@ export type Picked =
     | { readonly kind: 'section'; readonly id: string }
     | { readonly kind: 'step'; readonly direction: Direction }
     | { readonly kind: 'look'; readonly name: AppearanceName }
+    | { readonly kind: 'wires'; readonly wires: WireStyle }
     | {
           readonly kind: 'capture';
           readonly target: CaptureTarget;
@@ -59,7 +61,6 @@ const WORKSPACE = [
 const isWorkspaceCommand = (value: string): value is (typeof WORKSPACE)[number] =>
     WORKSPACE.some(command => command === value);
 
-// The frontmost window's state first, since that is the list in front of you, then Main, then by name.
 export const captureStores = (program: ProgramId, workspace: Workspace): readonly StoreEntry[] => {
     const front = [...workspace.processes]
         .reverse()
@@ -137,6 +138,12 @@ export const commandsOf = (
         hint: 'appearance',
         keyword: null,
     })),
+    ...WIRE_STYLES.map(style => ({
+        id: `wires:${style}`,
+        label: `Draw wires as ${style}`,
+        hint: 'appearance',
+        keyword: null,
+    })),
 ];
 
 // Untrusted in the sense that a click target carries it: parsed, never assumed.
@@ -159,6 +166,8 @@ export const pickedOf = (id: string, text: string | null): Picked | null => {
             return value === 'next' || value === 'previous' ? { kind, direction: value } : null;
         case 'look':
             return isAppearanceName(value) ? { kind, name: value } : null;
+        case 'wires':
+            return isWireStyle(value) ? { kind, wires: value } : null;
         case 'workspace':
             return isWorkspaceCommand(value) ? { kind, action: value } : null;
         default:

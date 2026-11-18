@@ -1,5 +1,13 @@
+import { DEFAULT_WIRE_STYLE, type WireStyle } from './shared/connections.ts';
 import { inputGroups } from './input-connections.ts';
-import { definitionOf, madeBy, SOURCES, type InputsFor } from './inputs.ts';
+import {
+    definitionOf,
+    followedStores,
+    madeBy,
+    SOURCES,
+    type Bindings,
+    type InputsFor,
+} from './inputs.ts';
 import {
     groupKey,
     windowOfGroup,
@@ -90,14 +98,48 @@ export const reduceSession = (session: ModeSession, action: ModeAction): ModeSes
         case 'hold':
             return { ...session, held: action.held };
         case 'busy':
-            return {
-                ...session,
-                locks: action.busy
-                    ? [...new Set([...session.locks, action.key])]
-                    : session.locks.filter(key => key !== action.key),
-            };
+            // Only a drag may start the mode, to show every target; any other lock only keeps it on.
+            return action.busy && action.key !== 'drag' && !modeOf(session).active
+                ? session
+                : {
+                      ...session,
+                      locks: action.busy
+                          ? [...new Set([...session.locks, action.key])]
+                          : session.locks.filter(key => key !== action.key),
+                  };
         default:
             return { ...session, pinned: reduceMode(session.pinned, action) };
+    }
+};
+
+export type Engaged = { readonly hovered: string | null; readonly focused: string | null };
+
+export type EngageAction =
+    | { readonly kind: 'hover'; readonly id: string; readonly over: boolean }
+    | { readonly kind: 'press'; readonly id: string | null }
+    | { readonly kind: 'windows'; readonly ids: readonly string[] };
+
+export const disengaged: Engaged = { hovered: null, focused: null };
+
+export const reduceEngaged = (engaged: Engaged, action: EngageAction): Engaged => {
+    switch (action.kind) {
+        case 'hover':
+            return action.over
+                ? { ...engaged, hovered: action.id }
+                : engaged.hovered === action.id
+                  ? { ...engaged, hovered: null }
+                  : engaged;
+        case 'press':
+            return engaged.focused === action.id ? engaged : { ...engaged, focused: action.id };
+        case 'windows': {
+            const open = (id: string | null) =>
+                id !== null && action.ids.includes(id) ? id : null;
+
+            return open(engaged.hovered) === engaged.hovered &&
+                open(engaged.focused) === engaged.focused
+                ? engaged
+                : { hovered: open(engaged.hovered), focused: open(engaged.focused) };
+        }
     }
 };
 
@@ -105,9 +147,25 @@ export const modeOf = ({ pinned, held, locks }: ModeSession) => ({
     active: pinned.active || held || locks.length > 0,
 });
 
-const SOCKET_WIDTH = 180;
+// Windows stack at even z and their tabs at the odd z just below, half tucked under their own frame and above the window behind.
+export const windowZ = (index: number) => (index + 1) * 2;
+
+const behindWindow = (index: number) => windowZ(index) - 1;
+
+const TAB_WIDTH = 150;
+
+const readsFrom = (
+    linked: ReadonlyMap<string, Linked>,
+    process: { readonly store: string; readonly follows: Bindings },
+): ReadonlySet<string> =>
+    new Set([
+        ...followedStores(process.follows),
+        ...Object.values(linked.get(process.store)?.sources ?? {}).flatMap(source =>
+            source === null ? [] : [source],
+        ),
+    ]);
+
 const INDENT = 14;
-const EDGE_WIDTH = 120;
 
 type Row =
     | { readonly kind: 'input'; readonly name: string; readonly group: string | null }
@@ -117,16 +175,6 @@ type Row =
           readonly title: string;
           readonly members: readonly string[];
       };
-
-const menuFor = (top: number, height: number, y: number, unit: number, rowHeight: number) => {
-    const below = top + height - 8 * unit - (y + rowHeight);
-    const above = y - (top + 36 * unit);
-
-    return {
-        above: above > below,
-        height: Math.max(24 * unit, Math.min(160 * unit, Math.max(above, below))),
-    };
-};
 
 const openGroupIn = ({ open, sprung }: ModeSession, window: string) =>
     sprung !== null && windowOfGroup(sprung) === window
@@ -143,17 +191,32 @@ export const wiringOf = (
     loops: ReadonlyMap<string, Linked> = signals,
     boxes: ReadonlyMap<string, Box> = new Map(),
     pinNames: ReadonlyMap<string, string> = new Map(),
+    style: WireStyle = DEFAULT_WIRE_STYLE,
+    engaged: Engaged = disengaged,
 ): WiringView | null => {
     const mode = modeOf(session);
+    const { processes, stores } = workspace;
+    const focused = mode.active ? undefined : processes.find(({ id }) => id === engaged.focused);
+    const sources = focused === undefined ? new Set<string>() : readsFrom(signals, focused);
+    const near = (process: (typeof processes)[number]) =>
+        focused !== undefined &&
+        process.id !== focused.id &&
+        (sources.has(process.store) || readsFrom(signals, process).has(focused.store));
+    const whole = (process: (typeof processes)[number]) =>
+        mode.active || process.id === engaged.hovered || process.id === engaged.focused;
 
-    if (!mode.active) {
+    if (!processes.some(process => whole(process) || near(process))) {
         return null;
     }
 
-    const { processes, stores } = workspace;
     const rowHeight = (touch ? 44 : 28) * unit;
-    const laid = processes.map(process => {
+    const laid = processes.flatMap((process, index) => {
+        if (!whole(process) && !near(process)) {
+            return [];
+        }
+
         const frame = boxOf(process);
+        const z = behindWindow(index);
         const inputs = inputsFor(process.program);
         const box = process.program === 'box' ? boxes.get(process.store) : undefined;
         const owned = HOLDING[process.program] !== null && process.program !== 'box';
@@ -189,43 +252,27 @@ export const wiringOf = (
                           : []),
                   ];
         });
-        const ins = rows.length + (box?.inputs.length ?? 0);
-        const outs = (owned ? 1 : 0) + (box?.outputs.length ?? 0);
         const pitch = rowHeight + 2 * unit;
         const clearance = (touch ? 56 : 40) * unit;
-        const inside =
-            clearance + (ins + outs) * pitch + 8 * unit <= frame.height &&
-            frame.width - 16 * unit >= EDGE_WIDTH * unit;
-        const width = inside
-            ? Math.min(SOCKET_WIDTH * unit, frame.width - 16 * unit)
-            : EDGE_WIDTH * unit;
+        const width = TAB_WIDTH * unit;
         const rowAt = (row: number) => frame.y + clearance + row * pitch;
-        const column = (index: number, count: number) =>
-            frame.y + frame.height / 2 - (count * pitch - 2 * unit) / 2 + index * pitch;
-        const menuAt = (y: number) =>
-            inside
-                ? menuFor(frame.y, frame.height, y, unit, rowHeight)
-                : { above: false, height: 160 * unit };
-        const inputAt = (index: number) =>
-            inside
-                ? { x: frame.x + 8 * unit, y: rowAt((owned ? 1 : 0) + index) }
-                : { x: frame.x - 10 * unit, y: column(index, ins) };
-        const outputAt = (index: number) =>
-            inside
-                ? {
-                      x: frame.x + frame.width - width - 8 * unit,
-                      y: rowAt(owned && index === 0 ? 0 : ins + index),
-                  }
-                : { x: frame.x + frame.width + 10 * unit - width, y: column(index, outs) };
+        const menu = { above: false, height: 160 * unit };
+        const inputAt = (index: number) => ({ x: frame.x - width + 10 * unit, y: rowAt(index) });
+        const outputAt = (index: number) => ({
+            x: frame.x + frame.width - 10 * unit,
+            y: rowAt(index),
+        });
         const output: Socket[] = !owned
             ? []
             : [
                   {
                       key: `${process.id}:output`,
                       window: process.id,
+                      z,
+                      side: 'right',
                       ...outputAt(0),
                       width,
-                      menu: menuAt(outputAt(0).y),
+                      menu,
                       title: 'Output',
                       type: madeBy(process.program),
                       colour: colourOf(process.store),
@@ -275,10 +322,12 @@ export const wiringOf = (
             return {
                 key: `${process.id}:input:${key}`,
                 window: process.id,
-                x: at.x + indent,
+                z,
+                side: 'left',
+                x: at.x - indent,
                 y: at.y,
                 width: width - indent,
-                menu: menuAt(at.y),
+                menu,
                 title: label ?? options[0]?.label ?? name,
                 type: definition?.takes ?? null,
                 colour: current?.colour ?? 'var(--muted)',
@@ -333,9 +382,11 @@ export const wiringOf = (
             ...pinsOut.map((pin, index): Socket => ({
                 key: `${process.id}:output:${pin}`,
                 window: process.id,
+                z,
+                side: 'right',
                 ...outputAt(output.length + index),
                 width,
-                menu: menuAt(outputAt(output.length + index).y),
+                menu,
                 title: nameOf(pin),
                 type: 'bit',
                 colour: colourOf(pin),
@@ -378,6 +429,8 @@ export const wiringOf = (
                     {
                         key: row.key,
                         window: process.id,
+                        z,
+                        side: 'left',
                         x: at.x,
                         y: at.y,
                         width,
@@ -392,22 +445,43 @@ export const wiringOf = (
             };
         });
 
-        return {
-            sockets: [
-                ...output,
-                ...placed.flatMap(entry => entry.sockets),
-                ...(box === undefined ? [] : pinSockets(box)),
-            ],
-            groups: placed.flatMap(entry => entry.groups),
-        };
+        const all = [
+            ...output,
+            ...placed.flatMap(entry => entry.sockets),
+            ...(box === undefined ? [] : pinSockets(box)),
+        ];
+        const kept = whole(process)
+            ? all
+            : all.filter(socket =>
+                  socket.end.kind === 'store'
+                      ? sources.has(socket.end.id)
+                      : socket.current === focused?.store,
+              );
+        const keys = new Set(kept.map(socket => socket.key));
+
+        return [
+            {
+                sockets: kept,
+                groups: placed
+                    .flatMap(entry => entry.groups)
+                    .filter(group => whole(process) || group.members.some(key => keys.has(key))),
+            },
+        ];
     });
     const sockets = laid.flatMap(entry => entry.sockets);
+    const windowOf = new Map(sockets.map(socket => [socket.key, socket.window]));
 
     return {
+        all: mode.active,
         unit,
         rowHeight,
         sockets,
         groups: laid.flatMap(entry => entry.groups),
-        wires: wiresOf(sockets, unit, rowHeight),
+        wires: wiresOf(sockets, unit, rowHeight, style).filter(
+            wire =>
+                mode.active ||
+                windowOf.get(wire.from) === engaged.focused ||
+                windowOf.get(wire.to) === engaged.focused,
+        ),
     };
 };

@@ -1,0 +1,38 @@
+:host {
+    position: absolute;
+    inset: 0 auto auto 0;
+    inline-size: 1px;
+    block-size: 1px;
+    z-index: 0;
+    pointer-events: none;
+}
+
+:host([hidden]) {
+    display: none;
+}
+
+svg {
+    position: absolute;
+    overflow: visible;
+}
+
+path {
+    fill: none;
+    stroke: var(--store, var(--accent));
+    stroke-width: 2;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.55;
+    transition:
+        opacity var(--duration-quick) var(--ease-out),
+        stroke-width var(--duration-quick) var(--ease-out);
+}
+
+path.shared {
+    stroke-dasharray: 3 5;
+}
+
+path[data-lit] {
+    opacity: 1;
+    stroke-width: 3;
+}

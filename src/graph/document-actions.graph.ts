@@ -100,6 +100,8 @@ export const documentActions$ = ({
                         return [{ kind: 'look', name: input.name }];
                     case 'aspect':
                         return [{ kind: 'aspect', aspect: input.aspect }];
+                    case 'wires':
+                        return [{ kind: 'wires', wires: input.wires }];
                     case 'prune':
                         return [{ kind: 'prune' }];
                     default:
@@ -160,7 +162,11 @@ export const documentActions$ = ({
         ),
         picked$.pipe(
             mergeMap((picked): DocumentAction[] =>
-                picked.kind === 'look' ? [{ kind: 'look', name: picked.name }] : [],
+                picked.kind === 'look'
+                    ? [{ kind: 'look', name: picked.name }]
+                    : picked.kind === 'wires'
+                      ? [{ kind: 'wires', wires: picked.wires }]
+                      : [],
             ),
         ),
         picked$.pipe(

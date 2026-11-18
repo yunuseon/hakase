@@ -72,7 +72,7 @@
 .toggle::before {
     display: inline-block;
     content: '▾';
-    transition: rotate 0.15s;
+    transition: rotate var(--duration-quick) var(--ease-out);
 }
 
 .group[data-closed] .toggle::before {
@@ -363,8 +363,8 @@
 .submit:focus-visible,
 .add-group:focus-visible {
     opacity: 1;
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 @media (any-pointer: coarse) {

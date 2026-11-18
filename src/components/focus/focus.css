@@ -44,7 +44,7 @@ svg {
 .arc {
     stroke: var(--accent);
     stroke-linecap: round;
-    transition: stroke-dashoffset 0.2s linear;
+    transition: stroke-dashoffset var(--duration-base) linear;
 }
 
 :host([data-phase='short']) .arc,
@@ -152,8 +152,8 @@ svg {
 button:focus-visible,
 summary:focus-visible,
 .lengths input:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .dial {

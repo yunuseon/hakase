@@ -39,7 +39,7 @@
     background: color-mix(in srgb, var(--panel) 55%, transparent);
     border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--edge));
     border-radius: var(--radius-xl);
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow) 14%, transparent);
+    box-shadow: var(--elevation-raised);
 }
 
 .hint {
@@ -68,7 +68,7 @@
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-full);
-    box-shadow: 0 6px 20px color-mix(in srgb, var(--shadow) 18%, transparent);
+    box-shadow: var(--elevation-raised);
     translate: -50% 0;
     pointer-events: none;
 }

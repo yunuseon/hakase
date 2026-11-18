@@ -150,3 +150,36 @@ svg {
     margin-block: var(--space-4);
     color: var(--label);
 }
+
+.depths,
+.motions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(calc(var(--spacing) * 30), 1fr));
+    gap: var(--space-5);
+    margin-block: var(--space-5) var(--space-7);
+}
+
+.depths div,
+.motion {
+    padding: var(--space-5) var(--space-4);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-2xl);
+}
+
+.motion {
+    color: var(--label);
+    transition-property: translate, box-shadow;
+    transition-timing-function: var(--ease-out);
+}
+
+.motion:hover,
+.motion:focus-visible {
+    translate: 0 calc(var(--rise) * -1);
+    box-shadow: var(--elevation-raised);
+}
+
+.motion:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+}

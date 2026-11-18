@@ -170,6 +170,10 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ aspect }) => aspect),
         distinctUntilChanged(),
     );
+    const wires$ = documents$.pipe(
+        map(({ wires }) => wires),
+        distinctUntilChanged(),
+    );
     const looks$ = documents$.pipe(
         map(({ looks }) => looks),
         distinctUntilChanged(),
@@ -212,6 +216,7 @@ export const projectionsOf = (history$: Observable<History>) => {
         palettes$,
         look$,
         aspect$,
+        wires$,
         looks$,
         appearance$,
     };

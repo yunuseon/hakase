@@ -1,4 +1,5 @@
 import { DEFAULT_ASPECT, isAspect, type Aspect } from './components/sketch/animation.ts';
+import { DEFAULT_WIRE_STYLE, isWireStyle, type WireStyle } from './shared/connections.ts';
 import { parsePen, type Pen } from './components/pen/pen.ts';
 import { parseVoice, type Voice } from './components/voice/voice.ts';
 import { parseDrums, type Drums } from './components/drums/drums.ts';
@@ -61,6 +62,7 @@ export type Snapshot = {
     readonly workspace: Workspace;
     readonly look: AppearanceName;
     readonly aspect: Aspect;
+    readonly wires: WireStyle;
     readonly looks: ReadonlyMap<AppearanceName, Appearance>;
     readonly formulas: ReadonlyMap<FormulaId, string>;
     readonly themes: ReadonlyMap<ThemeName, Theme>;
@@ -127,6 +129,8 @@ const looksFrom = (value: unknown): ReadonlyMap<AppearanceName, Appearance> =>
 
 const aspectFrom = (value: unknown): Aspect => (isAspect(value) ? value : DEFAULT_ASPECT);
 
+const wiresFrom = (value: unknown): WireStyle => (isWireStyle(value) ? value : DEFAULT_WIRE_STYLE);
+
 const lookFrom = (value: unknown): AppearanceName =>
     typeof value === 'string' && isAppearanceName(value) ? value : defaultLook;
 
@@ -177,6 +181,7 @@ const fresh: Restored = {
     workspace: null,
     look: defaultLook,
     aspect: DEFAULT_ASPECT,
+    wires: DEFAULT_WIRE_STYLE,
     looks: new Map(),
     formulas: new Map(),
     themes: new Map(),
@@ -320,6 +325,7 @@ const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
         ),
         look: lookFrom(field(stored, 'look')),
         aspect: aspectFrom(field(stored, 'aspect')),
+        wires: wiresFrom(field(stored, 'wires')),
         looks: looksFrom(field(stored, 'looks')),
         formulas: formulasFrom(field(stored, 'formulas')),
         themes: themesFrom(field(stored, 'themes')),
@@ -404,6 +410,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         workspace: snapshot.workspace,
         look: snapshot.look,
         aspect: snapshot.aspect,
+        wires: snapshot.wires,
         looks: Object.fromEntries(snapshot.looks),
         formulas: Object.fromEntries(snapshot.formulas),
         themes: Object.fromEntries(snapshot.themes),

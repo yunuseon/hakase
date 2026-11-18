@@ -110,6 +110,12 @@ export const commandOf = (a: End, b: End | null): StateCommand | null => {
 };
 
 // Level out of an output and into an input, always: the direction of a wire reads from its ends.
+export const WIRE_STYLES = ['curves', 'traces'] as const;
+export type WireStyle = (typeof WIRE_STYLES)[number];
+export const isWireStyle = (value: unknown): value is WireStyle =>
+    WIRE_STYLES.some(style => style === value);
+export const DEFAULT_WIRE_STYLE: WireStyle = 'curves';
+
 export const wirePath = (from: Point, to: Point) => {
     const dx = to.x - from.x;
     const pull =
@@ -118,4 +124,38 @@ export const wirePath = (from: Point, to: Point) => {
             : Math.min(160, Math.max(60, Math.max(-dx, Math.abs(to.y - from.y)) / 2));
 
     return `M${from.x} ${from.y} C${from.x + pull} ${from.y} ${to.x - pull} ${to.y} ${to.x} ${to.y}`;
+};
+
+const corner = (a: Point, at: Point, b: Point, radius: number) => {
+    const into = Math.hypot(at.x - a.x, at.y - a.y);
+    const out = Math.hypot(b.x - at.x, b.y - at.y);
+    const r = Math.min(radius, into / 2, out / 2);
+
+    return into === 0 || out === 0
+        ? ` L${at.x} ${at.y}`
+        : ` L${at.x + ((a.x - at.x) / into) * r} ${at.y + ((a.y - at.y) / into) * r}` +
+              ` Q${at.x} ${at.y} ${at.x + ((b.x - at.x) / out) * r} ${at.y + ((b.y - at.y) / out) * r}`;
+};
+
+export const tracePath = (from: Point, to: Point, lead = 16, radius = 8) => {
+    const ahead = to.x - from.x >= 2 * lead;
+    const middle = from.x + (to.x - from.x) / 2;
+    const below = Math.max(from.y, to.y) + 3 * lead;
+    const across = Math.abs(to.y - from.y) < 2 * lead ? below : from.y + (to.y - from.y) / 2;
+    const points: readonly Point[] = ahead
+        ? [from, { x: middle, y: from.y }, { x: middle, y: to.y }, to]
+        : [
+              from,
+              { x: from.x + lead, y: from.y },
+              { x: from.x + lead, y: across },
+              { x: to.x - lead, y: across },
+              { x: to.x - lead, y: to.y },
+              to,
+          ];
+    const turns = points
+        .slice(1, -1)
+        .map((at, index) => corner(points[index] ?? at, at, points[index + 2] ?? at, radius))
+        .join('');
+
+    return `M${from.x} ${from.y}${turns} L${to.x} ${to.y}`;
 };

@@ -1,3 +1,4 @@
+import type { WireStyle } from './shared/connections.ts';
 import type { Image } from './image.ts';
 import type { Observable } from 'rxjs';
 import type { Phase } from './shared/drag.ts';
@@ -116,6 +117,7 @@ export type AppInput =
     | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'aspect'; readonly aspect: Aspect }
+    | { readonly kind: 'wires'; readonly wires: WireStyle }
     | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
     | { readonly kind: 'locate'; readonly id: ProcessId }
     | { readonly kind: 'close-others' }
@@ -187,6 +189,7 @@ export type AppState = {
     readonly error$: (formula: FormulaId) => Observable<string | null>;
     readonly look$: Observable<AppearanceName>;
     readonly aspect$: Observable<Aspect>;
+    readonly wires$: Observable<WireStyle>;
     readonly previewSide$: Observable<number>;
     readonly library$: Observable<Library>;
     readonly blueprints$: Observable<Blueprints>;

@@ -14,18 +14,19 @@ const foundations: Story = {
     title: 'Design foundations',
     group: 'Foundations',
     description:
-        'The colour tokens, the rem type, spacing, radius and control scales, and program icons, displayed in the selected appearance.',
+        'The colour tokens, the rem type, spacing, radius and control scales, depth and motion, and program icons, displayed in the selected appearance.',
     elements: ['hks-design-foundations'],
     variants: [
         { id: 'colours', title: 'Colour tokens' },
         { id: 'type', title: 'Typography' },
         { id: 'space', title: 'Space & shape' },
+        { id: 'depth', title: 'Depth & motion' },
         { id: 'icons', title: 'Icons' },
     ],
     controls: ['label'],
     defaults: { ...defaults, label: 'Room to think.' },
     height: 430,
-    code: '// Colour tokens come from src/appearance.ts; size tokens (--space-*, --text-*, --radius-*, --control-*) from src/styles.css.\n// Appearance presets live in src/appearances.ts.\n// Components inherit --panel, --ink, --accent, … through shadow roots.',
+    code: '// Colour tokens come from src/appearance.ts; size, depth and motion tokens (--space-*, --text-*, --radius-*, --control-*, --elevation-*, --duration-*, --ease-*, --focus-ring) from src/styles.css.\n// Appearance presets live in src/appearances.ts.\n// Components inherit --panel, --ink, --accent, … through shadow roots.',
     action: null,
     create: ({ args$, variant }) => {
         const element = new HksDesignFoundations();

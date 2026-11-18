@@ -20,6 +20,7 @@ import type {
 import { inputGroups } from '../input-connections.ts';
 import { followedStores, playbackBinding, type Bindings, type PlaybackBinding } from '../inputs.ts';
 import { liveProcess$, type ProcessSignal } from '../process.ts';
+import { windowZ } from '../state-mode.ts';
 import { CATEGORIES, type ProcessId, type Slot } from '../program.ts';
 import { inputsFor, programList, programOf } from '../programs.ts';
 import type { Linked } from '../shared/signal.ts';
@@ -67,7 +68,7 @@ type Entry = { readonly process: Process; readonly index: number; readonly last:
 type Reads = Pick<Chrome, 'canvas'> &
     Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'links$' | 'camera$'> &
     Pick<Selection, 'selectedIds$'> &
-    Pick<StateMode, 'wiringEvents$'> & { readonly scoped: Scoped };
+    Pick<StateMode, 'wiringEvents$' | 'mode$'> & { readonly scoped: Scoped };
 
 export const windowsOf = ({
     canvas,
@@ -79,6 +80,7 @@ export const windowsOf = ({
     camera$,
     selectedIds$,
     wiringEvents$,
+    mode$,
     scoped,
 }: Reads) => {
     const entryOf = (id: ProcessId) =>
@@ -97,7 +99,7 @@ export const windowsOf = ({
     const slotOf = (entry$: Observable<Entry>): Observable<Slot> =>
         entry$.pipe(
             map(({ process, index, last }) => ({
-                frame: { ...process.frame, z: index + 1 },
+                frame: { ...process.frame, z: windowZ(index) },
                 focused: index === last,
             })),
             distinctUntilChanged(sameSlot),
@@ -232,6 +234,12 @@ export const windowsOf = ({
         }),
     );
 
+    const receded$ = mode$.pipe(
+        map(({ active }) => active),
+        distinctUntilChanged(),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
     const signals$: Observable<ProcessSignal> = appeared$.pipe(
         mergeMap(process => {
             const program = programOf(process.program);
@@ -290,6 +298,7 @@ export const windowsOf = ({
                           map(ids => ids.includes(process.id)),
                           distinctUntilChanged(),
                       ),
+                      receded$,
                       ids$.pipe(filter(ids => !ids.includes(process.id))),
                   );
         }),

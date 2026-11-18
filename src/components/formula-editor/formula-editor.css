@@ -59,8 +59,8 @@
 }
 
 .guide summary:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 2px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
     border-radius: var(--radius-sm);
 }
 
@@ -235,8 +235,8 @@
 }
 
 .toggle:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 /* Opens upward from the footer, so it never runs past the bottom of the window. */
@@ -253,7 +253,7 @@
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-xl);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 18%, transparent);
+    box-shadow: var(--elevation-raised);
 }
 
 .save {
@@ -296,7 +296,7 @@
 }
 
 .action:focus-visible {
-    outline: 2px solid var(--highlight);
+    outline: var(--focus-ring);
     outline-offset: -2px;
 }
 

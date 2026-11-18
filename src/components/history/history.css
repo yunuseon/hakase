@@ -97,7 +97,7 @@ li:last-child .step::before {
 }
 
 .step:focus-visible {
-    outline: 2px solid var(--highlight);
+    outline: var(--focus-ring);
     outline-offset: -2px;
 }
 
@@ -148,8 +148,8 @@ li:hover .take,
 }
 
 .take:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 li[data-taken] .label {

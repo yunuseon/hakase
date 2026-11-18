@@ -80,6 +80,31 @@ const findings = (
         }),
     )
 ).flat();
+const sheets = files.filter(path => path.endsWith('.css') && !path.endsWith('/src/styles.css'));
+const finishing = (
+    await Promise.all(
+        sheets.map(async path => {
+            const source = await readFile(path, 'utf8');
+            const name = relative(root, path);
+            return [...source.matchAll(/([a-z-]+)\s*:\s*([^;{}]*);/g)].flatMap(
+                ([, property, value]) =>
+                    property === 'box-shadow' &&
+                    value.includes('var(--shadow)') &&
+                    !/^\s*inset/.test(value)
+                        ? [`${name}: use an --elevation-* token, not a hand-written shadow.`]
+                        : /^(transition|animation)(-duration)?$/.test(property) &&
+                            [...value.matchAll(/(\d*\.?\d+)m?s\b/g)].some(
+                                ([, time]) => Number(time) > 0,
+                            )
+                          ? [`${name}: time ${property} with the --duration-* tokens.`]
+                          : property === 'outline' && /var\(--(highlight|rule)\)/.test(value)
+                            ? [`${name}: draw focus with var(--focus-ring).`]
+                            : [],
+            );
+        }),
+    )
+).flat();
+findings.push(...finishing);
 if (findings.length > 0) {
     process.stderr.write(`${findings.join('\n')}\n`);
     process.exitCode = 1;

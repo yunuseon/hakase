@@ -1,7 +1,9 @@
 import {
     commandOf,
     sameEnd,
+    tracePath,
     wirePath,
+    type WireStyle,
     type End,
     type StateCommand,
 } from '../../shared/connections.ts';
@@ -9,6 +11,8 @@ import {
 export type Socket = {
     readonly key: string;
     readonly window: string;
+    readonly z: number;
+    readonly side: 'left' | 'right';
     readonly x: number;
     readonly y: number;
     readonly width: number;
@@ -33,6 +37,8 @@ export type Socket = {
 export type GroupRow = {
     readonly key: string;
     readonly window: string;
+    readonly z: number;
+    readonly side: 'left' | 'right';
     readonly x: number;
     readonly y: number;
     readonly width: number;
@@ -51,6 +57,7 @@ export const groupKey = (window: string, group: string) => `${window}${GROUP}${g
 export const windowOfGroup = (key: string) => key.slice(0, Math.max(0, key.indexOf(GROUP)));
 
 export type WiringView = {
+    readonly all: boolean;
     readonly unit: number;
     readonly rowHeight: number;
     readonly sockets: readonly Socket[];
@@ -59,6 +66,8 @@ export type WiringView = {
         readonly path: string;
         readonly colour: string;
         readonly shared: boolean;
+        readonly from: string;
+        readonly to: string;
     }[];
 };
 
@@ -79,7 +88,7 @@ export type WiringEvent =
     | { readonly kind: 'land'; readonly to: string | null };
 
 export const anchorOf = (socket: Socket, unit: number, rowHeight = 28 * unit) => ({
-    x: socket.x + (socket.end.kind === 'store' ? socket.width - 10 * unit : 10 * unit),
+    x: socket.x + (socket.side === 'left' ? socket.width - 10 * unit : 10 * unit),
     y: socket.y + rowHeight / 2,
 });
 
@@ -174,6 +183,7 @@ export const wiresOf = (
     sockets: readonly Socket[],
     unit: number,
     rowHeight = 28 * unit,
+    style: WireStyle = 'curves',
 ): WiringView['wires'] =>
     sockets.flatMap(target => {
         const showing = (socket: Socket) =>
@@ -187,12 +197,22 @@ export const wiresOf = (
 
         return [
             {
-                path: wirePath(
-                    anchorOf(source, unit, rowHeight),
-                    anchorOf(target, unit, rowHeight),
-                ),
+                path:
+                    style === 'traces'
+                        ? tracePath(
+                              anchorOf(source, unit, rowHeight),
+                              anchorOf(target, unit, rowHeight),
+                              16 * unit,
+                              8 * unit,
+                          )
+                        : wirePath(
+                              anchorOf(source, unit, rowHeight),
+                              anchorOf(target, unit, rowHeight),
+                          ),
                 colour: source.colour,
                 shared,
+                from: source.key,
+                to: target.key,
             },
         ];
     });
@@ -200,6 +220,8 @@ export const wiresOf = (
 const sameSocket = (a: Socket, b: Socket) =>
     a.key === b.key &&
     a.window === b.window &&
+    a.z === b.z &&
+    a.side === b.side &&
     a.x === b.x &&
     a.y === b.y &&
     a.width === b.width &&
@@ -231,6 +253,8 @@ const sameSocket = (a: Socket, b: Socket) =>
 const sameGroup = (a: GroupRow, b: GroupRow) =>
     a.key === b.key &&
     a.window === b.window &&
+    a.z === b.z &&
+    a.side === b.side &&
     a.x === b.x &&
     a.y === b.y &&
     a.width === b.width &&
@@ -244,7 +268,8 @@ const sameGroup = (a: GroupRow, b: GroupRow) =>
 export const sameWiring = (a: WiringView | null, b: WiringView | null) =>
     a === null || b === null
         ? a === b
-        : a.unit === b.unit &&
+        : a.all === b.all &&
+          a.unit === b.unit &&
           a.rowHeight === b.rowHeight &&
           a.sockets.length === b.sockets.length &&
           a.sockets.every((socket, index) => {
@@ -266,6 +291,8 @@ export const sameWiring = (a: WiringView | null, b: WiringView | null) =>
                   other !== undefined &&
                   wire.path === other.path &&
                   wire.colour === other.colour &&
-                  wire.shared === other.shared
+                  wire.shared === other.shared &&
+                  wire.from === other.from &&
+                  wire.to === other.to
               );
           });

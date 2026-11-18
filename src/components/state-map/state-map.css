@@ -48,8 +48,8 @@
 }
 
 .tool:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .prune {
@@ -77,8 +77,8 @@
 .prune:focus-visible,
 .copy:focus-visible,
 .toggle:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .graph {
@@ -432,8 +432,8 @@
 }
 
 .locate:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .cut {
@@ -481,7 +481,7 @@
 
 .node,
 .wire {
-    transition: opacity 0.15s;
+    transition: opacity var(--duration-base) var(--ease-out);
 }
 
 .board[data-focus] .node:not([data-related]),

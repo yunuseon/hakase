@@ -12,6 +12,7 @@ import { HksSections } from '../components/sections/sections.component.ts';
 import type { SectionView } from '../components/sections/sections.ts';
 import { HksSelection } from '../components/selection/selection.component.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
+import { HksStateTraces } from '../components/state-traces/state-traces.component.ts';
 import { HksToolbar } from '../components/toolbar/toolbar.component.ts';
 import { commandsOf } from '../commands.ts';
 import { viewport$ } from '../lib/rx.ts';
@@ -44,6 +45,8 @@ export const mountChrome = () => {
 
     const seams = new HksSeams();
     canvas.append(seams);
+    const traces = new HksStateTraces();
+    canvas.append(traces);
     const wiring = new HksStateWiring();
     canvas.append(wiring);
 
@@ -71,6 +74,7 @@ export const mountChrome = () => {
         toolbar,
         navigator,
         seams,
+        traces,
         wiring,
         sections,
         palette,
@@ -96,6 +100,7 @@ export const connectChrome$ = ({
     toolbar,
     navigator,
     seams,
+    traces,
     wiring,
     sections,
     palette,
@@ -145,6 +150,7 @@ export const connectChrome$ = ({
             ),
         ),
         seams.connect$(workspace$.pipe(map(seamsOf))),
+        traces.connect$(wiringView$, wiring.hovered$),
         wiring.connect$(wiringView$),
         placement.connect$(
             combineLatest([placing$, camera$, blueprints$]).pipe(

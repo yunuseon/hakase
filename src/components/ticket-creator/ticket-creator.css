@@ -27,7 +27,7 @@ dialog {
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-4xl);
-    box-shadow: 0 20px 80px color-mix(in srgb, var(--shadow) 35%, transparent);
+    box-shadow: var(--elevation-overlay);
 }
 
 dialog::backdrop {

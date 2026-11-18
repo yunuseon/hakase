@@ -42,10 +42,10 @@
     background: var(--muted);
     opacity: 0.35;
     transition:
-        opacity 120ms ease,
-        background-color 120ms ease,
-        inline-size 120ms ease,
-        block-size 120ms ease;
+        opacity var(--duration-quick) var(--ease-out),
+        background-color var(--duration-quick) var(--ease-out),
+        inline-size var(--duration-quick) var(--ease-out),
+        block-size var(--duration-quick) var(--ease-out);
 }
 
 .seam[data-vertical]::before {
@@ -73,7 +73,7 @@
 }
 
 .seam:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 0;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
     border-radius: var(--radius-lg);
 }

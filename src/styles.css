@@ -59,6 +59,40 @@
     --control-xl: 2rem;
 }
 
+:root {
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --duration-quick: 120ms;
+    --duration-base: 180ms;
+    --duration-slow: 280ms;
+    --rise: var(--space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --duration-quick: 0ms;
+        --duration-base: 0ms;
+        --duration-slow: 0ms;
+        --rise: 0px;
+    }
+}
+
+/* Here, not on :root: these read the appearance's colours, which are set on the canvas, and a var() resolves where it is declared. */
+hks-canvas {
+    --elevation-control: 0 1px 2px color-mix(in srgb, var(--shadow) 18%, transparent);
+    --elevation-surface:
+        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
+        0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
+    --elevation-raised:
+        0 2px 6px color-mix(in srgb, var(--shadow) 10%, transparent),
+        0 14px 32px color-mix(in srgb, var(--shadow) 18%, transparent);
+    --elevation-overlay:
+        0 2px 6px color-mix(in srgb, var(--shadow) 10%, transparent),
+        0 24px 64px color-mix(in srgb, var(--shadow) 28%, transparent);
+    --focus-ring: 2px solid var(--highlight);
+    --focus-offset: 1px;
+}
+
 @media (any-pointer: coarse) {
     :root {
         --control-xs: 2.75rem;

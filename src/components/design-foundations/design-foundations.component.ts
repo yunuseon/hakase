@@ -61,6 +61,20 @@ const template = (view: FoundationView) =>
                 ${['xs', 'sm', 'md', 'lg', 'xl'].map(size => html`<div><i style=${styleMap({ 'inline-size': `var(--control-${size})`, 'block-size': `var(--control-${size})` })}></i><code>--control-${size}</code></div>`)}
             </div>
         </section>
+        <section ?hidden=${view.kind !== 'depth'}>
+            <h2>Depth & motion</h2>
+            <p>
+                Four depths and one way of moving. Content rests on the canvas; chrome floats above
+                it on the glass.
+            </p>
+            <div class="depths">
+                ${['control', 'surface', 'raised', 'overlay'].map(level => html`<div style=${styleMap({ 'box-shadow': `var(--elevation-${level})` })}><code>--elevation-${level}</code></div>`)}
+            </div>
+            <div class="motions">
+                ${['quick', 'base', 'slow'].map(pace => html`<div class="motion" tabindex="0" style=${styleMap({ 'transition-duration': `var(--duration-${pace})` })}><code>--duration-${pace}</code></div>`)}
+            </div>
+            <button class="ui-button" type="button">Focus ring</button>
+        </section>
         <section ?hidden=${view.kind !== 'icons'}>
             <h2>Program icons</h2>
             <p>Single strokes, quiet until they are needed.</p>

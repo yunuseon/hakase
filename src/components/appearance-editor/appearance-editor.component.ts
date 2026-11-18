@@ -7,6 +7,7 @@ import { styleMap } from 'lit-html/directives/style-map.js';
 import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
 import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
+import { connectChoices$ } from '../../shared/ui/choices.component.ts';
 import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
@@ -20,6 +21,17 @@ const TEMPLATE = () =>
             ><span class="key">look</span
             ><hks-select class="ui-field pick" aria-label="look"></hks-select
         ></label>
+        <div class="head">
+            <span class="key" id="wires-key">wires</span>
+            <div class="ui-choices wires" role="radiogroup" aria-labelledby="wires-key">
+                <button class="ui-choice" type="button" role="radio" data-wires="curves">
+                    curves
+                </button>
+                <button class="ui-choice" type="button" role="radio" data-wires="traces">
+                    traces
+                </button>
+            </div>
+        </div>
         <div class="swatches"></div>
         <div class="rows"></div>`;
 
@@ -31,6 +43,7 @@ export type PresetOption = {
 export class HksAppearanceEditor extends HTMLElement {
     readonly selections$: Observable<string>;
     readonly changes$: Observable<ReadonlyMap<string, string>>;
+    readonly wires$: Observable<string>;
 
     private readonly picker: HksSelect;
     private readonly rows: HTMLElement;
@@ -89,6 +102,15 @@ export class HksAppearanceEditor extends HTMLElement {
             map(() => this.picker.value),
         );
 
+        this.wires$ = fromElementEvent$(requireChild(shadow, '.wires'), 'click').pipe(
+            mergeMap(({ target }) => {
+                const choice = target instanceof Element ? target.closest('[data-wires]') : null;
+                const style = choice?.getAttribute('data-wires');
+
+                return style === null || style === undefined ? EMPTY : of(style);
+            }),
+        );
+
         this.changes$ = fromElementEvent$(this.rows, 'input').pipe(
             mergeMap(event => (event.target instanceof HTMLInputElement ? of(this.read()) : EMPTY)),
         );
@@ -118,6 +140,7 @@ export class HksAppearanceEditor extends HTMLElement {
     connect$(
         selected$: Observable<string>,
         values$: Observable<ReadonlyMap<string, string>>,
+        wires$: Observable<string>,
     ): Observable<void> {
         return merge(
             this.rendering.lifetime$,
@@ -126,6 +149,17 @@ export class HksAppearanceEditor extends HTMLElement {
             this.swatchView.lifetime$,
             merge(
                 connectSelects$(this.shadow),
+                connectChoices$(this.shadow),
+                wires$.pipe(
+                    tap(style => {
+                        for (const choice of this.shadow.querySelectorAll('[data-wires]')) {
+                            choice.setAttribute(
+                                'aria-checked',
+                                String(choice.getAttribute('data-wires') === style),
+                            );
+                        }
+                    }),
+                ),
                 selected$.pipe(
                     tap(name => {
                         this.picker.value = name;

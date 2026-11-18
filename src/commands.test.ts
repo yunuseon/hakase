@@ -122,6 +122,8 @@ describe('captures', () => {
             text: 'buy milk',
         });
         expect(pickedOf('capture:todo:store-1', '  ')).toBeNull();
+        expect(pickedOf('wires:traces', null)).toEqual({ kind: 'wires', wires: 'traces' });
+        expect(pickedOf('wires:zigzag', null)).toBeNull();
         expect(pickedOf('capture:todo:store-1', null)).toBeNull();
         expect(pickedOf('capture:todo', 'milk')).toBeNull();
         expect(pickedOf('capture:agenda:agenda', 'standup')).toBeNull();

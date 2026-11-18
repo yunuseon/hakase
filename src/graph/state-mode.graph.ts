@@ -26,12 +26,15 @@ import {
     wiringOf,
     type ModeAction,
     type StateMode as Mode,
+    disengaged,
+    reduceEngaged,
+    type EngageAction,
 } from '../state-mode.ts';
 import type { Chrome } from './chrome.graph.ts';
 import type { Projections } from './projections.graph.ts';
 
 type Reads = Pick<Chrome, 'canvas' | 'navigator' | 'wiring'> &
-    Pick<Projections, 'workspace$' | 'links$' | 'ids$'> & {
+    Pick<Projections, 'workspace$' | 'links$' | 'ids$' | 'wires$'> & {
         readonly signals$: Observable<ProcessSignal>;
     };
 
@@ -42,6 +45,7 @@ export const stateModeOf = ({
     workspace$,
     links$,
     ids$,
+    wires$,
     signals$,
 }: Reads) => {
     const session$ = merge(
@@ -79,15 +83,43 @@ export const stateModeOf = ({
     );
     const mode$: Observable<Mode> = session$.pipe(map(modeOf));
 
+    const engaged$ = merge(
+        signals$.pipe(
+            mergeMap((signal): EngageAction[] =>
+                signal.to === 'hover'
+                    ? [{ kind: 'hover', id: signal.id, over: signal.over }]
+                    : signal.to === 'workspace' && signal.action.kind === 'raise'
+                      ? [{ kind: 'press', id: signal.action.id }]
+                      : [],
+            ),
+        ),
+        canvas.grounds$.pipe(map((): EngageAction => ({ kind: 'press', id: null }))),
+        ids$.pipe(map((ids): EngageAction => ({ kind: 'windows', ids }))),
+    ).pipe(scan(reduceEngaged, disengaged), startWith(disengaged), distinctUntilChanged());
+
     const wiringView$: Observable<WiringView | null> = combineLatest([
         workspace$,
         links$,
         session$,
         remScale$,
         coarsePointer$,
+        wires$,
+        engaged$,
     ]).pipe(
-        map(([workspace, { linked, loops, boxes, names }, session, unit, touch]) =>
-            wiringOf(workspace, linked, inputsFor, session, unit, touch, loops, boxes, names),
+        map(([workspace, { linked, loops, boxes, names }, session, unit, touch, style, engaged]) =>
+            wiringOf(
+                workspace,
+                linked,
+                inputsFor,
+                session,
+                unit,
+                touch,
+                loops,
+                boxes,
+                names,
+                style,
+                engaged,
+            ),
         ),
         distinctUntilChanged(sameWiring),
         shareReplay({ bufferSize: 1, refCount: true }),

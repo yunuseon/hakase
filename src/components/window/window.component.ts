@@ -14,7 +14,17 @@ import {
     type RenderView,
     type Rendering,
 } from '../../lib/lit.ts';
-import { combineLatest, defer, EMPTY, merge, of, race, timer, type Observable } from 'rxjs';
+import {
+    animationFrameScheduler,
+    combineLatest,
+    defer,
+    EMPTY,
+    merge,
+    of,
+    race,
+    timer,
+    type Observable,
+} from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -27,13 +37,16 @@ import {
     switchMap,
     take,
     finalize,
+    observeOn,
     tap,
 } from 'rxjs/operators';
-import { requireChild, styleSheet } from '../../lib/dom.ts';
+import { requireChild, styleSheet, visibleViewport } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$ } from '../../shared/drag.ts';
 import {
     RESIZE_EDGES,
+    opensAbove,
+    tooSmall,
     type ResizeEdge,
     type FollowGroup,
     type StoreOption,
@@ -45,6 +58,33 @@ import {
 import css from './window.css?inline';
 
 const sheet = styleSheet(css);
+
+const opened$ = (
+    host: HTMLElement,
+    panel: HTMLElement,
+    open$: Observable<boolean>,
+): Observable<never> =>
+    open$.pipe(
+        tap(open => {
+            panel.removeAttribute('data-above');
+            panel.toggleAttribute('data-open', open);
+        }),
+        filter(open => open),
+        map(() =>
+            opensAbove(
+                panel.getBoundingClientRect(),
+                host.getBoundingClientRect(),
+                visibleViewport(),
+            ),
+        ),
+        tap(above => {
+            panel.toggleAttribute('data-above', above);
+        }),
+        finalize(() => {
+            panel.removeAttribute('data-open');
+        }),
+        ignoreElements(),
+    );
 
 const TEMPLATE = () =>
     html`<div class="title">
@@ -65,7 +105,7 @@ const TEMPLATE = () =>
             </button>
         </div>
         <div class="body"><slot></slot></div>
-        <div class="stores" role="dialog" aria-label="window state" hidden>
+        <div class="stores menu" role="dialog" aria-label="window state">
             <header
                 class="stores-head"
                 title="the state this window keeps: what it reads and writes"
@@ -110,7 +150,7 @@ const TEMPLATE = () =>
             <ul class="options"></ul>
             <div class="follows"></div>
         </div>
-        <div class="switcher" role="dialog" aria-label="change program" hidden>
+        <div class="switcher menu" role="dialog" aria-label="change program">
             <header class="stores-head">
                 <button
                     class="ui-icon back"
@@ -168,10 +208,11 @@ const reduceSwitching = (state: Switching, action: SwitchAction): Switching => {
     }
 };
 
-const dataOf = (target: EventTarget | null, key: string): string | undefined => {
-    const element = target instanceof Element ? target.closest(`[data-${key}]`) : null;
-    return element instanceof HTMLElement ? element.dataset[key] : undefined;
-};
+// By attribute, not dataset: dataset wants camelCase, so a hyphenated key like follow-store never matched.
+const dataOf = (target: EventTarget | null, key: string): string | undefined =>
+    (target instanceof Element ? target.closest(`[data-${key}]`) : null)?.getAttribute(
+        `data-${key}`,
+    ) ?? undefined;
 const usersLabel = (users: number): string =>
     users === 0 ? 'unused' : users === 1 ? '1 window' : `${users} windows`;
 type SwitchRender = {
@@ -360,17 +401,20 @@ const sameView = (a: WindowView, b: WindowView): boolean =>
     a.kind === b.kind &&
     a.frame === b.frame &&
     a.focused === b.focused &&
-    a.selected === b.selected;
+    a.selected === b.selected &&
+    a.receded === b.receded;
 
 export class HksWindow extends HTMLElement {
     readonly gestures$: Observable<WindowGesture>;
     readonly selectionToggles$: Observable<void>;
+    readonly hovers$: Observable<boolean>;
 
     private readonly name: HTMLElement;
     private readonly glyph: HTMLElement;
     private readonly shadow: ShadowRoot;
     private readonly expanded$: Observable<string | null>;
     readonly stateModes$: Observable<void>;
+    readonly approaches$: Observable<void>;
     // This window's own menu, apart from one opened from state mode, which alone keeps the mode on.
     readonly menus$: Observable<boolean>;
     private readonly switching$: Observable<SwitchAction>;
@@ -452,6 +496,12 @@ export class HksWindow extends HTMLElement {
         );
 
         this.stateModes$ = fromElementEvent$(connections, 'click').pipe(map(() => undefined));
+
+        this.approaches$ = fromElementEvent$(chip, 'click').pipe(
+            map(() => ({ shown: this.getBoundingClientRect().width, laid: this.offsetWidth })),
+            filter(({ shown, laid }) => tooSmall(shown, laid)),
+            map(() => undefined),
+        );
 
         this.expanded$ = merge(
             fromElementEvent$(popover, 'click').pipe(
@@ -543,6 +593,11 @@ export class HksWindow extends HTMLElement {
             ),
         ).pipe(share());
 
+        this.hovers$ = merge(
+            fromElementEvent$(this, 'pointerenter').pipe(map(() => true)),
+            fromElementEvent$(this, 'pointerleave').pipe(map(() => false)),
+        );
+
         this.selectionToggles$ = fromElementEvent$(this, 'pointerdown', { capture: true }).pipe(
             switchMap(down =>
                 down.isPrimary && down.button === 0 && down.shiftKey
@@ -590,12 +645,12 @@ export class HksWindow extends HTMLElement {
             fromElementEvent$(requireChild(shadow, '.close'), 'click').pipe(
                 map((): WindowGesture => ({ kind: 'quit' })),
             ),
-            // The chip sits inside the drag handle too.
+            // The chip sits inside the drag handle too; it raises by itself, so its menu is not under a neighbour.
             fromElementEvent$(chip, 'pointerdown').pipe(
                 tap(event => {
                     event.stopPropagation();
                 }),
-                ignoreElements(),
+                map((): WindowGesture => ({ kind: 'raise' })),
             ),
             fromElementEvent$(popover, 'click').pipe(
                 mergeMap(({ target }): Observable<WindowGesture> => {
@@ -748,6 +803,14 @@ export class HksWindow extends HTMLElement {
             return row;
         };
 
+        const switched$ = combineLatest([
+            this.switching$.pipe(
+                scan(reduceSwitching, { step: 'closed' }),
+                startWith<Switching>({ step: 'closed' }),
+            ),
+            programs$,
+        ]).pipe(share());
+
         return merge(
             this.rendering.lifetime$,
             this.glyphView.lifetime$,
@@ -755,13 +818,7 @@ export class HksWindow extends HTMLElement {
             this.followView.lifetime$,
             this.switchView.lifetime$,
             merge(
-                combineLatest([
-                    this.switching$.pipe(
-                        scan(reduceSwitching, { step: 'closed' }),
-                        startWith<Switching>({ step: 'closed' }),
-                    ),
-                    programs$,
-                ]).pipe(
+                switched$.pipe(
                     tap(([state, groups]) => {
                         const item =
                             state.step === 'stores'
@@ -773,7 +830,6 @@ export class HksWindow extends HTMLElement {
 
                         name.toggleAttribute('data-switchable', groups !== null);
                         name.setAttribute('aria-expanded', String(open));
-                        switcher.hidden = !open;
 
                         if (!open || groups === null) {
                             return;
@@ -828,11 +884,31 @@ export class HksWindow extends HTMLElement {
                         }
                     }),
                 ),
+                opened$(
+                    this,
+                    switcher,
+                    switched$.pipe(
+                        map(([state, groups]) => groups !== null && state.step !== 'closed'),
+                        distinctUntilChanged(),
+                    ),
+                ),
                 manage$.pipe(
                     distinctUntilChanged(),
                     tap(open => {
-                        popover.hidden = !open;
                         chip.setAttribute('aria-expanded', String(open));
+                    }),
+                ),
+                opened$(this, popover, manage$.pipe(distinctUntilChanged())),
+                this.expanded$.pipe(
+                    filter(input => input !== null),
+                    observeOn(animationFrameScheduler),
+                    tap(() => {
+                        popover.querySelector('.input-list')?.scrollIntoView({
+                            block: 'nearest',
+                            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                                ? 'auto'
+                                : 'smooth',
+                        });
                     }),
                 ),
                 // Captured, so the binding is read before the add is applied, whichever listener runs first.
@@ -882,7 +958,8 @@ export class HksWindow extends HTMLElement {
                 ),
                 view$.pipe(
                     distinctUntilChanged(sameView),
-                    tap(({ kind, frame, focused, selected = false }) => {
+                    tap(({ kind, frame, focused, selected = false, receded = false }) => {
+                        this.toggleAttribute('data-receded', receded);
                         this.toggleAttribute('data-focused', focused);
                         this.toggleAttribute('data-selected', selected);
                         this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;

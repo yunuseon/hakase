@@ -74,7 +74,7 @@ button {
 .jump svg:last-child,
 .close {
     opacity: 0;
-    transition: opacity 120ms ease;
+    transition: opacity var(--duration-quick) var(--ease-out);
 }
 
 .row:hover .jump svg:last-child,

@@ -1,6 +1,7 @@
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { Aspect } from './components/sketch/animation.ts';
+import type { WireStyle } from './shared/connections.ts';
 import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
 import {
     defaultBookmarks,
@@ -154,6 +155,7 @@ export type Documents = {
     readonly looks: ReadonlyMap<AppearanceName, Written<Appearance>>;
     readonly look: AppearanceName;
     readonly aspect: Aspect;
+    readonly wires: WireStyle;
 };
 
 type StoreCommands = {
@@ -222,7 +224,8 @@ export type DocumentAction =
           readonly from: ProcessId;
       }
     | { readonly kind: 'look'; readonly name: AppearanceName }
-    | { readonly kind: 'aspect'; readonly aspect: Aspect };
+    | { readonly kind: 'aspect'; readonly aspect: Aspect }
+    | { readonly kind: 'wires'; readonly wires: WireStyle };
 
 const commanded = <S, C>(
     all: ReadonlyMap<StoreId, S>,
@@ -799,6 +802,10 @@ export const reduceDocuments =
                 return action.aspect === documents.aspect
                     ? documents
                     : { ...documents, aspect: action.aspect };
+            case 'wires':
+                return action.wires === documents.wires
+                    ? documents
+                    : { ...documents, wires: action.wires };
         }
     };
 
@@ -840,6 +847,7 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
         case 'library':
         case 'look':
         case 'aspect':
+        case 'wires':
         case 'paste':
         case 'place':
         case 'box':
@@ -956,6 +964,8 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return `Switched to the ${action.name} look`;
         case 'aspect':
             return `Made pictures ${action.aspect}`;
+        case 'wires':
+            return `Drew wires as ${action.wires}`;
         default:
             return `Edited ${TITLES[action.kind]} ${storeName(before.workspace, action.store)}`;
     }

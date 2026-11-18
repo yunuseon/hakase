@@ -9,11 +9,9 @@
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-3xl);
-    box-shadow:
-        0 1px 2px color-mix(in srgb, var(--shadow) 8%, transparent),
-        0 12px 32px color-mix(in srgb, var(--shadow) 10%, transparent);
+    box-shadow: var(--elevation-surface);
     font-family: var(--font-ui);
-    animation: program-appear 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+    animation: program-appear var(--duration-base) var(--ease-out);
 }
 
 :host([data-selected]) {
@@ -24,7 +22,7 @@
 @keyframes program-appear {
     from {
         opacity: 0;
-        translate: 0 var(--space-2);
+        translate: 0 var(--rise);
     }
     to {
         opacity: 1;
@@ -32,15 +30,9 @@
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    :host {
-        animation: none;
-    }
-}
-
 :host([data-closing]) {
     pointer-events: none;
-    animation: program-disappear 140ms ease-in both;
+    animation: program-disappear var(--duration-quick) var(--ease-in) both;
 }
 
 @keyframes program-disappear {
@@ -50,13 +42,7 @@
     }
     to {
         opacity: 0;
-        translate: 0 var(--space-2);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    :host([data-closing]) {
-        animation: none;
+        translate: 0 var(--rise);
     }
 }
 
@@ -134,7 +120,7 @@
     border-radius: 50%;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 120ms ease;
+    transition: opacity var(--duration-quick) var(--ease-out);
 }
 
 :host(:hover) .close,
@@ -301,42 +287,66 @@
     border-radius: 50%;
 }
 
-.stores,
-.switcher {
+/* Inside the frame, not on the glass: a window's menus zoom with it, as its tabs' choices do. */
+.menu {
     position: absolute;
-    inset-block-start: calc(var(--spacing) * 8.5);
-    inset-inline-end: var(--space-2);
-    z-index: 10;
-    display: flex;
+    z-index: 1;
+    inset-block-start: calc(var(--space-9) - var(--space-1));
+    box-sizing: border-box;
+    display: none;
     flex-direction: column;
     gap: var(--space-2);
     inline-size: calc(var(--spacing) * 60);
+    max-block-size: calc(var(--spacing) * 104);
     padding: var(--space-2-5);
-    font: var(--text-sm) var(--font-ui);
+    overflow: auto;
+    overscroll-behavior: contain;
     color: var(--ink);
     background: var(--panel);
     border: 1px solid var(--edge);
     border-radius: var(--radius-2xl);
-    box-shadow: 0 12px 32px color-mix(in srgb, var(--shadow) 18%, transparent);
+    box-shadow: var(--elevation-raised);
+    font: var(--text-sm) / 1.4 var(--font-ui);
     cursor: default;
+    opacity: 0;
+    translate: 0 var(--rise);
+    transition:
+        opacity var(--duration-quick) var(--ease-in),
+        translate var(--duration-quick) var(--ease-in),
+        display var(--duration-quick) allow-discrete;
 }
 
-.stores[hidden],
-.switcher[hidden] {
-    display: none;
+.stores {
+    inset-inline-end: var(--space-2);
 }
 
 .switcher {
-    inset-inline: var(--space-2) auto;
-    max-block-size: calc(var(--spacing) * 90);
+    inset-inline-start: var(--space-2);
+}
+
+.menu[data-above] {
+    inset-block: auto calc(100% + var(--space-1));
+}
+
+.menu[data-open] {
+    display: flex;
+    opacity: 1;
+    translate: 0 0;
+    transition-duration: var(--duration-base);
+    transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+    .menu[data-open] {
+        opacity: 0;
+        translate: 0 var(--rise);
+    }
 }
 
 .switch-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-0-5);
-    min-block-size: 0;
-    overflow: auto;
 }
 
 .switch-group {
@@ -437,10 +447,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-0-5);
-    max-block-size: calc(var(--spacing) * 50);
     margin: 0;
     padding: 0;
-    overflow: auto;
     list-style: none;
 }
 
@@ -560,8 +568,8 @@ input.option-name:focus-visible {
 .pick:focus-visible,
 .remove:focus-visible,
 .add:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
 }
 
 .stores:not([data-own]) > .stores-head,
@@ -683,7 +691,7 @@ input.option-name:focus-visible {
     border-inline-end: 1.5px solid var(--muted);
     border-block-end: 1.5px solid var(--muted);
     transform: rotate(-45deg);
-    transition: transform 0.12s;
+    transition: transform var(--duration-quick) var(--ease-out);
 }
 
 .input-line[aria-expanded='true'] .chevron {
@@ -731,4 +739,16 @@ input.option-name:focus-visible {
     .handle--w {
         inset-inline-start: calc(var(--band) * -1);
     }
+}
+
+/* In state mode the content steps back, so the wiring over it reads first. */
+.body {
+    transition:
+        opacity var(--duration-base) var(--ease-out),
+        filter var(--duration-base) var(--ease-out);
+}
+
+:host([data-receded]) .body {
+    opacity: 0.4;
+    filter: grayscale(0.6);
 }

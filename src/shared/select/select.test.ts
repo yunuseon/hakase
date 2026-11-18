@@ -141,6 +141,23 @@ describe('popup placement', () => {
             ),
         ).toMatchObject({ top: null, bottom: 504, height: 288 });
     });
+    it('hangs a menu of its own width from the end of its anchor, as tall as there is room', () => {
+        const chip = { left: 600, top: 100, bottom: 124, width: 80 };
+
+        expect(
+            popupPlacement(chip, { width: 1000, height: 800 }, false, {
+                width: 240,
+                align: 'end',
+                tallest: Infinity,
+            }),
+        ).toEqual({ left: 440, top: 128, bottom: null, width: 240, height: 664 });
+        expect(
+            popupPlacement({ ...chip, left: 40 }, { width: 1000, height: 800 }, false, {
+                width: 240,
+                align: 'end',
+            }).left,
+        ).toBe(8);
+    });
     it('does not force a minimum height beyond the available space', () => {
         expect(
             popupPlacement({ left: 0, top: 15, bottom: 35, width: 200 }, { width: 360, height: 60 })

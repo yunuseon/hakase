@@ -64,8 +64,8 @@
 }
 
 .ink:focus-visible {
-    outline: 2px solid var(--highlight);
-    outline-offset: 1px;
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
     border-radius: 50%;
 }
 

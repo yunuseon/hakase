@@ -745,6 +745,48 @@ creation dialog. Ticket-list search intersects the tag filter and searches key,
 title, description and tags. Filtered moves use the visible listing under either
 kind of filter, while details still read the complete document.
 
+### The design language
+
+The app aims for subtle minimalism with one language every interaction
+speaks, and its rules are tokens, so a component cannot drift from them
+without the audit noticing.
+
+- **Nothing hangs off a window at another scale.** What belongs to a window
+  zooms with it; the glass (screen-space, top layer) is only for what belongs
+  to no window: the navigator, the palette, a select's list. A window's state
+  menu and program switcher briefly lived on the glass and read as two scales
+  fighting; they now hang inside the window's frame. To read a window, you
+  come close to it.
+- **One motion vocabulary**: `--ease-out` to enter and settle, `--ease-in` to
+  leave, and `--duration-quick` (hover, press), `--duration-base` (anything
+  that opens) and `--duration-slow` (what moves the canvas), with `--rise`,
+  the few pixels something settles by. `prefers-reduced-motion` sets every
+  duration and the rise to zero in `styles.css`, so no component carries a
+  reduced-motion block of its own; a window's closing waits on its
+  `animationend`, which a zero-length animation still fires, with a 200 ms
+  fallback.
+- **Four elevations**: `--elevation-control`, `-surface`, `-raised` and
+  `-overlay`. Their values are the shadows the app already used for a thumb,
+  a window, the toolbar's menu and the palette, so the finish converged on
+  what looked right instead of inventing depths.
+- **One focus ring**, `--focus-ring` at `--focus-offset`; the only other
+  offset is an inset ring inside a scrolling list, where an outside ring
+  would be clipped. The selected window's accent outline and a gate's
+  `data-now` mark are state, not focus, and keep their own.
+
+**The depth and focus tokens live on `hks-canvas`, not `:root`.** They read
+the appearance's colours, which are set on the canvas host, and a `var()` in
+a custom property resolves where it is declared: on `:root` they would be
+empty. Every window, piece of chrome and Storybook preview sits under the
+canvas, so they inherit them. The motion tokens use no colour and sit on
+`:root`.
+
+**`check:ui` enforces it**: a drop shadow built from `--shadow` outside the
+tokens (an inset hairline and a scrim are not drop shadows), a transition or
+animation with a literal duration, and an outline drawn from `--highlight` or
+`--rule` all fail the audit. Storybook's Design foundations story has a
+**Depth & motion** page drawn with the live tokens.
+
 ### Sizes: a rem scale, and the smallest screen
 
 **Every size in a stylesheet comes from a token in `src/styles.css`**, rem-based
@@ -865,6 +907,37 @@ It runs as part of lint. The only intentional catalogue exclusion is Storybook's
 own host, which would otherwise display itself recursively. Shared primitives
 and less visible states (wizard, export progress/failure, FPS and preview errors)
 also have direct stories rather than being discoverable only in a composition.
+
+**The glass** is `ui-glass` in the shared sheet: the face and the motion of
+every menu, picker and popover that belongs to no window (a select's list,
+the launcher's categories). It is a `popover="manual"`
+element in the top layer, so the canvas's zoom transform never reaches it and
+it reads the same size at 41% as at 200%; it fades and settles in with
+`@starting-style` at the base duration and leaves faster, at the quick one,
+easing in. Its owner places it with `popupPlacement` from its anchor's screen
+rectangle and the visible viewport, which now takes a width, an alignment and
+a tallest height (`{ width, align: 'end', tallest: Infinity }` for a menu hung
+from the end of a chip), so it is clamped on screen and scrolls inside itself:
+the glass is the one scroll container, and no list inside it caps its own
+height. A component's own rule may set `display` only on `:popover-open`, or it
+overrides the popover's hidden state and the menu shows while closed.
+
+**A window's menus hang inside its frame.** The state menu (from the chip,
+at its end) and the program switcher (from the title, at its start) are
+`.menu` panels positioned in the window, not popovers, so they pan and zoom
+with it like its tabs' choices; `opened$` only toggles `data-open`. One that
+would run off the bottom of the visible viewport, with more room above the
+window, opens above it instead (`opensAbove`, measured once as it opens).
+Opening one raises the window, from the chip's own press (which stops the
+press reaching the host, so it would not raise otherwise) or from state
+mode's ⋯, or a window in front would cover it. A chip too small to read
+still glides the window to reading distance as its menu opens. Opening an
+input's list scrolls it into view inside the menu, on the next frame and
+only when it opens, never on a later update, which would snatch the scroll
+from someone reading. The window's `dataOf` reads data attributes with
+`getAttribute`, not `dataset`: `dataset` wants camelCase, so `follow-store`
+never matched and picking a source never closed the menu until this was
+found.
 
 **Dropdowns and free-text autocompletes** use `hks-select` from
 `shared/select/select.component.ts`; do not add native selects or datalists.
@@ -1397,7 +1470,7 @@ are the same one with a different default binding at launch.
 
 The window shows its binding as a **chip** left of the close button: the store's
 colour and name, outlined when another window shares it. Clicking opens a
-popover listing the program's stores with how many windows use each, × on
+menu inside the window (above) listing the program's stores with how many windows use each, × on
 unused stores, and two icons in its header: **+** for a new empty store and
 a **fork** (a branch) for continuing on a copy of this one. The icons carry a
 `title` and an `aria-label`, because a glyph alone does not say which is which.
@@ -2346,6 +2419,59 @@ The rows are rebuilt on every change, so they are appended in reading order
 (window by window, top to bottom) for Tab to follow, and focus is restored to
 the matching row afterwards, or a click on a group line would drop the
 keyboard's place.
+
+**Wiring lives on tabs at a window's edges.** Every window's inputs are tabs
+on its left edge and its outputs on its right, each a jack on the frame with
+its label running outward, away from the window (`side` on a socket and a
+group; `anchorOf` reads the jack from it). A tab stacks just below its own
+window, so half its jack is tucked under the frame and only the outer half
+pokes out; it slides out by a few pixels as it appears (`@starting-style`),
+and its label shows only on hover, while a wire could land on it, or in state
+mode (`all` on the view). Its choices open in place below it, zooming with the
+window. A tab layer was chosen over turning windows over onto a back face,
+which was built and dropped: it hid what each window was while wiring it.
+
+**Only engaged windows show tabs.** `reduceEngaged` folds what is engaged: the
+hovered window (each window reports `hovers$`, pointer enter and leave) and the
+focused one, the window last pressed (its `raise`), let go by a press on the
+ground (the canvas's `grounds$`) or by closing. `wiringOf` then lays out:
+
+- **in state mode**, every window, every wire, and content recedes (`receded`
+  on each window's view: dimmed and greyed over the base duration);
+- **otherwise**, the hovered window's tabs and the focused window's, and on the
+  focused window's **neighbours** only the tabs its wires land on (`readsFrom`:
+  a window's follows and its store's links, so neighbours are found without
+  laying every window out), and only the focused window's wires. Nothing
+  engaged lays out nothing, which keeps a drag elsewhere cheap.
+
+**Only a drag may start the mode.** The mode stays on while a lock holds (an
+open selector, a drag), which is how releasing W mid-drag keeps the wire; with
+tabs available outside the mode, a selector opened on one tab would have
+switched everything on and receded every window. So a lock only keeps an
+active mode on, except a drag, which starts it, so every window's tabs come
+out as targets.
+
+**Wires run underneath.** `hks-state-traces` draws them alone, at z 0, below
+every window; `hks-state-wiring` keeps the jacks and the live drag wire.
+Windows stack at even z (`windowZ`) and each window's tabs at the odd z just
+below it, above the window behind, and the tab layer is no stacking context of
+its own, so a window in front covers the tabs of the windows behind it, as it
+covers their content; a tab whose list is open and the drag wire float above
+every window. A trace
+carries the keys of its two jacks, and hovering a jack lights its traces
+(`hovered$`). Each wire is drawn in the **wire style**, a document like the
+chain aspect (`Documents.wires`, saved, undoable, labelled): `curves`, the
+default, as before, or `traces`, right angles with soft corners
+(`tracePath`), out of an output to the right and into an input from the left,
+dropping below both ends when it has to turn back, since the boards hide what
+runs under them. It is picked in the Appearance window or from the palette
+(`Draw wires as …`). The drag wire stays a curve either way: in hand it is a
+cable.
+
+**Coming close to touch.** A window's chip clicked while the window is drawn
+below three quarters of its size (`tooSmall`, from its rendered against its
+laid-out width) also sends `locate` for itself, so the camera glides it to
+reading distance as its menu opens, and the two end at one scale.
 
 `state-mode.ts` derives the world-space sockets and wires. `hks-state-wiring`
 owns their DOM, and compact output selectors offer a manage button for the

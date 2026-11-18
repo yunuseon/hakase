@@ -8,6 +8,10 @@ import {
     defaultSession,
     reduceSession,
     modeOf,
+    reduceEngaged,
+    disengaged,
+    type EngageAction,
+    type Engaged,
 } from './state-mode.ts';
 import {
     anchorOf,
@@ -101,28 +105,44 @@ describe('state mode', () => {
         expect(reduceSession(pinned, { kind: 'close' })).toEqual(defaultSession);
     });
 
-    it('releases a menu lock when its window closes', () => {
-        const selecting = reduceSession(defaultSession, {
-            kind: 'busy',
-            key: 'menu:signal-5',
-            busy: true,
-        });
+    it('keeps the mode on through a menu lock, and lets go when its window closes', () => {
+        const held = reduceSession(defaultSession, { kind: 'hold', held: true });
+        const selecting = reduceSession(
+            reduceSession(held, { kind: 'busy', key: 'menu:signal-5', busy: true }),
+            { kind: 'hold', held: false },
+        );
         expect(modeOf(selecting).active).toBe(true);
         expect(modeOf(reduceSession(selecting, { kind: 'windows', ids: [] })).active).toBe(false);
     });
 
-    it('keeps collapsed and expanded sockets inside their owning windows', () => {
+    it('lets only a drag start the mode, so one tab opened outside it stays local', () => {
+        const picking = reduceSession(defaultSession, {
+            kind: 'busy',
+            key: 'selector',
+            busy: true,
+        });
+        const dragging = reduceSession(defaultSession, { kind: 'busy', key: 'drag', busy: true });
+
+        expect(modeOf(picking).active).toBe(false);
+        expect(modeOf(dragging).active).toBe(true);
+    });
+
+    it('puts every jack on the edge of its window, inputs left and outputs right, below the title', () => {
         const workspace = run([launch]);
         const view = wiringOf(workspace, new Map(), inputsFor, on, 1);
         expect(view).not.toBeNull();
-        view?.sockets.forEach(socket => {
-            const frame = workspace.processes.find(process => process.id === socket.window)?.frame;
-            if (frame === undefined) throw new Error('Missing window');
-            expect(socket.x).toBeGreaterThanOrEqual(frame.x);
-            expect(socket.x + socket.width).toBeLessThanOrEqual(frame.x + frame.width);
-            expect(socket.y).toBeGreaterThanOrEqual(frame.y + 36);
-            expect(socket.y + 28).toBeLessThanOrEqual(frame.y + frame.height);
-        });
+        view?.sockets
+            .filter(socket => !socket.hidden)
+            .forEach(socket => {
+                const frame = workspace.processes.find(
+                    process => process.id === socket.window,
+                )?.frame;
+                if (frame === undefined) throw new Error('Missing window');
+                const jack = anchorOf(socket, 1);
+                expect(jack.x).toBe(socket.side === 'left' ? frame.x : frame.x + frame.width);
+                expect(socket.side).toBe(socket.end.kind === 'store' ? 'right' : 'left');
+                expect(socket.y).toBeGreaterThanOrEqual(frame.y + 36);
+            });
     });
     it('stays on until closed or toggled off', () => {
         const entered = reduceMode(defaultMode, { kind: 'enter' });
@@ -271,6 +291,85 @@ describe('state mode', () => {
     });
 });
 
+describe('tabs outside state mode', () => {
+    const keysOf = (view: ReturnType<typeof wiringOf>) =>
+        [...new Set((view?.sockets ?? []).map(socket => socket.window))].sort();
+
+    it('draws nothing with no window engaged', () => {
+        expect(wiringOf(run(), new Map(), inputsFor, defaultSession, 1)).toBeNull();
+    });
+
+    it('peeks the own tabs of a hovered window and draws none of its wires', () => {
+        const view = wiringOf(
+            run(),
+            new Map(),
+            inputsFor,
+            defaultSession,
+            1,
+            false,
+            new Map(),
+            new Map(),
+            new Map(),
+            'curves',
+            { hovered: 'sketch-2', focused: null },
+        );
+
+        expect(keysOf(view)).toEqual(['sketch-2']);
+        expect(view?.wires).toEqual([]);
+        expect(view?.all).toBe(false);
+    });
+
+    it('wires a focused window to its neighbours, showing only the tabs its wires land on', () => {
+        const view = wiringOf(
+            run(),
+            new Map(),
+            inputsFor,
+            defaultSession,
+            1,
+            false,
+            new Map(),
+            new Map(),
+            new Map(),
+            'curves',
+            { hovered: null, focused: 'sketch-2' },
+        );
+
+        expect(keysOf(view)).toEqual(['sketch-2', 'timeline-3']);
+        expect(
+            view?.sockets.filter(socket => socket.window === 'timeline-3').map(({ key }) => key),
+        ).toEqual(['timeline-3:output']);
+        expect(view?.wires.map(({ from, to }) => [from, to])).toEqual([
+            ['timeline-3:output', 'sketch-2:input:playback'],
+        ]);
+    });
+
+    it('folds hover and presses, and lets go of a window that closed', () => {
+        const engaged = [
+            { kind: 'hover', id: 'a', over: true },
+            { kind: 'press', id: 'b' },
+            { kind: 'hover', id: 'c', over: false },
+            { kind: 'windows', ids: ['b'] },
+        ] satisfies EngageAction[];
+        const steps = engaged.reduce(
+            (seen: Engaged[], action) => [
+                ...seen,
+                reduceEngaged(seen.at(-1) ?? disengaged, action),
+            ],
+            [],
+        );
+
+        expect(steps).toEqual([
+            { hovered: 'a', focused: null },
+            { hovered: 'a', focused: 'b' },
+            { hovered: 'a', focused: 'b' },
+            { hovered: null, focused: 'b' },
+        ]);
+        expect(reduceEngaged(steps[3] ?? disengaged, { kind: 'press', id: null })).toEqual(
+            disengaged,
+        );
+    });
+});
+
 describe('input groups', () => {
     const small: WorkspaceAction = {
         kind: 'launch',
@@ -285,7 +384,7 @@ describe('input groups', () => {
     };
     const signals = new Map([['signal', defaultSignal]]);
 
-    it('keeps every row of the smallest sketch inside its frame, whichever group is open', () => {
+    it('keeps every tab of the smallest sketch outside its face, whichever group is open', () => {
         const workspace = run([small]);
         const sketch = sketchIn(workspace);
         const groups = ['Knobs', 'Camera', 'Look'];
@@ -305,9 +404,12 @@ describe('input groups', () => {
 
             expect(rows.length).toBeGreaterThan(0);
             rows.forEach(row => {
-                expect(row.x).toBeGreaterThanOrEqual(sketch.frame.x);
-                expect(row.x + row.width).toBeLessThanOrEqual(sketch.frame.x + sketch.frame.width);
-                expect(row.y + 28).toBeLessThanOrEqual(sketch.frame.y + sketch.frame.height);
+                if (row.side === 'left') {
+                    expect(row.x + row.width).toBeLessThanOrEqual(sketch.frame.x + 10);
+                } else {
+                    expect(row.x).toBeGreaterThanOrEqual(sketch.frame.x + sketch.frame.width - 10);
+                }
+                expect(row.y).toBeGreaterThanOrEqual(sketch.frame.y + 36);
             });
         });
     });
