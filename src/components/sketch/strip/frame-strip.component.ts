@@ -36,7 +36,7 @@ const TEMPLATE = () =>
                 </button>
             </div>
         </div>
-        <div class="scroller">
+        <div class="scroller" data-scrolls>
             <div class="track">
                 <canvas class="film"></canvas>
                 <div class="tiles"></div>

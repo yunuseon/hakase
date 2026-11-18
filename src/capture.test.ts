@@ -19,7 +19,8 @@ const workspace = {
         { id: 'store-2', program: 'note', name: 'Ideas', kept: true, copy: null, clock: null },
     ],
 } as const;
-const empty = { notes: new Map(), workspace };
+const registry = { stores: workspace.stores, made: workspace.made };
+const empty = { notes: new Map(), registry };
 
 describe('capturedActions', () => {
     it('adds a ticket through either keyword, into Main or a chosen state', () => {

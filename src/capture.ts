@@ -7,14 +7,14 @@ type Capture = Extract<Picked, { readonly kind: 'capture' }>;
 
 export const capturedActions = (
     { target, store, text }: Capture,
-    { notes, workspace }: Pick<Documents, 'notes' | 'workspace'>,
+    { notes, registry }: Pick<Documents, 'notes' | 'registry'>,
 ): readonly DocumentAction[] => {
     const program = CAPTURES.find(capture => capture.target === target)?.program;
 
     // The id came from a clicked row: a store of another program, or one since deleted, takes nothing.
     if (
         program === undefined ||
-        !withMain(program, workspace.stores).some(({ id }) => id === store)
+        !withMain(program, registry.stores).some(({ id }) => id === store)
     ) {
         return [];
     }

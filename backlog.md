@@ -5,6 +5,65 @@ says what done looks like. When an item lands, delete it here and describe the
 result in `AGENTS.md`, which says how the app _is_; this file says what is
 next. An idea that is not decided yet belongs in a conversation, not here.
 
+## Programs that fit any window
+
+### Why
+
+Program contents have no layout system of their own. Each component hand-rolls
+its rows, widths and breakpoints (most stylesheets have no container query, or
+one), each program's `minimum` is a number someone typed rather than what its
+content needs, and a window body that scrolls hides whatever does not fit.
+
+The layout audit (Storybook, Foundations) measures every program at its
+minimum, compact and regular size. Its first run, on 2026-11-18: **18 of 56
+programs fail, 33 findings.** Converters are 17 of them: every one makes its
+window scroll at its 220 × 180 minimum, by up to 198px; sound → level's reading
+chips push it sideways by 82 to 182px at every size, picture → level's by 9 to
+29px; level → bit's threshold is 3px narrower than its value at every size.
+Focus scrolls sideways by 3px in compact. A first scripted look also blamed
+Voice and Paint, but the screen's edge had cut them, not their frames, which is
+why the audit measures inside a frame of its own.
+
+The answer is the one the big systems give: a few designed layouts per window
+size class rather than one layout squeezed (Material's window size classes,
+Apple's compact and regular), the first layout that fits rather than one that
+clips (SwiftUI's `ViewThatFits`), and one aligned label and value grid with
+detail behind disclosure (Notion's properties). Made the app's way: a
+program's controls become **data** a single component renders, so the layout
+rules live in one place, and a client without a browser can list and set the
+same controls from the same description.
+
+### In order
+
+- **Size classes.** The window body is a named size container with shared
+  breakpoints: _glance_ (widget-small: only what the program shows), _compact_,
+  _regular_ and _wide_, rem literals beside the tokens. The title strip shrinks
+  the store chip to its dot before it truncates the title. A program's
+  `minimum` is its glance size. Done when every program has a glance layout and
+  the audit finds nothing clipped at the minimum.
+- **One controls grammar.** A program describes its settings as data
+  (`ControlSpec`: section, choice, range, number, toggle, text, action), built
+  by its pure view function, and one `hks-controls` component renders them:
+  label, control and value aligned on one subgrid across the whole panel;
+  number fields sized to their value; a row of choices that does not fit
+  becomes a select; in compact, secondary sections fold into rows that open in
+  place; never horizontal scroll. It emits `{ id, value }` changes, and the
+  program folds them as it does now. Done when every converter is rendered by
+  it, with no stylesheet of its own for its controls, and passes the audit.
+- **Stage and controls.** Every program window is a _stage_ (its bespoke view:
+  canvas, scope, plot, grid, list, flexible with a minimum of its own) and its
+  _controls_. Compact stacks them, wide puts them side by side, glance shows the
+  stage alone with the controls behind a ⋯. Done when Signal, Voice and Paint
+  follow it and pass the audit at every size.
+- **Migrate the rest**, worst first by the audit's count, deleting each
+  program's hand-rolled layout CSS as it moves. Done when the audit is clean for
+  all 57 programs at every size, and its zero is the bar a new program meets.
+- **Menus.** Every menu (the state chip's, the program switcher, the formula
+  editor's ⋯, the tickets' pickers) follows one grammar: a program's own actions
+  in a ⋯ at the same place in the header, grouped, with icons, destructive last,
+  and never clipped by its window. Done when each menu is listed in the
+  catalogue against that grammar and none departs from it.
+
 ## The finish
 
 The app gained a lot of capability and too little finish. The goal now is
@@ -53,17 +112,6 @@ at 41% and running off the screen at 100%.
 - **A first run that invites.** An empty canvas offers the starters as quiet
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
-
-## A core any client could drive
-
-The core boots in Node, imports no view, and lint keeps it so (see "The core,
-with no client" and "The model and the layout" in `AGENTS.md`). What is left:
-
-- **The store registry leaves the workspace.** Which stores exist and their
-  names sit in `Workspace` beside window frames and the camera, so a client
-  with no windows still carries a layout. Moving them into the documents
-  touches the saved shape, so it migrates the snapshot. Done when a client can
-  make and name a store with no window at all.
 
 ## Typed ports and converters
 

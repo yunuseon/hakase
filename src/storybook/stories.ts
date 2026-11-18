@@ -8,6 +8,7 @@ import { detailStories } from './detail-stories.ts';
 import { primitiveStories } from './primitive-stories.ts';
 import { controlStories } from './control-stories.ts';
 import { programStories, specimenPrograms } from './program-stories.ts';
+import { auditStories } from './audit-stories.ts';
 
 const foundations: Story = {
     id: 'foundations',
@@ -51,6 +52,7 @@ const foundations: Story = {
 };
 export const stories: readonly Story[] = [
     foundations,
+    ...auditStories,
     ...primitiveStories,
     ...controlStories,
     ...programStories,

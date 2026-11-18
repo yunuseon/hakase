@@ -1,6 +1,7 @@
 import { EMPTY, firstValueFrom, of } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 import { coreOf } from './core.ts';
+import type { DocumentAction } from './documents.ts';
 import type { Ports } from './ports.ts';
 import type { AppSignal } from './protocol.ts';
 import type { AppInput, ProgramId } from './protocol.ts';
@@ -96,5 +97,42 @@ describe('the core, with no client', () => {
         const notes = await firstValueFrom(again.notes$);
 
         expect(notes.get('note')?.items.map(({ text }) => text)).toEqual(['from a terminal']);
+    });
+
+    it('makes and names a store with no window, and keeps it', async () => {
+        const windowless = [
+            {
+                kind: 'stores',
+                command: { kind: 'make', program: 'note', name: 'Journal', copy: null },
+            },
+            { kind: 'stores', command: { kind: 'rename', store: 'note', name: 'Inbox' } },
+        ] satisfies readonly DocumentAction[];
+        const { storage } = memory();
+        const first = coreOf({
+            ports: portsWith(storage),
+            inputs$: EMPTY,
+            documentActions$: of(...windowless),
+            workspaceActions$: EMPTY,
+            pictureFrames$: () => of(null),
+        });
+        const saving = first.persisted$.subscribe();
+        const made = await firstValueFrom(first.stores$);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        saving.unsubscribe();
+
+        const again = coreOf({
+            ports: portsWith(storage),
+            inputs$: EMPTY,
+            documentActions$: EMPTY,
+            workspaceActions$: EMPTY,
+            pictureFrames$: () => of(null),
+        });
+        const { workspace, registry } = await firstValueFrom(again.documents$);
+        const names = (stores: typeof made) =>
+            stores.filter(({ program }) => program === 'note').map(({ name }) => name);
+
+        expect(names(made)).toEqual(['Journal', 'Inbox']);
+        expect(names(registry.stores)).toEqual(['Journal', 'Inbox']);
+        expect(workspace.processes.some(({ program }) => program === 'note')).toBe(false);
     });
 });

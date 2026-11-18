@@ -120,6 +120,75 @@ export const mainStore = (program: ProgramId): StoreEntry => ({
 export const ensured = (stores: readonly StoreEntry[], entry: StoreEntry): readonly StoreEntry[] =>
     stores.some(({ id }) => id === entry.id) ? stores : [...stores, entry];
 
+export type Registry = {
+    readonly stores: readonly StoreEntry[];
+    // Monotone, so a deleted store's id is never handed out again.
+    readonly made: number;
+};
+
+export const emptyRegistry: Registry = { stores: [], made: 0 };
+
+export type StoreCommand =
+    | {
+          readonly kind: 'make';
+          readonly program: ProgramId;
+          readonly name: string | null;
+          readonly copy: StoreId | null;
+      }
+    | { readonly kind: 'rename'; readonly store: StoreId; readonly name: string }
+    | { readonly kind: 'remove'; readonly store: StoreId };
+
+const registered = (registry: Registry, store: StoreId): Registry =>
+    isProgramId(store) && HOLDING[store] !== null
+        ? { ...registry, stores: ensured(registry.stores, mainStore(store)) }
+        : registry;
+
+export const reduceRegistry = (
+    registry: Registry,
+    command: StoreCommand,
+    used: ReadonlySet<StoreId>,
+    seq?: number,
+): Registry => {
+    switch (command.kind) {
+        case 'make': {
+            if (HOLDING[command.program] === null) {
+                return registry;
+            }
+
+            const made = registry.made + 1;
+            const name = command.name?.trim() ?? '';
+            const entry: StoreEntry = {
+                id: `store-${seq ?? made}`,
+                program: command.program,
+                name: name === '' ? `Store ${made}` : name,
+                kept: true,
+                copy: command.copy,
+                clock: null,
+            };
+
+            return { stores: [...registry.stores, entry], made };
+        }
+        case 'rename': {
+            const name = command.name.trim();
+            const known = registered(registry, command.store);
+
+            return name === '' || !known.stores.some(({ id }) => id === command.store)
+                ? registry
+                : {
+                      ...known,
+                      stores: known.stores.map(entry =>
+                          entry.id === command.store ? { ...entry, name, kept: true } : entry,
+                      ),
+                  };
+        }
+        case 'remove':
+            return used.has(command.store) ||
+                !registry.stores.some(({ id }) => id === command.store)
+                ? registry
+                : { ...registry, stores: registry.stores.filter(({ id }) => id !== command.store) };
+    }
+};
+
 export const pruned = (
     stores: readonly StoreEntry[],
     bound: ReadonlySet<StoreId>,
@@ -129,7 +198,6 @@ export const pruned = (
     return kept.length === stores.length ? stores : kept;
 };
 
-// Spread round the wheel by the golden angle, so neighbouring ids never share a colour.
 export const colourOf = (id: StoreId): string => {
     const hash = [...id].reduce((total, letter) => (total * 31 + letter.charCodeAt(0)) >>> 0, 7);
 

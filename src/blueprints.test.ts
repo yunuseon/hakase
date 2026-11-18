@@ -1,7 +1,13 @@
 import { unlinkedSketch } from './model/sketch/links.ts';
 import { describe, expect, it } from 'vitest';
 import { defaultVoice } from './model/voice.ts';
-import { documentsKit, reduceHistory, seqFloor, type Documents } from './documents.ts';
+import {
+    fromWorkspace,
+    documentsKit,
+    reduceHistory,
+    seqFloor,
+    type Documents,
+} from './documents.ts';
 import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import {
@@ -51,7 +57,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
     const workspace = defaultWorkspace({ width: 1400, height: 900 }, inputsFor);
 
     return {
-        workspace: {
+        ...fromWorkspace({
             ...workspace,
             processes: [...windows, ...extra],
             stores: [
@@ -89,7 +95,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
                 },
             ],
             links: [{ a: 'signal-1', b: 'voice-1' }],
-        },
+        }),
         settings: new Map([['sketch-1', { ...defaultSketch, formula: 'custom-1' }]]),
         tickets: new Map(),
         notes: new Map(),
@@ -198,7 +204,7 @@ describe('a blueprint', () => {
         });
         expect(after.library).toBe(before.library);
         expect(after.workspace.sections).toEqual(before.workspace.sections);
-        expect(after.workspace.stores.find(({ id }) => id === ids.get('voice'))?.name).toBe(
+        expect(after.registry.stores.find(({ id }) => id === ids.get('voice'))?.name).toBe(
             'Twinkle',
         );
         expect(after.workspace.links).toContainEqual({ a: 'signal-500-1', b: 'voice-500-2' });
@@ -222,7 +228,7 @@ describe('a blueprint', () => {
             7,
             inputsFor,
         );
-        const seeded = after.workspace.stores.find(({ clock }) => clock !== null);
+        const seeded = after.registry.stores.find(({ clock }) => clock !== null);
 
         expect(blueprint.stores.find(({ id }) => id === 'timeline')?.clock).toEqual({
             duration: 6,

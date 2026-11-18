@@ -18,7 +18,7 @@ const sheet = styleSheet(css);
 const ARM_MS = 3000;
 
 const TEMPLATE = (view: HabitsView) =>
-    html`<div class="scroll">
+    html`<div class="scroll" data-scrolls>
             <div class="grid">
                 <div class="row head">
                     <span></span>

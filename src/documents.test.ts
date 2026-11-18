@@ -1,6 +1,7 @@
 import { defaultTickets, ticketsIn } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import {
+    fromWorkspace,
     documentsKit,
     reduceHistory,
     seqFloor,
@@ -20,7 +21,7 @@ import { defaultWorkspace, type WorkspaceAction } from './workspace.ts';
 const viewport = { width: 1400, height: 900 };
 
 const started = (): Documents => ({
-    workspace: defaultWorkspace(viewport, inputsFor),
+    ...fromWorkspace(defaultWorkspace(viewport, inputsFor)),
     settings: new Map(),
     tickets: new Map(),
     notes: new Map(),
@@ -68,13 +69,14 @@ const labels = (history: History) => entriesOf(history).map(({ label }) => label
 describe('one log for every document', () => {
     it('deletes only selected programs and restores them in one undo step', () => {
         const start = run(fresh(), [launch('tickets'), launch('bookmarks')]);
-        const { processes, stores } = start.present.workspace;
+        const { processes } = start.present.workspace;
+        const { stores } = start.present.registry;
         const ids = processes.slice(-2).map(({ id }) => id);
         const deletion = act({ kind: 'close-selection', ids: [...ids, 'already-closed'] });
         const removed = reduce(start, deletion);
 
         expect(removed.present.workspace.processes).toEqual(processes.slice(0, -2));
-        expect(removed.present.workspace.stores).toEqual(stores);
+        expect(removed.present.registry.stores).toEqual(stores);
         expect(removed.steps).toHaveLength(start.steps.length + 1);
         expect(reduce(removed, deletion)).toBe(removed);
 
@@ -549,7 +551,7 @@ describe('links', () => {
         expect(looped.present.pedals.get('kaleido-5')?.sources['in']).toBe('sketch-2');
         expect(looped.steps).toHaveLength(chained.steps.length);
         // A store something links to is kept, so closing the sketch's window cannot take it away.
-        expect(chained.present.workspace.stores.find(({ id }) => id === 'sketch-2')?.kept).toBe(
+        expect(chained.present.registry.stores.find(({ id }) => id === 'sketch-2')?.kept).toBe(
             true,
         );
     });

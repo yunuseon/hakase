@@ -31,7 +31,7 @@ import { keptStores, renamedStore, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
 import type { InputsFor } from './inputs.ts';
-import { formerStoreFollows, parseWorkspace, type Workspace } from './workspace.ts';
+import { formerStoreFollows, parseWorkspace, parted, type Workspace } from './workspace.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { GATE_DEFAULTS, parseGate, type Gate } from './gates.ts';
 import { parseConverter, type Converter } from './converters.ts';
@@ -96,9 +96,22 @@ const entriesOf = (value: unknown): [string, unknown][] =>
 const field = (value: unknown, key: string): unknown =>
     entriesOf(value).find(([name]) => name === key)?.[1];
 
+// Saved apart since the registry left the workspace; a save from before keeps them in the workspace.
+const workspaceFrom = (stored: unknown): unknown => {
+    const registry = field(stored, 'registry');
+
+    return registry === undefined
+        ? field(stored, 'workspace')
+        : {
+              ...Object.fromEntries(entriesOf(field(stored, 'workspace'))),
+              stores: field(registry, 'stores'),
+              made: field(registry, 'made'),
+          };
+};
+
 // A constant left at its default 1 saved no document, and as a switch it would read 0.
 const constantsFrom = (stored: unknown): [StoreId, Gate][] => {
-    const stores = field(field(stored, 'workspace'), 'stores');
+    const stores = field(workspaceFrom(stored), 'stores');
 
     return (Array.isArray(stores) ? stores : []).flatMap((entry): [StoreId, Gate][] => {
         const id = field(entry, 'id');
@@ -314,10 +327,7 @@ export const parseSnapshot = (stored: unknown, inputsFor: InputsFor): Restored |
 
 const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
     return {
-        workspace: withBoard(
-            parseWorkspace(field(stored, 'workspace'), inputsFor),
-            ticketsFrom(stored),
-        ),
+        workspace: withBoard(parseWorkspace(workspaceFrom(stored), inputsFor), ticketsFrom(stored)),
         look: lookFrom(field(stored, 'look')),
         aspect: aspectFrom(field(stored, 'aspect')),
         wires: wiresFrom(field(stored, 'wires')),
@@ -399,10 +409,12 @@ const serialised = (snapshot: Snapshot): unknown => {
     const saved = <T>(all: ReadonlyMap<StoreId, T>): unknown => ({
         byStore: Object.fromEntries(keptStores(all, stores)),
     });
+    const { layout, registry } = parted(snapshot.workspace);
 
     return {
         version: VERSION,
-        workspace: snapshot.workspace,
+        workspace: layout,
+        registry,
         look: snapshot.look,
         aspect: snapshot.aspect,
         wires: snapshot.wires,

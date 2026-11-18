@@ -2,7 +2,7 @@ import type { Observable } from 'rxjs';
 import { distinctUntilChanged, map, shareReplay } from 'rxjs/operators';
 import type { Appearance } from '../appearance.ts';
 import { appearances, type AppearanceName } from '../appearances.ts';
-import { linkedOf, loopsOf, type History } from '../documents.ts';
+import { linkedOf, loopsOf, workspaceOf, type History } from '../documents.ts';
 import type { ProcessId, Written } from '../protocol.ts';
 import { sameStructure, type Workspace } from '../workspace.ts';
 
@@ -12,9 +12,10 @@ const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
 export const projectionsOf = (history$: Observable<History>) => {
     const documents$ = history$.pipe(map(({ present }) => present));
 
+    // One stream for both parts, or a launch, which changes both, would reach a reader twice.
     const workspace$: Observable<Workspace> = documents$.pipe(
-        map(({ workspace }) => workspace),
-        distinctUntilChanged(),
+        distinctUntilChanged((a, b) => a.workspace === b.workspace && a.registry === b.registry),
+        map(workspaceOf),
     );
     const stores$ = workspace$.pipe(
         map(({ stores }) => stores),

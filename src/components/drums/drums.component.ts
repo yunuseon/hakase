@@ -64,7 +64,7 @@ const TEMPLATE = () =>
                 )}<button class="ui-choice" type="button" data-clear>clear</button>
             </div>
         </div>
-        <div class="grid" role="grid" aria-label="pattern"></div>
+        <div class="grid" role="grid" aria-label="pattern" data-scrolls></div>
         <div class="settings">
             <div class="ui-choices steps" role="radiogroup" aria-label="steps">
                 ${STEP_COUNTS.map(

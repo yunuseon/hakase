@@ -894,6 +894,33 @@ when the software keyboard changes them, without changing saved frames or the
 workspace camera. Actual iPhone keyboard, scrolling and gesture behaviour still
 requires device verification.
 
+### The layout audit
+
+**Whether a program fits its window is measured, not eyeballed.** Storybook's
+**Layout audit** (Foundations) renders every program but Storybook itself at
+its minimum, compact (240 wide, its own height) and regular size, each inside
+a frame that copies the window's: the title strip, then the padded body that
+scrolls as the last resort. Each run mounts the program through `programDemo`
+against its sandbox, waits on timers rather than frames (a hidden pane stalls
+those), measures, and disposes of it before the next. Its findings:
+
+- **clipped**: a control or text cut off by an ancestor that clips and does
+  not scroll;
+- **field too narrow**: a text or number field narrower than its value;
+- **scrolls sideways**: any element, the body included, scrolling horizontally
+  when it was not meant to;
+- **window scrolls**: the body has to scroll to reach the content, which is
+  the fallback, not a layout;
+- **text cut** (a warning): an ellipsis that is actually truncating.
+
+**A scroller that is meant to scroll says so with `data-scrolls`**: the drum
+grid, the habits' dates, the frame strip, the formula editor's text and its
+highlight and gutter. Content inside one counts as reachable. The rules are
+pure (`findingsOf`, `jobsOf`, `auditView` in `components/layout-audit/audit.ts`,
+tested); the walk that measures (`measuredIn`) and the run live in
+`storybook/audit-stories.ts`. Its count is the backlog's bar for "Programs that
+fit any window".
+
 ### Shared UI primitives
 
 The UI library lives under `src/shared/ui/`; Storybook consumes it, as do the
@@ -1321,7 +1348,9 @@ flow it would hold its own viewport open, and the window could grow the drawing
 but never shrink it. The minimum (320 x 420) leaves room for the controls.
 
 **The whole app is one snapshot.** `state-store.ts` writes a single versioned
-`hakase.state`: the workspace (processes, links, camera, toolbar), the look and
+`hakase.state`: the workspace (processes, links, camera, toolbar), the store
+registry beside it (`registry`; a save from before it moved keeps its stores in
+the workspace, and `workspaceFrom` reads either), the look and
 its edits, formula and theme edits, duration, loop, where the playhead last
 rested, every window's settings, and every ticket state. `persistState$` takes one `combineLatest` of
 the folds, each reaching it by exactly one path, debounced: a drag emits on every
@@ -1462,13 +1491,27 @@ are the same one with a different default binding at launch.
   window gets a store of its own. The dial, progress bar, plot, Output, tasks,
   appearance, blueprints, history, state map and Storybook hold nothing: no
   store, no chip.
-- **The registry is workspace state**: `Workspace.stores` names each store, ids
-  `store-<n>` come from a monotone `made`, and binding, splitting, renaming and
-  removing are ordinary undoable workspace actions, emitted by the window as
-  untagged gestures and stamped in `liveProcess$`. Which windows share a store is
-  derived, never stored, and so is its colour (`colourOf`). A store a launch
-  made for one window is pruned once no window uses it, like a link; naming it or
-  splitting one off keeps it.
+- **The registry is a document of its own**, `Documents.registry` (`Registry`
+  in `stores.ts`): it names each store, and ids `store-<n>` come from a
+  monotone `made`. It sits beside the windows' document, `Documents.workspace`
+  (a `Layout`: processes, links, camera, sections), never inside it, so a client
+  with no windows has stores and no layout. `reduceRegistry` takes the commands
+  a store needs with no window at all, `make`, `rename` and `remove` (refused
+  while a window binds or follows it), as the `stores` document action; renaming
+  a main store not yet registered registers it.
+- **A window action changes both in one step.** Binding, splitting, launching,
+  replacing and pruning are still workspace actions, emitted by the window as
+  untagged gestures and stamped in `liveProcess$`, and `reduceWorkspace` folds
+  them over the two together, `Workspace` (`Layout & Registry`), with its
+  store-only cases delegating to `reduceRegistry`. The documents reducer joins
+  the two (`workspaceOf`) before and splits them (`withWorkspace`) after,
+  keeping the registry's reference when nothing changed it, so a launch that
+  makes a private store is one undo step and a pan touches no registry. The
+  browser reads them joined, through one `workspace$` built only when either
+  part changes: a `stores$` combined beside it would reach a reader twice on
+  every launch. Which windows share a store is derived, never stored, and so is
+  its colour (`colourOf`). A store a launch made for one window is pruned once
+  no window uses it, like a link; naming it or splitting one off keeps it.
 - **Programs never learn stores exist.** `liveProcess$` stamps every input with
   the window's binding as it leaves (`withLatestFrom(self.store$)`, which
   subscribes to the binding first, so nothing emitted on launch is lost), the
@@ -3102,8 +3145,8 @@ pointer adapter, which pulled `lib/dom.ts` and `lib/rx.ts` into the core;
 `Phase` lives in `shared/phase.ts` now. `URL`, `TextEncoder` and `btoa` are
 allowed, being in every runtime.
 
-What is still to do is in the backlog under "A core any client could drive":
-the store registry still lives in the workspace beside window frames.
+**`core.test.ts` also makes and names a store with no window**, through the
+`stores` document action, and a second core restores it.
 
 ## The model and the layout
 
@@ -3121,8 +3164,9 @@ included, lives outside `components/`, and the core reaches neither
   client would want it (an orbit, a frame count, a played note).
 - **`src/layout/`** holds the canvas workspace's pure maths: frames and window
   gestures, seams, sections, the toolbar's placement and the zoom commands. It is
-  a client's, but the workspace is a document today, so the core still folds it;
-  the backlog's last item takes the store registry out of it.
+  a client's, but the windows' document is folded by the core, so their undo,
+  saving and blueprints work for any client; the stores they bind are a document
+  apart (see "Stores").
 - **`src/protocol.ts`** is the language any client speaks: program and process
   ids, categories, `AppInput`, `AppSignal` and `Written`. `program.ts` keeps the
   browser's contract with its windows (`AppState`, `Program`, `ProcessView`,

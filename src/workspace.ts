@@ -57,9 +57,10 @@ import {
     mainStore,
     pruned,
     renamedStore,
+    type ClockSeed,
+    type Registry,
     type StoreEntry,
     type StoreId,
-    type ClockSeed,
 } from './stores.ts';
 
 type ProcessBase = {
@@ -98,7 +99,7 @@ export type ToolbarState =
     | { readonly kind: 'docked'; readonly edge: Edge; readonly retracted: boolean }
     | { readonly kind: 'floating'; readonly frame: Frame; readonly lastEdge: Edge };
 
-export type Workspace = {
+export type Layout = {
     readonly processes: readonly Process[];
     // Monotone, so a relaunch never reuses a dead process's id.
     readonly launched: number;
@@ -107,11 +108,20 @@ export type Workspace = {
     readonly minimap: boolean;
     readonly sections: readonly Section[];
     readonly links: readonly Link[];
-    readonly stores: readonly StoreEntry[];
-    // Monotone, like `launched`: a deleted store's id is never handed out again.
-    readonly made: number;
     readonly drift: Drift | null;
 };
+
+export type Workspace = Layout & Registry;
+
+export const parted = ({ stores, made, ...layout }: Workspace) => ({
+    layout,
+    registry: { stores, made } satisfies Registry,
+});
+
+export const joined = (layout: Layout, registry: Registry): Workspace => ({
+    ...layout,
+    ...registry,
+});
 
 export type WorkspaceAction =
     | {
@@ -1654,7 +1664,7 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
 };
 
 // Undoing restores where things were, not where you are looking: the camera and chrome stay put.
-export const keepingView = (restored: Workspace, current: Workspace): Workspace => ({
+export const keepingView = (restored: Layout, current: Layout): Layout => ({
     ...restored,
     camera: current.camera,
     toolbar: current.toolbar,
@@ -1663,7 +1673,7 @@ export const keepingView = (restored: Workspace, current: Workspace): Workspace 
 });
 
 // What an action reads from the moment it was made travels with it, so replaying the log without an earlier step does it the same.
-export const settledAction = (workspace: Workspace, action: WorkspaceAction): WorkspaceAction => {
+export const settledAction = (workspace: Layout, action: WorkspaceAction): WorkspaceAction => {
     switch (action.kind) {
         case 'launch':
             return { ...action, camera: workspace.camera };

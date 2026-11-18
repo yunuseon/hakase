@@ -2,6 +2,7 @@ import { merge, type Observable } from 'rxjs';
 import { map, mergeMap, scan, shareReplay, startWith } from 'rxjs/operators';
 import {
     documentsKit,
+    fromWorkspace,
     reduceHistory,
     seqFloor,
     type DocumentAction,
@@ -21,7 +22,7 @@ const reduced = reduceHistory(documentsKit(inputsFor));
 
 export const begunFrom = (stored: Restored, viewport: Ports['viewport']): History => {
     const started: Documents = {
-        workspace: stored.workspace ?? defaultWorkspace(viewport, inputsFor),
+        ...fromWorkspace(stored.workspace ?? defaultWorkspace(viewport, inputsFor)),
         settings: stored.settings,
         tickets: stored.tickets,
         notes: stored.notes,

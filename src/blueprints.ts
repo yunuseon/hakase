@@ -171,7 +171,7 @@ export const blueprintOf = (
     selected: readonly string[],
     name = 'Selection',
 ): Captured | null => {
-    const { workspace } = documents;
+    const { workspace, registry: kept } = documents;
     const inside = workspace.processes.filter(p => selected.includes(p.id));
     const bounds = boundsOf(inside.map(boxOf));
 
@@ -213,7 +213,7 @@ export const blueprintOf = (
     );
     const stores = new Set(reachedFrom(linkedOf(documents), bound));
     const entries = [...stores].flatMap((id): StoreEntry[] => {
-        const entry = workspace.stores.find(store => store.id === id);
+        const entry = kept.stores.find(store => store.id === id);
         // A main store has no registry entry until a window opens on it; its id is its program's.
         const program = entry?.program ?? (isProgramId(id) ? id : undefined);
         const saved = program === 'timeline' ? playback.get(id) : undefined;
@@ -305,7 +305,7 @@ export const placed = (
     seq: number,
     inputsFor: InputsFor,
 ): Documents => {
-    const { workspace } = documents;
+    const { workspace, registry: kept } = documents;
     const storeIds = new Map(
         blueprint.stores.map(({ id }, index) => [id, `store-${seq}-${index + 1}`]),
     );
@@ -365,13 +365,25 @@ export const placed = (
             ...workspace,
             launched: workspace.launched + processes.length,
             processes: [...workspace.processes, ...processes],
+            links: [
+                ...workspace.links,
+                ...blueprint.links.flatMap(({ a, b }) => {
+                    const from = windowIds.get(a);
+                    const to = windowIds.get(b);
+
+                    return from === undefined || to === undefined ? [] : [{ a: from, b: to }];
+                }),
+            ],
+        },
+        registry: {
+            ...kept,
             // A window on its program's main store registers it, as a launch would, or it shows no chip.
             stores: processes
                 .filter(({ program, store }) => store === program)
                 .reduce<readonly StoreEntry[]>(
                     (all, { program }) => ensured(all, mainStore(program)),
                     [
-                        ...workspace.stores,
+                        ...kept.stores,
                         ...blueprint.stores.map((entry): StoreEntry => ({
                             ...entry,
                             id: storeOf(entry.id),
@@ -382,15 +394,6 @@ export const placed = (
                         })),
                     ],
                 ),
-            links: [
-                ...workspace.links,
-                ...blueprint.links.flatMap(({ a, b }) => {
-                    const from = windowIds.get(a);
-                    const to = windowIds.get(b);
-
-                    return from === undefined || to === undefined ? [] : [{ a: from, b: to }];
-                }),
-            ],
         },
         settings: new Map([...documents.settings, ...settings]),
         library:

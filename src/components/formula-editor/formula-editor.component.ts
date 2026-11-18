@@ -24,10 +24,11 @@ const TEMPLATE = () =>
             <dl class="terms"></dl>
         </details>
         <div class="editor">
-            <pre class="highlight" aria-hidden="true"><code></code></pre>
-            <pre class="gutter" aria-hidden="true"></pre>
+            <pre class="highlight" aria-hidden="true" data-scrolls><code></code></pre>
+            <pre class="gutter" aria-hidden="true" data-scrolls></pre>
             <textarea
                 class="ui-field source"
+                data-scrolls
                 spellcheck="false"
                 autocomplete="off"
                 autocapitalize="off"

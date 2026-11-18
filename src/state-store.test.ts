@@ -204,3 +204,23 @@ describe('picture aspect', () => {
         expect(parseSnapshot(saved, inputsFor)?.aspect).toBe('1:1');
     });
 });
+
+describe('the registry apart', () => {
+    it('reads the stores saved beside the workspace, not in it', () => {
+        const { stores: _stores, made: _made, ...layout } = base;
+        const restored = parseSnapshot(
+            {
+                version: 1,
+                workspace: { ...layout, processes: [window('note', 'store-3')] },
+                registry: {
+                    stores: [{ id: 'store-3', program: 'note', name: 'Ideas', kept: true }],
+                    made: 3,
+                },
+            },
+            inputsFor,
+        );
+
+        expect(restored?.workspace?.stores.find(({ id }) => id === 'store-3')?.name).toBe('Ideas');
+        expect(restored?.workspace?.made).toBe(3);
+    });
+});

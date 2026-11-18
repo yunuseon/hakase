@@ -4,6 +4,8 @@ import { emptyBlueprints } from './blueprints.ts';
 import { canBox } from './boxes.ts';
 import { circuitTable } from './circuit.ts';
 import {
+    fromWorkspace,
+    workspaceOf,
     documentsKit,
     reduceHistory,
     seqFloor,
@@ -21,7 +23,7 @@ import { defaultWorkspace } from './workspace.ts';
 const viewport = { width: 1400, height: 900 };
 
 const started = (): Documents => ({
-    workspace: defaultWorkspace(viewport, inputsFor),
+    ...fromWorkspace(defaultWorkspace(viewport, inputsFor)),
     settings: new Map(),
     tickets: new Map(),
     notes: new Map(),
@@ -100,9 +102,9 @@ const circuit = () => {
     return { history, sw, pinIn, nand, pinOut, lamp };
 };
 
-const gatesOf = ({ workspace, gates }: Documents) =>
+const gatesOf = ({ registry, gates }: Documents) =>
     new Map(
-        workspace.stores.flatMap(({ id, program }): [string, Gate][] =>
+        registry.stores.flatMap(({ id, program }): [string, Gate][] =>
             isGateKind(program) ? [[id, gates.get(id) ?? GATE_DEFAULTS[program]]] : [],
         ),
     );
@@ -114,7 +116,7 @@ const windows = ({ workspace }: Documents) => workspace.processes.map(({ id }) =
 describe('components', () => {
     it('box only gates, and only with a pin out to show', () => {
         const { history, pinIn, nand, pinOut } = circuit();
-        const { workspace } = history.present;
+        const workspace = workspaceOf(history.present);
         const first = workspace.processes[0];
 
         expect(canBox(workspace, [pinIn.id, nand.id, pinOut.id])).toBe(true);
@@ -140,7 +142,7 @@ describe('components', () => {
         });
         expect(present.gates.get(lamp.store)?.sources['in']).toBe(pinOut.store);
         expect(bitsOf(present, lamp.store)).toEqual(before);
-        expect(present.workspace.stores.find(({ id }) => id === nand.store)?.kept).toBe(true);
+        expect(present.registry.stores.find(({ id }) => id === nand.store)?.kept).toBe(true);
 
         const toggled = run(boxed, [
             { kind: 'gates', store: sw.store, command: { kind: 'toggle' } },
@@ -190,7 +192,7 @@ describe('components', () => {
             { kind: 'prune' },
         ]).present;
 
-        expect(pruned.workspace.stores.some(({ id }) => id === nand.store)).toBe(true);
+        expect(pruned.registry.stores.some(({ id }) => id === nand.store)).toBe(true);
         expect(pruned.gates.get(nand.store)?.sources['a']).toBe(pinIn.store);
     });
 
@@ -215,7 +217,7 @@ describe('components', () => {
         expect(copies).toHaveLength(2);
         expect(a).not.toBe(b);
         expect(a).not.toBe(pinOut.store);
-        expect(placed.workspace.stores.find(({ id }) => id === a)?.kept).toBe(true);
+        expect(placed.registry.stores.find(({ id }) => id === a)?.kept).toBe(true);
         expect(placed.gates.get(a ?? '')?.sources['in']).not.toBe(nand.store);
         expect(placed.gates.has(placed.gates.get(a ?? '')?.sources['in'] ?? '')).toBe(true);
     });

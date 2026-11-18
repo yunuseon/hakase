@@ -1,0 +1,118 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    block-size: 100%;
+    min-block-size: 0;
+    font: var(--text-sm) / 1.4 var(--font-ui);
+    color: var(--label);
+}
+
+.head p {
+    margin: 0;
+}
+
+.progress {
+    color: var(--ink);
+}
+
+.counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1-5);
+    margin: 0;
+}
+
+.count {
+    padding: 0 var(--space-1-5);
+    font-size: var(--text-xs);
+    background: var(--well);
+    border-radius: var(--radius-md);
+}
+
+.count[data-kind='cut'] {
+    color: var(--muted);
+}
+
+/* The window as hks-window draws it: a title strip, then a padded body that scrolls as the last resort. */
+.frame {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-3xl);
+}
+
+.frame[hidden] {
+    display: none;
+}
+
+.strip {
+    flex: none;
+    block-size: var(--space-9);
+}
+
+.body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-block-size: 0;
+    padding: 0 var(--space-2) var(--space-2);
+    overflow: auto;
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-block-size: 0;
+    overflow: auto;
+}
+
+.row {
+    padding: var(--space-1-5) var(--space-2);
+    background: var(--well);
+    border-radius: var(--radius-xl);
+}
+
+.row summary {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+.title {
+    color: var(--ink);
+}
+
+.tally {
+    color: var(--muted);
+}
+
+.row[data-failing] .tally {
+    color: var(--accent);
+}
+
+.size h4 {
+    margin: var(--space-2) 0 var(--space-1);
+    font: 500 var(--text-xs) var(--font-ui);
+    color: var(--ink);
+}
+
+.extent {
+    color: var(--muted);
+}
+
+.findings {
+    margin: var(--space-1) 0 0;
+    padding-inline-start: var(--space-4);
+    font-size: var(--text-xs);
+}
+
+.findings code {
+    font: var(--text-xs) var(--font-mono);
+}

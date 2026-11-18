@@ -87,7 +87,15 @@ import {
     type Signal,
     type SignalCommand,
 } from './shared/signal.ts';
-import { storeEvent, type StoreEntry, type StoreEvent, type StoreId } from './stores.ts';
+import {
+    reduceRegistry,
+    storeEvent,
+    type Registry,
+    type StoreCommand,
+    type StoreEntry,
+    type StoreEvent,
+    type StoreId,
+} from './stores.ts';
 import {
     logged,
     redone,
@@ -104,13 +112,17 @@ import {
     reduceWorkspace,
     settledAction,
     stepOf as workspaceStep,
+    joined,
+    parted,
     usedStores,
+    type Layout,
     type Workspace,
     type WorkspaceAction,
 } from './workspace.ts';
 
 export type Documents = {
-    readonly workspace: Workspace;
+    readonly workspace: Layout;
+    readonly registry: Registry;
     readonly settings: ReadonlyMap<string, Settings>;
     readonly tickets: ReadonlyMap<StoreId, Tickets>;
     readonly notes: ReadonlyMap<StoreId, Notes>;
@@ -162,6 +174,7 @@ type StoreDocument = keyof StoreCommands;
 export type DocumentAction =
     | { readonly kind: 'workspace'; readonly action: WorkspaceAction }
     | { readonly kind: 'prune' }
+    | { readonly kind: 'stores'; readonly command: StoreCommand }
     | { readonly kind: 'settings'; readonly key: string; readonly settings: Settings }
     | {
           [K in StoreDocument]: {
@@ -295,7 +308,7 @@ const waitless = (before: Documents, after: Documents) => (circuitWaits(after) ?
 // The circuit table reads every non-gate source of a gate while it is being made, so none may lead back to a gate.
 export const circuitWaits = (documents: Documents): boolean => {
     const isGate = (id: string) => {
-        const owner = ownerOf(documents.workspace, id);
+        const owner = ownerOf(documents.registry, id);
 
         return owner !== null && isGateKind(owner);
     };
@@ -431,17 +444,43 @@ const linked = (
 
 // A store something links to is kept, as a named one is: closing its window must not take it out from under the link.
 const keptSource = (documents: Documents, source: StoreId | null): Documents =>
-    source === null || !documents.workspace.stores.some(({ id, kept }) => id === source && !kept)
+    source === null || !documents.registry.stores.some(({ id, kept }) => id === source && !kept)
         ? documents
         : {
               ...documents,
-              workspace: {
-                  ...documents.workspace,
-                  stores: documents.workspace.stores.map(entry =>
+              registry: {
+                  ...documents.registry,
+                  stores: documents.registry.stores.map(entry =>
                       entry.id === source ? { ...entry, kept: true } : entry,
                   ),
               },
           };
+
+export const workspaceOf = ({
+    workspace,
+    registry,
+}: Pick<Documents, 'workspace' | 'registry'>): Workspace => joined(workspace, registry);
+
+export const fromWorkspace = (workspace: Workspace): Pick<Documents, 'workspace' | 'registry'> => {
+    const { layout, registry } = parted(workspace);
+
+    return { workspace: layout, registry };
+};
+
+// Split back into its two documents, keeping the registry's reference when the action left it alone.
+const withWorkspace = (documents: Documents, workspace: Workspace): Documents => {
+    const { workspace: layout, registry } = fromWorkspace(workspace);
+
+    return {
+        ...documents,
+        workspace: layout,
+        registry:
+            registry.stores === documents.registry.stores &&
+            registry.made === documents.registry.made
+                ? documents.registry
+                : registry,
+    };
+};
 
 const CONVERTER_GAP = 48;
 
@@ -537,24 +576,35 @@ export const reduceDocuments =
     (documents: Documents, action: DocumentAction, seq: number): Documents => {
         switch (action.kind) {
             case 'workspace': {
-                const workspace = reduceWorkspace(
-                    documents.workspace,
-                    action.action,
-                    inputsFor,
+                const before = workspaceOf(documents);
+                const workspace = reduceWorkspace(before, action.action, inputsFor, seq);
+
+                return workspace === before
+                    ? documents
+                    : copiesOf(documents.registry.stores, workspace.stores).reduce(
+                          withEvent,
+                          withWorkspace(documents, workspace),
+                      );
+            }
+            case 'stores': {
+                const registry = reduceRegistry(
+                    documents.registry,
+                    action.command,
+                    usedStores(documents.workspace.processes),
                     seq,
                 );
 
-                return workspace === documents.workspace
+                return registry === documents.registry
                     ? documents
-                    : copiesOf(documents.workspace.stores, workspace.stores).reduce(withEvent, {
+                    : copiesOf(documents.registry.stores, registry.stores).reduce(withEvent, {
                           ...documents,
-                          workspace,
+                          registry,
                       });
             }
             case 'prune': {
                 const linked = linkedOf(documents);
                 const workspace = reduceWorkspace(
-                    documents.workspace,
+                    workspaceOf(documents),
                     { kind: 'prune-stores', followed: linked },
                     inputsFor,
                     seq,
@@ -562,16 +612,13 @@ export const reduceDocuments =
                 const { processes } = documents.workspace;
 
                 // Settings of a document program are kept by window, so the windows' ids are kept too.
-                return withEvent(
-                    { ...documents, workspace },
-                    {
-                        kind: 'keep',
-                        stores: new Set([
-                            ...reachedFrom(linked, usedStores(processes)),
-                            ...processes.map(({ id }) => id),
-                        ]),
-                    },
-                );
+                return withEvent(withWorkspace(documents, workspace), {
+                    kind: 'keep',
+                    stores: new Set([
+                        ...reachedFrom(linked, usedStores(processes)),
+                        ...processes.map(({ id }) => id),
+                    ]),
+                });
             }
             case 'settings':
                 return documents.settings.get(action.key) === action.settings
@@ -721,7 +768,7 @@ export const reduceDocuments =
                     ),
                 };
             case 'gates': {
-                const owner = ownerOf(documents.workspace, action.store);
+                const owner = ownerOf(documents.registry, action.store);
 
                 return owner === null || !isGateKind(owner)
                     ? documents
@@ -738,7 +785,7 @@ export const reduceDocuments =
                       };
             }
             case 'converters': {
-                const owner = ownerOf(documents.workspace, action.store);
+                const owner = ownerOf(documents.registry, action.store);
 
                 return owner === null || !isConverterKind(owner)
                     ? documents
@@ -755,7 +802,7 @@ export const reduceDocuments =
                       };
             }
             case 'boxes':
-                return ownerOf(documents.workspace, action.store) !== 'box' ||
+                return ownerOf(documents.registry, action.store) !== 'box' ||
                     !documents.boxes.has(action.store)
                     ? documents
                     : {
@@ -771,15 +818,18 @@ export const reduceDocuments =
                       };
             case 'box':
             case 'unbox': {
+                const whole = { ...documents, workspace: workspaceOf(documents) };
                 const parts =
                     action.kind === 'box'
-                        ? boxed(documents, action.ids, seq, inputsFor)
-                        : unboxed(documents, action.id, seq, inputsFor);
+                        ? boxed(whole, action.ids, seq, inputsFor)
+                        : unboxed(whole, action.id, seq, inputsFor);
 
-                return parts === null ? documents : { ...documents, ...parts };
+                return parts === null
+                    ? documents
+                    : { ...withWorkspace(documents, parts.workspace), boxes: parts.boxes };
             }
             case 'pedals': {
-                const owner = ownerOf(documents.workspace, action.store);
+                const owner = ownerOf(documents.registry, action.store);
 
                 return owner === null || !isPedalKind(owner)
                     ? documents
@@ -797,10 +847,10 @@ export const reduceDocuments =
             }
             case 'link': {
                 const { store, param, source } = action;
-                const owner = ownerOf(documents.workspace, store);
+                const owner = ownerOf(documents.registry, store);
                 const definition =
                     owner === null ? undefined : storeInputOf(inputsFor(owner), param);
-                const from = source === null ? null : ownerOf(documents.workspace, source);
+                const from = source === null ? null : ownerOf(documents.registry, source);
 
                 return owner === null ||
                     definition === undefined ||
@@ -918,6 +968,10 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
 
             return step ?? { key: null, breaks: action.action.kind === 'raise' };
         }
+        case 'stores':
+            return action.command.kind === 'rename'
+                ? { key: `store:${action.command.store}`, joins: true }
+                : { key: action.kind, joins: false };
         case 'prune':
         case 'library':
         case 'look':
@@ -990,21 +1044,21 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     boxes: 'component',
 };
 
-const storeName = ({ stores }: Workspace, id: StoreId) =>
+const storeName = ({ stores }: Pick<Registry, 'stores'>, id: StoreId) =>
     stores.find(store => store.id === id)?.name ?? (isProgramId(id) ? 'Main' : id);
 
 export const labelOfDocument = (action: DocumentAction, before: Documents): string => {
     switch (action.kind) {
         case 'workspace':
-            return workspaceLabel(action.action, before.workspace);
+            return workspaceLabel(action.action, workspaceOf(before));
         case 'prune':
             return 'Pruned unused states';
         case 'link':
-            return `Set ${storeName(before.workspace, action.store)} ${action.param} to follow ${
-                action.source === null ? 'nothing' : storeName(before.workspace, action.source)
+            return `Set ${storeName(before.registry, action.store)} ${action.param} to follow ${
+                action.source === null ? 'nothing' : storeName(before.registry, action.source)
             }`;
         case 'convert':
-            return `Read ${storeName(before.workspace, action.source)} into ${action.input} through a converter`;
+            return `Read ${storeName(before.registry, action.source)} into ${action.input} through a converter`;
         case 'settings':
             return action.settings.kind === 'state-map'
                 ? 'Arranged the state map'
@@ -1025,10 +1079,19 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
                   ? `Renamed blueprint ${was?.name ?? ''} to ${command.name}`
                   : `Deleted blueprint ${was?.name ?? ''}`;
         }
+        case 'stores': {
+            const { command } = action;
+
+            return command.kind === 'make'
+                ? `Made state ${command.name ?? ''}`.trim()
+                : command.kind === 'rename'
+                  ? `Renamed ${storeName(before.registry, command.store)} to ${command.name}`
+                  : `Deleted ${storeName(before.registry, command.store)}`;
+        }
         case 'box':
             return `Made a component of ${action.ids.length} programs`;
         case 'unbox':
-            return `Opened ${storeName(before.workspace, before.workspace.processes.find(({ id }) => id === action.id)?.store ?? '')}`;
+            return `Opened ${storeName(before.registry, before.workspace.processes.find(({ id }) => id === action.id)?.store ?? '')}`;
         case 'paste':
             return `Pasted ${action.blueprint.windows.length} programs`;
         case 'place':
@@ -1046,7 +1109,7 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
         case 'wires':
             return `Drew wires as ${action.wires}`;
         default:
-            return `Edited ${TITLES[action.kind]} ${storeName(before.workspace, action.store)}`;
+            return `Edited ${TITLES[action.kind]} ${storeName(before.registry, action.store)}`;
     }
 };
 
@@ -1085,7 +1148,7 @@ export const documentsKit = (inputsFor: InputsFor): Kit<Documents, DocumentActio
 export const seqFloor = (documents: Documents) =>
     Math.max(
         documents.workspace.launched,
-        documents.workspace.made,
+        documents.registry.made,
         documents.library.made,
         ...[
             documents.tickets,

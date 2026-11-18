@@ -1,6 +1,6 @@
 import { parseTickets } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
-import type { Documents } from './documents.ts';
+import { fromWorkspace, type Documents } from './documents.ts';
 import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
@@ -15,7 +15,7 @@ import { waveOf } from './shared/signal.ts';
 const tickets = parseTickets({ items: [{ id: 'todo-1', text: 'Mine', done: false }], made: 1 });
 
 const scene = (): Documents => ({
-    workspace: defaultWorkspace({ width: 1400, height: 900 }, inputsFor),
+    ...fromWorkspace(defaultWorkspace({ width: 1400, height: 900 }, inputsFor)),
     settings: new Map(),
     tickets: new Map([['tickets', tickets]]),
     notes: new Map(),
@@ -97,8 +97,8 @@ describe('starter blueprints', () => {
             source: { kind: 'tickets', store: 'tickets' },
         });
         expect(after.tickets.get('tickets')).toBe(tickets);
-        expect(after.workspace.stores.map(({ id }) => id)).toEqual([
-            ...before.workspace.stores.map(({ id }) => id),
+        expect(after.registry.stores.map(({ id }) => id)).toEqual([
+            ...before.registry.stores.map(({ id }) => id),
             'agenda',
             'progress',
             'tickets',
@@ -131,7 +131,7 @@ describe('starter blueprints', () => {
             'In progress',
             'Done',
         ]);
-        expect(after.workspace.stores.find(({ id }) => id === 'store-40-1')?.name).toBe(
+        expect(after.registry.stores.find(({ id }) => id === 'store-40-1')?.name).toBe(
             'Focus session',
         );
     });
@@ -175,7 +175,7 @@ describe('starter blueprints', () => {
         const before = scene();
         const after = placed(before, starter('starter-pedalboard'), view, 300, inputsFor);
         const id = (name: string) =>
-            after.workspace.stores.find(
+            after.registry.stores.find(
                 store => store.name === name && store.id.startsWith('store-300'),
             )?.id ?? '';
         const output = after.workspace.processes.find(({ program }) => program === 'output');
@@ -194,7 +194,7 @@ describe('starter blueprints', () => {
         const before = scene();
         const after = placed(before, starter('starter-light-show'), view, 300, inputsFor);
         const id = (name: string) =>
-            after.workspace.stores.find(
+            after.registry.stores.find(
                 store => store.name === name && store.id.startsWith('store-300'),
             )?.id ?? '';
         const output = after.workspace.processes.find(({ program }) => program === 'output');
@@ -226,7 +226,7 @@ describe('starter blueprints', () => {
         const before = scene();
         const after = placed(before, starter('starter-light-band'), view, 300, inputsFor);
         const id = (name: string) =>
-            after.workspace.stores.find(
+            after.registry.stores.find(
                 store => store.name === name && store.id.startsWith('store-300'),
             )?.id ?? '';
 
@@ -305,7 +305,7 @@ describe('starter blueprints', () => {
         const before = scene();
         const after = placed(before, starter('starter-logic'), view, 300, inputsFor);
         const id = (name: string) =>
-            after.workspace.stores.find(
+            after.registry.stores.find(
                 store => store.name === name && store.id.startsWith('store-300'),
             )?.id ?? '';
         const gates = new Map([...after.gates].filter(([store]) => store.startsWith('store-300')));
