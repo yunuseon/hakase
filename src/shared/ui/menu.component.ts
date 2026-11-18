@@ -234,6 +234,7 @@ export class HksMenu extends HTMLElement {
             combineLatest([groups$.pipe(map(ordered)), menu$]).pipe(
                 tap(([groups, menu]) => {
                     this.rendering.update({ groups, menu, label });
+                    this.toggleAttribute('data-open', menu.open);
                 }),
                 map(([, menu]) => menu.open),
                 filter(open => open),

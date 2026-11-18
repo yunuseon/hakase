@@ -1,5 +1,5 @@
 import { declarations } from '../declarations.ts';
-import { combineLatest, merge } from 'rxjs';
+import { combineLatest, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
     ignoreElements,
@@ -9,6 +9,7 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import type { PaintView } from '../model/paint.ts';
+import { paintEventOf, paintMenu } from '../components/paint/paint-menu.ts';
 import { paintInputsOf, workingFrame } from '../painting.ts';
 import type { Program } from '../program.ts';
 import { asPaint } from '../settings.ts';
@@ -19,11 +20,16 @@ export const paintProgram = {
     size: { width: 460, height: 580 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const { HksPaint } = await import('../components/paint/paint.component.ts');
+        const [{ HksPaint }, { HksMenu }] = await Promise.all([
+            import('../components/paint/paint.component.ts'),
+            import('../shared/ui/menu.component.ts'),
+        ]);
         const paint = new HksPaint();
+        const menu = new HksMenu();
 
         return {
             element: paint,
+            actions: menu,
             run$: ({ picture$, playhead$ }, self) => {
                 const settings$ = self.settings$.pipe(
                     map(asPaint),
@@ -49,7 +55,8 @@ export const paintProgram = {
 
                 return merge(
                     paint.connect$(view$, playing$).pipe(ignoreElements()),
-                    paint.changes$.pipe(
+                    menu.connect$(of(paintMenu), 'frame actions').pipe(ignoreElements()),
+                    merge(paint.changes$, menu.picks$.pipe(mergeMap(paintEventOf))).pipe(
                         withLatestFrom(settings$, picture$),
                         mergeMap(([event, settings, picture]) =>
                             paintInputsOf(event, settings, picture),

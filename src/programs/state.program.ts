@@ -7,6 +7,7 @@ import {
     map,
     mergeMap,
     scan,
+    share,
     shareReplay,
     startWith,
     switchMap,
@@ -19,6 +20,7 @@ import {
     focusedStores,
     layoutOf,
     placedAt,
+    stateMapMenu,
     unusedOf,
     type GraphStore,
 } from '../components/state-map/state-map.ts';
@@ -36,11 +38,16 @@ export const stateProgram = {
     size: { width: 520, height: 560 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const { HksStateMap } = await import('../components/state-map/state-map.component.ts');
+        const [{ HksStateMap }, { HksMenu }] = await Promise.all([
+            import('../components/state-map/state-map.component.ts'),
+            import('../shared/ui/menu.component.ts'),
+        ]);
         const stateMap = new HksStateMap();
+        const menu = new HksMenu();
 
         return {
             element: stateMap,
+            actions: menu,
             run$: ({ graph$, inspect$ }, self) => {
                 const settings$ = self.settings$.pipe(
                     map(asStateMap),
@@ -99,7 +106,22 @@ export const stateProgram = {
                     startWith([]),
                 );
 
+                const picks$ = menu.picks$.pipe(
+                    map(({ id }) => id),
+                    share(),
+                );
+
                 return merge(
+                    menu
+                        .connect$(
+                            layout$.pipe(map(unusedOf), distinctUntilChanged(), map(stateMapMenu)),
+                            'map actions',
+                        )
+                        .pipe(ignoreElements()),
+                    picks$.pipe(
+                        filter(id => id === 'prune'),
+                        map((): AppInput => ({ kind: 'prune' })),
+                    ),
                     stateMap
                         .connect$(
                             layout$,
@@ -122,7 +144,6 @@ export const stateProgram = {
                                     })),
                                 ),
                             ),
-                            layout$.pipe(map(unusedOf)),
                             stateMap.copies$.pipe(
                                 withLatestFrom(values$),
                                 map(([target, values]) => ({
@@ -166,9 +187,10 @@ export const stateProgram = {
                                         : zoomedAround(current.camera, gesture.factor, gesture.at),
                             })),
                         ),
-                        stateMap.fits$.pipe(
-                            withLatestFrom(settings$, layout$),
-                            map(([size, current, { bounds }]) => ({
+                        picks$.pipe(
+                            filter(id => id === 'fit'),
+                            withLatestFrom(stateMap.sizes$, settings$, layout$),
+                            map(([, size, current, { bounds }]) => ({
                                 ...current,
                                 camera: centredOn(IDENTITY, bounds, size),
                             })),
@@ -188,7 +210,8 @@ export const stateProgram = {
                                 camera: centredOn(IDENTITY, bounds, size),
                             })),
                         ),
-                        stateMap.tidies$.pipe(
+                        picks$.pipe(
+                            filter(id => id === 'tidy'),
                             withLatestFrom(settings$),
                             map(([, current]) => ({ ...current, positions: {} })),
                         ),

@@ -723,7 +723,7 @@ The filter belongs to the window's live program stream and is transient. Its
 listing is derived from the full document, which details and blocker counts
 still read. Filtered moves resolve against visible neighbours before reaching
 the full reducer, and a new ticket inherits the selected tag. Clear done is
-hidden while filtering so it cannot silently delete unseen completed tickets.
+left out of the ⋯ while filtering so it cannot silently delete unseen completed tickets.
 
 Rows and statuses drag by their grips, with arrow keys as the keyboard equivalent.
 Both views use the same drop rule: the nearest status in both dimensions, then the
@@ -1029,7 +1029,12 @@ no menu can break them:
   handle, so its press stops there and raises the window, like the chip's;
   without that the drag captures the pointer and the click lands on the title.
 
-The formula editor and the note use it. The window's own state and program
+The formula editor, the note, the state map (Fit, Tidy, Prune), paint (a
+frame's clear, invert, soften and noise) and tickets (clear done, offered only
+while nothing filters the list, or it would delete tickets the list is not
+showing) use it. An action on one item (a bookmark group's ×, a ticket's
+delete) stays on that item: the ⋯ is for what acts on the whole program. The
+window's own state and program
 menus hang in the frame by the same placement rules; menus that belong to no
 window (a select's list, the launcher's categories, the palette) are the glass.
 Storybook's **Menus** story shows each against the grammar.
@@ -2775,7 +2780,8 @@ the prune keeps by.
 
 **The map is a small canvas of its own.** Drag a node's body to move it, empty
 space to pan, the wheel to pan and a pinch (ctrl/cmd+wheel) to zoom around the
-pointer; **Fit** frames every node and **Tidy** forgets the moves. A wire still
+pointer; **Fit** frames every node and **Tidy** forgets the moves, both in
+the window's ⋯. A wire still
 starts only at a jack. The camera maths is the canvas's own (`panned`,
 `zoomedAround`, `centredOn`), and `wheelGesture` moved to `shared/wheel.ts` once
 the map became its second reader. The map claims its wheels with
@@ -2860,9 +2866,9 @@ and path together so two states never share one; it is not saved, like the
 focus. The component's `focus$` is replayed, because the map fades by it and the
 program inspects by it, and both must see the same one.
 
-**Prune** (in the bar above) deletes every store no wire touches, data and all,
-and says how many first; one click arms it, a second within three seconds
-prunes. It is one `prune` input routed twice: the workspace drops the unbound
+**Prune** (last in the window's ⋯) deletes every store no wire touches, data
+and all, and says how many first; it asks once, as every destructive menu item
+does. It is one `prune` input routed twice: the workspace drops the unbound
 registry entries (`prune-stores`, undoable), and every fold receives a `keep`
 store event with the bound stores and window ids, read from the same workspace,
 so it cannot matter which listener runs first. It is one documents step, so undo

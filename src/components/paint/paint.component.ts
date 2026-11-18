@@ -14,8 +14,6 @@ import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$ } from '../../shared/drag.ts';
 import { isSide, SIZES, type Frame } from '../../shared/picture.ts';
 import {
-    ACTIONS,
-    isAction,
     isBrushField,
     isTool,
     MAX_BRUSH,
@@ -169,14 +167,6 @@ const TEMPLATE = () =>
                                 title=${ifDefined(`${size} × ${size} pixels`)}
                             >
                                 ${size}
-                            </button>`,
-                    )}
-                </div>
-                <div class="actions">
-                    ${ACTIONS.map(
-                        action =>
-                            html`<button type="button" data-action=${ifDefined(action)}>
-                                ${action}
                             </button>`,
                     )}
                 </div>
@@ -339,7 +329,6 @@ export class HksPaint extends HTMLElement {
                 const tool = dataOf(target, 'tool');
                 const symmetry = dataOf(target, 'symmetry');
                 const side = Number(dataOf(target, 'side'));
-                const action = dataOf(target, 'action');
                 const frame = dataOf(target, 'frame');
 
                 return tool !== null && isTool(tool)
@@ -348,19 +337,17 @@ export class HksPaint extends HTMLElement {
                       ? [{ kind: 'symmetry', symmetry }]
                       : isSide(side)
                         ? [{ kind: 'side', side }]
-                        : action !== null && isAction(action)
-                          ? [{ kind: 'action', action }]
-                          : frame !== null
-                            ? [{ kind: 'select', frame: Number(frame) }]
-                            : dataOf(target, 'add') !== null
-                              ? [{ kind: 'add-frame' }]
-                              : dataOf(target, 'remove') !== null
-                                ? [{ kind: 'remove-frame' }]
-                                : dataOf(target, 'fade') !== null
-                                  ? [{ kind: 'fade' }]
-                                  : dataOf(target, 'onion') !== null
-                                    ? [{ kind: 'onion' }]
-                                    : [];
+                        : frame !== null
+                          ? [{ kind: 'select', frame: Number(frame) }]
+                          : dataOf(target, 'add') !== null
+                            ? [{ kind: 'add-frame' }]
+                            : dataOf(target, 'remove') !== null
+                              ? [{ kind: 'remove-frame' }]
+                              : dataOf(target, 'fade') !== null
+                                ? [{ kind: 'fade' }]
+                                : dataOf(target, 'onion') !== null
+                                  ? [{ kind: 'onion' }]
+                                  : [];
             }),
         );
 

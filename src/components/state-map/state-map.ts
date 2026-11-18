@@ -1,3 +1,5 @@
+import type { MenuGroup } from '../../shared/menu.ts';
+import { ICONS } from '../../shared/ui/icons.ts';
 import { wirePath, type StateCommand } from '../../shared/connections.ts';
 import type { Row } from './rows.ts';
 
@@ -343,4 +345,36 @@ export const closesLoop = ({ wires }: GraphLayout, command: StateCommand) => {
     };
 
     return grow(new Set([command.source])).has(command.store);
+};
+
+export const stateMapMenu = (unused: number): readonly MenuGroup[] => {
+    const states = unused === 1 ? '1 unused state' : `${unused} unused states`;
+
+    return [
+        {
+            id: 'view',
+            items: [
+                { id: 'fit', label: 'Frame the whole map', glyph: ICONS.fit },
+                {
+                    id: 'tidy',
+                    label: 'Tidy',
+                    glyph: ICONS.reset,
+                    hint: 'put every node back where the map would place it',
+                },
+            ],
+        },
+        {
+            id: 'prune',
+            items: [
+                {
+                    id: 'prune',
+                    label: unused === 0 ? 'Nothing to prune' : `Prune ${states}`,
+                    glyph: ICONS.remove,
+                    destructive: true,
+                    disabled: unused === 0,
+                    hint: 'deletes every state no window keeps or follows, with its data',
+                },
+            ],
+        },
+    ];
 };

@@ -327,11 +327,6 @@ hks-select:focus-visible {
     color: var(--muted);
 }
 
-.clear-done {
-    padding: var(--space-0-5) var(--space-2);
-    font-size: var(--text-sm);
-}
-
 .detail {
     position: absolute;
     inset-block: 0;

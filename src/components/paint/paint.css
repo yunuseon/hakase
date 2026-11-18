@@ -187,8 +187,7 @@
 }
 
 .key,
-.toggle,
-.actions button {
+.toggle {
     block-size: var(--control-md);
     padding: 0 calc(var(--spacing) * 2.25);
     font: 500 var(--text-xs) var(--font-ui);
@@ -206,8 +205,7 @@
 }
 
 .key:hover,
-.toggle:hover,
-.actions button:hover {
+.toggle:hover {
     color: var(--ink);
 }
 
@@ -228,16 +226,6 @@
     gap: var(--space-1-5);
     align-items: center;
     justify-content: space-between;
-}
-
-.actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-}
-
-.actions button {
-    text-transform: capitalize;
 }
 
 .bar > *,

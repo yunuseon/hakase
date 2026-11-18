@@ -137,7 +137,8 @@ slot[name='actions']::slotted(*) {
 }
 
 :host(:hover) slot[name='actions']::slotted(*),
-slot[name='actions']::slotted(:focus-within) {
+slot[name='actions']::slotted(:focus-within),
+slot[name='actions']::slotted([data-open]) {
     opacity: 1;
 }
 

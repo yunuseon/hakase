@@ -51,21 +51,10 @@ import css from './state-map.css?inline';
 const sheet = styleSheet(css);
 
 const COPIED_MS = 1500;
-const ARM_MS = 3000;
 
 const TEMPLATE = () =>
     html`<div class="bar" data-detail>
-            <span class="hint">Click a state or a window to inspect it.</span
-            ><button
-                class="tool"
-                data-tool="tidy"
-                type="button"
-                title="put every node back where the map would place it"
-            >
-                Tidy</button
-            ><button class="tool" data-tool="fit" type="button" title="frame the whole map">
-                Fit</button
-            ><button class="prune" type="button"></button>
+            <span class="hint">Click a state or a window to inspect it.</span>
         </div>
         <div class="graph" data-scrolls>
             <div class="board">
@@ -74,8 +63,6 @@ const TEMPLATE = () =>
             </div>
         </div>
         <div class="inspect" data-detail></div>`;
-
-type Arming = { readonly armed: number | null; readonly fire: boolean };
 
 type Drag = {
     readonly phase: Phase;
@@ -260,13 +247,10 @@ export class HksStateMap extends HTMLElement {
         readonly dy: number;
     }>;
     readonly views$: Observable<ViewGesture>;
-    readonly fits$: Observable<{ readonly width: number; readonly height: number }>;
-    readonly tidies$: Observable<void>;
     readonly sizes$: Observable<{ readonly width: number; readonly height: number }>;
 
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
-    private readonly arming$: Observable<Arming>;
 
     private readonly rendering: Rendering;
 
@@ -486,18 +470,6 @@ export class HksStateMap extends HTMLElement {
             }),
         );
 
-        // Shared: the button's label and the prune itself must read one sequence of clicks.
-        this.arming$ = fromElementEvent$(requireChild(shadow, '.prune'), 'click').pipe(
-            scan(
-                ({ armed }: Arming, { timeStamp }): Arming =>
-                    armed !== null && timeStamp - armed < ARM_MS
-                        ? { armed: null, fire: true }
-                        : { armed: timeStamp, fire: false },
-                { armed: null, fire: false },
-            ),
-            share(),
-        );
-
         // In the camera's units: the canvas zoom shrinks the rect but not the layout, and the board is drawn rem-scaled.
         const viewport = (clientX: number, clientY: number): Point => {
             const rect = graph.getBoundingClientRect();
@@ -592,17 +564,7 @@ export class HksStateMap extends HTMLElement {
             ),
         );
 
-        const tool = (name: string) =>
-            fromElementEvent$(requireChild(shadow, `[data-tool="${name}"]`), 'click');
-
-        this.fits$ = tool('fit').pipe(
-            map(() => ({
-                width: graph.clientWidth / remScale(),
-                height: graph.clientHeight / remScale(),
-            })),
-        );
-        this.tidies$ = tool('tidy').pipe(map(() => undefined));
-        this.sizes$ = observeResize$(graph).pipe(
+        this.sizes$ = merge(of(undefined), observeResize$(graph)).pipe(
             map(() => ({
                 width: graph.clientWidth / remScale(),
                 height: graph.clientHeight / remScale(),
@@ -610,10 +572,6 @@ export class HksStateMap extends HTMLElement {
         );
 
         this.commands$ = merge(
-            this.arming$.pipe(
-                filter(({ fire }) => fire),
-                map((): StateCommand => ({ kind: 'prune' })),
-            ),
             this.drags$.pipe(
                 filter(({ phase }) => phase === 'release'),
                 mergeMap(({ start, over }) => {
@@ -648,45 +606,15 @@ export class HksStateMap extends HTMLElement {
         layout$: Observable<GraphLayout>,
         camera$: Observable<{ readonly x: number; readonly y: number; readonly zoom: number }>,
         inspected$: Observable<readonly Inspected[]>,
-        unused$: Observable<number>,
         copied$: Observable<{ readonly target: string; readonly text: string }>,
     ): Observable<void> {
         const inspect = requireChild(this.shadow, '.inspect');
         const board = requireChild(this.shadow, '.board');
-        const prune = requireElement(this.shadow, '.prune', HTMLButtonElement);
 
         const shownInspection$ = inspected$.pipe(
             tap(list => {
                 this.inspectionView.update(list);
                 this.toggleAttribute('data-inspecting', list.length > 0);
-            }),
-        );
-
-        const pruning$ = combineLatest([
-            unused$.pipe(distinctUntilChanged()),
-            this.arming$.pipe(
-                switchMap(({ armed }) =>
-                    armed === null
-                        ? of(false)
-                        : concat(of(true), timer(ARM_MS).pipe(map(() => false))),
-                ),
-                startWith(false),
-            ),
-        ]).pipe(
-            tap(([count, armed]) => {
-                const states = count === 1 ? '1 unused state' : `${count} unused states`;
-                prune.disabled = count === 0;
-                prune.toggleAttribute('data-armed', armed && count > 0);
-                prune.textContent =
-                    count === 0
-                        ? 'Nothing to prune'
-                        : armed
-                          ? `Delete ${states}?`
-                          : `Prune ${states}`;
-                prune.title =
-                    count === 0
-                        ? ''
-                        : 'deletes every state no window keeps or follows, with its data';
             }),
         );
 
@@ -720,7 +648,7 @@ export class HksStateMap extends HTMLElement {
             this.inspectionView.lifetime$,
             this.nodeView.lifetime$,
             this.wireView.lifetime$,
-            merge(this.mapped$(layout$), viewed$, shownInspection$, pruning$, copying$).pipe(
+            merge(this.mapped$(layout$), viewed$, shownInspection$, copying$).pipe(
                 map(() => undefined),
             ),
         );

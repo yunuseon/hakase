@@ -297,16 +297,7 @@ const TEMPLATE = (view: TicketRender) =>
             </div>
         </div>
         <footer class="foot" data-detail>
-            <span class="left">${view.left}</span
-            ><button
-                ?hidden=${view.screen?.filter != null || (view.screen?.query.trim() ?? '') !== ''}
-                class="ui-icon clear-done icon-action"
-                type="button"
-                aria-label="clear completed tickets"
-                title="Clear completed tickets"
-            >
-                ${Icon('m4 7 3 3 6-6M15 7h5M4 14h16M4 19h11')}
-            </button>
+            <span class="left">${view.left}</span>
         </footer>
         <aside
             class="detail"
@@ -916,9 +907,7 @@ export class HksTickets extends HTMLElement {
                         return [{ kind: 'add-status' }];
                     }
 
-                    return element?.closest('.clear-done') !== null && element !== null
-                        ? [{ kind: 'clear-done' }]
-                        : [];
+                    return [];
                 }),
             ),
         );

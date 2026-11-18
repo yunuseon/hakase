@@ -12,6 +12,7 @@ import {
     startWith,
     withLatestFrom,
 } from 'rxjs/operators';
+import { ticketsMenu } from '../components/tickets/tickets-menu.ts';
 import { commandInView, sameTickets, ticketView } from '../shared/tickets.ts';
 import {
     closedCreation,
@@ -30,12 +31,15 @@ export const ticketsProgram = {
     size: { width: 360, height: 420 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const [{ HksTickets }, { HksSearchPicker }, { HksTicketCreator }] = await Promise.all([
-            import('../components/tickets/tickets.component.ts'),
-            import('../components/search-picker/search-picker.component.ts'),
-            import('../components/ticket-creator/ticket-creator.component.ts'),
-        ]);
+        const [{ HksTickets }, { HksSearchPicker }, { HksTicketCreator }, { HksMenu }] =
+            await Promise.all([
+                import('../components/tickets/tickets.component.ts'),
+                import('../components/search-picker/search-picker.component.ts'),
+                import('../components/ticket-creator/ticket-creator.component.ts'),
+                import('../shared/ui/menu.component.ts'),
+            ]);
         const tickets = new HksTickets();
+        const menu = new HksMenu();
         const creator = new HksTicketCreator();
         creator.slot = 'creator';
         const tags = new HksSearchPicker();
@@ -53,6 +57,7 @@ export const ticketsProgram = {
 
         return {
             element: tickets,
+            actions: menu,
             run$: ({ tickets$ }, self) => {
                 const document$ = tickets$.pipe(distinctUntilChanged(sameTickets));
                 const filter$ = tickets.filters$.pipe(startWith(null), distinctUntilChanged());
@@ -185,6 +190,13 @@ export const ticketsProgram = {
                             return applied === null ? [] : [applied];
                         }),
                         map((command): AppInput => ({ kind: 'ticket', command })),
+                    ),
+                    menu
+                        .connect$(screen$.pipe(map(ticketsMenu)), 'ticket actions')
+                        .pipe(ignoreElements()),
+                    menu.picks$.pipe(
+                        filter(({ id }) => id === 'clear-done'),
+                        map((): AppInput => ({ kind: 'ticket', command: { kind: 'clear-done' } })),
                     ),
                     tickets.views$.pipe(
                         map((view): AppInput => ({

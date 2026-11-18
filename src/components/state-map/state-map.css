@@ -32,55 +32,6 @@
     visibility: hidden;
 }
 
-.tool {
-    flex: none;
-    padding: calc(var(--spacing) * 1.25) var(--space-2-5);
-    font: 500 var(--text-xs) var(--font-ui);
-    color: var(--ink);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-}
-
-.tool:hover {
-    background: var(--well);
-}
-
-.tool:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: var(--focus-offset);
-}
-
-.prune {
-    flex: none;
-    padding: calc(var(--spacing) * 1.25) var(--space-2-5);
-    font: 500 var(--text-xs) var(--font-ui);
-    color: var(--ink);
-    background: var(--well);
-    border: none;
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-}
-
-.prune:hover:not(:disabled),
-.prune[data-armed] {
-    background: color-mix(in srgb, var(--accent) 25%, var(--well));
-}
-
-.prune:disabled {
-    color: var(--muted);
-    background: transparent;
-    cursor: default;
-}
-
-.prune:focus-visible,
-.copy:focus-visible,
-.toggle:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: var(--focus-offset);
-}
-
 .graph {
     position: relative;
     flex: 1 1 60%;

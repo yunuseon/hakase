@@ -37,12 +37,6 @@ same controls from the same description.
 
 ### In order
 
-- **Menus everywhere.** The grammar is in (`hks-menu`, see "Menus" in
-  `AGENTS.md`) and the formula editor and the note use it. Move the other
-  programs' own actions into their ⋯: the state map's Fit, Tidy and Prune,
-  paint's frame actions, the tickets' clear done, a bookmark group's delete.
-  Done when no program draws an action button that is not part of what it is
-  for.
 - **Properties everywhere.** The audit is clean, but only converters, voices
   and pedals describe their controls as `Section`s; the sketch's Scene tab,
   the drum machine's settings, the focus timer's lengths, the export panel and
