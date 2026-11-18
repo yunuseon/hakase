@@ -25,6 +25,7 @@ const TEMPLATE = () =>
             </svg></button
         ><button
             class="ui-icon loop"
+            data-detail
             type="button"
             aria-label="loop"
             title="loop"
@@ -36,6 +37,7 @@ const TEMPLATE = () =>
             </svg></button
         ><button
             class="ui-icon day"
+            data-detail
             type="button"
             aria-label="run on the time of day"
             title="run on the time of day: the loop is today, and it cannot be played or scrubbed"
@@ -61,6 +63,7 @@ const TEMPLATE = () =>
                 /><span>s</span></label
             ><label
                 class="field"
+                data-detail
                 title="logic ticks per loop: how many times a circuit steps in one loop"
                 ><input
                     class="ticks"

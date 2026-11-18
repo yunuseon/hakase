@@ -28,7 +28,7 @@ import { shareUrl } from '../share.ts';
 export const formulaProgram = {
     ...declarations.formula,
     size: { width: 340, height: 480 },
-    minimum: { width: 260, height: 260 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksFormulaEditor } =
             await import('../components/formula-editor/formula-editor.component.ts');

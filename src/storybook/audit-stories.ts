@@ -141,9 +141,14 @@ const measuredIn = (content: Element): Measured | null => {
     }
 
     const elements = within(content).filter(shown);
+    const program = content.firstElementChild;
+    const own =
+        program !== null && SCROLLS.test(getComputedStyle(program).overflowY)
+            ? program.scrollHeight - program.clientHeight
+            : 0;
 
     return {
-        overflow: body.scrollHeight - body.clientHeight,
+        overflow: Math.max(body.scrollHeight - body.clientHeight, own),
         probes: elements.filter(said).map(element => probeOf(element, body)),
         fields: elements
             .filter(element => element instanceof HTMLInputElement)

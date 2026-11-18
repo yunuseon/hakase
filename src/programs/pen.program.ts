@@ -13,7 +13,7 @@ const FAINT = 0.22;
 export const penProgram = {
     ...declarations.pen,
     size: { width: 380, height: 480 },
-    minimum: { width: 280, height: 360 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksPen } = await import('../components/pen/pen.component.ts');
         const pen = new HksPen();

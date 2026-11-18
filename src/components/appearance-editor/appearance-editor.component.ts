@@ -21,7 +21,7 @@ const TEMPLATE = () =>
             ><span class="key">look</span
             ><hks-select class="ui-field pick" aria-label="look"></hks-select
         ></label>
-        <div class="head">
+        <div class="head" data-detail>
             <span class="key" id="wires-key">wires</span>
             <div class="ui-choices wires" role="radiogroup" aria-labelledby="wires-key">
                 <button class="ui-choice" type="button" role="radio" data-wires="curves">
@@ -33,7 +33,7 @@ const TEMPLATE = () =>
             </div>
         </div>
         <div class="swatches"></div>
-        <div class="rows"></div>`;
+        <div class="rows" data-detail></div>`;
 
 export type PresetOption = {
     readonly value: string;

@@ -147,7 +147,7 @@ const TicketRow = (props: { readonly ticket: Ticket; readonly facts: Facts | und
 
 const TEMPLATE = (view: TicketRender) =>
     html`<div class="frame">
-        <header class="bar">
+        <header class="bar" data-detail>
             <div class="ui-choices views" role="radiogroup" aria-label="view">
                 <label class="ui-segment view"
                     ><input
@@ -236,6 +236,7 @@ const TEMPLATE = (view: TicketRender) =>
                                             })}
                                         /><hks-select
                                             class="ui-field stage"
+                                            data-detail
                                             data-stage=${ifDefined(id)}
                                             aria-label="what this status means"
                                             .value=${status.stage}
@@ -295,7 +296,7 @@ const TEMPLATE = (view: TicketRender) =>
                 )}
             </div>
         </div>
-        <footer class="foot">
+        <footer class="foot" data-detail>
             <span class="left">${view.left}</span
             ><button
                 ?hidden=${view.screen?.filter != null || (view.screen?.query.trim() ?? '') !== ''}

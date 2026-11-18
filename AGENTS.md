@@ -658,11 +658,10 @@ parked at the top. Two patterns carry the rest:
   container and sizes itself `min(100cqi, 100cqb)`, so it fits whichever side of
   the window is shorter rather than following the height out past the sides.
 
-Narrowed to the minimum width (180), every program still fits across; only the
-formula editor's long lines run on, inside its own scrolling code box. Below
-about 150 units of height there is not room for most programs at all, and their
-content runs past the frame — so **each program declares a `minimum`**, and
-`liveProcess$` stamps it onto every `resize` gesture it forwards. The reducer
+**Each program declares a `minimum`, and it is a glance** (see "Size classes"):
+the smallest frame in which it still shows what it is for, and no smaller. It is
+stamped by
+`liveProcess$` onto every `resize` gesture it forwards. The reducer
 clamps to the action's minimum, not a global one, because only the program
 knows how small its content can go; the window component still knows nothing
 about which program it holds.
@@ -894,6 +893,39 @@ when the software keyboard changes them, without changing saved frames or the
 workspace camera. Actual iPhone keyboard, scrolling and gesture behaviour still
 requires device verification.
 
+### Size classes
+
+**A window's body is a size container named `window`, and a program adapts to
+it in four classes**, queried as the stylesheets write them (container queries
+cannot read custom properties) and measured on the body, the frame less its
+title strip and padding:
+
+- **glance**: `(width < 13rem) or (height < 9rem)`, only what the program is for;
+- **compact**: `(width < 22rem)`;
+- **regular**: the rest;
+- **wide**: `(width >= 40rem)`.
+
+`layout/size-class.ts` (`BREAKPOINTS`, `sizeClassOf`) is the same rule as data,
+so the layout audit labels each size it renders; check:ui fails any
+`@container window` query that uses another number. The query reaches a
+program's stylesheets through every shadow root between them and the window
+(verified in Chromium; Safari and Firefox follow the same flat-tree rule but
+have not been checked). A fitted window takes its size from its content, so
+only an unfitted body is a container.
+
+**Glance is a contract, not a stylesheet per program.** A part that is not what
+the program is for marks itself `data-detail`, and one rule in `controlsSheet`
+hides every such part at a glance, so a component using it must adopt the
+sheet (check:ui says so). A `<slot data-detail>` hides everything slotted into
+it, which is how a sketch, an Output and every pedal drop their controls. A
+glance that needs more than hiding (the drum grid's minimum height, the
+timeline track's) overrides it under the same query. Every program's `minimum`
+is a glance, held by `programs.test.ts`.
+
+**The store chip gives way first.** The title strip is a container of its own
+(`strip`); the chip shrinks a thousand times faster than the title, and below a
+glance's width it is its dot alone, so a narrow window keeps its name.
+
 ### The layout audit
 
 **Whether a program fits its window is measured, not eyeballed.** Storybook's
@@ -909,8 +941,8 @@ those), measures, and disposes of it before the next. Its findings:
 - **field too narrow**: a text or number field narrower than its value;
 - **scrolls sideways**: any element, the body included, scrolling horizontally
   when it was not meant to;
-- **window scrolls**: the body has to scroll to reach the content, which is
-  the fallback, not a layout;
+- **window scrolls**: the body, or the program's own root, has to scroll to
+  reach the content, which is the fallback, not a layout;
 - **text cut** (a warning): an ellipsis that is actually truncating.
 
 **A scroller that is meant to scroll says so with `data-scrolls`**: the drum
@@ -1345,7 +1377,8 @@ That is the sketch's `size$`, so switching tabs, which changes how tall the
 controls are, reshapes the canvas, and the export summary and thumbnails follow
 the new aspect. The canvas is `position: absolute` inside the viewport: in the
 flow it would hold its own viewport open, and the window could grow the drawing
-but never shrink it. The minimum (320 x 420) leaves room for the controls.
+but never shrink it. Its minimum is a glance: the picture alone, its controls
+slot hidden.
 
 **The whole app is one snapshot.** `state-store.ts` writes a single versioned
 `hakase.state`: the workspace (processes, links, camera, toolbar), the store
@@ -2465,9 +2498,8 @@ followed input may name a `group` in its definition (the sketch's Knobs, Camera
 and Look); a group of one is not a group. A closed group is one line with a
 bundled jack (a second ring behind it), its name, how many of its inputs are
 bound, and a chevron; it opens to its members, indented on a rail from that
-jack. **One group is open per window**, which is what keeps the smallest sketch
-(320 x 420) inside its frame whichever group is open, and is tested at that
-size. Three rules make it feel right:
+jack. **One group is open per window**, which is what keeps a 320 x 420 sketch
+inside its frame whichever group is open, and is tested at that size. Three rules make it feel right:
 
 - **A closed group's wires still land.** Its members stay in the view as
   `hidden` sockets placed on the group's jack, so every wire has an end and

@@ -20,7 +20,7 @@ const TEMPLATE = () =>
             <p class="message" hidden></p>
             <slot name="status"></slot>
         </div>
-        <slot name="controls"></slot>`;
+        <slot name="controls" data-detail></slot>`;
 
 export class HksSketch extends HTMLElement {
     readonly pointers$: Observable<Omit<Pointer, 'down'>>;

@@ -22,7 +22,7 @@ const TEMPLATE = () =>
             ><hks-select class="ui-field pick" aria-label="theme"></hks-select>
         </div>
         <div class="bar"></div>
-        <div class="body">
+        <div class="body" data-detail>
             <label class="row"
                 ><span class="key">blend</span
                 ><hks-select class="ui-field blend" aria-label="blend"

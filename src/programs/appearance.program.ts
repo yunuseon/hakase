@@ -20,7 +20,7 @@ const options = Object.keys(appearances).map(value => ({ value, label: value }))
 export const appearanceProgram = {
     ...declarations.appearance,
     size: { width: 340, height: 300 },
-    minimum: { width: 240, height: 220 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksAppearanceEditor } =
             await import('../components/appearance-editor/appearance-editor.component.ts');

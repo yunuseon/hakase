@@ -88,6 +88,11 @@ svg {
     gap: var(--space-2);
 }
 
+.foot .ui-choices {
+    flex-wrap: wrap;
+    min-inline-size: 0;
+}
+
 .value {
     font: var(--text-md) var(--font-mono);
     font-variant-numeric: tabular-nums;
@@ -147,6 +152,14 @@ svg {
     inline-size: 7ch;
     padding-block: var(--space-0-5);
     font: var(--text-xs) var(--font-mono);
+    appearance: textfield;
+}
+
+/* The spinner took the value's room; the arrow keys still step it. */
+.bound::-webkit-inner-spin-button,
+.bound::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
 }
 
 .shape .ui-check {

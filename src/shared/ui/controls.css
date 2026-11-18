@@ -495,3 +495,10 @@
         opacity var(--duration-base) var(--ease-out),
         translate var(--duration-base) var(--ease-out);
 }
+
+/* Glance: a window too small for more shows only what its program is for. A part that is not marks itself data-detail. */
+@container window (width < 13rem) or (height < 9rem) {
+    [data-detail] {
+        display: none !important;
+    }
+}

@@ -105,6 +105,50 @@ const finishing = (
     )
 ).flat();
 findings.push(...finishing);
+// The size classes are four conditions, written as layout/size-class.ts gives them; any other number is a breakpoint of its own.
+const SIZE_CONDITIONS = [
+    '(width < 13rem)',
+    '(height < 9rem)',
+    '(width < 22rem)',
+    '(width >= 40rem)',
+];
+const sizing = (
+    await Promise.all(
+        files
+            .filter(path => path.endsWith('.css'))
+            .map(async path => {
+                const source = await readFile(path, 'utf8');
+                return [...source.matchAll(/@container\s+window\s+([^{]+)\{/g)].flatMap(
+                    ([, query]) => {
+                        const rest = SIZE_CONDITIONS.reduce(
+                            (left, condition) => left.replaceAll(condition, ''),
+                            query,
+                        ).replace(/\b(and|or)\b/g, '');
+                        return rest.trim() === ''
+                            ? []
+                            : [
+                                  `${relative(root, path)}: query the window with the size classes only (${SIZE_CONDITIONS.join(', ')}), not "${query.trim()}".`,
+                              ];
+                    },
+                );
+            }),
+    )
+).flat();
+findings.push(...sizing);
+findings.push(
+    ...(
+        await Promise.all(
+            components.map(async path => {
+                const source = await readFile(path, 'utf8');
+                return source.includes('data-detail') && !source.includes('controlsSheet')
+                    ? [
+                          `${relative(root, path)}: adopt controlsSheet, which holds the glance rule data-detail relies on.`,
+                      ]
+                    : [];
+            }),
+        )
+    ).flat(),
+);
 if (findings.length > 0) {
     process.stderr.write(`${findings.join('\n')}\n`);
     process.exitCode = 1;

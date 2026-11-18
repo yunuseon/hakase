@@ -28,7 +28,7 @@ import { asTickets } from '../settings.ts';
 export const ticketsProgram = {
     ...declarations.tickets,
     size: { width: 360, height: 420 },
-    minimum: { width: 240, height: 220 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const [{ HksTickets }, { HksSearchPicker }, { HksTicketCreator }] = await Promise.all([
             import('../components/tickets/tickets.component.ts'),

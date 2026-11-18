@@ -59,7 +59,7 @@ const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height 
 export const sketchProgram = {
     ...declarations.sketch,
     size: { width: 640, height: 820 },
-    minimum: { width: 320, height: 420 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const [
             { HksFpsCounter },

@@ -28,7 +28,7 @@ import type { AppInput } from '../protocol.ts';
 export const voiceProgram = {
     ...declarations.voice,
     size: { width: 400, height: 360 },
-    minimum: { width: 300, height: 300 },
+    minimum: { width: 220, height: 180 },
     audible: true,
     launch: async () => {
         const { HksVoice } = await import('../components/voice/voice.component.ts');

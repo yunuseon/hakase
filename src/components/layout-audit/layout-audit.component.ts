@@ -40,7 +40,10 @@ const Row = (row: AuditRow) =>
         ${row.sizes.map(
             size =>
                 html`<section class="size">
-                    <h4>${size.size} <span class="extent">${size.extent}</span></h4>
+                    <h4>
+                        ${size.size}
+                        <span class="extent">${size.extent} · ${size.sizeClass}</span>
+                    </h4>
                     <p class="counts">${counts(size.counts)}</p>
                     ${
                         size.findings.length === 0

@@ -18,8 +18,8 @@ import css from './formula-editor.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
-    html`<p class="about"></p>
-        <details class="guide">
+    html`<p class="about" data-detail></p>
+        <details class="guide" data-detail>
             <summary>How formulas work</summary>
             <dl class="terms"></dl>
         </details>
@@ -36,7 +36,7 @@ const TEMPLATE = () =>
             ></textarea>
         </div>
         <pre class="error" role="alert" hidden></pre>
-        <div class="foot">
+        <div class="foot" data-detail>
             <div class="status" role="status" hidden>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M5 12.5 L10 17 L19 7"></path></svg

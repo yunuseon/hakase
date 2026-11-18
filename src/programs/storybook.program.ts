@@ -6,7 +6,7 @@ import { switchMap } from 'rxjs/operators';
 export const storybookProgram = {
     ...declarations.storybook,
     size: { width: 920, height: 640 },
-    minimum: { width: 280, height: 400 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksStorybook } = await import('../components/storybook/storybook.component.ts');
         const book = new HksStorybook();

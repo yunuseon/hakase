@@ -217,7 +217,7 @@ const TEMPLATE = (view: Bookmarks) =>
                     ),
             )}
         </div>
-        <button class="ui-button add-group" type="button">+ group</button>
+        <button class="ui-button add-group" type="button" data-detail>+ group</button>
     </div>`;
 
 const ENDS = ['pointerup', 'pointercancel'] as const;

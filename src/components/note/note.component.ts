@@ -12,7 +12,7 @@ import css from './note.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
-    html`<header class="bar">
+    html`<header class="bar" data-detail>
             <hks-select class="ui-field pick" aria-label="note"></hks-select
             ><button class="ui-icon new" type="button" title="new note" aria-label="new note">
                 +</button
@@ -28,7 +28,7 @@ const TEMPLATE = () =>
             <p>No notes yet.</p>
             <button class="ui-button first" type="button">New note</button>
         </div>
-        <footer class="foot"><span class="count"></span></footer>`;
+        <footer class="foot" data-detail><span class="count"></span></footer>`;
 
 const ARM_MS = 3000;
 

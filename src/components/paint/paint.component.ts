@@ -65,7 +65,7 @@ const dial = (field: string, label: string, min: number, max: number, step: numb
     ></label>`;
 
 const TEMPLATE = () =>
-    html`<div class="bar">
+    html`<div class="bar" data-detail>
             <div class="ui-choices tools" role="radiogroup" aria-label="tool">
                 ${TOOLS.map(
                     tool =>
@@ -117,7 +117,7 @@ const TEMPLATE = () =>
                 <div class="cursor" hidden></div>
             </div>
         </div>
-        <div class="frames">
+        <div class="frames" data-detail>
             <ol class="strip" aria-label="frames"></ol>
             <button
                 type="button"
@@ -153,7 +153,7 @@ const TEMPLATE = () =>
                 onion
             </button>
         </div>
-        <div class="foot">
+        <div class="foot" data-detail>
             <div class="ui-choices sides" role="radiogroup" aria-label="resolution">
                 ${SIZES.map(
                     size =>

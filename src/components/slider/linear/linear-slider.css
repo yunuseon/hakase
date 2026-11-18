@@ -66,3 +66,9 @@
     background: var(--accent);
     border-radius: var(--radius-full);
 }
+
+@container window (width < 13rem) or (height < 9rem) {
+    .track {
+        min-block-size: var(--control-md);
+    }
+}

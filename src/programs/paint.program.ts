@@ -17,7 +17,7 @@ import { frameAt } from '../shared/picture.ts';
 export const paintProgram = {
     ...declarations.paint,
     size: { width: 460, height: 580 },
-    minimum: { width: 320, height: 420 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksPaint } = await import('../components/paint/paint.component.ts');
         const paint = new HksPaint();

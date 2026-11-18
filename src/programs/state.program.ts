@@ -34,7 +34,7 @@ const keyOf = (target: string, path: string) => `${target}\n${path}`;
 export const stateProgram = {
     ...declarations.state,
     size: { width: 520, height: 560 },
-    minimum: { width: 240, height: 260 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksStateMap } = await import('../components/state-map/state-map.component.ts');
         const stateMap = new HksStateMap();

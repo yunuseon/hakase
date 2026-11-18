@@ -25,7 +25,7 @@ import css from './pen.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
-    html`<div class="bar">
+    html`<div class="bar" data-detail>
             <div class="ui-choices modes" role="radiogroup" aria-label="mode">
                 ${MODES.map(
                     mode =>
@@ -82,7 +82,7 @@ const TEMPLATE = () =>
                 ><span class="tip"></span>
             </div>
         </div>
-        <div class="foot">
+        <div class="foot" data-detail>
             <p class="ui-hint hint">
                 Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the
                 pen follows them. Unplugged, it goes round in a circle.

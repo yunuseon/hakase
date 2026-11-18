@@ -14,7 +14,7 @@ const TEMPLATE = () =>
         <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
             <div class="fill"></div>
         </div>
-        <div class="span"><span class="start"></span><span class="end"></span></div>`;
+        <div class="span" data-detail><span class="start"></span><span class="end"></span></div>`;
 
 export class HksProgressBar extends HTMLElement {
     private readonly bar: HTMLElement;

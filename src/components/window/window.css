@@ -47,6 +47,7 @@
 }
 
 .title {
+    container: strip / inline-size;
     flex: none;
     display: flex;
     align-items: center;
@@ -225,6 +226,11 @@
     overscroll-behavior: contain;
 }
 
+/* The size classes every program queries (see "Size classes" in AGENTS.md). A fitted window takes its size from its content, so it cannot be a size container. */
+:host(:not([data-fitted])) .body {
+    container: window / size;
+}
+
 @media (any-pointer: coarse) {
     .close {
         opacity: 1;
@@ -242,11 +248,10 @@
 
 .store {
     display: flex;
-    flex: 0 1 auto;
+    flex: 0 1000 auto;
     min-inline-size: 0;
     gap: var(--space-1-5);
     align-items: center;
-    max-inline-size: 45%;
     block-size: var(--control-sm);
     padding-inline: min(calc(var(--spacing) * 1.75), 4%) min(calc(var(--spacing) * 2.25), 4%);
     overflow: hidden;
@@ -277,6 +282,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* The chip gives its width up first, a thousand times faster than the title, and below a glance's width it is only its dot. */
+@container strip (width < 13rem) {
+    .store {
+        gap: 0;
+    }
+
+    .store-name {
+        display: none;
+    }
 }
 
 .dot {

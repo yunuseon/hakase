@@ -51,7 +51,7 @@ const TEMPLATE = () =>
             >
                 ${ListenIcon()}<span>Listen</span>
             </button>
-            <div class="ui-choices presets" aria-label="patterns">
+            <div class="ui-choices presets" aria-label="patterns" data-detail>
                 ${PRESET_NAMES.map(
                     preset =>
                         html`<button
@@ -65,7 +65,7 @@ const TEMPLATE = () =>
             </div>
         </div>
         <div class="grid" role="grid" aria-label="pattern" data-scrolls></div>
-        <div class="settings">
+        <div class="settings" data-detail>
             <div class="ui-choices steps" role="radiogroup" aria-label="steps">
                 ${STEP_COUNTS.map(
                     steps =>

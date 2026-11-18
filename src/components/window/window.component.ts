@@ -962,6 +962,7 @@ export class HksWindow extends HTMLElement {
                         this.toggleAttribute('data-receded', receded);
                         this.toggleAttribute('data-focused', focused);
                         this.toggleAttribute('data-selected', selected);
+                        this.toggleAttribute('data-fitted', kind === 'fitted');
                         this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
                         this.style.zIndex = frame.z.toFixed(0);
 

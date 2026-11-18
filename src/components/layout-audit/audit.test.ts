@@ -115,7 +115,12 @@ describe('the layout audit', () => {
     });
 
     it('ranks programs by what fails, and counts a cut title apart', () => {
-        const job = { title: 'x', size: 'minimum' as const, extent: { width: 1, height: 1 } };
+        const job = {
+            title: 'x',
+            size: 'minimum' as const,
+            extent: { width: 1, height: 1 },
+            sizeClass: 'glance' as const,
+        };
         const view = auditView(
             [
                 { ...job, program: 'a', findings: [{ kind: 'cut', label: 't', by: 0 }] },

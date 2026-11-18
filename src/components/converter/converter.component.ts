@@ -80,7 +80,7 @@ const slider = (
     </label>`;
 
 const Shape = (shape: ShapeView) =>
-    html`<div class="shape" role="group" aria-label="shape">
+    html`<div class="shape" role="group" aria-label="shape" data-detail>
         <div class="row">
             <span class="key">range</span>
             <span class="bounds">
@@ -135,7 +135,7 @@ const Shape = (shape: ShapeView) =>
     </div>`;
 
 const Bits = (bits: BitsView) =>
-    html`<div class="shape" role="group" aria-label="bit">
+    html`<div class="shape" role="group" aria-label="bit" data-detail>
         ${
             bits.thresholded
                 ? html`<div class="row">
@@ -165,7 +165,7 @@ const Bits = (bits: BitsView) =>
     </div>`;
 
 const TEMPLATE = (view: ConverterView) =>
-    html`<p class="summary">${view.summary}</p>
+    html`<p class="summary" data-detail>${view.summary}</p>
         <div class="scope">
             <svg
                 viewBox=${ifDefined(`0 ${-PAD} ${WIDTH} ${HEIGHT + 2 * PAD}`)}
@@ -189,7 +189,7 @@ const TEMPLATE = (view: ConverterView) =>
             ${when(view.empty !== null, () => html`<p class="empty">${view.empty}</p>`)}
         </div>
         <div class="foot">
-            <div class="ui-choices" role="radiogroup" aria-label="reading">
+            <div class="ui-choices" role="radiogroup" aria-label="reading" data-detail>
                 ${view.choices.map(
                     choice =>
                         html`<button

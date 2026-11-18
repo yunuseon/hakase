@@ -24,7 +24,7 @@ type Scheduling = { readonly schedule: Schedule; readonly strikes: readonly Stri
 export const drumsProgram = {
     ...declarations.drums,
     size: { width: 560, height: 400 },
-    minimum: { width: 260, height: 300 },
+    minimum: { width: 220, height: 180 },
     audible: true,
     launch: async () => {
         const { HksDrums } = await import('../components/drums/drums.component.ts');

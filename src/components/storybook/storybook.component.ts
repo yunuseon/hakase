@@ -22,7 +22,7 @@ import css from './storybook.css?inline';
 const sheet = styleSheet(css);
 const template = (view: BookView) =>
     html` <div class="frame">
-        <nav aria-label="Component catalogue">
+        <nav aria-label="Component catalogue" data-detail>
             <header>
                 <span class="eyebrow">Hakase</span>
                 <h2>Storybook</h2>
@@ -64,7 +64,7 @@ const template = (view: BookView) =>
             </div>
         </nav>
         <main>
-            <header class="story-head">
+            <header class="story-head" data-detail>
                 <div>
                     <span class="eyebrow">${view.story?.group}</span>
                     <h1>${view.story?.title ?? 'No component selected'}</h1>
@@ -80,7 +80,7 @@ const template = (view: BookView) =>
                     ${Icon(ICONS.reset)}
                 </button>
             </header>
-            <div class="toolbar">
+            <div class="toolbar" data-detail>
                 <label
                     >Variant<hks-select
                         class="ui-field variant"
@@ -162,12 +162,12 @@ const template = (view: BookView) =>
                     <div class="sample"></div>
                 </div>
             </div>
-            <p class="isolation">Sandbox · changes stay in this example</p>
-            <details class="usage">
+            <p class="isolation" data-detail>Sandbox · changes stay in this example</p>
+            <details class="usage" data-detail>
                 <summary>Usage</summary>
                 <pre><code>${view.story?.code}</code></pre>
             </details>
-            <section class="event-section">
+            <section class="event-section" data-detail>
                 <header>
                     <h3>Events</h3>
                     <button

@@ -20,7 +20,9 @@ programs fail, 33 findings.** Converters are 17 of them: every one makes its
 window scroll at its 220 × 180 minimum, by up to 198px; sound → level's reading
 chips push it sideways by 82 to 182px at every size, picture → level's by 9 to
 29px; level → bit's threshold is 3px narrower than its value at every size.
-Focus scrolls sideways by 3px in compact. A first scripted look also blamed
+Focus scrolls sideways by 3px in compact. Size classes and glance layouts
+since left nothing failing at any program's minimum; what remains is compact
+and regular, the next two steps' work. A first scripted look also blamed
 Voice and Paint, but the screen's edge had cut them, not their frames, which is
 why the audit measures inside a frame of its own.
 
@@ -35,12 +37,6 @@ same controls from the same description.
 
 ### In order
 
-- **Size classes.** The window body is a named size container with shared
-  breakpoints: _glance_ (widget-small: only what the program shows), _compact_,
-  _regular_ and _wide_, rem literals beside the tokens. The title strip shrinks
-  the store chip to its dot before it truncates the title. A program's
-  `minimum` is its glance size. Done when every program has a glance layout and
-  the audit finds nothing clipped at the minimum.
 - **One controls grammar.** A program describes its settings as data
   (`ControlSpec`: section, choice, range, number, toggle, text, action), built
   by its pure view function, and one `hks-controls` component renders them:

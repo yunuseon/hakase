@@ -77,7 +77,7 @@ const TEMPLATE = () =>
                 <line class="now" y1="-4" y2=${ifDefined(HEIGHT + 4)}></line></svg
             ><span class="bound max"></span><span class="bound min"></span><span class="dot"></span>
         </div>
-        <div class="row">
+        <div class="row" data-detail>
             <div class="ui-choices shapes" role="radiogroup" aria-label="shape">
                 ${SHAPES.map(
                     shape =>
@@ -114,7 +114,7 @@ const TEMPLATE = () =>
                 )}
             </div>
         </div>
-        <div class="steps" data-only="steps">
+        <div class="steps" data-only="steps" data-detail>
             <div class="bars" title="draw the steps"></div>
             <div
                 class="ui-choices counts"
@@ -135,7 +135,7 @@ const TEMPLATE = () =>
                 )}
             </div>
         </div>
-        <div class="params">
+        <div class="params" data-detail>
             ${FIELDS.map(
                 param =>
                     html`<label

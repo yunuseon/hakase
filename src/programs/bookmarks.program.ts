@@ -7,7 +7,7 @@ import type { AppInput } from '../protocol.ts';
 export const bookmarksProgram = {
     ...declarations.bookmarks,
     size: { width: 320, height: 380 },
-    minimum: { width: 240, height: 200 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksBookmarks } = await import('../components/bookmarks/bookmarks.component.ts');
         const bookmarks = new HksBookmarks();

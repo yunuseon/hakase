@@ -1,3 +1,5 @@
+import { sizeClassOf, type SizeClass } from '../../layout/size-class.ts';
+
 export type Box = {
     readonly left: number;
     readonly top: number;
@@ -73,6 +75,7 @@ export type Job = {
     readonly title: string;
     readonly size: SizeName;
     readonly extent: Extent;
+    readonly sizeClass: SizeClass;
 };
 
 export const COMPACT_WIDTH = 240;
@@ -103,7 +106,9 @@ export const jobsOf = (
                     extents[earlier].height === extent.height,
             );
 
-            return repeated ? [] : [{ program: id, title, size: name, extent }];
+            return repeated
+                ? []
+                : [{ program: id, title, size: name, extent, sizeClass: sizeClassOf(extent) }];
         });
     });
 
@@ -115,6 +120,7 @@ export type AuditRow = {
     readonly failing: number;
     readonly sizes: readonly {
         readonly size: SizeName;
+        readonly sizeClass: SizeClass;
         readonly extent: string;
         readonly counts: Readonly<Record<Kind, number>>;
         readonly findings: readonly Finding[];
@@ -153,8 +159,9 @@ export const auditView = (results: readonly Result[], total: number): AuditView 
                 program,
                 title: own[0]?.title ?? program,
                 failing: own.reduce((sum, { findings }) => sum + failingIn(findings), 0),
-                sizes: own.map(({ size, extent, findings }) => ({
+                sizes: own.map(({ size, sizeClass, extent, findings }) => ({
                     size,
+                    sizeClass,
                     extent: `${extent.width} × ${extent.height}`,
                     counts: countsOf(findings),
                     findings,

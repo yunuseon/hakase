@@ -158,3 +158,9 @@ svg {
     background: var(--well);
     z-index: 1;
 }
+
+@container window (width < 13rem) or (height < 9rem) {
+    .grid {
+        min-block-size: 0;
+    }
+}

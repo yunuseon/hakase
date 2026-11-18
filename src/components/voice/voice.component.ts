@@ -54,7 +54,13 @@ const TEMPLATE = () =>
             >
                 ${ListenIcon()}<span>Listen</span>
             </button>
-            <div class="ui-choices shapes" role="radiogroup" aria-label="shape" data-synth>
+            <div
+                class="ui-choices shapes"
+                role="radiogroup"
+                aria-label="shape"
+                data-synth
+                data-detail
+            >
                 ${SHAPES.map(
                     shape =>
                         html`<button
@@ -74,6 +80,7 @@ const TEMPLATE = () =>
                 role="radiogroup"
                 aria-label="articulation"
                 data-synth
+                data-detail
             >
                 ${ARTICULATIONS.map(
                     articulation =>
@@ -93,7 +100,7 @@ const TEMPLATE = () =>
                 )}
             </div>
         </div>
-        <div class="ui-choices instruments" role="radiogroup" aria-label="instrument">
+        <div class="ui-choices instruments" role="radiogroup" aria-label="instrument" data-detail>
             ${VOICE_INSTRUMENTS.map(
                 instrument =>
                     html`<button
@@ -110,11 +117,11 @@ const TEMPLATE = () =>
             <canvas width="600" height="240"></canvas><span class="cursor"></span
             ><span class="now"></span>
         </div>
-        <p class="ui-hint hint">
+        <p class="ui-hint hint" data-detail>
             Plug a signal into <b>pitch</b> in the state menu or in state mode: its value is octaves
             above the root, snapped to the scale. A steps signal plays a melody.
         </p>
-        <div class="settings">
+        <div class="settings" data-detail>
             <label class="field"
                 ><span>root</span
                 ><hks-select class="ui-field" data-root

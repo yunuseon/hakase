@@ -54,7 +54,7 @@ const COPIED_MS = 1500;
 const ARM_MS = 3000;
 
 const TEMPLATE = () =>
-    html`<div class="bar">
+    html`<div class="bar" data-detail>
             <span class="hint">Click a state or a window to inspect it.</span
             ><button
                 class="tool"
@@ -67,13 +67,13 @@ const TEMPLATE = () =>
                 Fit</button
             ><button class="prune" type="button"></button>
         </div>
-        <div class="graph">
+        <div class="graph" data-scrolls>
             <div class="board">
                 <svg class="wires" aria-hidden="true"><path class="rubber"></path></svg>
                 <div class="nodes"></div>
             </div>
         </div>
-        <div class="inspect"></div>`;
+        <div class="inspect" data-detail></div>`;
 
 type Arming = { readonly armed: number | null; readonly fire: boolean };
 

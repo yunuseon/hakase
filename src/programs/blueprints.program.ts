@@ -23,7 +23,7 @@ const cardOf = ({ id, name, size, windows }: Blueprint, summary: string | null):
 export const blueprintsProgram = {
     ...declarations.blueprints,
     size: { width: 360, height: 420 },
-    minimum: { width: 260, height: 220 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksBlueprints } = await import('../components/blueprints/blueprints.component.ts');
         const blueprints = new HksBlueprints();

@@ -1,3 +1,4 @@
+import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { merge, of, type Observable } from 'rxjs';
 import { filter, map, tap } from 'rxjs/operators';
@@ -15,7 +16,7 @@ const TEMPLATE = () =>
             <canvas></canvas>
             <p class="message" hidden></p>
         </div>
-        <slot name="controls"></slot>`;
+        <slot name="controls" data-detail></slot>`;
 
 export class HksImageView extends HTMLElement {
     readonly sizes$: Observable<Size>;
@@ -28,7 +29,7 @@ export class HksImageView extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        shadow.adoptedStyleSheets = [sheet];
+        shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
         const viewport = requireChild(shadow, '.viewport');

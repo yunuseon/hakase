@@ -53,7 +53,7 @@ const ASPECT_SIDE = 2160;
 export const outputProgram = {
     ...declarations.output,
     size: { width: 480, height: 620 },
-    minimum: { width: 260, height: 460 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const [{ HksImageView }, { HksFrameStrip }, { HksExportPanel }] = await Promise.all([
             import('../components/image-view/image-view.component.ts'),

@@ -24,7 +24,7 @@ const sameShape = (a: Theme, b: Theme): boolean =>
 export const themeProgram = {
     ...declarations.theme,
     size: { width: 300, height: 260 },
-    minimum: { width: 240, height: 200 },
+    minimum: { width: 220, height: 180 },
     launch: async () => {
         const { HksThemeEditor } =
             await import('../components/theme-editor/theme-editor.component.ts');
