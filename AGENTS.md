@@ -999,6 +999,41 @@ the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
   are open is the component's own fold of its toggles, not saved, and in
   regular every section is open with its title as a plain heading.
 
+### Menus
+
+**A program's own actions are data in a ⋯ in its window's title strip.** A
+program builds an `hks-menu` and returns it as `actions` beside its element
+(`ProcessView.actions`); `liveProcess$` slots it into the window's `actions`
+slot, between the title and the store chip, so every program's ⋯ is in the
+same place and the window still knows nothing about what it holds. It fades
+in with the close button, on hover or focus, and always shows on a coarse
+pointer. The groups are `MenuGroup`s of `MenuItem`s (`shared/menu.ts`), each
+with a glyph from `ICONS`, built by a pure function beside the component
+(`formulaMenu`, `noteMenu`); the menu emits `{ id, text }` and the program
+maps the id, as it does a property change. Four rules are the component's, so
+no menu can break them:
+
+- **Destructive last.** `ordered` moves every destructive item into a group of
+  its own at the end, whatever group it was given in.
+- **A destructive item asks once.** The first click arms it ("Click again:
+  delete this note") for three seconds, the second acts. Arming and picking
+  are one `scan` (`reduceMenu`, `pickedBy`), because a second fold for the
+  label would arm on its own.
+- **An item may take a word**: a `field` item is a small form whose submit
+  picks it with the text, which is how "save a copy as…" keeps its name.
+- **It hangs inside the window and is never clipped.** The panel is in the
+  frame and zooms with it; it opens below the ⋯, or above it when below would
+  run off the visible viewport (`opensAbove`, as the state menu does). The
+  title strip is a positioned layer above the body for it, and the resize
+  handles sit above the title, so an edge still resizes. The ⋯ is in the drag
+  handle, so its press stops there and raises the window, like the chip's;
+  without that the drag captures the pointer and the click lands on the title.
+
+The formula editor and the note use it. The window's own state and program
+menus hang in the frame by the same placement rules; menus that belong to no
+window (a select's list, the launcher's categories, the palette) are the glass.
+Storybook's **Menus** story shows each against the grammar.
+
 ### Shared UI primitives
 
 The UI library lives under `src/shared/ui/`; Storybook consumes it, as do the
@@ -1094,8 +1129,8 @@ it; a restored window has chosen and does not. `shownNote` falls back to the
 first note when the chosen one was deleted elsewhere. Edits are folded per
 keystroke, not debounced, so the text that comes back always equals what the
 textarea holds and is written only when it differs: that is what keeps the caret
-still, without the formula editor's `from` fold. Delete asks first: one click
-arms it for three seconds, a second deletes, both read from one shared `scan`.
+still, without the formula editor's `from` fold. Delete is in the window's ⋯
+(see "Menus"), which asks once before it acts.
 
 **A focus timer is a store, like a playback clock**: `createTimers$` folds
 `toggle`, `reset`, `skip` and `length` commands per store with `reduceFocus`, and
@@ -3722,8 +3757,9 @@ saved in the snapshot) holds each saved formula's label and source;
 `source$(id)` falls back to it the way it falls back to the registry, and edits
 apply to either. Ids come from a monotone counter, like `launched`.
 
-The formula editor's ⋯ menu saves the current text as a new formula, copies a
-share link, or deletes a saved one (built-ins cannot be). Saving emits two
+The formula editor's ⋯ (see "Menus") saves the current text as a new formula
+under a name typed into the menu, copies a share link, or deletes a saved one
+(built-ins offer no delete). Saving emits two
 inputs in order — the `add`, then this editor's selection of it — and the id is
 chosen by the program from the library's counter, so the editor can select a
 formula that did not exist a moment ago. Both pickers, the editor's and every

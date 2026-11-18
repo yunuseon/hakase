@@ -121,6 +121,10 @@ export const liveProcess$ = (
             from(program.launch()).pipe(
                 tap(view => {
                     element.append(view.element);
+                    if (view.actions !== undefined) {
+                        view.actions.slot = 'actions';
+                        element.append(view.actions);
+                    }
                 }),
                 switchMap(view => view.run$(state, self)),
                 withLatestFrom(self.store$, self.clock$),

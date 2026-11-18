@@ -48,6 +48,8 @@
 
 .title {
     container: strip / inline-size;
+    position: relative;
+    z-index: 1;
     flex: none;
     display: flex;
     align-items: center;
@@ -129,6 +131,16 @@
     opacity: 1;
 }
 
+slot[name='actions']::slotted(*) {
+    opacity: 0;
+    transition: opacity var(--duration-quick) var(--ease-out);
+}
+
+:host(:hover) slot[name='actions']::slotted(*),
+slot[name='actions']::slotted(:focus-within) {
+    opacity: 1;
+}
+
 .close:hover {
     color: var(--panel);
     background: var(--accent);
@@ -145,6 +157,7 @@
 
 .handle {
     position: absolute;
+    z-index: 2;
     touch-action: none;
     --band: 8px;
     --corner: 14px;
@@ -232,7 +245,8 @@
 }
 
 @media (any-pointer: coarse) {
-    .close {
+    .close,
+    slot[name='actions']::slotted(*) {
         opacity: 1;
     }
 

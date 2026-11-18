@@ -1,13 +1,17 @@
 import { declarations } from '../declarations.ts';
-import { combineLatest, EMPTY, from, merge, of } from 'rxjs';
+import { combineLatest, concat, EMPTY, from, merge, of, timer } from 'rxjs';
 import {
     distinctUntilChanged,
+    filter,
     ignoreElements,
     map,
     mergeMap,
     scan,
+    share,
     shareReplay,
+    startWith,
     switchMap,
+    tap,
     withLatestFrom,
 } from 'rxjs/operators';
 import { FORMULA_GUIDE } from '../model/sketch/formulas/formula.ts';
@@ -24,18 +28,25 @@ import { seenBy, unseen, type Program } from '../program.ts';
 import { type AppInput } from '../protocol.ts';
 import { asFormulaEditor, defaultFormulaEditor } from '../settings.ts';
 import { shareUrl } from '../share.ts';
+import { formulaMenu } from '../components/formula-editor/formula-menu.ts';
+
+const COPIED_MS = 1600;
 
 export const formulaProgram = {
     ...declarations.formula,
     size: { width: 340, height: 480 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const { HksFormulaEditor } =
-            await import('../components/formula-editor/formula-editor.component.ts');
+        const [{ HksFormulaEditor }, { HksMenu }] = await Promise.all([
+            import('../components/formula-editor/formula-editor.component.ts'),
+            import('../shared/ui/menu.component.ts'),
+        ]);
         const editor = new HksFormulaEditor().guide(FORMULA_GUIDE);
+        const menu = new HksMenu();
 
         return {
             element: editor,
+            actions: menu,
             run$: ({ source$, error$, library$ }, self) => {
                 const chosen$ = self.settings$.pipe(
                     map(settings => asFormulaEditor(settings).formula),
@@ -62,6 +73,20 @@ export const formulaProgram = {
                     ),
                 );
 
+                const picks$ = menu.picks$.pipe(share());
+                const copied$ = picks$.pipe(
+                    filter(({ id }) => id === 'share'),
+                    withLatestFrom(chosen$, text$, library$),
+                    map(([, name, source, library]) =>
+                        shareUrl({ label: labelOf(name, library), source }),
+                    ),
+                    tap(link => {
+                        void navigator.clipboard?.writeText(link).catch(() => undefined);
+                    }),
+                    switchMap(() => concat(of(true), timer(COPIED_MS).pipe(map(() => false)))),
+                    startWith(false),
+                );
+
                 const choose = (formula: FormulaId): AppInput => ({
                     kind: 'settings',
                     settings: { kind: 'formula', formula },
@@ -77,14 +102,17 @@ export const formulaProgram = {
                                 map(([name, library]) => summaryOf(name, library)),
                             ),
                             error$: chosen$.pipe(switchMap(name => error$(name))),
-                            deletable$: chosen$.pipe(map(isCustomId)),
-                            copied$: editor.shares$.pipe(
-                                withLatestFrom(chosen$, text$, library$),
-                                map(([, name, source, library]) =>
-                                    shareUrl({ label: labelOf(name, library), source }),
+                        })
+                        .pipe(ignoreElements()),
+                    menu
+                        .connect$(
+                            combineLatest([chosen$, copied$]).pipe(
+                                map(([formula, copied]) =>
+                                    formulaMenu({ deletable: isCustomId(formula), copied }),
                                 ),
                             ),
-                        })
+                            'formula actions',
+                        )
                         .pipe(ignoreElements()),
                     editor.selections$.pipe(
                         mergeMap(name => (isFormulaId(name) ? of(name) : EMPTY)),
@@ -95,7 +123,8 @@ export const formulaProgram = {
                         map(([text, formula]): AppInput => ({ kind: 'source', formula, text })),
                     ),
                     // Two inputs, in order: the copy must exist before this editor turns to it.
-                    editor.saves$.pipe(
+                    picks$.pipe(
+                        mergeMap(({ id, text }) => (id === 'save' ? [text ?? ''] : [])),
                         withLatestFrom(text$, library$),
                         mergeMap(([label, source, library]) => {
                             const id = nextId(library);
@@ -107,7 +136,8 @@ export const formulaProgram = {
                             return from(inputs);
                         }),
                     ),
-                    editor.deletes$.pipe(
+                    picks$.pipe(
+                        filter(({ id }) => id === 'delete'),
                         withLatestFrom(chosen$),
                         mergeMap(([, id]) => {
                             if (!isCustomId(id)) {

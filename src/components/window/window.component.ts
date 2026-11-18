@@ -96,6 +96,7 @@ const TEMPLATE = () =>
                 aria-expanded="false"
                 title="change program"
             ></button
+            ><slot name="actions"></slot
             ><button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
                 <span class="dot"></span><span class="store-name"></span></button
             ><button class="ui-icon close" type="button" aria-label="quit">
@@ -645,8 +646,11 @@ export class HksWindow extends HTMLElement {
             fromElementEvent$(requireChild(shadow, '.close'), 'click').pipe(
                 map((): WindowGesture => ({ kind: 'quit' })),
             ),
-            // The chip sits inside the drag handle too; it raises by itself, so its menu is not under a neighbour.
-            fromElementEvent$(chip, 'pointerdown').pipe(
+            // The chip and a program's ⋯ sit inside the drag handle too; they raise by themselves, so their menu is not under a neighbour.
+            merge(
+                fromElementEvent$(chip, 'pointerdown'),
+                fromElementEvent$(requireChild(shadow, 'slot[name="actions"]'), 'pointerdown'),
+            ).pipe(
                 tap(event => {
                     event.stopPropagation();
                 }),

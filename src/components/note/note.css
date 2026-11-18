@@ -27,7 +27,6 @@
 }
 
 .new,
-.delete,
 .first {
     flex: none;
     block-size: calc(var(--spacing) * 6.5);
@@ -44,17 +43,6 @@
     inline-size: calc(var(--spacing) * 6.5);
     padding: 0;
     font-size: var(--text-lg);
-}
-
-.delete {
-    color: var(--muted);
-    background: transparent;
-}
-
-.delete:hover,
-.delete[data-armed] {
-    color: var(--ink);
-    background: color-mix(in srgb, var(--accent) 22%, var(--well));
 }
 
 .new:hover,
@@ -98,7 +86,6 @@
 }
 
 :host([data-empty]) .pick,
-:host([data-empty]) .delete,
 :host([data-empty]) .body,
 :host([data-empty]) .foot {
     display: none;
@@ -112,7 +99,6 @@
 
 .pick:focus-visible,
 .new:focus-visible,
-.delete:focus-visible,
 .first:focus-visible {
     outline: var(--focus-ring);
     outline-offset: var(--focus-offset);

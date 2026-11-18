@@ -2,6 +2,7 @@ import { declarations } from '../declarations.ts';
 import { combineLatest, EMPTY, from, merge } from 'rxjs';
 import {
     distinctUntilChanged,
+    filter,
     ignoreElements,
     map,
     mergeMap,
@@ -13,6 +14,7 @@ import { countOf, nextNoteId, shownNote, titleOf, type Notes } from '../model/no
 import type { Program } from '../program.ts';
 import type { AppInput } from '../protocol.ts';
 import { asNote } from '../settings.ts';
+import { noteMenu } from '../components/note/note-menu.ts';
 
 const choose = (note: string): AppInput => ({ kind: 'settings', settings: { kind: 'note', note } });
 
@@ -30,11 +32,16 @@ export const noteProgram = {
     size: { width: 300, height: 320 },
     minimum: { width: 200, height: 180 },
     launch: async () => {
-        const { HksNote } = await import('../components/note/note.component.ts');
+        const [{ HksNote }, { HksMenu }] = await Promise.all([
+            import('../components/note/note.component.ts'),
+            import('../shared/ui/menu.component.ts'),
+        ]);
         const note = new HksNote();
+        const menu = new HksMenu();
 
         return {
             element: note,
+            actions: menu,
             run$: ({ notes$ }, self) => {
                 const shown$ = combineLatest([
                     notes$,
@@ -92,7 +99,9 @@ export const noteProgram = {
                                 : [{ kind: 'note', command: { kind: 'edit', id, text } }],
                         ),
                     ),
-                    note.removes$.pipe(
+                    menu.connect$(id$.pipe(map(noteMenu)), 'note actions').pipe(ignoreElements()),
+                    menu.picks$.pipe(
+                        filter(({ id }) => id === 'delete'),
                         withLatestFrom(id$),
                         mergeMap(([, id]): AppInput[] =>
                             id === null ? [] : [{ kind: 'note', command: { kind: 'remove', id } }],

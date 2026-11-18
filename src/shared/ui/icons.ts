@@ -26,4 +26,5 @@ export const ICONS = {
     paste: 'M9 3h6v3H9zM9 4.5H6v16h12v-16h-3',
     section: 'M4 6h16M4 12h10M4 18h6',
     look: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 3v18',
+    link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
 } as const;

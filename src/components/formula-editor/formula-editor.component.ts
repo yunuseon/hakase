@@ -5,8 +5,8 @@ import { repeat } from 'lit-html/directives/repeat.js';
 import { renderOptions, type SelectChoice } from '../../shared/select/options.component.ts';
 import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../shared/select/select.component.ts';
-import { combineLatest, concat, merge, of, timer, type Observable } from 'rxjs';
-import { debounceTime, distinctUntilChanged, map, share, switchMap, tap } from 'rxjs/operators';
+import { combineLatest, merge, type Observable } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map, tap } from 'rxjs/operators';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-clike.js';
 import 'prismjs/components/prism-c.js';
@@ -43,26 +43,6 @@ const TEMPLATE = () =>
                 ><span>Compiled</span>
             </div>
             <hks-select class="ui-field preset" aria-label="formula preset"></hks-select>
-            <details class="more">
-                <summary class="toggle" aria-label="formula actions" title="save, share or delete">
-                    ⋯
-                </summary>
-                <div class="menu">
-                    <form class="save">
-                        <input
-                            class="ui-field name"
-                            type="text"
-                            placeholder="Name"
-                            aria-label="name for the copy"
-                            autocomplete="off"
-                        /><button class="ui-button action" type="submit">Save as new</button>
-                    </form>
-                    <button class="ui-button action share" type="button">Copy share link</button
-                    ><button class="ui-button action delete" type="button">
-                        Delete this formula
-                    </button>
-                </div>
-            </details>
         </div>`;
 
 const grammar = Prism.languages['glsl'];
@@ -92,18 +72,11 @@ export type FormulaEditorView = {
     readonly preset$: Observable<string>;
     readonly about$: Observable<string>;
     readonly error$: Observable<string | null>;
-    readonly deletable$: Observable<boolean>;
-    readonly copied$: Observable<string>;
 };
-
-const COPIED_MS = 1600;
 
 export class HksFormulaEditor extends HTMLElement {
     readonly changes$: Observable<string>;
     readonly selections$: Observable<string>;
-    readonly saves$: Observable<string>;
-    readonly shares$: Observable<void>;
-    readonly deletes$: Observable<void>;
 
     private readonly source: HTMLTextAreaElement;
     private readonly picker: HksSelect;
@@ -115,11 +88,6 @@ export class HksFormulaEditor extends HTMLElement {
     private readonly about: HTMLElement;
     private readonly terms: HTMLElement;
     private readonly typed$: Observable<string>;
-    private readonly menu: HTMLDetailsElement;
-    private readonly saveForm: HTMLFormElement;
-    private readonly share: HTMLButtonElement;
-    private readonly removal: HTMLButtonElement;
-    private readonly submitted$: Observable<string>;
 
     private readonly shadow: ShadowRoot;
 
@@ -162,24 +130,6 @@ export class HksFormulaEditor extends HTMLElement {
         this.selections$ = fromElementEvent$(this.picker, 'change').pipe(
             map(() => this.picker.value),
         );
-
-        this.menu = requireElement(shadow, '.more', HTMLDetailsElement);
-        this.saveForm = requireElement(shadow, '.save', HTMLFormElement);
-        this.share = requireElement(shadow, '.share', HTMLButtonElement);
-        this.removal = requireElement(shadow, '.delete', HTMLButtonElement);
-        const name = requireElement(shadow, '.name', HTMLInputElement);
-
-        // One listener, shared: the name is read once, before connect$ clears the field.
-        this.submitted$ = fromElementEvent$(this.saveForm, 'submit').pipe(
-            tap(event => {
-                event.preventDefault();
-            }),
-            map(() => name.value),
-            share(),
-        );
-        this.saves$ = this.submitted$;
-        this.shares$ = fromElementEvent$(this.share, 'click').pipe(map(() => undefined));
-        this.deletes$ = fromElementEvent$(this.removal, 'click').pipe(map(() => undefined));
     }
 
     guide(entries: readonly GuideEntry[]): this {
@@ -194,8 +144,6 @@ export class HksFormulaEditor extends HTMLElement {
         preset$,
         about$,
         error$,
-        deletable$,
-        copied$,
     }: FormulaEditorView): Observable<void> {
         // Presets only: echoing typing back would reset the caret every keystroke.
         // Not deduplicated: an undo can bring back the very text applied last, after the user typed over it.
@@ -219,31 +167,6 @@ export class HksFormulaEditor extends HTMLElement {
                     tap(([options, value]) => {
                         this.optionsView.update(options);
                         this.picker.value = value;
-                    }),
-                ),
-                deletable$.pipe(
-                    distinctUntilChanged(),
-                    tap(deletable => {
-                        this.removal.disabled = !deletable;
-                    }),
-                ),
-                merge(this.submitted$, this.shares$, this.deletes$).pipe(
-                    tap(() => {
-                        this.saveForm.reset();
-                    }),
-                ),
-                merge(this.submitted$, this.deletes$).pipe(
-                    tap(() => {
-                        this.menu.open = false;
-                    }),
-                ),
-                copied$.pipe(
-                    tap(link => {
-                        void navigator.clipboard?.writeText(link).catch(() => undefined);
-                    }),
-                    switchMap(() => concat(of(true), timer(COPIED_MS).pipe(map(() => false)))),
-                    tap(copied => {
-                        this.share.textContent = copied ? 'Link copied' : 'Copy share link';
                     }),
                 ),
                 text$.pipe(

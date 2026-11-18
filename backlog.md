@@ -37,11 +37,12 @@ same controls from the same description.
 
 ### In order
 
-- **Menus.** Every menu (the state chip's, the program switcher, the formula
-  editor's ⋯, the tickets' pickers) follows one grammar: a program's own actions
-  in a ⋯ at the same place in the header, grouped, with icons, destructive last,
-  and never clipped by its window. Done when each menu is listed in the
-  catalogue against that grammar and none departs from it.
+- **Menus everywhere.** The grammar is in (`hks-menu`, see "Menus" in
+  `AGENTS.md`) and the formula editor and the note use it. Move the other
+  programs' own actions into their ⋯: the state map's Fit, Tidy and Prune,
+  paint's frame actions, the tickets' clear done, a bookmark group's delete.
+  Done when no program draws an action button that is not part of what it is
+  for.
 - **Properties everywhere.** The audit is clean, but only converters, voices
   and pedals describe their controls as `Section`s; the sketch's Scene tab,
   the drum machine's settings, the focus timer's lengths, the export panel and

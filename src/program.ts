@@ -144,6 +144,7 @@ export type Self = {
 
 export type ProcessView = {
     readonly element: HTMLElement;
+    readonly actions?: HTMLElement;
     readonly run$: (state: AppState, self: Self) => Observable<AppInput>;
 };
 

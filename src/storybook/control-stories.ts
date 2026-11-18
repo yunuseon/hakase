@@ -13,6 +13,9 @@ import { HksDrums } from '../components/drums/drums.component.ts';
 import { defaultDrums, reduceDrums } from '../model/drums.ts';
 import { converterSections, type ConverterControls } from '../components/converter/converter.ts';
 import { HksProperties } from '../shared/ui/properties.component.ts';
+import { HksMenu } from '../shared/ui/menu.component.ts';
+import { formulaMenu } from '../components/formula-editor/formula-menu.ts';
+import { noteMenu } from '../components/note/note-menu.ts';
 import { defaults, recorded, type Story } from './story.ts';
 
 const propertiesFixture = (variant: string): ConverterControls => ({
@@ -356,6 +359,37 @@ export const controlStories: readonly Story[] = [
                 element,
                 run$: element.connect$(controls$.pipe(map(converterSections))),
                 events$: changes$.pipe(map(change => recorded('change', change))),
+            };
+        },
+    },
+    {
+        id: 'menu',
+        title: 'Menus',
+        group: 'Controls',
+        description:
+            "A program's own actions, as data, in a ⋯ in its window's title strip: grouped, each with a glyph, the destructive ones last in a group of their own and asking once before they act, hanging inside the window and opening above it when below would run off the screen. The formula editor and the note use it; the window's own state and program menus hang in the frame by the same rules, and menus that belong to no window (a select's list, the launcher's categories) are the glass.",
+        elements: ['hks-menu', 'MenuGroup', 'MenuItem', 'ordered', 'reduceMenu'],
+        variants: [
+            { id: 'formula', title: 'Formula, saved' },
+            { id: 'builtin', title: 'Formula, built in' },
+            { id: 'note', title: 'Note' },
+        ],
+        controls: [],
+        defaults,
+        height: 320,
+        action: null,
+        code: "const menu = new HksMenu();\n// A program hands it to its window: return { element, actions: menu, run$ }.\nconst lifetime$ = menu.connect$(of([{ id: 'note', items: [{ id: 'delete', label: 'Delete this note', glyph: ICONS.remove, destructive: true }] }]), 'note actions');\nconst picks$ = menu.picks$; // { id, text }",
+        create: ({ variant }) => {
+            const element = new HksMenu();
+            element.style.marginInlineStart = '12rem';
+            const groups =
+                variant === 'note'
+                    ? noteMenu('note-1')
+                    : formulaMenu({ deletable: variant === 'formula', copied: false });
+            return {
+                element,
+                run$: element.connect$(of(groups), `${variant} actions`),
+                events$: element.picks$.pipe(map(pick => recorded('pick', pick))),
             };
         },
     },

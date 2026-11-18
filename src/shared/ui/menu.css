@@ -1,0 +1,125 @@
+:host {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+}
+
+.trigger[hidden] {
+    display: none;
+}
+
+.panel {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: calc(100% + var(--space-1));
+    inset-inline-end: 0;
+    box-sizing: border-box;
+    display: none;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-inline-size: calc(var(--spacing) * 48);
+    max-inline-size: calc(var(--spacing) * 72);
+    padding: var(--space-1);
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--elevation-raised);
+    font: var(--text-sm) / 1.4 var(--font-ui);
+    cursor: default;
+    opacity: 0;
+    translate: 0 var(--rise);
+    transition:
+        opacity var(--duration-quick) var(--ease-in),
+        translate var(--duration-quick) var(--ease-in),
+        display var(--duration-quick) allow-discrete;
+}
+
+.panel[data-above] {
+    inset-block: auto calc(100% + var(--space-1));
+}
+
+.panel[data-open] {
+    display: flex;
+    opacity: 1;
+    translate: 0 0;
+    transition-duration: var(--duration-base);
+    transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+    .panel[data-open] {
+        opacity: 0;
+        translate: 0 var(--rise);
+    }
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+}
+
+.group + .group {
+    padding-block-start: var(--space-1);
+    border-block-start: 1px solid var(--rule);
+}
+
+.item {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    min-block-size: var(--control-lg);
+    padding: 0 var(--space-2);
+    font: inherit;
+    color: var(--ink);
+    text-align: start;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+}
+
+.item:hover:not(:disabled),
+.item:focus-visible {
+    background: var(--well);
+}
+
+.item:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.item:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.item .ui-glyph {
+    color: var(--muted);
+}
+
+.item[data-destructive] {
+    color: var(--accent);
+}
+
+.item[data-destructive] .ui-glyph {
+    color: currentColor;
+}
+
+.item[data-armed] {
+    background: color-mix(in srgb, var(--accent) 12%, var(--well));
+}
+
+.field {
+    display: flex;
+    gap: var(--space-1);
+    align-items: center;
+    padding: var(--space-0-5);
+}
+
+.field .ui-field {
+    flex: 1;
+    min-inline-size: 0;
+    padding-block: var(--space-1);
+}
