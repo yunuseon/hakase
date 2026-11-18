@@ -950,8 +950,54 @@ grid, the habits' dates, the frame strip, the formula editor's text and its
 highlight and gutter. Content inside one counts as reachable. The rules are
 pure (`findingsOf`, `jobsOf`, `auditView` in `components/layout-audit/audit.ts`,
 tested); the walk that measures (`measuredIn`) and the run live in
-`storybook/audit-stories.ts`. Its count is the backlog's bar for "Programs that
-fit any window".
+`storybook/audit-stories.ts`. **It is clean**: no program fails at any of
+its sizes, and that zero is the bar a new program meets. The one warning left
+is Storybook's own title, cut at 240 × 130.
+
+### Stage and properties
+
+**A program window is a stage and its controls.** The stage is the program's
+own view (a scope, a roll, a canvas, a picture) and the controls are what sets
+it. `ui-staged` in the controls sheet lays them out by size class: stacked,
+stage first, in compact and regular; side by side, the controls a column of
+`min(18rem, 40%)`, when the window is wide; the stage alone at a glance,
+because the controls region is `data-detail`. The stage is `[data-stage]`, a
+flex column that grows and never shrinks below `--stage-minimum`; the controls
+are a `slot name="controls"` or a `[data-controls]` element, and that one
+element is the scroll region, so a short window scrolls its controls and never
+itself. The slot is styled as a flex column on purpose: a slot is `display:
+contents` by default, and two slotted parts (an Output's strip and its export
+panel) would each have become a column of their own when wide. Converters,
+voices, pedals, Output, signals and paint follow it.
+
+**Controls are data: `hks-properties`.** A program describes its settings as
+`Section`s of `Property`s (`shared/properties.ts`: choice, range, number, span,
+toggle, text, action), built by a pure function beside its component
+(`converterSections`, `voiceSections`, `pedalSections`), and one component
+renders them, so the layout rules live once and a client with no browser can
+list the same controls from the same description. It emits `{ id, value }`, and
+the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
+`pedalChangeOf`) and folds it as before. The rules it holds:
+
+- **One grid for the whole panel**: label, control and value columns, every
+  section and row a `subgrid` of it, so values line up across sections. Rows
+  are grids of their own, not `display: contents`, because a driven range's
+  chain line (`ui-driven`) needs a positioned row to draw across.
+- **A row of choices that does not fit becomes a select**, measured, not
+  guessed: the choices are laid out at `max-content`, compared with their cell
+  on every render and resize, and when too wide they are hidden (and the cell
+  clipped, or the hidden row still widens the scroll area) while an
+  `hks-select` of the same options takes their place. A choice may carry a
+  `glyph`, drawn as an icon with the label as its name.
+- **Number fields fit their value** (`charsFor`, in `ch`), with the spinner
+  hidden, the arrow keys still stepping; numbers, toggles, text and selects
+  apply on `change`, ranges as they move.
+- **A setting exists only where it matters**: the builder leaves out a row
+  that does not apply (a voice's synth section for a preset instrument, decay
+  for a drone, the item picker with nothing to pick) rather than hiding it.
+- **In compact, titled sections fold** into a row that opens in place; which
+  are open is the component's own fold of its toggles, not saved, and in
+  regular every section is open with its title as a plain heading.
 
 ### Shared UI primitives
 
@@ -1871,7 +1917,7 @@ band-passed **noise** burst (the marimba's knock, the flute's breath), under a
 volume envelope, an optional sweeping lowpass (pad, bass) and vibrato on every
 oscillator's `detune`. A new instrument is one entry. With an instrument
 chosen, the window's own oscillator is shut (`drive`) and its bus carries only
-volume, filter and pan; the synth's own controls are hidden (`data-synth`).
+volume, filter and pan; `voiceSections` leaves the synth's own controls out.
 
 - **Notes are scheduled ahead on the audio clock, never struck per frame.**
   `scheduled` (in `shared/schedule.ts`, pure, shared with the drum machine)
@@ -2250,13 +2296,13 @@ An unshaped document passes the driver through untouched, so nothing recooks.
 combined `converter$` with a `converted$` derived from the same document at
 first, which fired every edit twice, once with a stale driver.
 
-`hks-converter` shows the summary, the curve fitted to its own bounds (0 and 1
-always in view, labelled top and bottom, a base line at 0), the moment and its
-value, the readings and, for a level, the shape controls; it takes a plain
-`ConverterView` from `converterView`, rendered in one pass. Ranges apply as
-they move; the range's number fields and the invert box on `change`, so "1" is
-not applied on the way to "12"; the fields keep their draft while focused
-(`displayValue`).
+`hks-converter` is the stage: the summary, the value now and the curve fitted
+to its own bounds (0 and 1 always in view, labelled top and bottom, a base
+line at 0) with the moment on it, from a plain `ConverterView`. Its controls
+are an `hks-properties` the program slots in, from `converterSections`: the
+item, the reading, and the Shape or Bit section, so the range's number fields
+and the invert box apply on `change` ("1" is not applied on the way to "12")
+and keep their draft while focused.
 
 **The pairs.**
 
@@ -3454,7 +3500,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and seventy-four of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

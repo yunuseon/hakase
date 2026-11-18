@@ -1,44 +1,15 @@
-import { html, nothing } from 'lit-html';
-import { ifDefined } from 'lit-html/directives/if-defined.js';
-import { repeat } from 'lit-html/directives/repeat.js';
+import { html } from 'lit-html';
 import { merge, type Observable } from 'rxjs';
-import { filter, map, mergeMap, tap } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 import { renderView, type RenderView } from '../../lib/lit.ts';
 import { styleSheet } from '../../lib/dom.ts';
-import { fromElementEvent$ } from '../../lib/rx.ts';
 import { controlsSheet, whys$ } from '../../shared/ui/controls.component.ts';
-import { readout, type KnobView, type PedalChange, type PedalView } from './pedal.ts';
+import type { PedalView } from './pedal.ts';
 import css from './pedal.css?inline';
 
 const sheet = styleSheet(css);
 
 const empty: PedalView = { summary: '', knobs: [], choices: [], choice: '', inputs: [] };
-
-const knobRow = (knob: KnobView) =>
-    html`<label class="row" data-driven=${ifDefined(knob.driven ? '' : undefined)}
-        ><span class="key">${knob.name}</span
-        ><input
-            class="ui-range dial"
-            type="range"
-            data-knob=${knob.name}
-            min=${knob.min}
-            max=${knob.max}
-            step=${knob.step}
-            ?disabled=${knob.driven}
-            .value=${String(knob.value)}
-        />${
-            knob.driven
-                ? html`<button
-                      type="button"
-                      class="ui-driven"
-                      data-why=${knob.name}
-                      data-chain=${knob.chain}
-                  >
-                      follows
-                  </button>`
-                : html`<output class="read">${readout(knob.value, knob.step)}</output>`
-        }</label
-    >`;
 
 const TEMPLATE = (view: PedalView) =>
     html`<p class="summary">${view.summary}</p>
@@ -50,27 +21,9 @@ const TEMPLATE = (view: PedalView) =>
                     </li>`,
             )}
         </ul>
-        ${
-            view.choices.length === 0
-                ? nothing
-                : html`<div class="ui-choices choices" role="radiogroup" aria-label="choice">
-                      ${view.choices.map(
-                          choice =>
-                              html`<label class="ui-segment"
-                                  ><input
-                                      type="radio"
-                                      name="choice"
-                                      .value=${choice}
-                                      .checked=${choice === view.choice}
-                                  /><span>${choice}</span></label
-                              >`,
-                      )}
-                  </div>`
-        }
-        ${repeat(view.knobs, knob => knob.name, knobRow)}`;
+        <slot></slot>`;
 
 export class HksPedal extends HTMLElement {
-    readonly changes$: Observable<PedalChange>;
     readonly whys$: Observable<string> = whys$(this);
 
     private readonly rendering: RenderView<PedalView>;
@@ -84,29 +37,6 @@ export class HksPedal extends HTMLElement {
         root.className = 'pedal';
         shadow.append(root);
         this.rendering = renderView(root, empty, TEMPLATE);
-
-        this.changes$ = merge(
-            fromElementEvent$(root, 'input').pipe(
-                mergeMap(({ target }): PedalChange[] =>
-                    target instanceof HTMLInputElement && target.type === 'range'
-                        ? [
-                              {
-                                  kind: 'value',
-                                  name: target.dataset['knob'] ?? '',
-                                  value: target.valueAsNumber,
-                              },
-                          ]
-                        : [],
-                ),
-            ),
-            fromElementEvent$(root, 'change').pipe(
-                mergeMap(({ target }): PedalChange[] =>
-                    target instanceof HTMLInputElement && target.type === 'radio'
-                        ? [{ kind: 'choice', choice: target.value }]
-                        : [],
-                ),
-            ),
-        ).pipe(filter(change => change.kind !== 'value' || change.name !== ''));
     }
 
     connect$(view$: Observable<PedalView>): Observable<void> {

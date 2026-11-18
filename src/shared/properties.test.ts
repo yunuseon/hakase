@@ -1,0 +1,34 @@
+import { describe, expect, it } from 'vitest';
+import { charsFor, fieldOf, numberOf, section, textOf, toggled } from './properties.ts';
+
+describe('properties', () => {
+    it('sizes a number field to its value, never under three characters', () => {
+        expect(charsFor(0.5, 0.1)).toBe(3);
+        expect(charsFor(-12.25, 0.01)).toBe(6);
+        expect(charsFor(1, 0.1)).toBe(3);
+        expect(charsFor(12345, 1)).toBe(5);
+    });
+
+    it('reads a change as the type its reader wants', () => {
+        expect(numberOf({ id: 'a', value: 2 })).toBe(2);
+        expect(numberOf({ id: 'a', value: true })).toBe(1);
+        expect(numberOf({ id: 'a', value: 'x' })).toBeNull();
+        expect(textOf({ id: 'a', value: 'x' })).toBe('x');
+        expect(textOf({ id: 'a', value: 1 })).toBeNull();
+    });
+
+    it('names a field within its group only', () => {
+        expect(fieldOf('shape.low', 'shape')).toBe('low');
+        expect(fieldOf('shapes.low', 'shape')).toBeNull();
+        expect(fieldOf('reading', 'shape')).toBeNull();
+    });
+
+    it('folds a titled section unless told not to, and toggles which are open', () => {
+        expect(section('a', 'A', []).fold).toBe(true);
+        expect(section('a', null, []).fold).toBe(false);
+        expect(section('a', 'A', [], false).fold).toBe(false);
+        const open = toggled(new Set(), 'a');
+        expect([...open]).toEqual(['a']);
+        expect([...toggled(open, 'a')]).toEqual([]);
+    });
+});

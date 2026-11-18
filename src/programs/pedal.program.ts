@@ -1,7 +1,7 @@
 import { pedalDeclaration } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
-import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
-import type { PedalView } from '../components/pedal/pedal.ts';
+import { distinctUntilChanged, ignoreElements, map, mergeMap, shareReplay } from 'rxjs/operators';
+import { pedalChangeOf, pedalSections, type PedalView } from '../components/pedal/pedal.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$ } from '../engine/view.ts';
 import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
@@ -18,13 +18,16 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
         size: { width: 300, height: 380 },
         minimum: { width: 200, height: 280 },
         launch: async () => {
-            const [{ HksImageView }, { HksPedal }] = await Promise.all([
+            const [{ HksImageView }, { HksPedal }, { HksProperties }] = await Promise.all([
                 import('../components/image-view/image-view.component.ts'),
                 import('../components/pedal/pedal.component.ts'),
+                import('../shared/ui/properties.component.ts'),
             ]);
             const view = new HksImageView();
             const pedal = new HksPedal();
+            const properties = new HksProperties();
             pedal.slot = 'controls';
+            pedal.append(properties);
             view.append(pedal);
 
             return {
@@ -66,6 +69,7 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                             choice: document.choice,
                             inputs,
                         })),
+                        shareReplay({ bufferSize: 1, refCount: true }),
                     );
 
                     return merge(
@@ -90,7 +94,11 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                             )
                             .pipe(ignoreElements()),
                         pedal.connect$(pedalView$).pipe(ignoreElements()),
-                        pedal.changes$.pipe(
+                        properties
+                            .connect$(pedalView$.pipe(map(pedalSections)))
+                            .pipe(ignoreElements()),
+                        properties.changes$.pipe(
+                            mergeMap(pedalChangeOf),
                             map((command): AppInput => ({ kind: 'pedal', command })),
                         ),
                         pedal.whys$.pipe(map((input): AppInput => ({ kind: 'why', input }))),

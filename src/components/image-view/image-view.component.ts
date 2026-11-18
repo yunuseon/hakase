@@ -12,11 +12,13 @@ import css from './image-view.css?inline';
 const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
-    html`<div class="viewport">
+    html`<div class="ui-staged">
+        <div class="viewport" data-stage>
             <canvas></canvas>
             <p class="message" hidden></p>
         </div>
-        <slot name="controls" data-detail></slot>`;
+        <slot name="controls" data-detail></slot>
+    </div>`;
 
 export class HksImageView extends HTMLElement {
     readonly sizes$: Observable<Size>;

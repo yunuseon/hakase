@@ -63,109 +63,116 @@ const HINTS: Readonly<Record<Field, string>> = {
 };
 
 const TEMPLATE = () =>
-    html`<div
-            class="scope"
-            title="drag the wave: up and down moves its offset, left and right its phase"
-        >
-            <svg
-                viewBox=${ifDefined(`0 -4 ${WIDTH} ${HEIGHT + 8}`)}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-            >
-                <line class="zero" x1="0" x2=${ifDefined(WIDTH)}></line>
-                <path class="wave"></path>
-                <line class="now" y1="-4" y2=${ifDefined(HEIGHT + 4)}></line></svg
-            ><span class="bound max"></span><span class="bound min"></span><span class="dot"></span>
-        </div>
-        <div class="row" data-detail>
-            <div class="ui-choices shapes" role="radiogroup" aria-label="shape">
-                ${SHAPES.map(
-                    shape =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-shape=${ifDefined(shape)}
-                            title=${ifDefined(shape)}
-                            aria-label=${ifDefined(shape)}
-                        >
-                            <svg viewBox="0 0 24 12" aria-hidden="true">
-                                <path d=${ifDefined(GLYPHS[shape])}></path>
-                            </svg>
-                        </button>`,
-                )}
-            </div>
+    html`<div class="ui-staged">
+        <div data-stage>
             <div
-                class="ui-choices rates"
-                role="radiogroup"
-                aria-label="cycles per loop"
-                title="cycles per loop"
+                class="scope"
+                title="drag the wave: up and down moves its offset, left and right its phase"
             >
-                ${RATES.map(
-                    rate =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-rate=${ifDefined(rate)}
-                        >
-                            ${rate}
-                        </button>`,
+                <svg
+                    viewBox=${ifDefined(`0 -4 ${WIDTH} ${HEIGHT + 8}`)}
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                >
+                    <line class="zero" x1="0" x2=${ifDefined(WIDTH)}></line>
+                    <path class="wave"></path>
+                    <line class="now" y1="-4" y2=${ifDefined(HEIGHT + 4)}></line></svg
+                ><span class="bound max"></span><span class="bound min"></span
+                ><span class="dot"></span>
+            </div>
+            <div class="steps" data-only="steps" data-detail>
+                <div class="bars" title="draw the steps"></div>
+                <div
+                    class="ui-choices counts"
+                    role="radiogroup"
+                    aria-label="steps"
+                    title="steps per cycle"
+                >
+                    ${STEP_COUNTS.map(
+                        count =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-count=${ifDefined(count)}
+                            >
+                                ${count}
+                            </button>`,
+                    )}
+                </div>
+            </div>
+        </div>
+        <div class="controls" data-controls data-detail>
+            <div class="row">
+                <div class="ui-choices shapes" role="radiogroup" aria-label="shape">
+                    ${SHAPES.map(
+                        shape =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-shape=${ifDefined(shape)}
+                                title=${ifDefined(shape)}
+                                aria-label=${ifDefined(shape)}
+                            >
+                                <svg viewBox="0 0 24 12" aria-hidden="true">
+                                    <path d=${ifDefined(GLYPHS[shape])}></path>
+                                </svg>
+                            </button>`,
+                    )}
+                </div>
+                <div
+                    class="ui-choices rates"
+                    role="radiogroup"
+                    aria-label="cycles per loop"
+                    title="cycles per loop"
+                >
+                    ${RATES.map(
+                        rate =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-rate=${ifDefined(rate)}
+                            >
+                                ${rate}
+                            </button>`,
+                    )}
+                </div>
+            </div>
+            <div class="params">
+                ${FIELDS.map(
+                    param =>
+                        html`<label
+                            class="param"
+                            title=${ifDefined(HINTS[param])}
+                            data-only=${ifDefined(param === 'glide' ? 'steps' : undefined)}
+                            ><span class="key">${param}</span
+                            ><input
+                                class="ui-field num"
+                                data-param=${ifDefined(param)}
+                                type="text"
+                                inputmode="decimal"
+                                spellcheck="false"
+                                autocomplete="off"
+                            />${
+                                isParam(param)
+                                    ? html`<button
+                                          type="button"
+                                          class="ui-driven"
+                                          data-why=${param}
+                                          data-chain=""
+                                          hidden
+                                      >
+                                          follows
+                                      </button>`
+                                    : nothing
+                            }</label
+                        >`,
                 )}
             </div>
         </div>
-        <div class="steps" data-only="steps" data-detail>
-            <div class="bars" title="draw the steps"></div>
-            <div
-                class="ui-choices counts"
-                role="radiogroup"
-                aria-label="steps"
-                title="steps per cycle"
-            >
-                ${STEP_COUNTS.map(
-                    count =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-count=${ifDefined(count)}
-                        >
-                            ${count}
-                        </button>`,
-                )}
-            </div>
-        </div>
-        <div class="params" data-detail>
-            ${FIELDS.map(
-                param =>
-                    html`<label
-                        class="param"
-                        title=${ifDefined(HINTS[param])}
-                        data-only=${ifDefined(param === 'glide' ? 'steps' : undefined)}
-                        ><span class="key">${param}</span
-                        ><input
-                            class="ui-field num"
-                            data-param=${ifDefined(param)}
-                            type="text"
-                            inputmode="decimal"
-                            spellcheck="false"
-                            autocomplete="off"
-                        />${
-                            isParam(param)
-                                ? html`<button
-                                      type="button"
-                                      class="ui-driven"
-                                      data-why=${param}
-                                      data-chain=""
-                                      hidden
-                                  >
-                                      follows
-                                  </button>`
-                                : nothing
-                        }</label
-                    >`,
-            )}
-        </div>`;
+    </div>`;
 
 type Pull = {
     readonly phase: Phase;

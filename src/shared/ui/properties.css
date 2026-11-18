@@ -1,0 +1,183 @@
+:host {
+    display: block;
+    min-block-size: 0;
+    overflow-y: auto;
+}
+
+.properties {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    gap: var(--space-1) var(--space-2);
+    align-items: center;
+    font: var(--text-sm) var(--font-ui);
+    color: var(--ink);
+}
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+}
+
+.section + .section {
+    padding-block-start: var(--space-2);
+    border-block-start: 1px solid var(--rule);
+}
+
+.title {
+    grid-column: 1 / -1;
+    margin: 0;
+    font: 500 var(--text-2xs) var(--font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.toggle {
+    display: none;
+    grid-column: 1 / -1;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    font: 500 var(--text-2xs) var(--font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.toggle:hover {
+    color: var(--ink);
+}
+
+.toggle:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+}
+
+.toggle .ui-glyph {
+    transition: rotate var(--duration-quick) var(--ease-out);
+}
+
+.section:not([data-open]) .toggle .ui-glyph {
+    rotate: -90deg;
+}
+
+.row {
+    position: relative;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    min-block-size: var(--control-md);
+}
+
+.row > .ui-driven {
+    justify-self: end;
+}
+
+.key {
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+.row:is([data-kind='choice'], [data-kind='number'], [data-kind='span'], [data-kind='text'])
+    > :not(.key),
+.row[data-kind='toggle'] > input {
+    grid-column: 2 / -1;
+}
+
+.row[data-kind='range'] > input {
+    inline-size: 100%;
+    min-inline-size: 0;
+}
+
+.row[data-kind='toggle'] > input,
+.row[data-kind='number'] > input {
+    justify-self: start;
+}
+
+.row[data-kind='action'] > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+}
+
+.value {
+    min-inline-size: 5ch;
+    font: var(--text-xs) var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    color: var(--label);
+}
+
+.fit {
+    position: relative;
+    display: grid;
+    min-inline-size: 0;
+}
+
+.fit .ui-choices {
+    inline-size: max-content;
+}
+
+.fit[data-fits='true'] hks-select {
+    display: none;
+}
+
+.fit[data-fits='false'] {
+    overflow: clip;
+}
+
+.fit[data-fits='false'] .ui-choices {
+    position: absolute;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.number {
+    inline-size: calc(var(--chars) * 1ch + var(--space-4) + 2px);
+    padding-block: var(--space-0-5);
+    font: var(--text-xs) var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+}
+
+/* The spinner took the value's room; the arrow keys still step it. */
+.number::-webkit-inner-spin-button,
+.number::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.span {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1-5);
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+@container window (width < 22rem) {
+    .section[data-fold] > .title {
+        display: none;
+    }
+
+    .section[data-fold] > .toggle {
+        display: flex;
+    }
+
+    .section[data-fold]:not([data-open]) > .row {
+        display: none;
+    }
+
+    .section[data-fold] + .section,
+    .section + .section[data-fold] {
+        padding-block-start: var(--space-1);
+    }
+}

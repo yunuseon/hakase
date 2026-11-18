@@ -1,6 +1,7 @@
 import { declarations } from '../declarations.ts';
 import { combineLatest, EMPTY, merge } from 'rxjs';
 import {
+    distinctUntilChanged,
     ignoreElements,
     map,
     mergeMap,
@@ -13,6 +14,7 @@ import {
 } from 'rxjs/operators';
 import { applyLevel, voiceGraph$, type VoiceGraph } from '../components/voice/audio/graph.ts';
 import { strike } from '../components/voice/audio/strike.ts';
+import { voiceCommandOf, voiceSections } from '../components/voice/voice-controls.ts';
 import { frameOf } from '../shared/schedule.ts';
 import {
     notesOf,
@@ -31,8 +33,14 @@ export const voiceProgram = {
     minimum: { width: 220, height: 180 },
     audible: true,
     launch: async () => {
-        const { HksVoice } = await import('../components/voice/voice.component.ts');
+        const [{ HksVoice }, { HksProperties }] = await Promise.all([
+            import('../components/voice/voice.component.ts'),
+            import('../shared/ui/properties.component.ts'),
+        ]);
         const voice = new HksVoice();
+        const properties = new HksProperties();
+        properties.slot = 'controls';
+        voice.append(properties);
 
         return {
             element: voice,
@@ -93,6 +101,23 @@ export const voiceProgram = {
 
                 return merge(
                     voice.connect$(heard$, playhead$, listening$).pipe(ignoreElements()),
+                    properties
+                        .connect$(
+                            sounding$.pipe(
+                                map(({ voice: document }) => document),
+                                distinctUntilChanged(),
+                                map(voiceSections),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
+                    properties.changes$.pipe(
+                        mergeMap(change =>
+                            voiceCommandOf(change).map((command): AppInput => ({
+                                kind: 'voice',
+                                command,
+                            })),
+                        ),
+                    ),
                     sound$.pipe(ignoreElements()),
                     events$.pipe(
                         mergeMap((event): AppInput[] =>

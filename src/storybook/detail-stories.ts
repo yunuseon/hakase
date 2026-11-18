@@ -7,10 +7,20 @@ import { HksBox } from '../components/box/box.component.ts';
 import type { BoxView } from '../components/box/box.ts';
 import { GATE_DEFAULTS, reduceGate, type Bit } from '../gates.ts';
 import { circuitTable } from '../circuit.ts';
-import type { PedalView } from '../components/pedal/pedal.ts';
+import { pedalChangeOf, pedalSections, type PedalView } from '../components/pedal/pedal.ts';
+import { HksProperties } from '../shared/ui/properties.component.ts';
 import { defaultPedal, PEDALS, reducePedal, valueOf } from '../pedals.ts';
 import type { Shown } from '../shared/shown.ts';
-import { filter, map, scan, share, shareReplay, startWith, withLatestFrom } from 'rxjs/operators';
+import {
+    filter,
+    map,
+    mergeMap,
+    scan,
+    share,
+    shareReplay,
+    startWith,
+    withLatestFrom,
+} from 'rxjs/operators';
 import { HksTicketCreator } from '../components/ticket-creator/ticket-creator.component.ts';
 import {
     closedCreation,
@@ -305,12 +315,15 @@ export const detailStories: readonly Story[] = [
         defaults,
         height: 300,
         action: 'changes$',
-        code: 'const pedal = new HksPedal();\nconst lifetime$ = pedal.connect$(view$);\nconst commands$ = pedal.changes$;',
+        code: 'const pedal = new HksPedal();\nconst properties = new HksProperties();\npedal.append(properties);\nconst lifetime$ = merge(pedal.connect$(view$), properties.connect$(view$.pipe(map(pedalSections))));\nconst commands$ = properties.changes$.pipe(mergeMap(pedalChangeOf));',
         create: ({ variant }) => {
             const element = new HksPedal();
+            const properties = new HksProperties();
+            element.append(properties);
             const kind = variant === 'mix' ? 'mix' : 'kaleido';
             const spec = PEDALS[kind];
-            const view$ = element.changes$.pipe(
+            const commands$ = properties.changes$.pipe(mergeMap(pedalChangeOf), share());
+            const view$ = commands$.pipe(
                 scan(reducePedal, defaultPedal(kind)),
                 startWith(defaultPedal(kind)),
                 map((pedal): PedalView => ({
@@ -329,12 +342,16 @@ export const detailStories: readonly Story[] = [
                         from: index === 0 ? 'sketch 2' : null,
                     })),
                 })),
+                shareReplay({ bufferSize: 1, refCount: true }),
             );
 
             return {
                 element,
-                run$: element.connect$(view$),
-                events$: element.changes$.pipe(map(change => recorded(change.kind, change))),
+                run$: merge(
+                    element.connect$(view$),
+                    properties.connect$(view$.pipe(map(pedalSections))),
+                ),
+                events$: commands$.pipe(map(change => recorded(change.kind, change))),
             };
         },
     },

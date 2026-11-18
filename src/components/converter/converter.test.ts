@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundsOf, converterView, HEIGHT, pathOf, WIDTH } from './converter.ts';
+import { boundsOf, converterSections, converterView, HEIGHT, pathOf, WIDTH } from './converter.ts';
 
 describe('a converter view', () => {
     it('keeps 0 and 1 in view, and widens to whatever the curve reaches', () => {
@@ -14,23 +14,40 @@ describe('a converter view', () => {
         expect(path.endsWith(`L${WIDTH} ${HEIGHT.toFixed(1)}`)).toBe(true);
     });
 
-    it('says what to plug in while nothing is, and shows no shape it was not given', () => {
+    it('says what to plug in while nothing is', () => {
         const view = converterView({
             summary: 's',
-            choices: [{ id: 'a', title: 'A' }],
-            choice: 'a',
             samples: null,
             value: null,
             t: 0.5,
             empty: 'Nothing plugged into in.',
-            shape: null,
-            bits: null,
-            thresholded: false,
         });
 
         expect(view.empty).toBe('Nothing plugged into in.');
         expect(view.value).toBe('–');
-        expect(view.choices).toEqual([{ id: 'a', title: 'A', checked: true }]);
-        expect(view.shape).toBeNull();
+    });
+
+    it('lists the item picker only when there is something to pick, and a shape only for a level', () => {
+        const base = {
+            choices: [{ id: 'a', title: 'A' }],
+            choice: 'a',
+            items: [],
+            item: '',
+            shape: null,
+            bits: { invert: false, hold: 0, threshold: 0.5, band: 0 },
+            thresholded: true,
+        };
+        const plain = converterSections(base);
+        const picked = converterSections({ ...base, items: [{ id: 'x', title: 'X' }], item: 'x' });
+
+        expect(plain.map(({ id }) => id)).toEqual(['reading', 'bits']);
+        expect(plain[0]?.properties.map(({ id }) => id)).toEqual(['reading']);
+        expect(picked[0]?.properties.map(({ id }) => id)).toEqual(['item', 'reading']);
+        expect(plain[1]?.properties.map(({ id }) => id)).toEqual([
+            'bits.threshold',
+            'bits.band',
+            'bits.invert',
+            'bits.hold',
+        ]);
     });
 });

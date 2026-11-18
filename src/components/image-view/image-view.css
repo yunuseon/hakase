@@ -1,11 +1,8 @@
 :host {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: block;
     block-size: 100%;
+    min-block-size: 0;
     min-inline-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
 }
 
 .viewport {
@@ -40,9 +37,4 @@ canvas {
 
 .message[hidden] {
     display: none;
-}
-
-::slotted([slot='controls']) {
-    display: block;
-    flex: none;
 }

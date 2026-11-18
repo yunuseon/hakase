@@ -1,5 +1,5 @@
 import { combineLatest, EMPTY, merge, of } from 'rxjs';
-import { map, scan, share, shareReplay, startWith, tap } from 'rxjs/operators';
+import { map, mergeMap, scan, share, shareReplay, startWith, tap } from 'rxjs/operators';
 import { HksSelect } from '../shared/select/select.component.ts';
 import { renderOptions } from '../shared/select/options.component.ts';
 import { HksSearchPicker } from '../components/search-picker/search-picker.component.ts';
@@ -7,10 +7,45 @@ import { HksProgressBar } from '../components/progress-bar/progress-bar.componen
 import { HksLinearSlider } from '../components/slider/linear/linear-slider.component.ts';
 import { HksCircularSlider } from '../components/slider/circular/circular-slider.component.ts';
 import { HksVoice } from '../components/voice/voice.component.ts';
+import { voiceCommandOf, voiceSections } from '../components/voice/voice-controls.ts';
 import { defaultVoice, notesOf, reduceVoice, soundingOf } from '../model/voice.ts';
 import { HksDrums } from '../components/drums/drums.component.ts';
 import { defaultDrums, reduceDrums } from '../model/drums.ts';
+import { converterSections, type ConverterControls } from '../components/converter/converter.ts';
+import { HksProperties } from '../shared/ui/properties.component.ts';
 import { defaults, recorded, type Story } from './story.ts';
+
+const propertiesFixture = (variant: string): ConverterControls => ({
+    choices: [
+        { id: 'loudness', title: 'loudness' },
+        { id: 'pitch', title: 'pitch' },
+        { id: 'drum', title: 'one drum' },
+    ],
+    choice: 'loudness',
+    items:
+        variant === 'items'
+            ? ['Tokyo', 'Lagos', 'Lima', 'Oslo', 'Perth', 'Quito'].map(title => ({
+                  id: title.toLowerCase(),
+                  title,
+              }))
+            : [],
+    item: 'tokyo',
+    shape:
+        variant === 'bit'
+            ? null
+            : {
+                  low: 0,
+                  high: 1,
+                  fit: false,
+                  invert: false,
+                  curve: 0,
+                  steps: 0,
+                  smooth: 0,
+                  grid: 0,
+              },
+    bits: variant === 'bit' ? { invert: false, hold: 0, threshold: 0.5, band: 0.05 } : null,
+    thresholded: variant === 'bit',
+});
 
 const normal = [{ id: 'default', title: 'Default' }];
 export const controlStories: readonly Story[] = [
@@ -210,32 +245,36 @@ export const controlStories: readonly Story[] = [
         defaults,
         height: 420,
         action: null,
-        code: 'const voice = new HksVoice();\nconst lifetime$ = voice.connect$(heard$, position$, listening$);\nconst requests$ = voice.changes$;',
+        code: "const voice = new HksVoice();\nconst properties = new HksProperties();\nproperties.slot = 'controls';\nvoice.append(properties);\nconst lifetime$ = merge(voice.connect$(heard$, position$, listening$), properties.connect$(voice$.pipe(map(voiceSections))));\nconst commands$ = properties.changes$.pipe(mergeMap(voiceCommandOf));",
         create: ({ args$, variant }) => {
             const element = new HksVoice();
+            const properties = new HksProperties();
+            properties.slot = 'controls';
+            element.append(properties);
             if (variant === 'compact') {
                 element.style.inlineSize = 'min(100%, 240px)';
                 element.style.blockSize = '300px';
             }
-            const events$ = element.changes$.pipe(share());
-            const heard$ = events$.pipe(
-                scan(
-                    (voice, event) =>
-                        event.kind === 'command' ? reduceVoice(voice, event.command) : voice,
-                    defaultVoice,
-                ),
+            const commands$ = properties.changes$.pipe(mergeMap(voiceCommandOf), share());
+            const voice$ = commands$.pipe(
+                scan(reduceVoice, defaultVoice),
                 startWith(defaultVoice),
+                shareReplay({ bufferSize: 1, refCount: true }),
+            );
+            const heard$ = voice$.pipe(
                 map(voice => soundingOf(voice, new Map())),
                 map(sounding => ({ sounding, notes: notesOf(sounding) })),
             );
             return {
                 element,
-                run$: element.connect$(
-                    heard$,
-                    args$.pipe(map(args => args.value / 100)),
-                    of(false),
+                run$: merge(
+                    element.connect$(heard$, args$.pipe(map(args => args.value / 100)), of(false)),
+                    properties.connect$(voice$.pipe(map(voiceSections))),
                 ),
-                events$: events$.pipe(map(event => recorded(event.kind, event))),
+                events$: merge(
+                    element.changes$.pipe(map(event => recorded(event.kind, event))),
+                    commands$.pipe(map(command => recorded('command', command))),
+                ),
             };
         },
     },
@@ -275,6 +314,48 @@ export const controlStories: readonly Story[] = [
                     of(false),
                 ),
                 events$: events$.pipe(map(event => recorded(event.kind, event))),
+            };
+        },
+    },
+    {
+        id: 'properties',
+        title: 'Properties',
+        group: 'Controls',
+        description:
+            "A program's settings as data, rendered on one aligned grid of label, control and value. A row of choices that does not fit becomes a select, number fields fit their value, and in a compact window titled sections fold into rows that open in place.",
+        elements: ['hks-properties', 'Section', 'Property', 'PropertyChange'],
+        variants: [
+            { id: 'level', title: 'Shape (a level)' },
+            { id: 'bit', title: 'Threshold (a bit)' },
+            { id: 'items', title: 'Many choices' },
+        ],
+        controls: [],
+        defaults,
+        height: 420,
+        action: null,
+        code: "const properties = new HksProperties();\nconst lifetime$ = properties.connect$(sections$);\n// sections: [section('shape', 'Shape', [{ kind: 'range', id: 'shape.curve', label: 'curve', value, min, max, step, text }])]\nconst changes$ = properties.changes$; // { id, value }",
+        create: ({ variant }) => {
+            const element = new HksProperties();
+            const changes$ = element.changes$.pipe(share());
+            const controls$ = changes$.pipe(
+                scan((controls, { id, value }) => {
+                    const field = id.split('.')[1] ?? '';
+                    return id === 'reading' && typeof value === 'string'
+                        ? { ...controls, choice: value }
+                        : id === 'item' && typeof value === 'string'
+                          ? { ...controls, item: value }
+                          : id.startsWith('shape.') && controls.shape !== null
+                            ? { ...controls, shape: { ...controls.shape, [field]: value } }
+                            : id.startsWith('bits.') && controls.bits !== null
+                              ? { ...controls, bits: { ...controls.bits, [field]: value } }
+                              : controls;
+                }, propertiesFixture(variant)),
+                startWith(propertiesFixture(variant)),
+            );
+            return {
+                element,
+                run$: element.connect$(controls$.pipe(map(converterSections))),
+                events$: changes$.pipe(map(change => recorded('change', change))),
             };
         },
     },

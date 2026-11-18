@@ -20,9 +20,9 @@ programs fail, 33 findings.** Converters are 17 of them: every one makes its
 window scroll at its 220 × 180 minimum, by up to 198px; sound → level's reading
 chips push it sideways by 82 to 182px at every size, picture → level's by 9 to
 29px; level → bit's threshold is 3px narrower than its value at every size.
-Focus scrolls sideways by 3px in compact. Size classes and glance layouts
-since left nothing failing at any program's minimum; what remains is compact
-and regular, the next two steps' work. A first scripted look also blamed
+Focus scrolls sideways by 3px in compact. Size classes, glance layouts, the
+stage and controls layout and `hks-properties` (see `AGENTS.md`) have since
+taken it to **0 of 56**. A first scripted look also blamed
 Voice and Paint, but the screen's edge had cut them, not their frames, which is
 why the audit measures inside a frame of its own.
 
@@ -37,28 +37,19 @@ same controls from the same description.
 
 ### In order
 
-- **One controls grammar.** A program describes its settings as data
-  (`ControlSpec`: section, choice, range, number, toggle, text, action), built
-  by its pure view function, and one `hks-controls` component renders them:
-  label, control and value aligned on one subgrid across the whole panel;
-  number fields sized to their value; a row of choices that does not fit
-  becomes a select; in compact, secondary sections fold into rows that open in
-  place; never horizontal scroll. It emits `{ id, value }` changes, and the
-  program folds them as it does now. Done when every converter is rendered by
-  it, with no stylesheet of its own for its controls, and passes the audit.
-- **Stage and controls.** Every program window is a _stage_ (its bespoke view:
-  canvas, scope, plot, grid, list, flexible with a minimum of its own) and its
-  _controls_. Compact stacks them, wide puts them side by side, glance shows the
-  stage alone with the controls behind a ⋯. Done when Signal, Voice and Paint
-  follow it and pass the audit at every size.
-- **Migrate the rest**, worst first by the audit's count, deleting each
-  program's hand-rolled layout CSS as it moves. Done when the audit is clean for
-  all 57 programs at every size, and its zero is the bar a new program meets.
 - **Menus.** Every menu (the state chip's, the program switcher, the formula
   editor's ⋯, the tickets' pickers) follows one grammar: a program's own actions
   in a ⋯ at the same place in the header, grouped, with icons, destructive last,
   and never clipped by its window. Done when each menu is listed in the
   catalogue against that grammar and none departs from it.
+- **Properties everywhere.** The audit is clean, but only converters, voices
+  and pedals describe their controls as `Section`s; the sketch's Scene tab,
+  the drum machine's settings, the focus timer's lengths, the export panel and
+  the theme and appearance editors still hand-build their rows. Move each onto
+  `hks-properties` (adding a property kind where one is missing, such as a
+  drag-number for the signal's instrument-like fields), deleting its row CSS.
+  Done when no component outside `shared/ui` styles a label and value row of
+  its own.
 
 ## The finish
 

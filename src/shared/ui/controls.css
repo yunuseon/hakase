@@ -502,3 +502,39 @@
         display: none !important;
     }
 }
+
+:where(.ui-staged) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    block-size: 100%;
+    min-block-size: 0;
+    min-inline-size: 0;
+}
+:where(.ui-staged) > :where([data-stage]) {
+    display: flex;
+    flex: 1 0 var(--stage-minimum, var(--space-20));
+    flex-direction: column;
+    gap: var(--space-2);
+    min-inline-size: 0;
+}
+.ui-staged > :is(slot[name='controls'], [data-controls]) {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-block-size: 0;
+    min-inline-size: 0;
+    overflow-y: auto;
+}
+@container window (width >= 40rem) {
+    :where(.ui-staged) {
+        flex-direction: row;
+    }
+    :where(.ui-staged) > :where([data-stage]) {
+        flex: 1 1 0;
+    }
+    .ui-staged > :is(slot[name='controls'], [data-controls]) {
+        flex: 0 0 min(18rem, 40%);
+    }
+}

@@ -28,13 +28,16 @@ svg {
     inset: 0;
     inline-size: 100%;
     block-size: 100%;
-    transform: rotate(-90deg);
 }
 
+/* The circles turn, not the svg: a dial that is not quite square turned sideways sticks out of the window. */
 .track,
 .arc {
     fill: none;
     stroke-width: 4;
+    transform: rotate(-90deg);
+    transform-box: view-box;
+    transform-origin: center;
 }
 
 .track {

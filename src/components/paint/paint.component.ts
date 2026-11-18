@@ -65,118 +65,124 @@ const dial = (field: string, label: string, min: number, max: number, step: numb
     ></label>`;
 
 const TEMPLATE = () =>
-    html`<div class="bar" data-detail>
-            <div class="ui-choices tools" role="radiogroup" aria-label="tool">
-                ${TOOLS.map(
-                    tool =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-tool=${ifDefined(tool)}
-                            title=${ifDefined(`${tool} (${TOOL_KEYS[tool].toUpperCase()})`)}
-                            aria-label=${ifDefined(tool)}
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d=${ifDefined(TOOL_GLYPHS[tool])}></path>
-                            </svg>
-                        </button>`,
-                )}
+    html`<div class="ui-staged">
+        <div data-stage>
+            <div class="bar" data-detail>
+                <div class="ui-choices tools" role="radiogroup" aria-label="tool">
+                    ${TOOLS.map(
+                        tool =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-tool=${ifDefined(tool)}
+                                title=${ifDefined(`${tool} (${TOOL_KEYS[tool].toUpperCase()})`)}
+                                aria-label=${ifDefined(tool)}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d=${ifDefined(TOOL_GLYPHS[tool])}></path>
+                                </svg>
+                            </button>`,
+                    )}
+                </div>
+                ${dial('size', 'size', 1, MAX_BRUSH, 1)}${dial('hardness', 'edge', 0, 1, 0.05)}${dial('flow', 'flow', 0.05, 1, 0.05)}
+                <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
+                    ${SYMMETRIES.map(
+                        symmetry =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-symmetry=${ifDefined(symmetry)}
+                                title=${ifDefined(SYMMETRY_TITLES[symmetry])}
+                                aria-label=${ifDefined(SYMMETRY_TITLES[symmetry])}
+                            >
+                                ${SymmetryIcon({ symmetry: symmetry })}
+                            </button>`,
+                    )}
+                </div>
             </div>
-            ${dial('size', 'size', 1, MAX_BRUSH, 1)}${dial('hardness', 'edge', 0, 1, 0.05)}${dial('flow', 'flow', 0.05, 1, 0.05)}
-            <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
-                ${SYMMETRIES.map(
-                    symmetry =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-symmetry=${ifDefined(symmetry)}
-                            title=${ifDefined(SYMMETRY_TITLES[symmetry])}
-                            aria-label=${ifDefined(SYMMETRY_TITLES[symmetry])}
-                        >
-                            ${SymmetryIcon({ symmetry: symmetry })}
-                        </button>`,
-                )}
+            <div
+                class="stage"
+                tabindex="0"
+                aria-label="painting: arrow keys shift it, [ and ] size the brush, comma and full stop step through frames"
+            >
+                <div class="sheet">
+                    <canvas class="onion" width="1" height="1"></canvas
+                    ><canvas class="ink" width="1" height="1"></canvas
+                    ><svg
+                        class="guides"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    ></svg>
+                    <div class="cursor" hidden></div>
+                </div>
             </div>
         </div>
-        <div
-            class="stage"
-            tabindex="0"
-            aria-label="painting: arrow keys shift it, [ and ] size the brush, comma and full stop step through frames"
-        >
-            <div class="sheet">
-                <canvas class="onion" width="1" height="1"></canvas
-                ><canvas class="ink" width="1" height="1"></canvas
-                ><svg
-                    class="guides"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                ></svg>
-                <div class="cursor" hidden></div>
+        <div class="controls" data-controls data-detail>
+            <div class="frames">
+                <ol class="strip" aria-label="frames"></ol>
+                <button
+                    type="button"
+                    class="key"
+                    data-add
+                    title="add a frame: a copy of this one"
+                    aria-label="add a frame"
+                >
+                    +</button
+                ><button
+                    type="button"
+                    class="key"
+                    data-remove
+                    title="delete this frame"
+                    aria-label="delete this frame"
+                >
+                    −</button
+                ><button
+                    type="button"
+                    class="toggle"
+                    data-fade
+                    aria-pressed="false"
+                    title="fade each frame into the next as the loop plays"
+                >
+                    fade</button
+                ><button
+                    type="button"
+                    class="toggle"
+                    data-onion
+                    aria-pressed="false"
+                    title="show the frame before this one faintly underneath"
+                >
+                    onion
+                </button>
+            </div>
+            <div class="foot">
+                <div class="ui-choices sides" role="radiogroup" aria-label="resolution">
+                    ${SIZES.map(
+                        size =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-side=${ifDefined(size)}
+                                title=${ifDefined(`${size} × ${size} pixels`)}
+                            >
+                                ${size}
+                            </button>`,
+                    )}
+                </div>
+                <div class="actions">
+                    ${ACTIONS.map(
+                        action =>
+                            html`<button type="button" data-action=${ifDefined(action)}>
+                                ${action}
+                            </button>`,
+                    )}
+                </div>
             </div>
         </div>
-        <div class="frames" data-detail>
-            <ol class="strip" aria-label="frames"></ol>
-            <button
-                type="button"
-                class="key"
-                data-add
-                title="add a frame: a copy of this one"
-                aria-label="add a frame"
-            >
-                +</button
-            ><button
-                type="button"
-                class="key"
-                data-remove
-                title="delete this frame"
-                aria-label="delete this frame"
-            >
-                −</button
-            ><button
-                type="button"
-                class="toggle"
-                data-fade
-                aria-pressed="false"
-                title="fade each frame into the next as the loop plays"
-            >
-                fade</button
-            ><button
-                type="button"
-                class="toggle"
-                data-onion
-                aria-pressed="false"
-                title="show the frame before this one faintly underneath"
-            >
-                onion
-            </button>
-        </div>
-        <div class="foot" data-detail>
-            <div class="ui-choices sides" role="radiogroup" aria-label="resolution">
-                ${SIZES.map(
-                    size =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-side=${ifDefined(size)}
-                            title=${ifDefined(`${size} × ${size} pixels`)}
-                        >
-                            ${size}
-                        </button>`,
-                )}
-            </div>
-            <div class="actions">
-                ${ACTIONS.map(
-                    action =>
-                        html`<button type="button" data-action=${ifDefined(action)}>
-                            ${action}
-                        </button>`,
-                )}
-            </div>
-        </div>`;
+    </div>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element

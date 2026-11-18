@@ -1,18 +1,13 @@
 :host {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: block;
     block-size: 100%;
     min-block-size: 0;
+    min-inline-size: 0;
     font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
-    min-inline-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
 }
 
-.bar,
-.settings {
+.bar {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1-5) var(--space-2-5);
@@ -21,20 +16,6 @@
 
 button {
     color: inherit;
-}
-
-.shapes button {
-    padding: 0 var(--space-1);
-}
-
-svg {
-    inline-size: var(--space-4);
-    block-size: var(--space-4);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
 }
 
 .roll {
@@ -69,6 +50,10 @@ svg {
     color: var(--ink);
 }
 
+.hint {
+    margin: 0;
+}
+
 .hint b {
     font: 600 var(--text-xs) var(--font-mono);
     color: var(--label);
@@ -76,51 +61,4 @@ svg {
 
 .hint[hidden] {
     display: none;
-}
-
-.field,
-.dial {
-    display: flex;
-    gap: var(--space-1-5);
-    align-items: center;
-    color: var(--muted);
-}
-
-.field hks-select {
-    padding: var(--space-1) var(--space-1-5);
-    font: 500 var(--text-xs) var(--font-mono);
-    color: var(--ink);
-    background: var(--well);
-    border: none;
-    border-radius: var(--radius-lg);
-}
-
-.dial input {
-    inline-size: var(--space-16);
-    accent-color: var(--accent);
-}
-
-.dial output {
-    min-inline-size: 5ch;
-    font: 500 var(--text-xs) var(--font-mono);
-    color: var(--ink);
-}
-
-:host(:not([data-articulation='pluck'])) [data-only='pluck'],
-:host(:not([data-instrument='synth'])) [data-synth] {
-    display: none;
-}
-
-.instruments {
-    flex-wrap: wrap;
-    align-self: flex-start;
-}
-
-.shapes {
-    flex-wrap: wrap;
-}
-.dial {
-    flex-wrap: wrap;
-    min-inline-size: 0;
-    max-inline-size: 100%;
 }

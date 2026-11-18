@@ -1,3 +1,5 @@
+import { section, type Section } from '../../shared/properties.ts';
+
 export const WIDTH = 200;
 export const HEIGHT = 80;
 
@@ -21,31 +23,16 @@ export type Bits = {
     readonly band: number;
 };
 
-export type BitsView = Bits & { readonly holdText: string; readonly thresholded: boolean };
-
 export type ConverterInput = {
     readonly summary: string;
-    readonly choices: readonly Choice[];
-    readonly choice: string;
     readonly samples: ArrayLike<number> | null;
     readonly value: number | null;
     readonly t: number;
     readonly empty: string;
-    readonly shape: Shape | null;
-    readonly bits: Bits | null;
-    readonly thresholded: boolean;
-};
-
-export type ShapeView = Shape & {
-    readonly curveText: string;
-    readonly stepsText: string;
-    readonly smoothText: string;
-    readonly gridText: string;
 };
 
 export type ConverterView = {
     readonly summary: string;
-    readonly choices: readonly (Choice & { readonly checked: boolean })[];
     readonly path: string;
     readonly x: number;
     readonly y: number;
@@ -54,8 +41,6 @@ export type ConverterView = {
     readonly bottom: string;
     readonly zero: number;
     readonly empty: string | null;
-    readonly shape: ShapeView | null;
-    readonly bits: BitsView | null;
 };
 
 type Bounds = { readonly low: number; readonly high: number };
@@ -81,34 +66,17 @@ export const pathOf = (samples: ArrayLike<number>, bounds: Bounds = boundsOf(sam
 
 const number = (value: number) => String(Math.round(value * 100) / 100);
 
-export const shapeView = (shape: Shape): ShapeView => ({
-    ...shape,
-    curveText:
-        shape.curve === 0
-            ? 'linear'
-            : `${shape.curve < 0 ? 'out' : 'in'} ${number(Math.abs(shape.curve))}`,
-    stepsText: shape.steps < 2 ? 'off' : String(shape.steps),
-    smoothText: shape.smooth === 0 ? 'off' : number(shape.smooth),
-    gridText: shape.grid === 0 ? 'off' : `${shape.grid} a loop`,
-});
-
 export const converterView = ({
     summary,
-    choices,
-    choice,
     samples,
     value,
     t,
     empty,
-    shape,
-    bits,
-    thresholded,
 }: ConverterInput): ConverterView => {
     const bounds = samples === null ? { low: 0, high: 1 } : boundsOf(samples);
 
     return {
         summary,
-        choices: choices.map(item => ({ ...item, checked: item.id === choice })),
         path: samples === null ? '' : pathOf(samples, bounds),
         x: t * WIDTH,
         y: yOf(value ?? bounds.low, bounds),
@@ -117,14 +85,154 @@ export const converterView = ({
         bottom: number(bounds.low),
         zero: yOf(0, bounds),
         empty: samples === null ? empty : null,
-        shape: shape === null ? null : shapeView(shape),
-        bits:
-            bits === null
-                ? null
-                : {
-                      ...bits,
-                      holdText: bits.hold === 0 ? 'off' : `${Math.round(bits.hold * 100)}%`,
-                      thresholded,
-                  },
     };
 };
+
+export type ConverterControls = {
+    readonly choices: readonly Choice[];
+    readonly choice: string;
+    readonly items: readonly Choice[];
+    readonly item: string;
+    readonly shape: Shape | null;
+    readonly bits: Bits | null;
+    readonly thresholded: boolean;
+};
+
+const shapeSection = (shape: Shape): Section =>
+    section('shape', 'Shape', [
+        {
+            kind: 'span',
+            id: 'shape.range',
+            label: 'range',
+            low: { id: 'shape.low', label: 'lowest value', value: shape.low },
+            high: { id: 'shape.high', label: 'highest value', value: shape.high },
+            step: 0.1,
+        },
+        {
+            kind: 'toggle',
+            id: 'shape.fit',
+            label: 'fit',
+            value: shape.fit,
+            hint: 'stretch what it reads to fill the range',
+        },
+        { kind: 'toggle', id: 'shape.invert', label: 'invert', value: shape.invert },
+        {
+            kind: 'range',
+            id: 'shape.curve',
+            label: 'curve',
+            value: shape.curve,
+            min: -1,
+            max: 1,
+            step: 0.05,
+            text:
+                shape.curve === 0
+                    ? 'linear'
+                    : `${shape.curve < 0 ? 'out' : 'in'} ${number(Math.abs(shape.curve))}`,
+        },
+        {
+            kind: 'range',
+            id: 'shape.steps',
+            label: 'steps',
+            value: shape.steps,
+            min: 0,
+            max: 16,
+            step: 1,
+            text: shape.steps < 2 ? 'off' : String(shape.steps),
+        },
+        {
+            kind: 'range',
+            id: 'shape.smooth',
+            label: 'smooth',
+            value: shape.smooth,
+            min: 0,
+            max: 0.99,
+            step: 0.01,
+            text: shape.smooth === 0 ? 'off' : number(shape.smooth),
+        },
+        {
+            kind: 'range',
+            id: 'shape.grid',
+            label: 'grid',
+            value: shape.grid,
+            min: 0,
+            max: 64,
+            step: 1,
+            text: shape.grid === 0 ? 'off' : `${shape.grid} a loop`,
+            hint: 'sample and hold, this many times a loop',
+        },
+    ]);
+
+const bitsSection = (bits: Bits, thresholded: boolean): Section =>
+    section('bits', 'Bit', [
+        ...(thresholded
+            ? [
+                  {
+                      kind: 'number' as const,
+                      id: 'bits.threshold',
+                      label: 'threshold',
+                      value: bits.threshold,
+                      step: 0.1,
+                  },
+                  {
+                      kind: 'number' as const,
+                      id: 'bits.band',
+                      label: 'band',
+                      value: bits.band,
+                      step: 0.1,
+                      hint: 'hysteresis: how far past the threshold it must go to flip back',
+                  },
+              ]
+            : []),
+        { kind: 'toggle', id: 'bits.invert', label: 'invert', value: bits.invert },
+        {
+            kind: 'range',
+            id: 'bits.hold',
+            label: 'hold',
+            value: bits.hold,
+            min: 0,
+            max: 0.5,
+            step: 0.01,
+            text: bits.hold === 0 ? 'off' : `${Math.round(bits.hold * 100)}%`,
+        },
+    ]);
+
+const optionsOf = (choices: readonly Choice[]) =>
+    choices.map(({ id, title }) => ({ value: id, label: title }));
+
+export const converterSections = ({
+    choices,
+    choice,
+    items,
+    item,
+    shape,
+    bits,
+    thresholded,
+}: ConverterControls): readonly Section[] => [
+    section(
+        'reading',
+        null,
+        [
+            ...(items.length === 0
+                ? []
+                : [
+                      {
+                          kind: 'choice' as const,
+                          id: 'item',
+                          label: 'of',
+                          value: item,
+                          options: optionsOf(items),
+                      },
+                  ]),
+            {
+                kind: 'choice',
+                id: 'reading',
+                label: 'reads',
+                value: choice,
+                options: optionsOf(choices),
+            },
+        ],
+        false,
+    ),
+    ...(shape === null ? [] : [shapeSection(shape)]),
+    ...(bits === null ? [] : [bitsSection(bits, thresholded)]),
+];
