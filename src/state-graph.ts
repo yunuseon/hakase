@@ -8,7 +8,7 @@ import { followedBy, followedStores, madeBy, SOURCES, type InputsFor } from './i
 import { GLOBALS, targetId } from './inventory.ts';
 import type { Linked } from './shared/signal.ts';
 import { sourceIn } from './input-connections.ts';
-import { PROGRAM_IDS, type ProgramId } from './program.ts';
+import { PROGRAM_IDS, type ProgramId } from './protocol.ts';
 import { colourOf, HOLDING, mainStore, type StoreEntry } from './stores.ts';
 import { listed, type Workspace } from './workspace.ts';
 

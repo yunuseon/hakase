@@ -1,5 +1,5 @@
-import type { Logged } from '../../shared/logged.ts';
-import { isDay, shiftDay, type Day } from '../../lib/day.ts';
+import type { Logged } from '../shared/logged.ts';
+import { isDay, shiftDay, type Day } from '../lib/day.ts';
 
 export type Habit = {
     readonly id: string;

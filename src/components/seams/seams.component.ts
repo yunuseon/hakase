@@ -10,7 +10,7 @@ import { EMPTY, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { sameSeams, type SeamToggle, type SeamView } from './seams.ts';
+import { sameSeams, type SeamToggle, type SeamView } from '../../layout/seams.ts';
 import css from './seams.css?inline';
 
 const sheet = styleSheet(css);

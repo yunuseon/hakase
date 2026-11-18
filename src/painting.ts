@@ -1,6 +1,6 @@
-import { MAX_BRUSH, type PaintEvent } from './components/paint/paint.ts';
+import { MAX_BRUSH, type PaintEvent } from './model/paint.ts';
 import { clamp } from './lib/math.ts';
-import type { AppInput } from './program.ts';
+import type { AppInput } from './protocol.ts';
 import type { PaintSettings } from './settings.ts';
 import type { Picture } from './shared/picture.ts';
 

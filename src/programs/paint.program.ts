@@ -8,7 +8,7 @@ import {
     shareReplay,
     withLatestFrom,
 } from 'rxjs/operators';
-import type { PaintView } from '../components/paint/paint.ts';
+import type { PaintView } from '../model/paint.ts';
 import { paintInputsOf, workingFrame } from '../painting.ts';
 import type { Program } from '../program.ts';
 import { asPaint } from '../settings.ts';

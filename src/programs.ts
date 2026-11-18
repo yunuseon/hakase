@@ -1,5 +1,6 @@
 import { storybookProgram } from './programs/storybook.program.ts';
-import type { Program, ProgramId } from './program.ts';
+import type { Program } from './program.ts';
+import type { ProgramId } from './protocol.ts';
 import { agendaProgram } from './programs/agenda.program.ts';
 import { appearanceProgram } from './programs/appearance.program.ts';
 import { bookmarksProgram } from './programs/bookmarks.program.ts';

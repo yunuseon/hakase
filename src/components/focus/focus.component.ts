@@ -6,7 +6,13 @@ import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { isFocusPhase, PHASES, ROUNDS, type FocusCommand, type FocusView } from './focus.ts';
+import {
+    isFocusPhase,
+    PHASES,
+    ROUNDS,
+    type FocusCommand,
+    type FocusView,
+} from '../../model/focus.ts';
 import css from './focus.css?inline';
 
 const sheet = styleSheet(css);

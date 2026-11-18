@@ -1,7 +1,7 @@
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { context$ } from '../../../shared/audio.ts';
-import type { Played } from '../voice.ts';
+import type { Played } from '../../../model/voice.ts';
 
 export type VoiceGraph = {
     readonly context: AudioContext;

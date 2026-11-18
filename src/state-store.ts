@@ -1,8 +1,8 @@
-import { DEFAULT_ASPECT, isAspect, type Aspect } from './components/sketch/animation.ts';
+import { DEFAULT_ASPECT, isAspect, type Aspect } from './model/sketch/export.ts';
 import { DEFAULT_WIRE_STYLE, isWireStyle, type WireStyle } from './shared/connections.ts';
-import { parsePen, type Pen } from './components/pen/pen.ts';
-import { parseVoice, type Voice } from './components/voice/voice.ts';
-import { parseDrums, type Drums } from './components/drums/drums.ts';
+import { parsePen, type Pen } from './model/pen.ts';
+import { parseVoice, type Voice } from './model/voice.ts';
+import { parseDrums, type Drums } from './model/drums.ts';
 import { parsePicture, type Picture } from './shared/picture.ts';
 import type { Observable } from 'rxjs';
 import { debounceTime, map, tap } from 'rxjs/operators';
@@ -15,23 +15,18 @@ import {
     type FormulaId,
     type Library,
 } from './library.ts';
-import { parseTheme, type Theme } from './components/sketch/theme.ts';
-import { parseNotes, type Notes } from './components/note/note.ts';
-import {
-    parseFocus,
-    parseFocusLink,
-    type Focus,
-    type FocusLink,
-} from './components/focus/focus.ts';
-import { parseAgenda, type Agenda } from './components/agenda/agenda.ts';
-import { parseHabits, type Habits } from './components/habits/habits.ts';
-import { parseClocks, type Clocks } from './components/clocks/clocks.ts';
-import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks.ts';
+import { parseTheme, type Theme } from './model/sketch/theme.ts';
+import { parseNotes, type Notes } from './model/note.ts';
+import { parseFocus, parseFocusLink, type Focus, type FocusLink } from './model/focus.ts';
+import { parseAgenda, type Agenda } from './model/agenda.ts';
+import { parseHabits, type Habits } from './model/habits.ts';
+import { parseClocks, type Clocks } from './model/clocks.ts';
+import { parseBookmarks, type Bookmarks } from './model/bookmarks.ts';
 import { parseSignal, type Signal } from './shared/signal.ts';
 import { parseTickets, type Tickets } from './shared/tickets.ts';
-import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
+import { isThemeName, type ThemeName } from './model/sketch/themes/registry.ts';
 import type { Storage } from './ports.ts';
-import type { ProcessId } from './program.ts';
+import type { ProcessId } from './protocol.ts';
 import { keptStores, renamedStore, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parseClock, type Clock } from './shared/playhead.ts';
@@ -48,7 +43,7 @@ import {
     parseSketchLink,
     unlinkedSketch,
     type SketchLink,
-} from './components/sketch/links.ts';
+} from './model/sketch/links.ts';
 import { emptyBlueprints, parseBlueprints, type Blueprints } from './blueprints.ts';
 
 const KEY = 'hakase.state';

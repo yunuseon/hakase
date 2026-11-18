@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { seenBy, unseen, type Seen, type Written } from './program.ts';
+import { seenBy, unseen, type Seen } from './program.ts';
+import { type Written } from './protocol.ts';
 
 const shown = (self: string, writes: readonly Written<string>[]) =>
     writes.reduce<{ seen: Seen<string>; out: readonly string[] }>(

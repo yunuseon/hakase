@@ -1,6 +1,6 @@
 import { combineLatest } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
-import { valuesOf } from '../program.ts';
+import { valuesOf } from '../protocol.ts';
 import { persistState$ } from '../state-store.ts';
 import type { Projections } from './projections.graph.ts';
 import type { Ports } from '../ports.ts';

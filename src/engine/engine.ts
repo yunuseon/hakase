@@ -1,6 +1,6 @@
 import { fitted } from '../components/sketch/animation.ts';
 import { evolutionTo, stepAt, type Evolved } from '../components/sketch/evolution.ts';
-import { panelParams, samePointer, type Pointer } from '../components/sketch/params.ts';
+import { panelParams, samePointer, type Pointer } from '../model/sketch/params.ts';
 import {
     createSketch,
     drawFrame,
@@ -21,8 +21,8 @@ import {
     releaseSketchResources,
     type SketchResources,
 } from '../components/sketch/gl/surface.ts';
-import { buildRamp, RAMP_SIZE, type Theme } from '../components/sketch/theme.ts';
-import { themes } from '../components/sketch/themes/registry.ts';
+import { buildRamp, RAMP_SIZE, type Theme } from '../model/sketch/theme.ts';
+import { themes } from '../model/sketch/themes/registry.ts';
 import {
     knobAt,
     sameImage,
@@ -32,7 +32,7 @@ import {
     type PointsImage,
 } from '../image.ts';
 import { PEDALS, type PedalKind } from '../pedals.ts';
-import type { Size } from '../components/window/frame.ts';
+import type { Size } from '../layout/frame.ts';
 import type { Rgb } from '../lib/color.ts';
 import { createInkPass, inked, loadStroke, type InkPass } from '../shared/gl/ink.ts';
 import { dabCount, type Stroke } from '../shared/stroke.ts';

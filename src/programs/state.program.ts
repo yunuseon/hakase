@@ -22,7 +22,8 @@ import {
     unusedOf,
     type GraphStore,
 } from '../components/state-map/state-map.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asStateMap, defaultStateMap } from '../settings.ts';
 import { centredOn, IDENTITY, panned, zoomedAround } from '../shared/camera.ts';
 

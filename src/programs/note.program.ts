@@ -9,8 +9,9 @@ import {
     take,
     withLatestFrom,
 } from 'rxjs/operators';
-import { countOf, nextNoteId, shownNote, titleOf, type Notes } from '../components/note/note.ts';
-import type { AppInput, Program } from '../program.ts';
+import { countOf, nextNoteId, shownNote, titleOf, type Notes } from '../model/note.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asNote } from '../settings.ts';
 
 const choose = (note: string): AppInput => ({ kind: 'settings', settings: { kind: 'note', note } });

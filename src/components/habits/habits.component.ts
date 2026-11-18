@@ -10,7 +10,7 @@ import { concat, EMPTY, merge, of, timer, type Observable } from 'rxjs';
 import { filter, map, mergeMap, scan, share, switchMap, take, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import type { HabitCommand, HabitsView } from './habits.ts';
+import type { HabitCommand, HabitsView } from '../../model/habits.ts';
 import css from './habits.css?inline';
 
 const sheet = styleSheet(css);

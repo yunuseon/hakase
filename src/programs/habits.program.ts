@@ -1,10 +1,11 @@
 import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
-import { habitsView } from '../components/habits/habits.ts';
+import { habitsView } from '../model/habits.ts';
 import { dayOf, shortDayLabel } from '../lib/day.ts';
 import { wallClock$ } from '../lib/rx.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const habitsProgram = {
     ...declarations.habits,

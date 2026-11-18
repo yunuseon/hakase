@@ -1,9 +1,10 @@
 import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { clocksView } from '../components/clocks/clocks.ts';
+import { clocksView } from '../model/clocks.ts';
 import { wallClock$ } from '../lib/rx.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const clocksProgram = {
     ...declarations.clocks,

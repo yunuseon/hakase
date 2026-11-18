@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { inputsFor } from './declarations.ts';
 import { madeBy, progressBinding, sourceProgram, SOURCES } from './inputs.ts';
 import { HOLDING } from './stores.ts';
-import { PROGRAM_IDS } from './program.ts';
+import { PROGRAM_IDS } from './protocol.ts';
 import { CONVERSIONS, converts } from './port-types.ts';
 
 describe('typed ports', () => {

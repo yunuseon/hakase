@@ -10,7 +10,7 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import { FORMULA_GUIDE } from '../components/sketch/formulas/formula.ts';
+import { FORMULA_GUIDE } from '../model/sketch/formulas/formula.ts';
 import {
     isCustomId,
     isFormulaId,
@@ -20,7 +20,8 @@ import {
     summaryOf,
     type FormulaId,
 } from '../library.ts';
-import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
+import { seenBy, unseen, type Program } from '../program.ts';
+import { type AppInput } from '../protocol.ts';
 import { asFormulaEditor, defaultFormulaEditor } from '../settings.ts';
 import { shareUrl } from '../share.ts';
 

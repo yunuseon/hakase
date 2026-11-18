@@ -10,8 +10,8 @@ import {
     type TimeCommand,
 } from '../documents.ts';
 import type { Ports } from '../ports.ts';
-import type { AppSignal } from '../process.ts';
-import { restored } from '../program.ts';
+import type { AppSignal } from '../protocol.ts';
+import { restored } from '../protocol.ts';
 import { inputsFor } from '../declarations.ts';
 import type { Restored } from '../state-store.ts';
 import { startTimeline } from '../timeline.ts';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkedSketch, unlinkedSketch } from './components/sketch/links.ts';
+import { linkedSketch, unlinkedSketch } from './model/sketch/links.ts';
 import { envelopeOf, enveloped, type Wired } from './envelopes.ts';
 import { GATE_DEFAULTS } from './gates.ts';
 import { defaultPedal } from './pedals.ts';

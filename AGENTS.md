@@ -73,7 +73,7 @@ flat sketch used to). `FITS` is a closed list, so a new mode is one entry and a
 case in `scales`. It is purely a projection setting — formulas, the axes and the
 pointer ray all follow it unchanged, because `aim()` reads the scale back out of
 `uProjection`. TypeScript only supplies `uProjection` (the pure
-`projection(aspect)` in `components/sketch/space.ts`, 25° field of view, set in
+`projection(aspect)` in `model/sketch/space.ts`, 25° field of view, set in
 `prepare` because it changes only with size) and `uOrbit`. A camera that a
 formula scripts loops with the playhead like everything else, so a shot loops
 seamlessly; the old turntable switch is just one such camera and is gone.
@@ -305,7 +305,7 @@ equation) and `coral` (Gray-Scott) are the worked examples.
 
 **Shaders live in their own files**, never in template literals: `.vert`/`.frag`
 for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
-body under `components/sketch/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
+body under `model/sketch/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
 `string` type comes from `vite/client` — no plugin and no cast. `sketch.vert`
 declares a `vec3 formula(...)` prototype and the selected formula's definition
 is concatenated after it, so the shader file stays valid on its own and the
@@ -469,7 +469,7 @@ the window does not know which program it holds, so `liveProcess$` — which is
 program-layer, at `src/` root — is what stamps the `id` on.
 
 It is also why the layout is cut in two. Frame maths (`moved`, `resized`,
-`frameFrom`) and camera maths (`components/canvas/camera.ts`) are program-agnostic;
+`frameFrom`, in `layout/frame.ts`) and camera maths (`shared/camera.ts`) are program-agnostic;
 the app's actual workspace — processes keyed by `ProcessId`, the default four
 windows, the toolbar's state, `parseWorkspace`'s schema — is app configuration
 and lives in `src/workspace.ts`. If you find yourself adding a
@@ -514,8 +514,11 @@ controls. The renderer never derives business state; pure functions and RxJS
 still decide what a component displays and when it changes.
 
 **A component folder holds everything only that component needs**, whatever layer
-it belongs to: `components/sketch/` owns its `gl/`, its `shaders/`, its
-`formulas/` and its compile stage, because nothing else imports them. Only a few
+it belongs to: `components/sketch/` owns its `gl/`, its `shaders/` and its
+compile stage, because nothing else imports them. What the core reads is never
+only a component's: a document's model lives in `model/` and the canvas
+workspace's pure maths in `layout/` (see "The model and the layout"), and
+components import them from there. Only a few
 modules are genuinely shared — `lib/`, `shared/drag.ts`, `shared/playhead.ts` and
 `shared/camera.ts` (the canvas and the navigator both read the camera) —
 and a module earns `shared/` by having a second importer, not by being general in
@@ -1661,7 +1664,7 @@ wire and chip wear. A cursor marks the playhead of the clock it follows, with a
 dot on each line and the value in the legend; a chained signal is drawn as it
 plays, modulation included. **Overlay** puts every line on one fitted scale,
 **lanes** gives each its own band and scale (`lanesOf`, `boundsOf`,
-`readingsAt` in `components/plot/plot.ts`). The layout is the window's only
+`readingsAt` in `components/plot/plot.ts`, the layout setting in `model/plot.ts`). The layout is the window's only
 setting, and a view-only one, so it is not a step. Dragging across the plot
 scrubs its clock like the frame strip does. It keeps no state of its own
 (`HOLDING` is null): inputs in, a picture out.
@@ -1783,7 +1786,7 @@ or a change would reach the levels by two paths.
 
 **Instruments strike notes of their own.** A voice's `instrument` is the
 `synth` (the one oscillator above, which follows the pitch) or a preset from
-`INSTRUMENTS` in `components/voice/instruments.ts`, plain data built from a
+`INSTRUMENTS` in `model/instruments.ts`, plain data built from a
 closed set of parts: oscillator **partials** with ratios and their own fades
 (additive: the organ's drawbars, the marimba's partial near 4×), an **fm** pair
 (Chowning's: a modulator at ratio × the note bends the carrier by index × its
@@ -3075,9 +3078,44 @@ is also why `viewport$` in `lib/rx.ts` is deferred: built at load it reached for
 `window`, and every module that imported `lib/rx.ts` failed in Node.
 
 What is still to do is in the backlog under "A core any client could drive":
-the model still lives in component folders, `program.ts` still mixes the
-command language with the web contract, and the store registry still lives in
+the layers are not yet checked by lint, and the store registry still lives in
 the workspace beside window frames.
+
+## The model and the layout
+
+**The core imports no view.** Every module the core reaches, type imports
+included, lives outside `components/`, and the core reaches neither
+`program.ts` nor `process.ts`. Three homes hold what it needs:
+
+- **`src/model/`** holds the documents: each one's type, commands, reducer,
+  parser and the pure readings the levels take from it (`agenda`, `bookmarks`,
+  `clocks`, `drums`, `focus`, `habits`, `note`, `paint`, `pen`, `voice` and
+  `instruments`), the sketch's (`model/sketch/`: params, space, theme, the theme
+  registry, links, the controls' fold, the export settings and the formula
+  registry with its GLSL), `plot.ts` for the plot's one setting and `reading.ts`
+  for what a progress bar reads. A function a view calls stays here when any
+  client would want it (an orbit, a frame count, a played note).
+- **`src/layout/`** holds the canvas workspace's pure maths: frames and window
+  gestures, seams, sections, the toolbar's placement and the zoom commands. It is
+  a client's, but the workspace is a document today, so the core still folds it;
+  the backlog's last item takes the store registry out of it.
+- **`src/protocol.ts`** is the language any client speaks: program and process
+  ids, categories, `AppInput`, `AppSignal` and `Written`. `program.ts` keeps the
+  browser's contract with its windows (`AppState`, `Program`, `ProcessView`,
+  `Self`, `Slot`, `Task` and the editors' echo folds), and `process.ts` adds the
+  signals only a window sends.
+
+**Both point down.** `model/` and `layout/` import only `lib/`, `shared/` and
+each other, so components import them freely; a model never imports a
+component, and neither does its test. What only a screen needs went back beside
+its component when it came along with a file: the theme preview's CSS
+(`theme-editor/gradient.ts`), bookmark drop targets (`bookmarks/drop.ts`),
+agenda lanes (`agenda/lanes.ts`) and a drum stroke's skipped cells
+(`drums/stroke.ts`), each with its test. A mixed file gave up only what the
+core reads: `animation.ts` its export settings to `model/sketch/export.ts`,
+keeping the frame strip's maths; the progress bar its `Reading`; the navigator
+its zoom commands; `PictureFrames` moved to `ports.ts`, so the core names no
+engine type.
 
 ## Layering
 
@@ -3105,9 +3143,8 @@ belongs to is read from its name instead of its path:
 - **`AppState` vs a state type.** `Workspace`, `SketchParams` and the like are
   values; `AppState` is the record of _streams_ that carry them, which is why
   every member keeps its `$` and why it is not called `State`. It lives in
-  `program.ts` beside `Program` and `ProgramId`: splitting it out again brings
-  back a type-only import cycle, since `Program.connect$` takes an `AppState` and
-  `AppState.frame$` takes a `ProgramId`.
+  `program.ts` beside `Program`, since `Program`'s `run$` takes an `AppState`;
+  `ProgramId` is the protocol's, which neither of them imports back.
 - **`src/main.ts`** — the browser client and nothing else: it mounts the
   chrome, builds the core with `browserPorts()`, calls the web `*.graph.ts`
   modules in dependency order, closes the cycle, and subscribes once. It reads
@@ -3560,9 +3597,9 @@ build twice.
 
 ## Adding a formula
 
-The `Formula` contract lives in `components/sketch/formulas/formula.ts`, one level
+The `Formula` contract lives in `model/sketch/formulas/formula.ts`, one level
 above the implementations, so a formula can annotate itself without importing the
-registry that imports it. `components/sketch/formulas/registry.ts` is the single
+registry that imports it. `model/sketch/formulas/registry.ts` is the single
 source of truth for selectable sketch
 functions: one entry carries the key, the label, a `summary` the editor shows
 beside it, and the function. `FormulaName`

@@ -1,4 +1,5 @@
-import { CATEGORIES, type Program } from './program.ts';
+import { type Program } from './program.ts';
+import { CATEGORIES } from './protocol.ts';
 import type { ToolbarCategory } from './components/toolbar/toolbar.component.ts';
 
 export const categoriesOf = (

@@ -9,7 +9,7 @@ import { HksPlacement } from '../components/placement/placement.component.ts';
 import { HksSeams } from '../components/seams/seams.component.ts';
 import { HksSectionDrawing } from '../components/section-drawing/section-drawing.component.ts';
 import { HksSections } from '../components/sections/sections.component.ts';
-import type { SectionView } from '../components/sections/sections.ts';
+import type { SectionView } from '../layout/sections.ts';
 import { HksSelection } from '../components/selection/selection.component.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
 import { HksStateTraces } from '../components/state-traces/state-traces.component.ts';

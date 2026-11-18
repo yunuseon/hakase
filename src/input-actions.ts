@@ -1,5 +1,5 @@
 import type { DocumentAction } from './documents.ts';
-import type { AppSignal } from './process.ts';
+import type { AppSignal } from './protocol.ts';
 import { settingsKey } from './stores.ts';
 
 export const documentActionsOf = ({

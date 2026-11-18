@@ -1,14 +1,14 @@
 import { combineLatest, of, timer, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, switchMap } from 'rxjs/operators';
-import { centre, samePointer, steppedRatio, type Pointer } from '../components/sketch/params.ts';
-import type { Size } from '../components/window/frame.ts';
+import { centre, samePointer, steppedRatio, type Pointer } from '../model/sketch/params.ts';
+import type { Size } from '../layout/frame.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import type { Clock } from '../shared/playhead.ts';
 import type { Moment } from './engine.ts';
 import { isPedalKind } from '../pedals.ts';
 import { boxOf, onScreen, type Workspace } from '../workspace.ts';
 import type { Extent } from '../shared/camera.ts';
-import { aspectSize, type Aspect } from '../components/sketch/animation.ts';
+import { aspectSize, type Aspect } from '../model/sketch/export.ts';
 
 const MAX_SIDE = 2048;
 const SETTLE_MS = 150;

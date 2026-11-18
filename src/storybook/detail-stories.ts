@@ -26,7 +26,7 @@ import {
     HksExportPanel,
     type ExportStatus,
 } from '../components/sketch/export/export-panel.component.ts';
-import { DEFAULT_ASPECT, defaultExport, withExportChange } from '../components/sketch/animation.ts';
+import { DEFAULT_ASPECT, defaultExport, withExportChange } from '../model/sketch/export.ts';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
 import { HksPreviewError } from '../components/storybook/preview-error.component.ts';
 import { defaults, recorded, type Story } from './story.ts';

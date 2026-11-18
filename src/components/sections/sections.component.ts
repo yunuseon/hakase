@@ -9,7 +9,7 @@ import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { areaFill, areaOutline, boundsOf } from '../../shared/area.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import { sameSections, type SectionGesture, type SectionView } from './sections.ts';
+import { sameSections, type SectionGesture, type SectionView } from '../../layout/sections.ts';
 import css from './sections.css?inline';
 const sheet = styleSheet(css);
 

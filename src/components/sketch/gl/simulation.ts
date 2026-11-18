@@ -1,6 +1,6 @@
 import { momentOf, type Evolution, type Front } from '../evolution.ts';
-import type { PanelParams, Pointer } from '../params.ts';
-import type { Orbit } from '../space.ts';
+import type { PanelParams, Pointer } from '../../../model/sketch/params.ts';
+import type { Orbit } from '../../../model/sketch/space.ts';
 import { PASS_SEED, PASS_STEP, setMoment, type Sketch } from './sketch-program.ts';
 import type { Surface } from './surface.ts';
 

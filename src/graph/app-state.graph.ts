@@ -9,10 +9,10 @@ import {
     switchMap,
 } from 'rxjs/operators';
 import { boxReading, EMPTY_BOX } from '../boxes.ts';
-import { defaultBookmarks } from '../components/bookmarks/bookmarks.ts';
-import { emptyNotes } from '../components/note/note.ts';
-import type { Reading } from '../components/progress-bar/progress-bar.ts';
-import { themes, type ThemeName } from '../components/sketch/themes/registry.ts';
+import { defaultBookmarks } from '../model/bookmarks.ts';
+import { emptyNotes } from '../model/note.ts';
+import type { Reading } from '../model/reading.ts';
+import { themes, type ThemeName } from '../model/sketch/themes/registry.ts';
 import { previewSideOf } from '../engine/moment.ts';
 import { NONE } from '../image.ts';
 import {
@@ -25,8 +25,9 @@ import {
 import { parseTarget, type Global } from '../inventory.ts';
 import { devicePixelRatio$, viewport$, wallClock$ } from '../lib/rx.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
-import type { AppSignal } from '../process.ts';
-import { isProgramId, type AppState, type ProgramId, type Task } from '../program.ts';
+import type { AppSignal } from '../protocol.ts';
+import { type AppState, type Task } from '../program.ts';
+import { isProgramId, type ProgramId } from '../protocol.ts';
 import { declarationOf, inputsFor } from '../declarations.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import { TIME } from '../shared/signal.ts';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSignal, type Signal } from '../../shared/signal.ts';
-import { DAB, dabCount, dabsAt, type Stroke } from '../../shared/stroke.ts';
+import { defaultSignal, type Signal } from '../shared/signal.ts';
+import { DAB, dabCount, dabsAt, type Stroke } from '../shared/stroke.ts';
 import { defaultPen, drawingOf, parsePen, penAt, reducePen, strokeOf, type Pen } from './pen.ts';
 
 const dabs = (stroke: Stroke) =>

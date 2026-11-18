@@ -4,7 +4,7 @@ import { appearances, isAppearanceName, type AppearanceName } from './appearance
 import type { Command } from './components/palette/palette.ts';
 import { ICONS } from './shared/ui/icons.ts';
 import { centreOf, worldAt, type Camera, type Extent } from './shared/camera.ts';
-import { isProgramId, type ProgramId } from './program.ts';
+import { isProgramId, type ProgramId } from './protocol.ts';
 import { withMain, type StoreEntry, type StoreId } from './stores.ts';
 import type { Section, Workspace, WorkspaceAction } from './workspace.ts';
 

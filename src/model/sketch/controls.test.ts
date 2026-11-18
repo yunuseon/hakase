@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSignal, waveOf } from '../../../shared/signal.ts';
-import { defaultPanel, panelParams, type Signals } from '../params.ts';
+import { defaultSignal, waveOf } from '../../shared/signal.ts';
+import { defaultPanel, panelParams, type Signals } from './params.ts';
 import { GROUPS, groupChanged, liveReadouts, resetGroup, withChange } from './controls.ts';
 
 const tweaked = {

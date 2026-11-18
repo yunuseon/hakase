@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-    aspectSize,
-    exportFrames,
-    exportPixels,
     fitted,
     frameAt,
     frameAtX,
@@ -13,6 +10,7 @@ import {
     tilesIn,
     zoomedStrip,
 } from './animation.ts';
+import { aspectSize, exportFrames, exportPixels } from '../../model/sketch/export.ts';
 
 const square = { width: 640, height: 640 };
 

@@ -5,7 +5,8 @@ import { converterView } from '../components/converter/converter.ts';
 import { CONVERTERS, isBitField, isShapeField, type ConverterKind } from '../converters.ts';
 import { converterInputs } from '../inputs.ts';
 import { CONVERSIONS } from '../port-types.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { curveOf } from '../shared/curve.ts';
 import { driverAt } from '../shared/signal.ts';
 

@@ -2,9 +2,9 @@ import { animationFrameScheduler, combineLatest, EMPTY, from, merge, type Observ
 import { auditTime, concatMap, debounceTime, filter, map, share, switchMap } from 'rxjs/operators';
 import { fitted, supersampleFor, type StripLayout } from '../components/sketch/animation.ts';
 import { evolves } from '../components/sketch/gl/sketch-program.ts';
-import { centre } from '../components/sketch/params.ts';
+import { centre } from '../model/sketch/params.ts';
 import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
-import type { Size } from '../components/window/frame.ts';
+import type { Size } from '../layout/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
 import { backdropOf, cook, filmed, filmFor, framedIn } from './engine.ts';
 import { engine$ } from './view.ts';

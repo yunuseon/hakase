@@ -1,26 +1,26 @@
 import { DEFAULT_WIRE_STYLE } from '../shared/connections.ts';
-import { DEFAULT_ASPECT } from '../components/sketch/animation.ts';
-import type { AppInput } from '../program.ts';
+import { DEFAULT_ASPECT } from '../model/sketch/export.ts';
+import type { AppInput } from '../protocol.ts';
 import type { Settings } from '../settings.ts';
 import { appearances, isAppearanceName, defaultLook, type AppearanceName } from '../appearances.ts';
-import { themes, isThemeName } from '../components/sketch/themes/registry.ts';
+import { themes, isThemeName } from '../model/sketch/themes/registry.ts';
 import { emptyLibrary, reduceLibrary } from '../library.ts';
 import { defaultTickets, reduceTickets, type TicketCommand } from '../shared/tickets.ts';
-import { emptyNotes, reduceNotes } from '../components/note/note.ts';
-import { initialFocus, reduceFocus } from '../components/focus/focus.ts';
-import { emptyAgenda, reduceAgenda } from '../components/agenda/agenda.ts';
-import { emptyHabits, reduceHabits } from '../components/habits/habits.ts';
-import { defaultClocks, reduceClocks } from '../components/clocks/clocks.ts';
-import { defaultBookmarks, reduceBookmarks } from '../components/bookmarks/bookmarks.ts';
+import { emptyNotes, reduceNotes } from '../model/note.ts';
+import { initialFocus, reduceFocus } from '../model/focus.ts';
+import { emptyAgenda, reduceAgenda } from '../model/agenda.ts';
+import { emptyHabits, reduceHabits } from '../model/habits.ts';
+import { defaultClocks, reduceClocks } from '../model/clocks.ts';
+import { defaultBookmarks, reduceBookmarks } from '../model/bookmarks.ts';
 import { defaultSignal, reduceSignal } from '../shared/signal.ts';
 import { defaultPicture } from '../shared/picture.ts';
-import { reducePicture } from '../components/paint/paint.ts';
-import { defaultPen, reducePen } from '../components/pen/pen.ts';
+import { reducePicture } from '../model/paint.ts';
+import { defaultPen, reducePen } from '../model/pen.ts';
 import { initialClock, reduceTransport } from '../shared/playhead.ts';
 import type { Appearance } from '../appearance.ts';
-import type { Theme } from '../components/sketch/theme.ts';
+import type { Theme } from '../model/sketch/theme.ts';
 import type { FormulaId } from '../library.ts';
-import type { ThemeName } from '../components/sketch/themes/registry.ts';
+import type { ThemeName } from '../model/sketch/themes/registry.ts';
 
 const commands: readonly TicketCommand[] = [
     {

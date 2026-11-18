@@ -1,4 +1,4 @@
-import { ringOf, STAGE, type Instrument, type Source } from '../instruments.ts';
+import { ringOf, STAGE, type Instrument, type Source } from '../../../model/instruments.ts';
 import { plucked } from '../string.ts';
 
 const hashed = (index: number, seed: number) => {

@@ -1,173 +1,41 @@
 import type { WireStyle } from './shared/connections.ts';
 import type { Image } from './image.ts';
 import type { Observable } from 'rxjs';
-import type { Phase } from './shared/drag.ts';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
-import type { FormulaId, Library, LibraryCommand } from './library.ts';
-import type { BlueprintCommand, Blueprints } from './blueprints.ts';
-import type { Theme } from './components/sketch/theme.ts';
-import type { ThemeName } from './components/sketch/themes/registry.ts';
-import type { Frame, Size } from './components/window/frame.ts';
-import type { Aspect } from './components/sketch/animation.ts';
-import type { NoteCommand, Notes } from './components/note/note.ts';
-import type { Focus, FocusCommand, Plan } from './components/focus/focus.ts';
-import type { Agenda, AgendaCommand } from './components/agenda/agenda.ts';
-import type { HabitCommand, Habits } from './components/habits/habits.ts';
-import type { ClockCommand, Clocks } from './components/clocks/clocks.ts';
+import type { FormulaId, Library } from './library.ts';
+import type { Blueprints } from './blueprints.ts';
+import type { Theme } from './model/sketch/theme.ts';
+import type { ThemeName } from './model/sketch/themes/registry.ts';
+import type { Frame, Size } from './layout/frame.ts';
+import type { Aspect } from './model/sketch/export.ts';
+import type { Notes } from './model/note.ts';
+import type { Focus, Plan } from './model/focus.ts';
+import type { Agenda } from './model/agenda.ts';
+import type { Habits } from './model/habits.ts';
+import type { Clocks } from './model/clocks.ts';
 import type { Clock } from './shared/playhead.ts';
-import type { Signal, SignalCommand, Wave } from './shared/signal.ts';
+import type { Signal, Wave } from './shared/signal.ts';
 import type { Picture } from './shared/picture.ts';
 import type { Sheet } from './shared/stroke.ts';
 import type { Driver } from './shared/curve.ts';
-import type { PaintCommand } from './components/paint/paint.ts';
-import type { Drawing, PenCommand } from './components/pen/pen.ts';
-import type { Sounding, VoiceCommand } from './components/voice/voice.ts';
-import type { DrumsCommand, Kit } from './components/drums/drums.ts';
-import type { Pedal, PedalCommand } from './pedals.ts';
-import type { Gate, GateCommand } from './gates.ts';
-import type { Conversion, ConverterCommand } from './converters.ts';
-import type { BoxCommand, BoxReading } from './boxes.ts';
+import type { Drawing } from './model/pen.ts';
+import type { Sounding } from './model/voice.ts';
+import type { Kit } from './model/drums.ts';
+import type { Pedal } from './pedals.ts';
+import type { Gate } from './gates.ts';
+import type { Conversion } from './converters.ts';
+import type { BoxReading } from './boxes.ts';
 import type { StateGraph } from './components/state-map/state-map.ts';
-import type { StateCommand } from './shared/connections.ts';
-import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmarks.ts';
+import type { Bookmarks } from './model/bookmarks.ts';
 import type { HistoryEntry } from './components/history/history.component.ts';
-import type { TicketCommand, Tickets } from './shared/tickets.ts';
+import type { Tickets } from './shared/tickets.ts';
 import type { Settings } from './settings.ts';
 import type { Declaration } from './declarations.ts';
 import type { PlaybackBinding } from './inputs.ts';
-import type { Reading } from './components/progress-bar/progress-bar.ts';
-import type { TransportCommand } from './shared/playhead.ts';
+import type { Reading } from './model/reading.ts';
 
-export const PROGRAM_IDS = [
-    'formula',
-    'theme',
-    'appearance',
-    'sketch',
-    'timeline',
-    'playhead',
-    'signal',
-    'plot',
-    'paint',
-    'pen',
-    'voice',
-    'drums',
-    'output',
-    'colourmap',
-    'kaleido',
-    'feedback',
-    'mix',
-    'blur',
-    'nand',
-    'delay',
-    'switch',
-    'pattern',
-    'compare',
-    'lamp',
-    'pin-in',
-    'pin-out',
-    'box',
-    'schedule-level',
-    'sound-level',
-    'timer-level',
-    'tasks-level',
-    'level-level',
-    'level-bit',
-    'schedule-bit',
-    'timer-bit',
-    'tasks-bit',
-    'sound-bit',
-    'clock-level',
-    'clock-bit',
-    'zones-level',
-    'zones-bit',
-    'habits-level',
-    'habits-bit',
-    'picture-level',
-    'blueprints',
-    'tasks',
-    'tickets',
-    'note',
-    'focus',
-    'agenda',
-    'progress',
-    'habits',
-    'clocks',
-    'bookmarks',
-    'history',
-    'state',
-    'storybook',
-] as const;
-
-export type ProgramId = (typeof PROGRAM_IDS)[number];
-
-export const isProgramId = (value: string): value is ProgramId =>
-    PROGRAM_IDS.some(id => id === value);
-
-export type ProcessId = string;
-
-// Collected from whichever processes run, so feeding app state needs no singleton.
-export type AppInput =
-    | { readonly kind: 'scrub'; readonly phase: Phase; readonly at: number }
-    | { readonly kind: 'transport'; readonly command: TransportCommand }
-    | { readonly kind: 'duration'; readonly seconds: number }
-    | { readonly kind: 'ticks'; readonly count: number }
-    | { readonly kind: 'day' }
-    | { readonly kind: 'source'; readonly formula: FormulaId; readonly text: string }
-    | { readonly kind: 'theme'; readonly theme: ThemeName; readonly value: Theme }
-    | { readonly kind: 'look'; readonly name: AppearanceName }
-    | { readonly kind: 'aspect'; readonly aspect: Aspect }
-    | { readonly kind: 'wires'; readonly wires: WireStyle }
-    | { readonly kind: 'task'; readonly command: TaskCommand; readonly id: ProcessId }
-    | { readonly kind: 'locate'; readonly id: ProcessId }
-    | { readonly kind: 'close-others' }
-    | { readonly kind: 'prune' }
-    | { readonly kind: 'travel'; readonly offset: number }
-    | { readonly kind: 'take-back'; readonly id: number }
-    | { readonly kind: 'settings'; readonly settings: Settings }
-    | { readonly kind: 'library'; readonly command: LibraryCommand }
-    | { readonly kind: 'blueprint'; readonly command: BlueprintCommand }
-    | { readonly kind: 'place-blueprint'; readonly id: string }
-    | { readonly kind: 'ticket'; readonly command: TicketCommand }
-    | { readonly kind: 'note'; readonly command: NoteCommand }
-    | { readonly kind: 'focus'; readonly command: FocusCommand }
-    | { readonly kind: 'agenda'; readonly command: AgendaCommand }
-    | { readonly kind: 'habit'; readonly command: HabitCommand }
-    | { readonly kind: 'clock'; readonly command: ClockCommand }
-    | { readonly kind: 'signal'; readonly command: SignalCommand }
-    | { readonly kind: 'paint'; readonly command: PaintCommand }
-    | { readonly kind: 'pen'; readonly command: PenCommand }
-    | { readonly kind: 'voice'; readonly command: VoiceCommand }
-    | { readonly kind: 'drums'; readonly command: DrumsCommand }
-    | { readonly kind: 'pedal'; readonly command: PedalCommand }
-    | { readonly kind: 'gate'; readonly command: GateCommand }
-    | { readonly kind: 'converter'; readonly command: ConverterCommand }
-    | { readonly kind: 'box'; readonly command: BoxCommand }
-    | { readonly kind: 'unbox' }
-    | { readonly kind: 'why'; readonly input: string }
-    | {
-          readonly kind: 'modulate';
-          readonly store: string;
-          readonly param: string;
-          readonly source: string | null;
-      }
-    | { readonly kind: 'convert'; readonly command: Extract<StateCommand, { kind: 'convert' }> }
-    | {
-          readonly kind: 'wiring';
-          readonly command: Exclude<
-              StateCommand,
-              { kind: 'locate' | 'prune' | 'source' | 'convert' }
-          >;
-      }
-    | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
-    | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
-    | {
-          readonly kind: 'diagnostic';
-          readonly formula: FormulaId;
-          readonly message: string | null;
-      };
-
-export type TaskCommand = 'reveal' | 'close';
+import type { AppInput, ProcessId, ProgramId, Source, Written } from './protocol.ts';
 
 export type Task = {
     readonly id: ProcessId;
@@ -239,14 +107,6 @@ export type FollowedLevel = {
     readonly driver: Driver;
 };
 
-export type Written<T> = {
-    readonly value: T;
-    // null while the value is still the registry's own definition.
-    readonly from: ProcessId | null;
-};
-
-export type Source = Written<string>;
-
 export type Seen<T> = { readonly had: T | null; readonly write: T | null };
 
 export const unseen: Seen<never> = { had: null, write: null };
@@ -267,12 +127,6 @@ export const seenBy =
         return { had: written.value, write };
     };
 
-export const restored = <K, V>(values: ReadonlyMap<K, V>): ReadonlyMap<K, Written<V>> =>
-    new Map([...values].map(([key, value]): [K, Written<V>] => [key, { value, from: null }]));
-
-export const valuesOf = <K, V>(written: ReadonlyMap<K, Written<V>>): ReadonlyMap<K, V> =>
-    new Map([...written].map(([key, { value }]): [K, V] => [key, value]));
-
 // One stream, not frame$ beside focused$: a raise changes both, and two would fire twice.
 export type Slot = {
     readonly frame: Frame;
@@ -292,28 +146,6 @@ export type ProcessView = {
     readonly element: HTMLElement;
     readonly run$: (state: AppState, self: Self) => Observable<AppInput>;
 };
-
-export const CATEGORIES = [
-    { id: 'make', title: 'Make', icon: 'M4 20 L9.5 9.5 L15 20 Z M14 4 H20 V10 H14 Z' },
-    {
-        id: 'logic',
-        title: 'Logic',
-        icon: 'M4 6 H11 A6 6 0 0 1 11 18 H4 Z M17 12 H21 M1 9 H4 M1 15 H4',
-    },
-    {
-        id: 'convert',
-        title: 'Convert',
-        icon: 'M4 8 H15 M12 5 L15 8 L12 11 M20 16 H9 M12 13 L9 16 L12 19',
-    },
-    {
-        id: 'plan',
-        title: 'Plan',
-        icon: 'M5 4 H19 V20 H5 Z M8.5 9 H15.5 M8.5 12.5 H15.5 M8.5 16 H12.5',
-    },
-    { id: 'system', title: 'System', icon: 'M4 7 H20 M4 17 H20 M9 4 V10 M15 14 V20' },
-] as const;
-
-export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
 export type Program<K extends ProgramId = ProgramId> = Declaration<K> & {
     readonly size: Size;

@@ -23,7 +23,7 @@ import {
     type PaintEvent,
     type PaintView,
     type Tool,
-} from './paint.ts';
+} from '../../model/paint.ts';
 import { guidesOf, isSymmetry, SYMMETRIES, type Point, type Symmetry } from '../../shared/brush.ts';
 import css from './paint.css?inline';
 

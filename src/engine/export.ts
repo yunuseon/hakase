@@ -5,10 +5,10 @@ import {
     exportPixels,
     frameCount,
     type ExportSettings,
-} from '../components/sketch/animation.ts';
+} from '../model/sketch/export.ts';
 import { messageOf, writer$, type ExportEvent } from '../components/sketch/export/export.ts';
-import { centre } from '../components/sketch/params.ts';
-import type { Size } from '../components/window/frame.ts';
+import { centre } from '../model/sketch/params.ts';
+import type { Size } from '../layout/frame.ts';
 import { hasHistory, type Image } from '../image.ts';
 import { cook, createEngine, drawn, releaseEngine, type Engine } from './engine.ts';
 

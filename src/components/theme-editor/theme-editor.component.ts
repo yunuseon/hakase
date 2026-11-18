@@ -10,7 +10,8 @@ import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { gradientCss, ordered, type Blend, type Stop, type Theme } from '../sketch/theme.ts';
+import { ordered, type Blend, type Stop, type Theme } from '../../model/sketch/theme.ts';
+import { gradientCss } from './gradient.ts';
 import css from './theme-editor.css?inline';
 
 const sheet = styleSheet(css);

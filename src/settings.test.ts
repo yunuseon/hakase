@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ORBIT } from './components/sketch/space.ts';
+import { DEFAULT_ORBIT } from './model/sketch/space.ts';
 import { controlsView, defaultSketch, withControl } from './settings.ts';
 
 describe('withControl', () => {

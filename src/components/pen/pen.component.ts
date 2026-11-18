@@ -19,7 +19,7 @@ import {
     penAt,
     type Drawing,
     type PenCommand,
-} from './pen.ts';
+} from '../../model/pen.ts';
 import css from './pen.css?inline';
 
 const sheet = styleSheet(css);

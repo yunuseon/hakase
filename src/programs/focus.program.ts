@@ -1,8 +1,9 @@
 import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { focusView } from '../components/focus/focus.ts';
-import type { AppInput, Program } from '../program.ts';
+import { focusView } from '../model/focus.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const focusProgram = {
     ...declarations.focus,

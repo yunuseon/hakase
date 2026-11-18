@@ -56,20 +56,9 @@ at 41% and running off the screen at 100%.
 
 ## A core any client could drive
 
-The core boots in Node (see "The core, with no client" in `AGENTS.md`). What
-still ties the data to the browser, in order:
+The core boots in Node and imports no view (see "The core, with no client" and
+"The model and the layout" in `AGENTS.md`). What is left, in order:
 
-- **The model leaves the view folders.** The core imports about forty modules
-  from `components/`: the document types, reducers and parsers of notes, focus,
-  agenda, habits, clocks, bookmarks, paint, pen, voice, drums, the sketch's
-  params, themes and formula registry, readings, `Frame`, and `HistoryEntry`
-  from a `.component.ts`. Each moves to a home outside `components/`, and
-  components import it from there. Done when no core module imports
-  `components/`.
-- **`program.ts` splits in two.** The command and state language (`ProgramId`,
-  `AppInput`, `AppState`, `AppSignal` from `process.ts`) moves to a core module;
-  `Program` and `ProcessView`, which return an `HTMLElement`, stay with the
-  browser. Done when the core imports neither `program.ts` nor `process.ts`.
 - **The layers are checked.** A check in lint fails when a core module (the
   root modules, `graph/` modules the core composes, `shared/` outside `ui/`)
   imports `components/`, lit or a browser global, as the comment ceiling is

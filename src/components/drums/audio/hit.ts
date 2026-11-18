@@ -1,4 +1,4 @@
-import { DECAYS, type Drum } from '../drums.ts';
+import { DECAYS, type Drum } from '../../../model/drums.ts';
 
 // From offline renders, to a drum machine's balance: the kick leads, snare, clap and tom a step under, hats and bell light.
 const GAINS: Readonly<Record<Drum, number>> = {

@@ -1,44 +1,23 @@
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
-import type { Aspect } from './components/sketch/animation.ts';
+import type { Aspect } from './model/sketch/export.ts';
 import type { StateCommand, WireStyle } from './shared/connections.ts';
-import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
+import { reduceAgenda, type Agenda, type AgendaCommand } from './model/agenda.ts';
 import {
     defaultBookmarks,
     reduceBookmarks,
     type BookmarkCommand,
     type Bookmarks,
-} from './components/bookmarks/bookmarks.ts';
-import {
-    defaultClocks,
-    reduceClocks,
-    type ClockCommand,
-    type Clocks,
-} from './components/clocks/clocks.ts';
-import {
-    emptyHabits,
-    reduceHabits,
-    type HabitCommand,
-    type Habits,
-} from './components/habits/habits.ts';
-import { emptyNotes, reduceNotes, type NoteCommand, type Notes } from './components/note/note.ts';
-import type { Theme } from './components/sketch/theme.ts';
-import { reducePicture, type PaintCommand } from './components/paint/paint.ts';
+} from './model/bookmarks.ts';
+import { defaultClocks, reduceClocks, type ClockCommand, type Clocks } from './model/clocks.ts';
+import { emptyHabits, reduceHabits, type HabitCommand, type Habits } from './model/habits.ts';
+import { emptyNotes, reduceNotes, type NoteCommand, type Notes } from './model/note.ts';
+import type { Theme } from './model/sketch/theme.ts';
+import { reducePicture, type PaintCommand } from './model/paint.ts';
 import { defaultPicture, type Picture } from './shared/picture.ts';
-import {
-    defaultPen,
-    isPenParam,
-    reducePen,
-    type Pen,
-    type PenCommand,
-} from './components/pen/pen.ts';
-import {
-    defaultDrums,
-    reduceDrums,
-    type Drums,
-    type DrumsCommand,
-} from './components/drums/drums.ts';
-import type { FocusLink } from './components/focus/focus.ts';
+import { defaultPen, isPenParam, reducePen, type Pen, type PenCommand } from './model/pen.ts';
+import { defaultDrums, reduceDrums, type Drums, type DrumsCommand } from './model/drums.ts';
+import type { FocusLink } from './model/focus.ts';
 import { defaultPedal, isPedalKind, reducePedal, type Pedal, type PedalCommand } from './pedals.ts';
 import {
     GATE_DEFAULTS,
@@ -68,15 +47,15 @@ import {
     unlinkedSketch,
     type SketchLink,
     type SketchParam,
-} from './components/sketch/links.ts';
+} from './model/sketch/links.ts';
 import {
     defaultVoice,
     isVoiceParam,
     reduceVoice,
     type Voice,
     type VoiceCommand,
-} from './components/voice/voice.ts';
-import { isProgramId, type ProgramId } from './program.ts';
+} from './model/voice.ts';
+import { isProgramId, type ProgramId } from './protocol.ts';
 import {
     placed,
     reduceBlueprints,
@@ -86,17 +65,17 @@ import {
 } from './blueprints.ts';
 import { blueprintIn } from './starters.ts';
 import type { Rect } from './shared/camera.ts';
-import type { ThemeName } from './components/sketch/themes/registry.ts';
+import type { ThemeName } from './model/sketch/themes/registry.ts';
 import {
     defaultTickets,
     reduceTickets,
     type TicketCommand,
     type Tickets,
 } from './shared/tickets.ts';
-import { emptyAgenda } from './components/agenda/agenda.ts';
+import { emptyAgenda } from './model/agenda.ts';
 import { storeInputOf, type InputsFor } from './inputs.ts';
 import { reduceLibrary, type FormulaId, type Library, type LibraryCommand } from './library.ts';
-import type { ProcessId, Written } from './program.ts';
+import type { ProcessId, Written } from './protocol.ts';
 import { viewOnly, type Settings } from './settings.ts';
 import {
     closesLoop,

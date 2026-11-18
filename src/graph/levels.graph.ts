@@ -1,25 +1,18 @@
 import { combineLatest, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, shareReplay, switchMap } from 'rxjs/operators';
-import { emptyAgenda } from '../components/agenda/agenda.ts';
-import { cityOf, defaultClocks, offsetMinutes } from '../components/clocks/clocks.ts';
-import {
-    defaultDrums,
-    drumCurve,
-    isDrum,
-    kitCurve,
-    sameKit,
-    type Kit,
-} from '../components/drums/drums.ts';
-import { focusView, initialFocus } from '../components/focus/focus.ts';
-import { emptyHabits } from '../components/habits/habits.ts';
-import { defaultPen, sameDrawing, strokeOf, type Drawing } from '../components/pen/pen.ts';
+import { emptyAgenda } from '../model/agenda.ts';
+import { cityOf, defaultClocks, offsetMinutes } from '../model/clocks.ts';
+import { defaultDrums, drumCurve, isDrum, kitCurve, sameKit, type Kit } from '../model/drums.ts';
+import { focusView, initialFocus } from '../model/focus.ts';
+import { emptyHabits } from '../model/habits.ts';
+import { defaultPen, sameDrawing, strokeOf, type Drawing } from '../model/pen.ts';
 import {
     defaultVoice,
     pitchCurve,
     sameSounding,
     voiceCurve,
     type Sounding,
-} from '../components/voice/voice.ts';
+} from '../model/voice.ts';
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 import {
     bitShaped,
@@ -50,17 +43,16 @@ import { ownerOf } from '../documents.ts';
 import { GATE_DEFAULTS, GATES, isGateKind, sourceOfGate, type Gate } from '../gates.ts';
 import { sourceIn } from '../input-connections.ts';
 import { isImageKind, progressBinding, SOURCES, type Follow } from '../inputs.ts';
-import type { PictureFrames } from '../engine/levels.ts';
 import { NONE, sameImage, type Image } from '../image.ts';
 import { sourceOf } from '../library.ts';
 import { defaultPedal, isPedalKind, PEDALS, type Pedal, type PedalKind } from '../pedals.ts';
 import { asSketch } from '../settings.ts';
 import { defaultPicture } from '../shared/picture.ts';
-import { samePanel, type Drive } from '../components/sketch/params.ts';
-import { sameOrbit } from '../components/sketch/space.ts';
-import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
+import { samePanel, type Drive } from '../model/sketch/params.ts';
+import { sameOrbit } from '../model/sketch/space.ts';
+import { isThemeName, themes } from '../model/sketch/themes/registry.ts';
 import { dayOf } from '../lib/day.ts';
-import type { Ports } from '../ports.ts';
+import type { PictureFrames, Ports } from '../ports.ts';
 import { curveOf, type Driver } from '../shared/curve.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import {

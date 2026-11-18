@@ -33,11 +33,10 @@ import {
     REPEATS,
     STEP_COUNTS,
     beatOf,
-    between,
-    type Cell,
     type Drums,
     type DrumsCommand,
-} from './drums.ts';
+} from '../../model/drums.ts';
+import { between, type Cell } from './stroke.ts';
 import css from './drums.css?inline';
 
 const sheet = styleSheet(css);

@@ -11,7 +11,8 @@ import {
 } from 'rxjs/operators';
 import { appearanceFrom, sameAppearance, tokenValues, TOKENS } from '../appearance.ts';
 import { appearances, isAppearanceName } from '../appearances.ts';
-import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
+import { seenBy, unseen, type Program } from '../program.ts';
+import { type AppInput } from '../protocol.ts';
 import { isWireStyle } from '../shared/connections.ts';
 
 const options = Object.keys(appearances).map(value => ({ value, label: value }));

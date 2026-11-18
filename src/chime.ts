@@ -1,7 +1,7 @@
 import type { Observable } from 'rxjs';
 import { merge } from 'rxjs';
 import { filter, map, pairwise, startWith, tap } from 'rxjs/operators';
-import { endedPlans, finished, type Plan, type Timers } from './components/focus/focus.ts';
+import { endedPlans, finished, type Plan, type Timers } from './model/focus.ts';
 
 const NOTES = [660, 880, 990];
 

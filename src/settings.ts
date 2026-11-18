@@ -1,7 +1,7 @@
 import { isView, type View } from './shared/tickets.ts';
-import { isTool, MAX_BRUSH, type Tool } from './components/paint/paint.ts';
+import { isTool, MAX_BRUSH, type Tool } from './model/paint.ts';
 import { isSymmetry, type Symmetry } from './shared/brush.ts';
-import { isLayout, type Layout } from './components/plot/plot.ts';
+import { isLayout, type Layout } from './model/plot.ts';
 import {
     defaultExport,
     isExportSize,
@@ -12,13 +12,13 @@ import {
     isTab,
     type ExportSettings,
     type Tab,
-} from './components/sketch/animation.ts';
+} from './model/sketch/export.ts';
 import {
     groupChanged,
     withChange,
     type ControlChange,
     type ControlsView,
-} from './components/sketch/controls/controls.ts';
+} from './model/sketch/controls.ts';
 import { isFormulaId, type FormulaId } from './library.ts';
 import {
     DRAW_MODES,
@@ -31,7 +31,7 @@ import {
     type Knobs,
     type Motion,
     type Panel,
-} from './components/sketch/params.ts';
+} from './model/sketch/params.ts';
 import {
     DEFAULT_ORBIT,
     isFit,
@@ -44,8 +44,8 @@ import {
     type Lens,
     type Space,
     type Orbit,
-} from './components/sketch/space.ts';
-import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
+} from './model/sketch/space.ts';
+import { isThemeName, type ThemeName } from './model/sketch/themes/registry.ts';
 import { isDay } from './lib/day.ts';
 import { clamp } from './lib/math.ts';
 

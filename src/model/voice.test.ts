@@ -1,6 +1,6 @@
-import { driverAt } from '../../shared/signal.ts';
+import { driverAt } from '../shared/signal.ts';
 import { describe, expect, it } from 'vitest';
-import { defaultSignal, type Signal } from '../../shared/signal.ts';
+import { defaultSignal, type Signal } from '../shared/signal.ts';
 import {
     defaultVoice,
     frequencyOf,

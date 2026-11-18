@@ -3,7 +3,8 @@ import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, shareReplay } from 'rxjs/operators';
 import type { Trace } from '../components/plot/plot.ts';
 import { plotInputs } from '../inputs.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asPlot } from '../settings.ts';
 
 const INPUTS = Object.keys(plotInputs);

@@ -12,18 +12,12 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import {
-    createTimers$,
-    restedTimers,
-    samePlan,
-    startedPlans,
-    type Plan,
-} from '../components/focus/focus.ts';
+import { createTimers$, restedTimers, samePlan, startedPlans, type Plan } from '../model/focus.ts';
 import { playbackBinding } from '../inputs.ts';
 import { dayFractionOf, dayOf, minuteOfDay } from '../lib/day.ts';
 import type { Ports } from '../ports.ts';
 import { routePlayback$ } from '../playback-routing.ts';
-import type { AppSignal } from '../process.ts';
+import type { AppSignal } from '../protocol.ts';
 import { inputsFor } from '../declarations.ts';
 import { plansOf } from '../readings.ts';
 import { createClocks$, initialClock, restedClocks } from '../shared/playhead.ts';

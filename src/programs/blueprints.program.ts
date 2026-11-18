@@ -4,7 +4,8 @@ import { ignoreElements, map } from 'rxjs/operators';
 import type { BlueprintCard } from '../components/blueprints/blueprints.ts';
 import type { Blueprint } from '../blueprints.ts';
 import { STARTERS } from '../starters.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 const cardOf = ({ id, name, size, windows }: Blueprint, summary: string | null): BlueprintCard => ({
     id,

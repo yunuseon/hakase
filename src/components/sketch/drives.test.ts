@@ -8,7 +8,7 @@ import {
     orbitAt,
     trailsAt,
     type Signals,
-} from './params.ts';
+} from '../../model/sketch/params.ts';
 
 const none: Signals = {
     k1: null,

@@ -1,13 +1,6 @@
 import { boundsOf, sameArea, type Area } from '../../shared/area.ts';
 import { worldAt, type Camera, type Extent, type Rect } from '../../shared/camera.ts';
 
-export const ZOOM_COMMANDS = ['in', 'out', 'reset', 'fit'] as const;
-
-export type ZoomCommand = (typeof ZOOM_COMMANDS)[number];
-
-export const isZoomCommand = (value: string): value is ZoomCommand =>
-    ZOOM_COMMANDS.some(command => command === value);
-
 export const MINIMAP: Extent = { width: 328, height: 180 };
 
 const PADDING = 0.08;

@@ -11,15 +11,13 @@ import { filter, map, mergeMap, share, startWith, switchMap, takeWhile, tap } fr
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
 import {
-    dropTarget,
     faviconOf,
     hostOf,
     safeUrl,
     type BookmarkCommand,
     type Bookmarks,
-    type Shelf,
-    type Target,
-} from './bookmarks.ts';
+} from '../../model/bookmarks.ts';
+import { dropTarget, type Shelf, type Target } from './drop.ts';
 import css from './bookmarks.css?inline';
 
 const sheet = styleSheet(css);

@@ -1,5 +1,5 @@
 import { createInkPass, releaseInkPass, type InkPass } from '../../../shared/gl/ink.ts';
-import { RAMP_SIZE } from '../theme.ts';
+import { RAMP_SIZE } from '../../../model/sketch/theme.ts';
 
 export type Surface<
     C extends HTMLCanvasElement | OffscreenCanvas = HTMLCanvasElement | OffscreenCanvas,

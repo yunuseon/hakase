@@ -17,7 +17,7 @@ import {
     type DrawingAction,
 } from '../components/section-drawing/section-drawing.ts';
 import { viewport$, visibleViewport$ } from '../lib/rx.ts';
-import { isProgramId } from '../program.ts';
+import { isProgramId } from '../protocol.ts';
 import { programOf } from '../programs.ts';
 import type { WorkspaceAction } from '../workspace.ts';
 import type { Chrome } from './chrome.graph.ts';

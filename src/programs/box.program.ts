@@ -5,7 +5,8 @@ import { tickAt } from '../circuit.ts';
 import type { Pin } from '../boxes.ts';
 import type { BoxView, PinView } from '../components/box/box.ts';
 import type { Bit } from '../gates.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 const pinView =
     (tick: number) =>

@@ -2,8 +2,8 @@ import { EMPTY, firstValueFrom, of } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 import { coreOf } from './core.ts';
 import type { Ports } from './ports.ts';
-import type { AppSignal } from './process.ts';
-import type { AppInput, ProgramId } from './program.ts';
+import type { AppSignal } from './protocol.ts';
+import type { AppInput, ProgramId } from './protocol.ts';
 
 const memory = () => {
     const kept = new Map<string, unknown>();

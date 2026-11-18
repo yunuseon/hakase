@@ -21,7 +21,8 @@ import {
     type CreationChange,
 } from '../components/ticket-creator/ticket-creator.ts';
 import { detailPickers, draftPickers } from '../ticket-pickers.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asTickets } from '../settings.ts';
 
 export const ticketsProgram = {

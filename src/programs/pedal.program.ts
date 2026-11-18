@@ -5,7 +5,8 @@ import type { PedalView } from '../components/pedal/pedal.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$ } from '../engine/view.ts';
 import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { chainLine } from '../why.ts';
 import { shownOf } from './output.program.ts';
 

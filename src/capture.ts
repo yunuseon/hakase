@@ -1,4 +1,4 @@
-import { emptyNotes, nextNoteId } from './components/note/note.ts';
+import { emptyNotes, nextNoteId } from './model/note.ts';
 import { CAPTURES, type Picked } from './commands.ts';
 import type { DocumentAction, Documents } from './documents.ts';
 import { withMain } from './stores.ts';

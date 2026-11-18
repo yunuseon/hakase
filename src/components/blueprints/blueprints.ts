@@ -1,4 +1,4 @@
-import type { Size } from '../window/frame.ts';
+import type { Size } from '../../layout/frame.ts';
 
 export type BlueprintCard = {
     readonly id: string;

@@ -27,7 +27,7 @@ import {
     type Note,
     type Shape,
     type VoiceCommand,
-} from './voice.ts';
+} from '../../model/voice.ts';
 import css from './voice.css?inline';
 
 const sheet = styleSheet(css);

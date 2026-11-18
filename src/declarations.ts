@@ -23,7 +23,7 @@ import {
     type ProgramInputs,
 } from './inputs.ts';
 import { PEDALS, type PedalKind } from './pedals.ts';
-import type { CategoryId, ProgramId } from './program.ts';
+import type { CategoryId, ProgramId } from './protocol.ts';
 
 export type Declaration<K extends ProgramId = ProgramId> = {
     readonly id: K;

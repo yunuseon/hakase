@@ -13,16 +13,11 @@ import {
     switchMap,
     tap,
 } from 'rxjs/operators';
-import type {
-    FollowGroup,
-    StoreOption,
-    SwitchGroup,
-    WindowView,
-} from './components/window/frame.ts';
+import type { FollowGroup, StoreOption, SwitchGroup, WindowView } from './layout/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
-import type { AppInput, AppState, ProcessId, Program, ProgramId, Self } from './program.ts';
+import type { AppState, Program, Self } from './program.ts';
+import type { AppSignal, ProcessId } from './protocol.ts';
 import { storeInputCommand } from './input-connections.ts';
-import type { PlaybackBinding } from './inputs.ts';
 import type { WorkspaceAction } from './workspace.ts';
 
 export type ProcessSignal =
@@ -31,18 +26,7 @@ export type ProcessSignal =
     | { readonly to: 'toggle-selection'; readonly id: ProcessId }
     | { readonly to: 'state-busy'; readonly id: ProcessId; readonly busy: boolean }
     | { readonly to: 'hover'; readonly id: ProcessId; readonly over: boolean }
-    // Stamped here so a process can tell its own edits from everyone else's.
-    | {
-          readonly to: 'app';
-          readonly from: ProcessId;
-          // Stamped as the input leaves, so a rebind takes effect from the next one.
-          readonly store: string;
-          readonly clock: PlaybackBinding | null;
-          readonly program: ProgramId;
-          readonly input: AppInput;
-      };
-
-export type AppSignal = Extract<ProcessSignal, { readonly to: 'app' }>;
+    | AppSignal;
 
 // Two subscriptions mean two processes: defer launches and opens, finalize closes.
 export const liveProcess$ = (

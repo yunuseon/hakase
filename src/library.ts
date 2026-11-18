@@ -1,8 +1,4 @@
-import {
-    formulas,
-    isFormulaName,
-    type FormulaName,
-} from './components/sketch/formulas/registry.ts';
+import { formulas, isFormulaName, type FormulaName } from './model/sketch/formulas/registry.ts';
 
 export type CustomId = `custom-${number}`;
 

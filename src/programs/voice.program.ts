@@ -21,8 +21,9 @@ import {
     unplanned,
     type Heard,
     type Planning,
-} from '../components/voice/voice.ts';
-import type { AppInput, Program } from '../program.ts';
+} from '../model/voice.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const voiceProgram = {
     ...declarations.voice,

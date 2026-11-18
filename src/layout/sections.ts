@@ -1,4 +1,4 @@
-import { sameArea, type Area } from '../../shared/area.ts';
+import { sameArea, type Area } from '../shared/area.ts';
 export type SectionView = {
     readonly id: string;
     readonly name: string;

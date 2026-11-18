@@ -15,11 +15,12 @@ import {
     takeUntil,
     withLatestFrom,
 } from 'rxjs/operators';
-import { reduceOrbit, type OrbitAction } from '../components/sketch/space.ts';
+import { reduceOrbit, type OrbitAction } from '../model/sketch/space.ts';
 import { optionsOf } from '../library.ts';
-import { themes } from '../components/sketch/themes/registry.ts';
-import type { AppInput, Program } from '../program.ts';
-import { liveReadouts } from '../components/sketch/controls/controls.ts';
+import { themes } from '../model/sketch/themes/registry.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
+import { liveReadouts } from '../model/sketch/controls.ts';
 import { filmstrip$ } from '../engine/thumbnails.ts';
 import type {
     ExportStatus,
@@ -28,32 +29,30 @@ import type {
 import { statusOf } from '../components/sketch/export/export.ts';
 import { imageExport$, imageStill$ } from '../engine/export.ts';
 import {
-    exportPixels,
     followed,
     markerX,
     frameAtX,
-    frameCount,
     isZoom,
     sameLayout,
     stripGeometry,
     tilesIn,
-    withExportChange,
     zoomedStrip,
     type ZoomGesture,
 } from '../components/sketch/animation.ts';
+import { exportPixels, frameCount, withExportChange } from '../model/sketch/export.ts';
 import {
     centre,
     DRIVES,
     panelParams,
     type Pointer,
     type SketchParams,
-} from '../components/sketch/params.ts';
+} from '../model/sketch/params.ts';
 import { asSketch, controlsView, withControl, type SketchSettings } from '../settings.ts';
 import { devicePixelRatio$ } from '../lib/rx.ts';
 import { viewRatio$, windowShowing$ } from '../engine/moment.ts';
 import { checked$, view$ } from '../engine/view.ts';
 import { shownOf } from './output.program.ts';
-import type { Size } from '../components/window/frame.ts';
+import type { Size } from '../layout/frame.ts';
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 

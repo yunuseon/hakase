@@ -1,7 +1,7 @@
 import { parseTickets } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
-import { initialFocus, reduceFocus } from './components/focus/focus.ts';
-import { focusView } from './components/focus/focus.ts';
+import { initialFocus, reduceFocus } from './model/focus.ts';
+import { focusView } from './model/focus.ts';
 import { agendaReading, focusReading, planOf, plansOf, ticketsReading } from './readings.ts';
 
 const block = (id: string, day: string, start: number, end: number, title = '') => ({

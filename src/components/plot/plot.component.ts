@@ -16,15 +16,13 @@ import {
     atOf,
     boundsOf,
     HEIGHT,
-    isLayout,
     lanesOf,
-    LAYOUTS,
     readingsAt,
     valueText,
     WIDTH,
-    type Layout,
     type Trace,
 } from './plot.ts';
+import { isLayout, LAYOUTS, type Layout } from '../../model/plot.ts';
 import css from './plot.css?inline';
 
 const sheet = styleSheet(css);

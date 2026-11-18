@@ -4,7 +4,8 @@ import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import { tickAt } from '../circuit.ts';
 import { gateView } from '../components/gate/gate.ts';
 import { GATES, type GateKind } from '../gates.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const gateProgram = <K extends GateKind>(kind: K) => {
     const spec = GATES[kind];

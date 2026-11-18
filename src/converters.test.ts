@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-    DAY_MINUTES,
-    emptyAgenda,
-    reduceAgenda,
-    type AgendaCommand,
-} from './components/agenda/agenda.ts';
-import { focusView, initialFocus, type Focus } from './components/focus/focus.ts';
+import { DAY_MINUTES, emptyAgenda, reduceAgenda, type AgendaCommand } from './model/agenda.ts';
+import { focusView, initialFocus, type Focus } from './model/focus.ts';
 import { defaultTickets, reduceTickets, type TicketCommand } from './shared/tickets.ts';
-import type { Habits } from './components/habits/habits.ts';
+import type { Habits } from './model/habits.ts';
 import { initialClock, type Clock } from './shared/playhead.ts';
 import {
     bitShaped,

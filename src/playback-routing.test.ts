@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyRouting, reduceRouting, type Routing } from './playback-routing.ts';
-import type { AppInput } from './program.ts';
+import type { AppInput } from './protocol.ts';
 import type { PlaybackBinding } from './inputs.ts';
 
 const playback: PlaybackBinding = { kind: 'playback', store: 'movie' };

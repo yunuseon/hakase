@@ -1,4 +1,5 @@
 import type { Observable } from 'rxjs';
+import type { Image } from './image.ts';
 
 export type Storage = {
     readonly read: (key: string) => unknown;
@@ -11,3 +12,8 @@ export type Ports = {
     readonly viewport: { readonly width: number; readonly height: number };
     readonly storage: Storage;
 };
+
+export type PictureFrames = (
+    image$: Observable<Image>,
+    seconds$: Observable<number>,
+) => Observable<readonly Uint8Array[] | null>;

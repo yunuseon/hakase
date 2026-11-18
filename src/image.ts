@@ -1,6 +1,6 @@
-import { DRIVES, samePanel, type Panel, type Signals } from './components/sketch/params.ts';
-import { sameOrbit, type Orbit } from './components/sketch/space.ts';
-import { sameTheme, type Theme } from './components/sketch/theme.ts';
+import { DRIVES, samePanel, type Panel, type Signals } from './model/sketch/params.ts';
+import { sameOrbit, type Orbit } from './model/sketch/space.ts';
+import { sameTheme, type Theme } from './model/sketch/theme.ts';
 import { PEDALS, valueOf, type Pedal } from './pedals.ts';
 import { type Driver } from './shared/curve.ts';
 import { driverAt } from './shared/signal.ts';

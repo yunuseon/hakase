@@ -1,7 +1,7 @@
 import { from, Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import type { Size } from '../../window/frame.ts';
-import { bitrateOf, type ExportSettings } from '../animation.ts';
+import type { Size } from '../../../layout/frame.ts';
+import { bitrateOf, type ExportSettings } from '../../../model/sketch/export.ts';
 import { muxWebM, type VideoChunk } from './webm.ts';
 import type { ExportStatus } from './export-panel.component.ts';
 import { zip, zipEntry, type ZipEntry } from './zip.ts';

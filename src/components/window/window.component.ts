@@ -54,7 +54,7 @@ import {
     type SwitchItem,
     type WindowGesture,
     type WindowView,
-} from './frame.ts';
+} from '../../layout/frame.ts';
 import css from './window.css?inline';
 
 const sheet = styleSheet(css);

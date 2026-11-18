@@ -14,7 +14,7 @@ import {
 } from 'rxjs/operators';
 import { HksCanvas } from '../components/canvas/canvas.component.ts';
 import { HksWindow } from '../components/window/window.component.ts';
-import { moved, resized, type Frame } from '../components/window/frame.ts';
+import { moved, resized, type Frame } from '../layout/frame.ts';
 import { HksSections } from '../components/sections/sections.component.ts';
 import { HksSeams } from '../components/seams/seams.component.ts';
 import { HksNavigator } from '../components/navigator/navigator.component.ts';

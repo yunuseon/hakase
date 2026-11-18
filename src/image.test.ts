@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { defaultPanel, type Signals } from './components/sketch/params.ts';
-import { DEFAULT_ORBIT } from './components/sketch/space.ts';
-import { themes } from './components/sketch/themes/registry.ts';
+import { defaultPanel, type Signals } from './model/sketch/params.ts';
+import { DEFAULT_ORBIT } from './model/sketch/space.ts';
+import { themes } from './model/sketch/themes/registry.ts';
 import {
     knobAt,
     NONE,

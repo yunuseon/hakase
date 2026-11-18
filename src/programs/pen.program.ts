@@ -4,8 +4,9 @@ import { distinctUntilChanged, ignoreElements, map, shareReplay, switchMap } fro
 import { sheet$ } from '../engine/view.ts';
 import { parseHexColor } from '../lib/color.ts';
 import { dabsAt } from '../shared/stroke.ts';
-import { strokeOf } from '../components/pen/pen.ts';
-import type { AppInput, Program } from '../program.ts';
+import { strokeOf } from '../model/pen.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 const FAINT = 0.22;
 

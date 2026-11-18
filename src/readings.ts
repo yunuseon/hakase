@@ -1,12 +1,6 @@
-import {
-    currentBlock,
-    nextBlock,
-    timeOf,
-    type Agenda,
-    type Block,
-} from './components/agenda/agenda.ts';
-import { focusView, type Focus, type FocusLink, type Plan } from './components/focus/focus.ts';
-import type { Reading } from './components/progress-bar/progress-bar.ts';
+import { currentBlock, nextBlock, timeOf, type Agenda, type Block } from './model/agenda.ts';
+import { focusView, type Focus, type FocusLink, type Plan } from './model/focus.ts';
+import type { Reading } from './model/reading.ts';
 import { factsOf, type Tickets } from './shared/tickets.ts';
 
 const MINUTE = 60_000;

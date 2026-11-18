@@ -11,13 +11,8 @@ import { EMPTY, fromEvent, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import {
-    isZoomCommand,
-    MINIMAP,
-    sameMiniMap,
-    type MiniMap,
-    type ZoomCommand,
-} from './navigator.ts';
+import { MINIMAP, sameMiniMap, type MiniMap } from './navigator.ts';
+import { isZoomCommand, type ZoomCommand } from '../../layout/zoom.ts';
 import css from './navigator.css?inline';
 
 const sheet = styleSheet(css);

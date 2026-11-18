@@ -28,7 +28,8 @@ import {
 } from 'rxjs/operators';
 import { requireChild, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import { DAY_MINUTES, SNAP, snapped, timeOf, type Placed } from './agenda.ts';
+import { DAY_MINUTES, SNAP, snapped, timeOf } from '../../model/agenda.ts';
+import { type Placed } from './lanes.ts';
 import css from './agenda.css?inline';
 
 const sheet = styleSheet(css);

@@ -7,9 +7,9 @@ import { HksProgressBar } from '../components/progress-bar/progress-bar.componen
 import { HksLinearSlider } from '../components/slider/linear/linear-slider.component.ts';
 import { HksCircularSlider } from '../components/slider/circular/circular-slider.component.ts';
 import { HksVoice } from '../components/voice/voice.component.ts';
-import { defaultVoice, notesOf, reduceVoice, soundingOf } from '../components/voice/voice.ts';
+import { defaultVoice, notesOf, reduceVoice, soundingOf } from '../model/voice.ts';
 import { HksDrums } from '../components/drums/drums.component.ts';
-import { defaultDrums, reduceDrums } from '../components/drums/drums.ts';
+import { defaultDrums, reduceDrums } from '../model/drums.ts';
 import { defaults, recorded, type Story } from './story.ts';
 
 const normal = [{ id: 'default', title: 'Default' }];

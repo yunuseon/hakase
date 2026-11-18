@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
-import { isProgramId, type ProgramId } from './program.ts';
+import { isProgramId, type ProgramId } from './protocol.ts';
 
 export type StoreId = string;
 

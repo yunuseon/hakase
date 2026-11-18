@@ -2,7 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { merge, of } from 'rxjs';
 import { HksSections } from './sections.component.ts';
 import { requireElement } from '../../lib/dom.ts';
-import type { SectionGesture } from './sections.ts';
+import type { SectionGesture } from '../../layout/sections.ts';
 afterEach(() => document.body.replaceChildren());
 it('draws a cutout and renames through the shadow-root change event', () => {
     const element = new HksSections();

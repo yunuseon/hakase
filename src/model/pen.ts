@@ -1,7 +1,7 @@
-import { copiesOf, isSymmetry, type Point, type Symmetry } from '../../shared/brush.ts';
-import { driverAt, sameDriver, type Signal, waveOf } from '../../shared/signal.ts';
-import type { Driver } from '../../shared/curve.ts';
-import { INK_SIDE, type Stroke } from '../../shared/stroke.ts';
+import { copiesOf, isSymmetry, type Point, type Symmetry } from '../shared/brush.ts';
+import { driverAt, sameDriver, type Signal, waveOf } from '../shared/signal.ts';
+import type { Driver } from '../shared/curve.ts';
+import { INK_SIDE, type Stroke } from '../shared/stroke.ts';
 
 export const PEN_PARAMS = ['x', 'y', 'size', 'ink'] as const;
 export type PenParam = (typeof PEN_PARAMS)[number];

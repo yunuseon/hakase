@@ -12,7 +12,7 @@ import {
     type PanelParams,
     type Pointer,
     type SketchParams,
-} from '../params.ts';
+} from '../../../model/sketch/params.ts';
 import {
     LATTICES,
     LENSES,
@@ -22,8 +22,8 @@ import {
     REFERENCE_DISTANCE,
     wraps,
     type Orbit,
-} from '../space.ts';
-import { RAMP_SIZE } from '../theme.ts';
+} from '../../../model/sketch/space.ts';
+import { RAMP_SIZE } from '../../../model/sketch/theme.ts';
 import { PAINT_UNIT, type Surface } from './surface.ts';
 import { frameAt } from '../../../shared/picture.ts';
 import { inked, loadStroke } from '../../../shared/gl/ink.ts';

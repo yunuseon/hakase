@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scheduled, unscheduled, type Frame, type Schedule, type Strike } from './schedule.ts';
-import type { Note } from '../components/voice/voice.ts';
+import type { Note } from '../model/voice.ts';
 
 const quarters: readonly Note[] = [0, 0.25, 0.5, 0.75].map((from, index) => ({
     from,

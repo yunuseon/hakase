@@ -1,4 +1,4 @@
-import { linkedSketch, SKETCH_PARAMS, type SketchLink } from './components/sketch/links.ts';
+import { linkedSketch, SKETCH_PARAMS, type SketchLink } from './model/sketch/links.ts';
 import { CONVERTER_DEFAULTS, type Converter } from './converters.ts';
 import type { Gate } from './gates.ts';
 import type { Pedal } from './pedals.ts';

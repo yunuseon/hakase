@@ -7,7 +7,7 @@ import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
 import { blueprintIn, RHYTHM, STARTERS } from './starters.ts';
 import { bitCurve, circuitTable } from './circuit.ts';
 import { defaultWorkspace } from './workspace.ts';
-import { notesOf, soundingOf } from './components/voice/voice.ts';
+import { notesOf, soundingOf } from './model/voice.ts';
 import { shaped } from './converters.ts';
 import { curveAt, curveOf } from './shared/curve.ts';
 import { waveOf } from './shared/signal.ts';

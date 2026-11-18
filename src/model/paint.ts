@@ -1,5 +1,5 @@
-import type { Logged } from '../../shared/logged.ts';
-import { blank, MAX_FRAMES, type Frame, type Picture, type Side } from '../../shared/picture.ts';
+import type { Logged } from '../shared/logged.ts';
+import { blank, MAX_FRAMES, type Frame, type Picture, type Side } from '../shared/picture.ts';
 import {
     averageAround,
     copiesOf,
@@ -9,7 +9,7 @@ import {
     type Brush,
     type Point,
     type Symmetry,
-} from '../../shared/brush.ts';
+} from '../shared/brush.ts';
 
 export const TOOLS = [...INKS, 'fill'] as const;
 export type Tool = (typeof TOOLS)[number];

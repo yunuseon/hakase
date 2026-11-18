@@ -1,4 +1,4 @@
-import type { Tab } from '../animation.ts';
+import type { Tab } from './export.ts';
 import {
     defaultPanel,
     dotsAt,
@@ -13,8 +13,8 @@ import {
     type Knob,
     type Panel,
     type PanelParams,
-} from '../params.ts';
-import { isFit, isLattice, isLens, isSpace } from '../space.ts';
+} from './params.ts';
+import { isFit, isLattice, isLens, isSpace } from './space.ts';
 
 export const GROUPS = ['parameters', 'sampling', 'space', 'drawing', 'camera'] as const;
 

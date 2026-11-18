@@ -1,7 +1,8 @@
 import { declarations } from '../declarations.ts';
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 
 export const historyProgram = {
     ...declarations.history,

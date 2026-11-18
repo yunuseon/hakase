@@ -19,9 +19,9 @@ import {
     isKnob,
     type DrawMode,
     type Knob,
-} from '../params.ts';
-import { FITS, LATTICES, LENSES, SPACES } from '../space.ts';
-import { TABS } from '../animation.ts';
+} from '../../../model/sketch/params.ts';
+import { FITS, LATTICES, LENSES, SPACES } from '../../../model/sketch/space.ts';
+import { TABS } from '../../../model/sketch/export.ts';
 import {
     FLAGS,
     GROUPS,
@@ -36,7 +36,7 @@ import {
     type KnobView,
     type NumericField,
     sameKnobViews,
-} from './controls.ts';
+} from '../../../model/sketch/controls.ts';
 import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);

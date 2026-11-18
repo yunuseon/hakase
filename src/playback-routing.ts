@@ -1,6 +1,6 @@
 import { merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, scan } from 'rxjs/operators';
-import type { AppInput } from './program.ts';
+import type { AppInput } from './protocol.ts';
 import type { ClockCommand } from './shared/playhead.ts';
 import type { PlaybackBinding } from './inputs.ts';
 import type { Stamped } from './stores.ts';

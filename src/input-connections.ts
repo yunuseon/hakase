@@ -1,10 +1,10 @@
-import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
+import type { FollowGroup, WindowGesture } from './layout/frame.ts';
 import { definitionOf, followedBy, followedStores, SOURCES, type ProgramInputs } from './inputs.ts';
 import { isConverterKind } from './converters.ts';
 import { dependentsOf, type Linked } from './shared/signal.ts';
 import { readsTickBefore } from './gates.ts';
 import { colourOf, MAIN, withMain, type StoreEntry } from './stores.ts';
-import { isProgramId } from './program.ts';
+import { isProgramId } from './protocol.ts';
 import type { Process } from './workspace.ts';
 
 // Read by entry, not sources[param]: the documents come from storage.

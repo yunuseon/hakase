@@ -6,9 +6,9 @@ import { filter, map, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
 import { pointerDelta$, pointerDrag$ } from '../../shared/drag.ts';
-import type { OrbitAction } from './space.ts';
-import { pointerAt, type Pointer } from './params.ts';
-import type { Size } from '../window/frame.ts';
+import type { OrbitAction } from '../../model/sketch/space.ts';
+import { pointerAt, type Pointer } from '../../model/sketch/params.ts';
+import type { Size } from '../../layout/frame.ts';
 import type { Shown } from '../../shared/shown.ts';
 import css from './sketch.css?inline';
 

@@ -35,10 +35,10 @@ import {
     type Point,
     type Rect,
 } from './shared/camera.ts';
-import type { ZoomCommand } from './components/navigator/navigator.ts';
-import type { SeamView } from './components/seams/seams.ts';
-import type { SectionGesture } from './components/sections/sections.ts';
-import { isEdge, type Edge, type Placement } from './components/toolbar/toolbar.ts';
+import type { ZoomCommand } from './layout/zoom.ts';
+import type { SeamView } from './layout/seams.ts';
+import type { SectionGesture } from './layout/sections.ts';
+import { isEdge, type Edge, type Placement } from './layout/toolbar.ts';
 import {
     frameFrom,
     moved,
@@ -47,9 +47,9 @@ import {
     type ResizeEdge,
     type Size,
     type WindowGesture,
-} from './components/window/frame.ts';
+} from './layout/frame.ts';
 import { clamp } from './lib/math.ts';
-import { isProgramId, type ProcessId, type ProgramId } from './program.ts';
+import { isProgramId, type ProcessId, type ProgramId } from './protocol.ts';
 import {
     ensured,
     HOLDING,

@@ -10,7 +10,7 @@ import {
 } from 'rxjs/operators';
 import { steppedSection } from '../commands.ts';
 import { viewport$ } from '../lib/rx.ts';
-import type { AppSignal } from '../process.ts';
+import type { AppSignal } from '../protocol.ts';
 import { centredOn, fitted, flight, IDENTITY } from '../shared/camera.ts';
 import { boxOf, type WorkspaceAction } from '../workspace.ts';
 import type { Chrome } from './chrome.graph.ts';

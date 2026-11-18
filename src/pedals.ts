@@ -1,4 +1,4 @@
-import { themes } from './components/sketch/themes/registry.ts';
+import { themes } from './model/sketch/themes/registry.ts';
 
 export const PEDAL_KINDS = ['colourmap', 'kaleido', 'feedback', 'mix', 'blur'] as const;
 export type PedalKind = (typeof PEDAL_KINDS)[number];

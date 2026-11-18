@@ -16,20 +16,17 @@ import {
 } from 'rxjs/operators';
 import type { Shown } from '../shared/shown.ts';
 import {
-    aspectSize,
-    exportPixels,
     followed,
     frameAtX,
-    frameCount,
     isZoom,
     markerX,
     sameLayout,
     stripGeometry,
     tilesIn,
-    withExportChange,
     zoomedStrip,
     type ZoomGesture,
 } from '../components/sketch/animation.ts';
+import { aspectSize, exportPixels, frameCount, withExportChange } from '../model/sketch/export.ts';
 import { filmstrip$ } from '../engine/thumbnails.ts';
 import { statusOf } from '../components/sketch/export/export.ts';
 import type {
@@ -39,7 +36,8 @@ import type {
 import { imageExport$, imageStill$ } from '../engine/export.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$, type View } from '../engine/view.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asOutput } from '../settings.ts';
 
 export const shownOf =

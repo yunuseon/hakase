@@ -10,9 +10,10 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import type { Theme } from '../components/sketch/theme.ts';
-import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
-import { seenBy, unseen, type AppInput, type Program } from '../program.ts';
+import type { Theme } from '../model/sketch/theme.ts';
+import { isThemeName, themes } from '../model/sketch/themes/registry.ts';
+import { seenBy, unseen, type Program } from '../program.ts';
+import { type AppInput } from '../protocol.ts';
 import { asThemeEditor } from '../settings.ts';
 
 const options = Object.keys(themes).map(value => ({ value, label: value }));

@@ -16,7 +16,7 @@ import {
     QUALITIES,
     type ExportChange,
     type ExportSettings,
-} from '../animation.ts';
+} from '../../../model/sketch/export.ts';
 import css from './export-panel.css?inline';
 
 const sheet = styleSheet(css);

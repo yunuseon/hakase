@@ -1,11 +1,11 @@
-import { curveOf, type Driver } from '../../shared/curve.ts';
+import { curveOf, type Driver } from '../shared/curve.ts';
 import {
     scheduled,
     unscheduled,
     type Frame,
     type Schedule,
     type Strike,
-} from '../../shared/schedule.ts';
+} from '../shared/schedule.ts';
 import {
     envelopeAt,
     INSTRUMENT_NAMES,
@@ -14,7 +14,7 @@ import {
     type InstrumentName,
     type Instrument,
 } from './instruments.ts';
-import { driverAt, sameDriver, type Signal, waveOf } from '../../shared/signal.ts';
+import { driverAt, sameDriver, type Signal, waveOf } from '../shared/signal.ts';
 
 export const VOICE_PARAMS = ['pitch', 'volume', 'filter', 'pan'] as const;
 export type VoiceParam = (typeof VOICE_PARAMS)[number];

@@ -11,17 +11,13 @@ import {
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
-import type {
-    FollowGroup,
-    StoreOption,
-    SwitchGroup,
-    SwitchItem,
-} from '../components/window/frame.ts';
+import type { FollowGroup, StoreOption, SwitchGroup, SwitchItem } from '../layout/frame.ts';
 import { inputGroups } from '../input-connections.ts';
 import { followedStores, playbackBinding, type Bindings, type PlaybackBinding } from '../inputs.ts';
 import { liveProcess$, type ProcessSignal } from '../process.ts';
 import { windowZ } from '../state-mode.ts';
-import { CATEGORIES, type ProcessId, type Slot } from '../program.ts';
+import { type Slot } from '../program.ts';
+import { CATEGORIES, type ProcessId } from '../protocol.ts';
 import { inputsFor } from '../declarations.ts';
 import { programList, programOf } from '../programs.ts';
 import type { Linked } from '../shared/signal.ts';

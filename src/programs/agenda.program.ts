@@ -7,10 +7,12 @@ import {
     shareReplay,
     withLatestFrom,
 } from 'rxjs/operators';
-import { laidOut, nextBlockId } from '../components/agenda/agenda.ts';
+import { nextBlockId } from '../model/agenda.ts';
+import { laidOut } from '../components/agenda/lanes.ts';
 import { dayLabel, dayOf, minuteOfDay, shiftDay } from '../lib/day.ts';
 import { wallClock$ } from '../lib/rx.ts';
-import type { AppInput, Program } from '../program.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { asAgenda } from '../settings.ts';
 
 const show = (day: string | null): AppInput => ({

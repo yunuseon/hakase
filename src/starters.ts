@@ -1,9 +1,9 @@
 import { defaultTickets } from './shared/tickets.ts';
 import { defaultSignal, type Signal } from './shared/signal.ts';
-import { defaultVoice, type Voice } from './components/voice/voice.ts';
-import { ACCENT, defaultDrums, NORMAL, PRESETS } from './components/drums/drums.ts';
-import { defaultPanel } from './components/sketch/params.ts';
-import { unlinkedSketch } from './components/sketch/links.ts';
+import { defaultVoice, type Voice } from './model/voice.ts';
+import { ACCENT, defaultDrums, NORMAL, PRESETS } from './model/drums.ts';
+import { defaultPanel } from './model/sketch/params.ts';
+import { unlinkedSketch } from './model/sketch/links.ts';
 import { defaultPedal, type Pedal, type PedalKind } from './pedals.ts';
 import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
 import {
@@ -15,10 +15,10 @@ import {
 } from './converters.ts';
 import type { Box } from './boxes.ts';
 import { defaultSketch, defaultPlot } from './settings.ts';
-import type { Size } from './components/window/frame.ts';
+import type { Size } from './layout/frame.ts';
 import type { Bindings } from './inputs.ts';
 import type { Blueprint, BlueprintWindow, Blueprints } from './blueprints.ts';
-import type { ProgramId } from './program.ts';
+import type { ProgramId } from './protocol.ts';
 import type { Settings } from './settings.ts';
 import type { StoreEntry, StoreId } from './stores.ts';
 

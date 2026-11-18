@@ -1,15 +1,11 @@
 import type { Driver } from '../../shared/curve.ts';
 import { driverAt, samplesOf } from '../../shared/signal.ts';
+import type { Layout } from '../../model/plot.ts';
 
 export const WIDTH = 400;
 export const HEIGHT = 120;
 const SAMPLES = 320;
 const LANE_GAP = 8;
-
-export const LAYOUTS = ['overlay', 'lanes'] as const;
-export type Layout = (typeof LAYOUTS)[number];
-export const isLayout = (value: string): value is Layout =>
-    LAYOUTS.some(layout => layout === value);
 
 export type Trace = {
     readonly key: string;

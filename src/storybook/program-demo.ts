@@ -1,6 +1,6 @@
 import { GATE_DEFAULTS } from '../gates.ts';
 import { CONVERTER_DEFAULTS, timingCurve } from '../converters.ts';
-import { reduceAgenda, emptyAgenda } from '../components/agenda/agenda.ts';
+import { reduceAgenda, emptyAgenda } from '../model/agenda.ts';
 
 const DEMO_DAY = '2026-01-01';
 const DEMO_AGENDA = [
@@ -12,7 +12,7 @@ import { defaultPedal } from '../pedals.ts';
 import { NONE, type Image } from '../image.ts';
 import { asSketch } from '../settings.ts';
 import { emptyLibrary } from '../library.ts';
-import { UNDRIVEN } from '../components/sketch/params.ts';
+import { UNDRIVEN } from '../model/sketch/params.ts';
 import { animationFrames, defer, EMPTY, from, fromEvent, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -29,13 +29,14 @@ import {
     tap,
 } from 'rxjs/operators';
 import { appearances } from '../appearances.ts';
-import { themes } from '../components/sketch/themes/registry.ts';
+import { themes } from '../model/sketch/themes/registry.ts';
 import { sourceOf } from '../library.ts';
-import { drawingOf } from '../components/pen/pen.ts';
-import { defaultVoice, soundingOf } from '../components/voice/voice.ts';
-import { defaultDrums, kitOf } from '../components/drums/drums.ts';
+import { drawingOf } from '../model/pen.ts';
+import { defaultVoice, soundingOf } from '../model/voice.ts';
+import { defaultDrums, kitOf } from '../model/drums.ts';
 import { waveOf } from '../shared/signal.ts';
-import type { AppInput, AppState, Program, Self } from '../program.ts';
+import type { AppState, Program, Self } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import type { Settings } from '../settings.ts';
 import { reduceSandbox, sandboxSeed, type Sandbox, type SandboxInput } from './sandbox.ts';
 import { recorded, type Demo } from './story.ts';

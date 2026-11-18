@@ -10,7 +10,7 @@ import { EMPTY, merge, of, type Observable } from 'rxjs';
 import { map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import type { ClockCommand, ClockRow } from './clocks.ts';
+import type { ClockCommand, ClockRow } from '../../model/clocks.ts';
 import css from './clocks.css?inline';
 
 const sheet = styleSheet(css);

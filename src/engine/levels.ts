@@ -1,3 +1,4 @@
+import type { PictureFrames } from '../ports.ts';
 import {
     animationFrameScheduler,
     combineLatest,
@@ -9,7 +10,7 @@ import {
     type Observable,
 } from 'rxjs';
 import { concatMap, debounceTime, ignoreElements, switchMap, tap } from 'rxjs/operators';
-import { centre } from '../components/sketch/params.ts';
+import { centre } from '../model/sketch/params.ts';
 import { hasHistory, type Image } from '../image.ts';
 import { averagedInto, cook, readAtlas, type Engine } from './engine.ts';
 import { engine$ } from './view.ts';
@@ -101,10 +102,7 @@ const framesOf$ = (engine: Engine, image: Image, seconds: number): Observable<Ui
         defer(() => of(cellsOf(readAtlas(engine, ATLAS, performance.now()), ACROSS, CELL))),
     );
 
-export const pictureFrames$ = (
-    image$: Observable<Image>,
-    seconds$: Observable<number>,
-): Observable<readonly Uint8Array[] | null> =>
+export const pictureFrames$: PictureFrames = (image$, seconds$) =>
     engine$.pipe(
         switchMap(engine =>
             engine instanceof Error
@@ -117,5 +115,3 @@ export const pictureFrames$ = (
                   ),
         ),
     );
-
-export type PictureFrames = typeof pictureFrames$;

@@ -2,15 +2,14 @@ import { merge, type Observable } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 import { inputsFor } from './declarations.ts';
 import type { DocumentAction } from './documents.ts';
-import type { PictureFrames } from './engine/levels.ts';
 import { begunFrom, historyOf } from './graph/history.graph.ts';
 import { levelsOf } from './graph/levels.graph.ts';
 import { persisted$ } from './graph/persistence.graph.ts';
 import { projectionsOf } from './graph/projections.graph.ts';
 import { timekeepingOf } from './graph/timekeeping.graph.ts';
 import { documentActionsOf } from './input-actions.ts';
-import type { Ports } from './ports.ts';
-import type { AppSignal } from './process.ts';
+import type { PictureFrames, Ports } from './ports.ts';
+import type { AppSignal } from './protocol.ts';
 import { restoreState } from './state-store.ts';
 import type { WorkspaceAction } from './workspace.ts';
 

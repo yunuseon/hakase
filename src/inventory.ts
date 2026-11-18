@@ -1,4 +1,4 @@
-import { isProgramId, type ProgramId } from './program.ts';
+import { isProgramId, type ProgramId } from './protocol.ts';
 import type { StoreId } from './stores.ts';
 
 export const GLOBALS = ['workspace', 'appearance', 'formulas', 'themes', 'library'] as const;

@@ -1,11 +1,11 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import type { Agenda } from './components/agenda/agenda.ts';
-import type { Focus, Plan } from './components/focus/focus.ts';
-import type { Reading } from './components/progress-bar/progress-bar.ts';
+import type { Agenda } from './model/agenda.ts';
+import type { Focus, Plan } from './model/focus.ts';
+import type { Reading } from './model/reading.ts';
 import type { Tickets } from './shared/tickets.ts';
 import { dayOf, minuteOfDay } from './lib/day.ts';
-import type { ProgramId } from './program.ts';
+import type { ProgramId } from './protocol.ts';
 import { PEDALS, type PedalKind } from './pedals.ts';
 import { GATES, type GateKind } from './gates.ts';
 import { CONVERTERS, converterTitle, type ConverterKind } from './converters.ts';

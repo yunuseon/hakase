@@ -1,14 +1,14 @@
 import { boundsOf } from './shared/area.ts';
-import { parseAgenda } from './components/agenda/agenda.ts';
-import { parseBookmarks } from './components/bookmarks/bookmarks.ts';
-import { parseClocks } from './components/clocks/clocks.ts';
-import { parseHabits } from './components/habits/habits.ts';
-import { parseNotes } from './components/note/note.ts';
-import { parsePen, type Pen } from './components/pen/pen.ts';
-import { formulas as registry } from './components/sketch/formulas/registry.ts';
+import { parseAgenda } from './model/agenda.ts';
+import { parseBookmarks } from './model/bookmarks.ts';
+import { parseClocks } from './model/clocks.ts';
+import { parseHabits } from './model/habits.ts';
+import { parseNotes } from './model/note.ts';
+import { parsePen, type Pen } from './model/pen.ts';
+import { formulas as registry } from './model/sketch/formulas/registry.ts';
 import { parseTickets } from './shared/tickets.ts';
-import { parseVoice, type Voice } from './components/voice/voice.ts';
-import { parseDrums, type Drums } from './components/drums/drums.ts';
+import { parseVoice, type Voice } from './model/voice.ts';
+import { parseDrums, type Drums } from './model/drums.ts';
 import type { Documents } from './documents.ts';
 import { parseStoredPedal, type Pedal } from './pedals.ts';
 import { parseGate, type Gate } from './gates.ts';
@@ -17,7 +17,7 @@ import { enveloped } from './envelopes.ts';
 import { parseBox, type Box } from './boxes.ts';
 import type { Bindings, InputsFor } from './inputs.ts';
 import { isCustomId, isFormulaId, type CustomId, type FormulaId, type Library } from './library.ts';
-import { isProgramId } from './program.ts';
+import { isProgramId } from './protocol.ts';
 import { parseSettings, type Settings } from './settings.ts';
 import { parsePicture } from './shared/picture.ts';
 import { parseSignal, reachedFrom, type Linked, type Signal } from './shared/signal.ts';
@@ -28,7 +28,7 @@ import {
     SKETCH_PARAMS,
     unlinkedSketch,
     type SketchLink,
-} from './components/sketch/links.ts';
+} from './model/sketch/links.ts';
 import {
     ensured,
     HOLDING,
@@ -40,7 +40,7 @@ import {
     type StoreEntry,
     type StoreId,
 } from './stores.ts';
-import type { Size } from './components/window/frame.ts';
+import type { Size } from './layout/frame.ts';
 import type { Rect } from './shared/camera.ts';
 import {
     boxOf,

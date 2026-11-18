@@ -3,7 +3,7 @@ import { distinctUntilChanged, map, shareReplay } from 'rxjs/operators';
 import type { Appearance } from '../appearance.ts';
 import { appearances, type AppearanceName } from '../appearances.ts';
 import { linkedOf, loopsOf, type History } from '../documents.ts';
-import type { ProcessId, Written } from '../program.ts';
+import type { ProcessId, Written } from '../protocol.ts';
 import { sameStructure, type Workspace } from '../workspace.ts';
 
 const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>

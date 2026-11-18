@@ -1,4 +1,4 @@
-import type { ProcessId } from './program.ts';
+import type { ProcessId } from './protocol.ts';
 import type { SelectionView } from './components/selection/selection.ts';
 import { overlaps } from './shared/area.ts';
 import type { Rect } from './shared/camera.ts';

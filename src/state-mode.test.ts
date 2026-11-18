@@ -1,5 +1,5 @@
 import type { Linked } from './shared/signal.ts';
-import { unlinkedSketch } from './components/sketch/links.ts';
+import { unlinkedSketch } from './model/sketch/links.ts';
 import { describe, expect, it } from 'vitest';
 import {
     defaultMode,

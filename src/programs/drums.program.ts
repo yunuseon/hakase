@@ -14,8 +14,9 @@ import {
 } from 'rxjs/operators';
 import { applyVolume, drumBus$, type DrumBus } from '../components/drums/audio/bus.ts';
 import { hit } from '../components/drums/audio/hit.ts';
-import { hitsOf, swellOf, type Hit } from '../components/drums/drums.ts';
-import type { AppInput, Program } from '../program.ts';
+import { hitsOf, swellOf, type Hit } from '../model/drums.ts';
+import type { Program } from '../program.ts';
+import type { AppInput } from '../protocol.ts';
 import { frameOf, scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
 
 type Scheduling = { readonly schedule: Schedule; readonly strikes: readonly Strike<Hit>[] };

@@ -1,5 +1,5 @@
 import type { GhostView } from './components/placement/placement.ts';
-import type { Size } from './components/window/frame.ts';
+import type { Size } from './layout/frame.ts';
 import type { Blueprint } from './blueprints.ts';
 import { worldAt, type Camera, type Point, type Rect } from './shared/camera.ts';
 
