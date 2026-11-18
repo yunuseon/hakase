@@ -18,9 +18,8 @@
 }
 
 .preset {
+    flex: 1 1 7rem;
     min-inline-size: 0;
-    max-inline-size: 100%;
-    margin-inline-start: auto;
     padding: calc(var(--spacing) * 0.75) var(--space-1-5);
     border: 1px solid var(--edge);
     border-radius: var(--radius-md);
@@ -217,8 +216,7 @@
     block-size: var(--control-md);
     font: 600 var(--text-base)/1 var(--font-ui);
     color: var(--label);
-    border: 1px solid var(--edge);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     cursor: pointer;
     list-style: none;
     user-select: none;

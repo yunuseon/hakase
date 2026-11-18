@@ -23,6 +23,7 @@ import {
 import { bitCurve, circuitTable, type Table } from '../circuit.ts';
 import {
     bitShaped,
+    PLAIN_BITS,
     clockBit,
     clockLevel,
     CONVERTER_DEFAULTS,
@@ -328,162 +329,141 @@ export const levelsOf = ({
                 )
               : of(null);
 
+    const readingOf = (
+        binding: Follow,
+        { kind, choice, bits }: Converter,
+        pace$: Observable<Pace>,
+        below: Seen,
+    ): Observable<Driver | null> => {
+        switch (kind) {
+            case 'schedule-level':
+                return binding.kind === 'agenda'
+                    ? combineLatest([agendaIn(binding.store), today$]).pipe(
+                          map(([agenda, day]) => timingCurve(agenda, day, choice)),
+                      )
+                    : of(null);
+            case 'sound-level':
+                return binding.kind === 'voice'
+                    ? choice === 'pitch'
+                        ? soundingIn(binding.store, pace$, below).pipe(map(pitchCurve))
+                        : choice === 'loudness'
+                          ? combineLatest([soundingIn(binding.store, pace$, below), pace$]).pipe(
+                                map(([sounding, { seconds }]) => voiceCurve(sounding, seconds)),
+                            )
+                          : of(null)
+                    : binding.kind === 'drums'
+                      ? choice === 'pitch'
+                          ? of(curveOf(() => 0))
+                          : combineLatest([kitIn(binding.store, pace$, below), pace$]).pipe(
+                                map(([kit, { seconds }]) =>
+                                    isDrum(choice)
+                                        ? drumCurve(kit, choice, seconds)
+                                        : kitCurve(kit, seconds),
+                                ),
+                            )
+                      : of(null);
+            case 'timer-level':
+                return binding.kind === 'focus'
+                    ? nowAs(
+                          combineLatest([timerIn(binding.store), planIn(binding.store)]).pipe(
+                              map(([focus, plan]) => phaseLevel(focusView(focus, plan), choice)),
+                          ),
+                      )
+                    : of(null);
+            case 'tasks-level':
+                return binding.kind === 'tickets'
+                    ? nowAs(
+                          ticketsIn(binding.store).pipe(map(tickets => doneLevel(tickets, choice))),
+                      )
+                    : of(null);
+            case 'level-level':
+                return boundIn(binding, pace$, below);
+            case 'level-bit':
+                return boundIn(binding, pace$, below).pipe(
+                    map(driver =>
+                        driver === null
+                            ? null
+                            : thresholded(driver, choice === 'below', bits.threshold, bits.band),
+                    ),
+                );
+            case 'schedule-bit':
+                return binding.kind === 'agenda'
+                    ? combineLatest([agendaIn(binding.store), today$]).pipe(
+                          map(([agenda, day]) =>
+                              thresholded(timingCurve(agenda, day, choice), false, 0.001, 0),
+                          ),
+                      )
+                    : of(null);
+            case 'timer-bit':
+                return binding.kind === 'focus'
+                    ? nowAs(
+                          combineLatest([timerIn(binding.store), planIn(binding.store)]).pipe(
+                              map(([focus, plan]) => timerBit(focusView(focus, plan), choice)),
+                          ),
+                      )
+                    : of(null);
+            case 'tasks-bit':
+                return binding.kind === 'tickets'
+                    ? nowAs(
+                          ticketsIn(binding.store).pipe(map(tickets => tasksBit(tickets, choice))),
+                      )
+                    : of(null);
+            case 'sound-bit':
+                return loudnessIn(binding, pace$, below).pipe(
+                    map(loudness => (loudness === null ? null : soundBits(loudness, choice))),
+                );
+            case 'clock-level':
+            case 'clock-bit':
+                return binding.kind === 'playback'
+                    ? nowAs(
+                          playbackIn(binding.store).pipe(
+                              map(clock =>
+                                  kind === 'clock-bit'
+                                      ? clockBit(clock, choice)
+                                      : clockLevel(clock, choice),
+                              ),
+                          ),
+                      )
+                    : of(null);
+            case 'picture-level':
+                return isImageKind(binding.kind)
+                    ? pictureFrames$(
+                          imageIn(binding.store, pace$, below),
+                          pace$.pipe(
+                              map(({ seconds }) => seconds),
+                              distinctUntilChanged(),
+                          ),
+                      ).pipe(map(frames => (frames === null ? null : pictureCurve(frames, choice))))
+                    : of(null);
+            case 'zones-level':
+            case 'zones-bit':
+            case 'habits-level':
+            case 'habits-bit':
+                return of(null);
+        }
+    };
+
     const readingIn = (
         store: StoreId,
-        { kind, choice, bits }: Converter,
+        converter: Converter,
         pace$: Observable<Pace>,
         seen: Seen,
     ): Observable<Driver | null> =>
         linkIn(store, 'in').pipe(
-            switchMap((binding): Observable<Driver | null> => {
-                if (binding === null || seen.has(binding.store)) {
-                    return of(null);
-                }
+            switchMap(binding =>
+                binding === null || seen.has(binding.store)
+                    ? of(null)
+                    : readingOf(binding, converter, pace$, new Set([...seen, store])),
+            ),
+        );
 
-                const below = new Set([...seen, store]);
-
-                switch (kind) {
-                    case 'schedule-level':
-                        return binding.kind === 'agenda'
-                            ? combineLatest([agendaIn(binding.store), today$]).pipe(
-                                  map(([agenda, day]) => timingCurve(agenda, day, choice)),
-                              )
-                            : of(null);
-                    case 'sound-level':
-                        return binding.kind === 'voice'
-                            ? choice === 'pitch'
-                                ? soundingIn(binding.store, pace$, below).pipe(map(pitchCurve))
-                                : choice === 'loudness'
-                                  ? combineLatest([
-                                        soundingIn(binding.store, pace$, below),
-                                        pace$,
-                                    ]).pipe(
-                                        map(([sounding, { seconds }]) =>
-                                            voiceCurve(sounding, seconds),
-                                        ),
-                                    )
-                                  : of(null)
-                            : binding.kind === 'drums'
-                              ? choice === 'pitch'
-                                  ? of(curveOf(() => 0))
-                                  : combineLatest([kitIn(binding.store, pace$, below), pace$]).pipe(
-                                        map(([kit, { seconds }]) =>
-                                            isDrum(choice)
-                                                ? drumCurve(kit, choice, seconds)
-                                                : kitCurve(kit, seconds),
-                                        ),
-                                    )
-                              : of(null);
-                    case 'timer-level':
-                        return binding.kind === 'focus'
-                            ? nowAs(
-                                  combineLatest([
-                                      timerIn(binding.store),
-                                      planIn(binding.store),
-                                  ]).pipe(
-                                      map(([focus, plan]) =>
-                                          phaseLevel(focusView(focus, plan), choice),
-                                      ),
-                                  ),
-                              )
-                            : of(null);
-                    case 'tasks-level':
-                        return binding.kind === 'tickets'
-                            ? nowAs(
-                                  ticketsIn(binding.store).pipe(
-                                      map(tickets => doneLevel(tickets, choice)),
-                                  ),
-                              )
-                            : of(null);
-                    case 'level-level':
-                        return boundIn(binding, pace$, below);
-                    case 'level-bit':
-                        return boundIn(binding, pace$, below).pipe(
-                            map(driver =>
-                                driver === null
-                                    ? null
-                                    : thresholded(
-                                          driver,
-                                          choice === 'below',
-                                          bits.threshold,
-                                          bits.band,
-                                      ),
-                            ),
-                        );
-                    case 'schedule-bit':
-                        return binding.kind === 'agenda'
-                            ? combineLatest([agendaIn(binding.store), today$]).pipe(
-                                  map(([agenda, day]) =>
-                                      thresholded(
-                                          timingCurve(agenda, day, choice),
-                                          false,
-                                          0.001,
-                                          0,
-                                      ),
-                                  ),
-                              )
-                            : of(null);
-                    case 'timer-bit':
-                        return binding.kind === 'focus'
-                            ? nowAs(
-                                  combineLatest([
-                                      timerIn(binding.store),
-                                      planIn(binding.store),
-                                  ]).pipe(
-                                      map(([focus, plan]) =>
-                                          timerBit(focusView(focus, plan), choice),
-                                      ),
-                                  ),
-                              )
-                            : of(null);
-                    case 'tasks-bit':
-                        return binding.kind === 'tickets'
-                            ? nowAs(
-                                  ticketsIn(binding.store).pipe(
-                                      map(tickets => tasksBit(tickets, choice)),
-                                  ),
-                              )
-                            : of(null);
-                    case 'sound-bit':
-                        return loudnessIn(binding, pace$, below).pipe(
-                            map(loudness =>
-                                loudness === null ? null : soundBits(loudness, choice),
-                            ),
-                        );
-                    case 'clock-level':
-                    case 'clock-bit':
-                        return binding.kind === 'playback'
-                            ? nowAs(
-                                  playbackIn(binding.store).pipe(
-                                      map(clock =>
-                                          kind === 'clock-bit'
-                                              ? clockBit(clock, choice)
-                                              : clockLevel(clock, choice),
-                                      ),
-                                  ),
-                              )
-                            : of(null);
-                    case 'picture-level':
-                        return isImageKind(binding.kind)
-                            ? pictureFrames$(
-                                  imageIn(binding.store, pace$, below),
-                                  pace$.pipe(
-                                      map(({ seconds }) => seconds),
-                                      distinctUntilChanged(),
-                                  ),
-                              ).pipe(
-                                  map(frames =>
-                                      frames === null ? null : pictureCurve(frames, choice),
-                                  ),
-                              )
-                            : of(null);
-                    case 'zones-level':
-                    case 'zones-bit':
-                    case 'habits-level':
-                    case 'habits-bit':
-                        return of(null);
-                }
-            }),
+    const offeredIn = (via: ConverterKind, binding: Follow, pace$: Observable<Pace>) =>
+        readingOf(binding, CONVERTER_DEFAULTS[via], pace$, NONE_SEEN).pipe(
+            map(driver =>
+                driver !== null && CONVERTERS[via].makes === 'bit'
+                    ? bitShaped(driver, PLAIN_BITS)
+                    : driver,
+            ),
         );
 
     type Read = { readonly driver: Driver | null; readonly items: readonly ConverterItem[] };
@@ -854,6 +834,7 @@ export const levelsOf = ({
         linkIn,
         boundIn,
         driverIn,
+        offeredIn,
     };
 };
 

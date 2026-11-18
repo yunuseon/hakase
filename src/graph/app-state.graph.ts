@@ -26,13 +26,14 @@ import { parseTarget, type Global } from '../inventory.ts';
 import { devicePixelRatio$, viewport$, wallClock$ } from '../lib/rx.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
-import type { AppState, ProgramId, Task } from '../program.ts';
+import { isProgramId, type AppState, type ProgramId, type Task } from '../program.ts';
 import { inputsFor, programOf } from '../programs.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import { TIME } from '../shared/signal.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
 import { colourOf, inStore, MAIN, type StoreId } from '../stores.ts';
 import { entriesOf } from '../timeline.ts';
+import { chainsOf, sameChains } from '../why.ts';
 import { listed } from '../workspace.ts';
 import { NONE_SEEN, type Levels, type Pace } from './levels.graph.ts';
 import type { Projections } from './projections.graph.ts';
@@ -73,7 +74,8 @@ type StoreKey =
     | 'bits$'
     | 'box$'
     | 'image$'
-    | 'linkedName$';
+    | 'linkedName$'
+    | 'chains$';
 
 type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
     Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
@@ -431,6 +433,18 @@ export const scopedOf = ({
                     ),
                     distinctUntilChanged(),
                 ),
+            chains$: combineLatest([store$, linked$, stores$]).pipe(
+                map(([store, linked, stores]) =>
+                    chainsOf(
+                        linked,
+                        store,
+                        id =>
+                            stores.find(entry => entry.id === id)?.name ??
+                            (isProgramId(id) ? MAIN : id),
+                    ),
+                ),
+                distinctUntilChanged(sameChains),
+            ),
             linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param, pace$))),
             followedImage$: input =>
                 followed$(input).pipe(

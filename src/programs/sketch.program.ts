@@ -313,8 +313,10 @@ export const sketchProgram = {
                                         : of(new Map<string, string>()),
                                 ),
                             ),
+                            state.chains$,
                         )
                         .pipe(ignoreElements()),
+                    controls.whys$.pipe(map((input): AppInput => ({ kind: 'why', input }))),
                     strip
                         .connect$(
                             layout$,

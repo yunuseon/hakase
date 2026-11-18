@@ -15,7 +15,7 @@ export class HksFpsCounter extends HTMLElement {
 
         const root = this.attachShadow({ mode: 'open' });
         root.adoptedStyleSheets = [controlsSheet, sheet];
-        this.rendering = renderView(root, '0 fps', value => value);
+        this.rendering = renderView(root, '', value => value);
     }
 
     connect$(frames$: Observable<unknown>): Observable<void> {
@@ -23,9 +23,10 @@ export class HksFpsCounter extends HTMLElement {
             this.rendering.lifetime$,
             frames$.pipe(
                 bufferTime(1000, animationFrameScheduler),
-                map(frames => `${frames.length} fps`),
-                tap(text => {
-                    this.rendering.update(text);
+                map(frames => frames.length),
+                tap(count => {
+                    this.hidden = count === 0;
+                    this.rendering.update(`${count} fps`);
                 }),
             ),
         ).pipe(map(() => undefined));

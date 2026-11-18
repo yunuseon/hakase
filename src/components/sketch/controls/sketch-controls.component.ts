@@ -1,11 +1,11 @@
 import { Icon } from '../../../shared/ui/icon.component.ts';
 import { ICONS } from '../../../shared/ui/icons.ts';
-import { controlsSheet } from '../../../shared/ui/controls.component.ts';
+import { controlsSheet, whys$ } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { renderOptions, type SelectChoice } from '../../../shared/select/options.component.ts';
 
-import { mountView, type RenderView, type Rendering } from '../../../lib/lit.ts';
+import { mountView, withValue, type RenderView, type Rendering } from '../../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
@@ -42,10 +42,10 @@ import css from './sketch-controls.css?inline';
 const sheet = styleSheet(css);
 
 const DRIVEN_FIELDS = [
-    ['focus', 'focus'],
-    ['size', 'baseSize'],
-    ['depth', 'depthScalar'],
-    ['trails', 'trails'],
+    ['focus', 'focus', 'focus'],
+    ['size', 'baseSize', 'dot size'],
+    ['depth', 'depthScalar', 'depth'],
+    ['trails', 'trails', 'trails'],
 ] as const;
 
 const slider = (
@@ -67,8 +67,21 @@ const slider = (
             min=${ifDefined(min)}
             max=${ifDefined(max)}
             step=${ifDefined(step)}
-            .value=${value} /><output class="read" data-read=${ifDefined(key)}></output
-    ></label>`;
+            .value=${value}
+        /><output class="read" data-read=${ifDefined(key)}></output>${withValue(
+            DRIVEN_FIELDS.find(([, field]) => field === key)?.[0],
+            drive =>
+                html`<button
+                    type="button"
+                    class="ui-driven driven"
+                    data-why=${drive}
+                    data-chain=""
+                    hidden
+                >
+                    follows
+                </button>`,
+        )}</label
+    >`;
 
 const knobRow = (knob: Knob) =>
     html`<div class="knob" data-knob=${ifDefined(knob)} hidden>
@@ -85,10 +98,8 @@ const knobRow = (knob: Knob) =>
                 class="read"
                 data-read=${ifDefined(knob)}
             ></output></label
-        ><span
-            class="driven"
-            title="this knob follows a signal or a voice; set it to none in the window's state menu to turn it by hand"
-            >follows</span
+        ><button type="button" class="ui-driven driven" data-why=${ifDefined(knob)} data-chain="">
+            follows</button
         ><hks-select
             class="ui-field pick motion"
             data-cycles=${ifDefined(knob)}
@@ -190,8 +201,7 @@ const TEMPLATE = () =>
         </div>
         <div class="panes">
             <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
-                <header class="group-head">
-                    <h3>Parameters</h3>
+                <header class="group-head knobs-head">
                     <button
                         class="ui-button reset labelled"
                         type="button"
@@ -310,6 +320,7 @@ const RADIOS = ['mode', 'lens', 'fit'] as const;
 
 export class HksSketchControls extends HTMLElement {
     readonly changes$: Observable<ControlChange>;
+    readonly whys$: Observable<string> = whys$(this);
     readonly resets$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
@@ -336,7 +347,6 @@ export class HksSketchControls extends HTMLElement {
         this.resets$ = fromElementEvent$(this.view, 'click').pipe(map(() => undefined));
 
         this.changes$ = merge(
-            // Above every tab: the formula and theme decide what the parameters draw and what the animation exports.
             fromElementEvent$(requireChild(this.shadow, '.head'), 'change').pipe(
                 mergeMap(({ target }): Observable<ControlChange> => {
                     if (target instanceof HTMLInputElement && target.name === 'tab') {
@@ -435,6 +445,7 @@ export class HksSketchControls extends HTMLElement {
         formulas$: Observable<readonly PresetOption[]>,
         driven$: Observable<readonly string[]>,
         live$: Observable<ReadonlyMap<string, string>>,
+        chains$: Observable<ReadonlyMap<string, string>> = EMPTY,
     ): Observable<void> {
         // Together: options rebuilt after the value was set would drop the selection.
         const formula$ = combineLatest([formulas$, view$.pipe(map(({ formula }) => formula))]).pipe(
@@ -547,6 +558,8 @@ export class HksSketchControls extends HTMLElement {
                         `[data-read="${field}"]`,
                         HTMLOutputElement,
                     ).toggleAttribute('data-driven', input.disabled);
+                    requireElement(this.shadow, `[data-why="${drive}"]`, HTMLButtonElement).hidden =
+                        !input.disabled;
                 }
 
                 for (const knob of KNOBS) {
@@ -578,13 +591,31 @@ export class HksSketchControls extends HTMLElement {
                         value === undefined ? 'follows' : `follows · ${value}`;
                 }
 
-                for (const [, field] of DRIVEN_FIELDS) {
+                for (const [drive, field] of DRIVEN_FIELDS) {
                     const value = valueOf(field);
                     requireElement(
                         this.shadow,
-                        `[data-read="${field}"]`,
-                        HTMLOutputElement,
-                    ).dataset['live'] = value === undefined ? '' : ` · ${value}`;
+                        `[data-why="${drive}"]`,
+                        HTMLButtonElement,
+                    ).textContent = value === undefined ? 'follows' : `follows · ${value}`;
+                }
+            }),
+        );
+
+        const chained$ = combineLatest([chains$, knobs$]).pipe(
+            tap(([chains, knobs]) => {
+                for (const button of this.shadow.querySelectorAll('[data-why]')) {
+                    const input = button.getAttribute('data-why') ?? '';
+                    const chain = chains.get(input);
+                    const label =
+                        knobs.find(({ knob }) => knob === input)?.label ??
+                        DRIVEN_FIELDS.find(([drive]) => drive === input)?.[2] ??
+                        input;
+
+                    button.setAttribute(
+                        'data-chain',
+                        chain === undefined ? '' : `${label} ← ${chain}`,
+                    );
                 }
             }),
         );
@@ -643,6 +674,7 @@ export class HksSketchControls extends HTMLElement {
                 shown$,
                 drivers$,
                 readings$,
+                chained$,
                 turned$,
             ).pipe(map(() => undefined)),
         );

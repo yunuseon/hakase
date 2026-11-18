@@ -109,10 +109,16 @@ export const workspaceActions$ = ({
             ),
             wiringCommands$.pipe(
                 mergeMap(
-                    (command): Exclude<StateCommand, { kind: 'locate' | 'prune' | 'source' }>[] =>
+                    (
+                        command,
+                    ): Exclude<
+                        StateCommand,
+                        { kind: 'locate' | 'prune' | 'source' | 'convert' }
+                    >[] =>
                         command.kind === 'source' ||
                         command.kind === 'locate' ||
-                        command.kind === 'prune'
+                        command.kind === 'prune' ||
+                        command.kind === 'convert'
                             ? []
                             : [command],
                 ),

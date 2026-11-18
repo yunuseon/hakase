@@ -306,6 +306,56 @@ describe('the wire style', () => {
     });
 });
 
+describe('reading a source of another type', () => {
+    const opened = run(fresh(), [
+        act({
+            kind: 'launch',
+            program: 'voice',
+            size: { width: 300, height: 300 },
+            viewport,
+        }),
+    ]);
+    const voice = opened.present.workspace.processes.find(({ program }) => program === 'voice');
+    const convert = {
+        kind: 'convert',
+        converter: 'picture-level',
+        source: 'sketch-2',
+        owner: 'store',
+        sink: 'voice',
+        input: 'pan',
+        window: voice?.id ?? '',
+        low: -1,
+        high: 1,
+    } as const;
+
+    it('opens a converter beside the input, fitted to its unit, and wires both ends in one step', () => {
+        const history = run(opened, [convert]);
+        const converter = history.present.workspace.processes.find(
+            ({ program }) => program === 'picture-level',
+        );
+        const store = converter?.store ?? '';
+
+        expect(converter?.frame.x).toBeLessThan(voice?.frame.x ?? 0);
+        expect(converter?.frame.y).toBe(voice?.frame.y);
+        expect(history.present.converters.get(store)?.sources.in).toBe('sketch-2');
+        expect(history.present.converters.get(store)?.shape).toMatchObject({
+            fit: true,
+            low: -1,
+            high: 1,
+        });
+        expect(history.present.voices.get('voice')?.sources['pan']).toBe(store);
+        expect(history.steps).toHaveLength(opened.steps.length + 1);
+        expect(run(history, [{ kind: 'undo' }]).present).toEqual(opened.present);
+    });
+
+    it('does nothing at all when either link is refused', () => {
+        expect(run(opened, [{ ...convert, input: 'nonsense' }]).present).toBe(opened.present);
+        expect(run(opened, [{ ...convert, converter: 'sound-level' }]).present).toBe(
+            opened.present,
+        );
+    });
+});
+
 describe('links', () => {
     const launched = (
         program:

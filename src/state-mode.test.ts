@@ -20,11 +20,13 @@ import {
     groupKey,
     selectionOf,
     sameWiring,
+    sparkOf,
     windowOfGroup,
 } from './components/state-wiring/wiring.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { defaultWorkspace, reduceWorkspace, type WorkspaceAction } from './workspace.ts';
+import { tracedOf } from './why.ts';
 
 const viewport = { width: 1400, height: 900 };
 const run = (actions: readonly WorkspaceAction[] = []) =>
@@ -291,6 +293,46 @@ describe('state mode', () => {
     });
 });
 
+describe('tracing why a control moves', () => {
+    it('draws only the wires of the path, and the tabs they land on', () => {
+        const workspace = run([launch, launch, { kind: 'add-store', id: 'signal-6', copy: false }]);
+        const sketch = workspace.processes.find(({ id }) => id === 'sketch-2')?.store ?? '';
+        const linked = new Map<string, Linked>([
+            ['signal', { sources: { phase: null, offset: null, depth: 'store-1' } }],
+            [sketch, { sources: { k1: 'signal' } }],
+        ]);
+        const traced = tracedOf(workspace.processes, linked, {
+            window: 'sketch-2',
+            store: sketch,
+            input: 'k1',
+        });
+        const view = wiringOf(
+            workspace,
+            linked,
+            inputsFor,
+            defaultSession,
+            1,
+            false,
+            linked,
+            new Map(),
+            new Map(),
+            'curves',
+            { hovered: 'timeline-3', focused: 'timeline-3' },
+            traced,
+        );
+
+        expect([...new Set(view?.sockets.map(socket => socket.window))].sort()).toEqual([
+            'signal-5',
+            'signal-6',
+            'sketch-2',
+        ]);
+        expect(view?.wires.map(({ from, to }) => [from, to]).sort()).toEqual([
+            ['signal-5:output', 'sketch-2:input:k1'],
+            ['signal-6:output', 'signal-5:input:depth'],
+        ]);
+    });
+});
+
 describe('tabs outside state mode', () => {
     const keysOf = (view: ReturnType<typeof wiringOf>) =>
         [...new Set((view?.sockets ?? []).map(socket => socket.window))].sort();
@@ -468,13 +510,13 @@ describe('input groups', () => {
         const view = wiringOf(workspace, signals, inputsFor, on, 1);
         const knobs = groupKey('sketch-2', 'Knobs');
         const signalOut = 'signal-5:output';
-        const clockOut = 'timeline-3:output';
+        const formulaOut = 'formula-1:output';
 
         expect(commandFor(view, { kind: 'hover', group: knobs, from: signalOut })).toEqual({
             kind: 'spring',
             key: knobs,
         });
-        expect(commandFor(view, { kind: 'hover', group: knobs, from: clockOut })).toBeNull();
+        expect(commandFor(view, { kind: 'hover', group: knobs, from: formulaOut })).toBeNull();
         expect(commandFor(view, { kind: 'toggle', group: knobs })).toEqual({
             kind: 'expand',
             key: knobs,
@@ -506,5 +548,42 @@ describe('input groups', () => {
 
         expect(view?.groups.filter(row => row.window === 'signal-5')).toEqual([]);
         expect(windowOfGroup(groupKey('signal-5', 'Knobs'))).toBe('signal-5');
+    });
+});
+
+describe('sources of another type', () => {
+    const voice: WorkspaceAction = { ...launch, program: 'voice' };
+    const view = wiringOf(run([voice]), new Map(), inputsFor, on, 1);
+    const socketOf = (input: string) =>
+        view?.sockets.find(socket => socket.key === `voice-5:input:${input}`);
+
+    it('are offered through the converter that fits, named by the reading it makes', () => {
+        const sketch = socketOf('pitch')?.options.find(option => option.id === 'sketch-2');
+
+        expect(sketch).toMatchObject({ via: 'picture-level', hint: 'brightness' });
+        const end = socketOf('pitch')?.end;
+
+        expect(end?.kind === 'port' && end.accepts.includes('sketch')).toBe(false);
+    });
+
+    it('turn a pick into one convert, carrying the span of the input they feed', () => {
+        const pan = socketOf('pan');
+
+        expect(pan === undefined ? null : selectionOf(pan, 'sketch-2')).toEqual({
+            kind: 'convert',
+            converter: 'picture-level',
+            source: 'sketch-2',
+            owner: 'store',
+            sink: 'voice',
+            input: 'pan',
+            window: 'voice-5',
+            low: -1,
+            high: 1,
+        });
+    });
+
+    it('draw a sparkline across the whole box, flat when nothing moves', () => {
+        expect(sparkOf([0, 1])).toBe('M0.0 14.5 L48.0 1.5');
+        expect(sparkOf([3, 3])).toBe('M0.0 8.0 L48.0 8.0');
     });
 });

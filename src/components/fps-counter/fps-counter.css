@@ -5,3 +5,6 @@
     color: var(--muted);
     letter-spacing: 0.04em;
 }
+:host([hidden]) {
+    display: none;
+}

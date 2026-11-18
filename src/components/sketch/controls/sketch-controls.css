@@ -92,6 +92,12 @@
     block-size: var(--space-6);
 }
 
+.knobs-head {
+    justify-content: flex-end;
+}
+.pane:has(.empty:not([hidden])) .knobs-head {
+    display: none;
+}
 .group-head h3 {
     margin: 0;
     font: 600 var(--text-xs) var(--font-ui);
@@ -102,6 +108,7 @@
 
 /* Label, control, value: every row the same three columns, so controls line up down a group. */
 .row {
+    position: relative;
     display: grid;
     grid-template-columns: var(--space-16) minmax(0, 1fr) auto;
     align-items: center;
@@ -134,6 +141,7 @@
 }
 
 .knob {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -148,17 +156,12 @@
     color: var(--label);
 }
 
-.driven {
+.knob > .driven {
     display: none;
-    padding: var(--space-0-5) var(--space-2);
-    font: 500 var(--text-xs) var(--font-ui);
-    color: var(--accent);
-    background: var(--well);
-    border-radius: var(--radius-lg);
 }
 
-.knob[data-driven] .driven {
-    display: block;
+.knob[data-driven] > .driven {
+    display: inline-flex;
 }
 
 .knob[data-driven] .motion,
@@ -229,15 +232,9 @@
     gap: var(--space-2);
 }
 
-/* A driven slider keeps its value for when it is let go; the readout says a signal plays it. */
+/* A driven slider keeps its value for when it is let go; its pill says what plays it. */
 .read[data-driven] {
-    font-size: 0;
-}
-
-.read[data-driven]::after {
-    font: 500 var(--text-xs) var(--font-ui);
-    color: var(--accent);
-    content: 'follows' attr(data-live);
+    display: none;
 }
 
 :host {

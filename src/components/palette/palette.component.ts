@@ -8,7 +8,9 @@ import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import { distinctUntilChanged, filter, map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromDocumentEvent$, fromElementEvent$ } from '../../lib/rx.ts';
-import { matched, sameCommands, type Command, type Match } from './palette.ts';
+import { entriesOf, matched, sameCommands, type Command, type Match } from './palette.ts';
+import { Icon } from '../../shared/ui/icon.component.ts';
+import { ICONS } from '../../shared/ui/icons.ts';
 import css from './palette.css?inline';
 
 const sheet = styleSheet(css);
@@ -16,41 +18,61 @@ const sheet = styleSheet(css);
 const TEMPLATE = (matches: readonly Match[]) =>
     html`<div class="scrim"></div>
         <div class="panel" role="dialog" aria-label="command palette">
-            <input
-                class="ui-field query"
-                type="text"
-                placeholder="Type a command"
-                aria-label="command"
-                autocomplete="off"
-                spellcheck="false"
-                role="combobox"
-                aria-expanded="true"
-                aria-controls="results"
-            />
+            <div class="search">
+                ${Icon(ICONS.search)}<input
+                    class="ui-field query"
+                    type="text"
+                    placeholder="Type a command"
+                    aria-label="command"
+                    autocomplete="off"
+                    spellcheck="false"
+                    role="combobox"
+                    aria-expanded="true"
+                    aria-controls="results"
+                />
+            </div>
             <ul class="results" id="results" role="listbox">
                 ${repeat(
-                    matches,
-                    (_item, index) => index,
-                    (match, index) =>
-                        html`<li
-                            class="row"
-                            id=${ifDefined(`command-${index}`)}
-                            data-command=${ifDefined(match.command.id)}
-                            data-keyword=${ifDefined(match.command.keyword ?? undefined)}
-                            data-text=${ifDefined(match.text ?? undefined)}
-                            role="option"
-                        >
-                            <span class="label"
-                                >${
-                                    match.text === null
-                                        ? match.command.label
-                                        : `${match.command.label}: ${match.text}`
-                                }</span
-                            ><span class="hint">${match.command.hint}</span>
-                        </li>`,
+                    entriesOf(matches),
+                    entry => (entry.kind === 'heading' ? `heading:${entry.title}` : entry.index),
+                    entry =>
+                        entry.kind === 'heading'
+                            ? html`<li class="heading" role="presentation">${entry.title}</li>`
+                            : html`<li
+                                  class="row"
+                                  id=${ifDefined(`command-${entry.index}`)}
+                                  data-command=${ifDefined(entry.match.command.id)}
+                                  data-keyword=${ifDefined(entry.match.command.keyword ?? undefined)}
+                                  data-text=${ifDefined(entry.match.text ?? undefined)}
+                                  role="option"
+                              >
+                                  <span class="icon"
+                                      >${
+                                          entry.match.command.icon === null
+                                              ? ''
+                                              : Icon(entry.match.command.icon)
+                                      }</span
+                                  ><span class="label"
+                                      >${
+                                          entry.match.text === null
+                                              ? entry.match.command.label
+                                              : `${entry.match.command.label}: ${entry.match.text}`
+                                      }</span
+                                  >${
+                                      entry.match.command.hint === ''
+                                          ? ''
+                                          : html`<kbd class="hint"
+                                                >${entry.match.command.hint}</kbd
+                                            >`
+                                  }
+                              </li>`,
                 )}
             </ul>
             <p class="ui-empty empty">No command matches.</p>
+            <footer class="keys" aria-hidden="true">
+                <span><kbd>↑</kbd><kbd>↓</kbd> to move</span><span><kbd>↵</kbd> to run</span
+                ><span><kbd>esc</kbd> to close</span>
+            </footer>
         </div>`;
 
 export type Pick = { readonly id: string; readonly text: string | null };
@@ -122,7 +144,9 @@ export class HksPalette extends HTMLElement {
     }
 
     private rows(): HTMLElement[] {
-        return [...this.results.children].filter(row => row instanceof HTMLElement);
+        return [...this.results.children].flatMap(row =>
+            row instanceof HTMLElement && row.hasAttribute('data-command') ? [row] : [],
+        );
     }
 
     private active(): HTMLElement | undefined {

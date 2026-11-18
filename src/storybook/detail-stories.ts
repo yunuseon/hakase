@@ -170,7 +170,7 @@ export const detailStories: readonly Story[] = [
         title: 'Frame-rate readout',
         group: 'System',
         description:
-            'The real sampled status readout. Move the Value control to emit sample frames; no background render loop is created.',
+            'The real sampled status readout, hidden while no frames are drawn. Move the Value control to emit sample frames; no background render loop is created.',
         elements: ['hks-fps-counter'],
         variants: [{ id: 'default', title: 'Default' }],
         controls: ['value'],
@@ -319,6 +319,8 @@ export const detailStories: readonly Story[] = [
                         ...knob,
                         value: valueOf(pedal, knob.name),
                         driven: kind === 'kaleido' && index === 1,
+                        chain:
+                            kind === 'kaleido' && index === 1 ? `${knob.name} ← Spin ← Breath` : '',
                     })),
                     choices: spec.choices,
                     choice: pedal.choice,

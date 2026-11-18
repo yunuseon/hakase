@@ -42,18 +42,6 @@ at 41% and running off the screen at 100%.
 
 ### In order
 
-- **Sources with a preview.** A tab's choices list the sources that fit, each
-  with a live sparkline of what it would play, current choice first and
-  **None** to let go. A source of another type is offered through the
-  converter that fits it, created and linked in one undo step, its range
-  fitted to what it reads and to the unit of the input it feeds (octaves
-  for pitch, -1 to 1 for pan). Done when Light band's marimba can be wired
-  from its pitch tab to a sketch in three clicks, with no measuring.
-- **Why is this moving.** Hovering a driven control shows its chain as one
-  quiet line, `Glow ← Lights ← Breath`; clicking it lights that path and
-  fades the rest, as the state map's focus does, until Escape or a click on
-  the ground. Done when every driven control answers it and the fade uses
-  the motion tokens.
 - **One sound switch.** One Listen in the navigator that unlocks audio for
   every voice and drum machine in view, with a small mixer for each one's
   level and mute. A window's own Listen stays, as a solo. Done when Light

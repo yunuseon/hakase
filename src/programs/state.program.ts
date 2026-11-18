@@ -209,6 +209,8 @@ export const stateProgram = {
                                         param: command.param,
                                         source: command.source,
                                     };
+                                case 'convert':
+                                    return { kind: 'convert', command };
                                 default:
                                     return { kind: 'wiring', command };
                             }

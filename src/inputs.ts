@@ -256,6 +256,7 @@ export type FollowedInput = {
     readonly group: string | null;
     readonly sources: readonly Source[];
     readonly initial: Follow | null;
+    readonly span?: Span;
 };
 
 export type OwnInput = {
@@ -273,7 +274,17 @@ export type StoreInput = {
     readonly group: string | null;
     readonly sources: readonly Source[];
     readonly initial: null;
+    readonly span?: Span;
 };
+
+export type Span = readonly [low: number, high: number];
+
+export const UNIT_SPAN: Span = [0, 1];
+
+export const spanOf = (definition: InputDefinition | undefined): Span =>
+    definition === undefined || definition.from === 'own'
+        ? UNIT_SPAN
+        : (definition.span ?? UNIT_SPAN);
 
 export type InputDefinition = FollowedInput | OwnInput | StoreInput;
 export type ProgramInputs = { readonly [name: string]: InputDefinition };
@@ -323,7 +334,7 @@ const signalInput = (title: string, group: string) =>
         initial: null,
     }) as const satisfies FollowedInput;
 
-const driveInput = (title: string, param: string, group: string) =>
+const driveInput = (title: string, param: string, group: string, span: Span = UNIT_SPAN) =>
     ({
         title,
         takes: 'level',
@@ -332,6 +343,7 @@ const driveInput = (title: string, param: string, group: string) =>
         group,
         sources: LEVEL_SOURCES,
         initial: null,
+        span,
     }) satisfies StoreInput;
 
 // Not a bit: a compare's input is read while the circuit table is made, so a gate there would wait on itself.
@@ -346,7 +358,7 @@ const levelInput = (param: string) =>
         initial: null,
     }) satisfies StoreInput;
 
-const storedSignalInput = (param: string) =>
+const storedSignalInput = (param: string, span: Span = UNIT_SPAN) =>
     ({
         title: param,
         takes: 'level',
@@ -355,6 +367,7 @@ const storedSignalInput = (param: string) =>
         group: null,
         sources: LEVEL_SOURCES,
         initial: null,
+        span,
     }) satisfies StoreInput;
 
 export const timeInput = {
@@ -383,13 +396,13 @@ export const knobInputs = {
 
 export const sceneInputs = {
     turn: driveInput('turn', 'turn', 'Camera'),
-    pitch: driveInput('pitch', 'pitch', 'Camera'),
-    distance: driveInput('distance', 'distance', 'Camera'),
-    focus: driveInput('focus', 'focus', 'Look'),
+    pitch: driveInput('pitch', 'pitch', 'Camera', [-0.1, 0.1]),
+    distance: driveInput('distance', 'distance', 'Camera', [3, 8]),
+    focus: driveInput('focus', 'focus', 'Look', [0.5, 2]),
     colour: driveInput('colour', 'colour', 'Look'),
     size: driveInput('dot size', 'size', 'Look'),
     depth: driveInput('depth', 'depth', 'Look'),
-    trails: driveInput('trails', 'trails', 'Look'),
+    trails: driveInput('trails', 'trails', 'Look', [0, 0.9]),
 };
 
 export const paintInput = {
@@ -413,7 +426,7 @@ export const voiceInputs = {
     pitch: storedSignalInput('pitch'),
     volume: storedSignalInput('volume'),
     filter: storedSignalInput('filter'),
-    pan: storedSignalInput('pan'),
+    pan: storedSignalInput('pan', [-1, 1]),
 };
 
 export const focusInputs = {

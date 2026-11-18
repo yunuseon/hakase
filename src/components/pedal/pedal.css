@@ -35,8 +35,9 @@
 }
 
 .row {
+    position: relative;
     display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) 3.5rem;
+    grid-template-columns: 4.5rem minmax(0, 1fr) minmax(3.5rem, auto);
     align-items: center;
     gap: var(--space-2);
     min-block-size: var(--control-md);
@@ -55,8 +56,8 @@
     color: var(--muted);
 }
 
-.row[data-driven] .read {
-    color: var(--accent);
+.row > .ui-driven {
+    justify-self: end;
 }
 
 .choices {

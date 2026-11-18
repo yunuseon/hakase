@@ -61,6 +61,15 @@ const specs = [
         height: 190,
     },
     {
+        id: 'driven',
+        title: 'Driven pill',
+        description:
+            'Stands in for a control another state plays: says it follows, shows the chain on hover, and lights it on a click.',
+        elements: ['.ui-driven', 'whys$'],
+        controls: ['label'],
+        height: 190,
+    },
+    {
         id: 'listen',
         title: 'Listen toggle',
         description: 'The shared voice and drums toggle, including muted and active icon states.',
@@ -112,7 +121,14 @@ export const primitiveStories: readonly Story[] = specs.map(spec => ({
     variants: [{ id: 'default', title: 'Default' }],
     defaults: {
         ...defaults,
-        label: spec.id === 'badges' ? 'Design' : spec.id === 'listen' ? 'Listen' : 'Example',
+        label:
+            spec.id === 'badges'
+                ? 'Design'
+                : spec.id === 'listen'
+                  ? 'Listen'
+                  : spec.id === 'driven'
+                    ? 'Lights'
+                    : 'Example',
     },
     action: null,
     code: `import { controlsSheet } from './shared/ui/controls.component.ts';\n// Adopt before the component's own layout sheet.\nroot.adoptedStyleSheets = [controlsSheet, sheet];\n\n// Shared primitives: ${spec.elements.join(', ')}\n// Keep native buttons/inputs and their normal form semantics.`,

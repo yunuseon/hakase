@@ -13,6 +13,7 @@ import { persisted$ } from './graph/persistence.graph.ts';
 import { projectionsOf } from './graph/projections.graph.ts';
 import { selectionOf } from './graph/selection.graph.ts';
 import { stateModeOf } from './graph/state-mode.graph.ts';
+import { previewsOf } from './graph/previews.graph.ts';
 import { timekeepingOf } from './graph/timekeeping.graph.ts';
 import { windowsOf } from './graph/windows.graph.ts';
 import { workspaceActions$ } from './graph/workspace-actions.graph.ts';
@@ -47,6 +48,13 @@ const bootstrap = () => {
     const navigation = navigationOf({ ...chrome, ...intents, ...projected, inputs$ });
     const stateMode = stateModeOf({ ...chrome, ...projected, signals$ });
     const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$ });
+    const previews = previewsOf({
+        ...chrome,
+        ...stateMode,
+        ...projected,
+        ...timekeeping,
+        ...levels,
+    });
     const scoped = scopedOf({ ...projected, ...timekeeping, ...levels, inputs$ });
     const windows = windowsOf({ ...chrome, ...projected, ...selection, ...stateMode, scoped });
 
@@ -71,7 +79,14 @@ const bootstrap = () => {
     return merge(
         chime$(timekeeping.timers$, timekeeping.plans$),
         persisted$({ ...projected, ...timekeeping }),
-        connectChrome$({ ...chrome, ...intents, ...projected, ...selection, ...stateMode }),
+        connectChrome$({
+            ...chrome,
+            ...intents,
+            ...projected,
+            ...selection,
+            ...stateMode,
+            ...previews,
+        }),
     ).subscribe();
 };
 

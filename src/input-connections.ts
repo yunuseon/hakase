@@ -1,5 +1,6 @@
 import type { FollowGroup, WindowGesture } from './components/window/frame.ts';
-import { definitionOf, followedBy, followedStores, type ProgramInputs } from './inputs.ts';
+import { definitionOf, followedBy, followedStores, SOURCES, type ProgramInputs } from './inputs.ts';
+import { isConverterKind } from './converters.ts';
 import { dependentsOf, type Linked } from './shared/signal.ts';
 import { readsTickBefore } from './gates.ts';
 import { colourOf, MAIN, withMain, type StoreEntry } from './stores.ts';
@@ -17,6 +18,7 @@ export const inputGroups = (
     stores: readonly StoreEntry[],
     linked: ReadonlyMap<string, Linked>,
     loops: ReadonlyMap<string, Linked> = linked,
+    offering = false,
 ): readonly FollowGroup[] => {
     const looping = readsTickBefore(process.program)
         ? new Set<string>()
@@ -48,30 +50,63 @@ export const inputGroups = (
                 ? definition.sources.find(source => source.program === owner)?.kind
                 : followedBy(process.follows, name)?.kind;
 
-        return definition.sources.map((source, index): FollowGroup => ({
-            input: name,
-            optional: index === 0 && definition.initial === null,
-            source: source.kind,
-            label: definition.title,
-            title: [
-                source.title,
-                ...(definition.sources.some(other => other.access !== source.access) &&
-                source.access === 'read'
-                    ? ['read-only']
-                    : []),
-            ].join(' · '),
-            type: definition.takes,
-            setAside: definition.from === 'followed' && source.kind === 'playback' ? readOn : null,
-            options: withMain(source.program, stores)
+        const optionsOf = (program: Parameters<typeof withMain>[0], current: boolean) =>
+            withMain(program, stores)
                 .filter(store => definition.from !== 'store' || !looping.has(store.id))
                 .map(store => ({
                     id: store.id,
                     name: store.name,
                     colour: colourOf(store.id),
                     users: users.get(store.id) ?? 0,
-                    current: kind === source.kind && bound === store.id,
-                })),
-        }));
+                    current: current && bound === store.id,
+                }));
+        const offers = offering
+            ? SOURCES.flatMap(source => {
+                  const via = `${source.makes}-${definition.takes}`;
+
+                  return source.makes === definition.takes ||
+                      !isConverterKind(via) ||
+                      !definition.sources.some(({ kind }) => kind === via)
+                      ? []
+                      : [
+                            {
+                                input: name,
+                                optional: false,
+                                source: source.kind,
+                                label: definition.title,
+                                title: source.title,
+                                type: definition.takes,
+                                setAside: null,
+                                options: optionsOf(source.program, false).filter(
+                                    store => store.id !== process.store,
+                                ),
+                                via,
+                            } satisfies FollowGroup,
+                        ];
+              })
+            : [];
+
+        return [
+            ...definition.sources.map((source, index): FollowGroup => ({
+                input: name,
+                optional: index === 0 && definition.initial === null,
+                source: source.kind,
+                label: definition.title,
+                title: [
+                    source.title,
+                    ...(definition.sources.some(other => other.access !== source.access) &&
+                    source.access === 'read'
+                        ? ['read-only']
+                        : []),
+                ].join(' · '),
+                type: definition.takes,
+                setAside:
+                    definition.from === 'followed' && source.kind === 'playback' ? readOn : null,
+                options: optionsOf(source.program, kind === source.kind),
+                via: null,
+            })),
+            ...offers.filter(group => group.options.length > 0),
+        ];
     });
 };
 

@@ -118,6 +118,8 @@
 }
 
 .params {
+    --driven-reach: calc(var(--control-lg) + var(--space-2-5));
+    position: relative;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
@@ -213,8 +215,11 @@
 }
 
 .param[data-driven] .num {
-    color: var(--accent);
-    cursor: default;
+    display: none;
+}
+
+.param > .ui-driven {
+    align-self: flex-start;
 }
 
 .shapes,

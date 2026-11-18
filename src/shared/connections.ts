@@ -17,6 +17,17 @@ export type StateCommand =
           readonly store: string;
           readonly param: string;
           readonly source: string | null;
+      }
+    | {
+          readonly kind: 'convert';
+          readonly converter: string;
+          readonly source: string;
+          readonly owner: 'window' | 'store';
+          readonly sink: string;
+          readonly input: string;
+          readonly window: string;
+          readonly low: number;
+          readonly high: number;
       };
 
 export type End =

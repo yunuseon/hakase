@@ -234,6 +234,22 @@ const template = (view: SpecimenView) => {
                     ${ListenIcon()}<span>${view.label}</span>
                 </button>
                 <p class="ui-hint">A visual toggle only. No audio engine runs in this example.</p>`;
+        case 'driven':
+            return html`<div class="driven-row">
+                    <span class="driven-key">depth</span
+                    ><button
+                        class="ui-driven"
+                        type="button"
+                        data-action="why"
+                        data-chain=${`depth ← ${view.label} ← Breath`}
+                    >
+                        follows · 0.42
+                    </button>
+                </div>
+                <p class="ui-hint">
+                    Hover or focus it for its chain, drawn across its row. A click lights the chain
+                    on the canvas.
+                </p>`;
         case 'symmetry':
             return html`<div class="icons symmetry">
                 ${SYMMETRIES.map(symmetry => html`<div>${SymmetryIcon({ symmetry })}<code>${symmetry}</code></div>`)}

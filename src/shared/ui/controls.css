@@ -449,3 +449,49 @@
         translate: 0 var(--rise);
     }
 }
+
+/* A driven control's pill. Its chain is drawn across the top of its owner's nearest positioned ancestor, the row, so the line stays inside the window instead of hanging off the pill; a whole row tall, so it covers the row above rather than cutting it in half; an owner with a wider gap sets --driven-reach. */
+:where(.ui-driven) {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-0-5) var(--space-2);
+    font: 500 var(--text-xs) var(--font-ui);
+    color: var(--accent);
+    white-space: nowrap;
+    background: var(--well);
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: background var(--duration-quick) var(--ease-out);
+}
+:where(.ui-driven):hover {
+    background: color-mix(in srgb, var(--accent) 12%, var(--well));
+}
+:where(.ui-driven)::after {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 100%;
+    z-index: 2;
+    overflow: hidden;
+    font: var(--text-xs) / var(--driven-reach, calc(var(--control-lg) + var(--space-1)))
+        var(--font-ui);
+    color: var(--label);
+    text-align: end;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    content: attr(data-chain);
+    background: var(--panel);
+    opacity: 0;
+    translate: 0 var(--rise);
+    transition:
+        opacity var(--duration-quick) var(--ease-in),
+        translate var(--duration-quick) var(--ease-in);
+}
+:where(.ui-driven:not([data-chain='']):is(:hover, :focus-visible))::after {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+        opacity var(--duration-base) var(--ease-out),
+        translate var(--duration-base) var(--ease-out);
+}

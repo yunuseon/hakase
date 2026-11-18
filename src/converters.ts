@@ -260,6 +260,7 @@ export const isConverterParam = (value: string): value is ConverterParam =>
 export type Shape = {
     readonly low: number;
     readonly high: number;
+    readonly fit: boolean;
     readonly invert: boolean;
     readonly curve: number;
     readonly steps: number;
@@ -267,7 +268,16 @@ export type Shape = {
     readonly grid: number;
 };
 
-export const SHAPE_FIELDS = ['low', 'high', 'invert', 'curve', 'steps', 'smooth', 'grid'] as const;
+export const SHAPE_FIELDS = [
+    'low',
+    'high',
+    'fit',
+    'invert',
+    'curve',
+    'steps',
+    'smooth',
+    'grid',
+] as const;
 export type ShapeField = (typeof SHAPE_FIELDS)[number];
 export const isShapeField = (value: string): value is ShapeField =>
     SHAPE_FIELDS.some(field => field === value);
@@ -279,6 +289,7 @@ export const MAX_GRID = 64;
 export const UNSHAPED: Shape = {
     low: 0,
     high: 1,
+    fit: false,
     invert: false,
     curve: 0,
     steps: 0,
@@ -289,6 +300,7 @@ export const UNSHAPED: Shape = {
 export const sameShape = (a: Shape, b: Shape): boolean =>
     a.low === b.low &&
     a.high === b.high &&
+    a.fit === b.fit &&
     a.invert === b.invert &&
     a.curve === b.curve &&
     a.steps === b.steps &&
@@ -305,6 +317,8 @@ const shapeWith = (shape: Shape, field: ShapeField, value: number): Shape => {
             return { ...shape, low: value };
         case 'high':
             return { ...shape, high: value };
+        case 'fit':
+            return { ...shape, fit: value !== 0 };
         case 'invert':
             return { ...shape, invert: value !== 0 };
         case 'curve':
@@ -552,6 +566,13 @@ const held = (samples: Float32Array, grid: number): Float32Array =>
             ] ?? 0,
     );
 
+export const stretched = (samples: Float32Array): Float32Array => {
+    const low = Math.min(...samples);
+    const high = Math.max(...samples);
+
+    return high > low ? samples.map(value => (value - low) / (high - low)) : samples;
+};
+
 export const shaped = (driver: Driver, shape: Shape): Driver => {
     if (sameShape(shape, UNSHAPED)) {
         return driver;
@@ -565,8 +586,9 @@ export const shaped = (driver: Driver, shape: Shape): Driver => {
     const smoothed =
         shape.smooth > 0 && samples.length > 1 ? slewed(samples, shape.smooth) : samples;
     const gridded = shape.grid > 0 ? held(smoothed, shape.grid) : smoothed;
+    const fitted = shape.fit ? stretched(gridded) : gridded;
 
-    return { samples: gridded.map(value => shapedValue(value, shape)) };
+    return { samples: fitted.map(value => shapedValue(value, shape)) };
 };
 
 const LEAD_MINUTES = 60;

@@ -1,7 +1,7 @@
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { Aspect } from './components/sketch/animation.ts';
-import type { WireStyle } from './shared/connections.ts';
+import type { StateCommand, WireStyle } from './shared/connections.ts';
 import { reduceAgenda, type Agenda, type AgendaCommand } from './components/agenda/agenda.ts';
 import {
     defaultBookmarks,
@@ -52,6 +52,8 @@ import {
 } from './gates.ts';
 import {
     CONVERTER_DEFAULTS,
+    CONVERTERS,
+    UNSHAPED,
     isConverterKind,
     isConverterParam,
     reduceConverter,
@@ -225,7 +227,10 @@ export type DocumentAction =
       }
     | { readonly kind: 'look'; readonly name: AppearanceName }
     | { readonly kind: 'aspect'; readonly aspect: Aspect }
-    | { readonly kind: 'wires'; readonly wires: WireStyle };
+    | { readonly kind: 'wires'; readonly wires: WireStyle }
+    | Convert;
+
+type Convert = Extract<StateCommand, { readonly kind: 'convert' }>;
 
 const commanded = <S, C>(
     all: ReadonlyMap<StoreId, S>,
@@ -458,6 +463,95 @@ const keptSource = (documents: Documents, source: StoreId | null): Documents =>
                   ),
               },
           };
+
+const CONVERTER_GAP = 48;
+
+// All or nothing: a converter whose link either way is refused would be left reading nothing.
+const converted = (
+    inputsFor: InputsFor,
+    documents: Documents,
+    action: Convert,
+    seq: number,
+): Documents => {
+    const kind = action.converter;
+    const target = documents.workspace.processes.find(({ id }) => id === action.window);
+
+    if (!isConverterKind(kind) || target === undefined) {
+        return documents;
+    }
+
+    const reduce = reduceDocuments(inputsFor);
+    const { size, makes } = CONVERTERS[kind];
+    const opened = reduce(
+        documents,
+        {
+            kind: 'workspace',
+            action: {
+                kind: 'launch',
+                program: kind,
+                size,
+                viewport: { width: size.width * 2, height: size.height * 2 },
+            },
+        },
+        seq,
+    );
+    const store = `${kind}-${seq}`;
+    const placed: Documents = {
+        ...opened,
+        workspace: {
+            ...opened.workspace,
+            processes: opened.workspace.processes.map(process =>
+                process.id === store
+                    ? {
+                          ...process,
+                          frame: {
+                              x: target.frame.x - size.width - CONVERTER_GAP,
+                              y: target.frame.y,
+                              z: 0,
+                              ...size,
+                          },
+                          measured: size,
+                      }
+                    : process,
+            ),
+        },
+        converters:
+            makes === 'level'
+                ? new Map(opened.converters).set(store, {
+                      ...CONVERTER_DEFAULTS[kind],
+                      shape: { ...UNSHAPED, fit: true, low: action.low, high: action.high },
+                  })
+                : opened.converters,
+    };
+    const reading = reduce(
+        placed,
+        { kind: 'link', store, param: 'in', source: action.source },
+        seq,
+    );
+    const fed =
+        action.owner === 'store'
+            ? reduce(
+                  reading,
+                  { kind: 'link', store: action.sink, param: action.input, source: store },
+                  seq,
+              )
+            : reduce(
+                  reading,
+                  {
+                      kind: 'workspace',
+                      action: {
+                          kind: 'follow',
+                          id: action.sink,
+                          input: action.input,
+                          source: kind,
+                          store,
+                      },
+                  },
+                  seq,
+              );
+
+    return opened === documents || reading === placed || fed === reading ? documents : fed;
+};
 
 export const reduceDocuments =
     (inputsFor: InputsFor) =>
@@ -745,6 +839,8 @@ export const reduceDocuments =
                           ),
                       );
             }
+            case 'convert':
+                return converted(inputsFor, documents, action, seq);
             case 'library': {
                 const library = reduceLibrary(documents.library, action.command);
 
@@ -859,6 +955,8 @@ export const stepOfDocument = (action: DocumentAction, before: Documents): StepK
                 : { key: action.kind, joins: false };
         case 'link':
             return { key: `link:${action.store}:${action.param}`, joins: false };
+        case 'convert':
+            return { key: action.kind, joins: false };
         case 'settings':
             return viewOnly(before.settings.get(action.key), action.settings)
                 ? { key: null, breaks: false }
@@ -926,6 +1024,8 @@ export const labelOfDocument = (action: DocumentAction, before: Documents): stri
             return `Set ${storeName(before.workspace, action.store)} ${action.param} to follow ${
                 action.source === null ? 'nothing' : storeName(before.workspace, action.source)
             }`;
+        case 'convert':
+            return `Read ${storeName(before.workspace, action.source)} into ${action.input} through a converter`;
         case 'settings':
             return action.settings.kind === 'state-map'
                 ? 'Arranged the state map'

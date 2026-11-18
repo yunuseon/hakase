@@ -30,6 +30,7 @@ import {
     reduceEngaged,
     type EngageAction,
 } from '../state-mode.ts';
+import { reduceWhy, sameTraced, tracedOf, type WhyAction } from '../why.ts';
 import type { Chrome } from './chrome.graph.ts';
 import type { Projections } from './projections.graph.ts';
 
@@ -97,6 +98,34 @@ export const stateModeOf = ({
         ids$.pipe(map((ids): EngageAction => ({ kind: 'windows', ids }))),
     ).pipe(scan(reduceEngaged, disengaged), startWith(disengaged), distinctUntilChanged());
 
+    const traced$ = combineLatest([
+        workspace$,
+        links$,
+        merge(
+            signals$.pipe(
+                mergeMap((signal): WhyAction[] =>
+                    signal.to === 'app' && signal.input.kind === 'why'
+                        ? [
+                              {
+                                  kind: 'why',
+                                  why: {
+                                      window: signal.from,
+                                      store: signal.store,
+                                      input: signal.input.input,
+                                  },
+                              },
+                          ]
+                        : [],
+                ),
+            ),
+            merge(canvas.escapes$, canvas.grounds$).pipe(map((): WhyAction => ({ kind: 'clear' }))),
+        ).pipe(scan(reduceWhy, null), startWith(null), distinctUntilChanged()),
+    ]).pipe(
+        map(([{ processes }, { linked }, why]) => tracedOf(processes, linked, why)),
+        distinctUntilChanged(sameTraced),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
     const wiringView$: Observable<WiringView | null> = combineLatest([
         workspace$,
         links$,
@@ -105,21 +134,33 @@ export const stateModeOf = ({
         coarsePointer$,
         wires$,
         engaged$,
+        traced$,
     ]).pipe(
-        map(([workspace, { linked, loops, boxes, names }, session, unit, touch, style, engaged]) =>
-            wiringOf(
+        map(
+            ([
                 workspace,
-                linked,
-                inputsFor,
+                { linked, loops, boxes, names },
                 session,
                 unit,
                 touch,
-                loops,
-                boxes,
-                names,
                 style,
                 engaged,
-            ),
+                traced,
+            ]) =>
+                wiringOf(
+                    workspace,
+                    linked,
+                    inputsFor,
+                    session,
+                    unit,
+                    touch,
+                    loops,
+                    boxes,
+                    names,
+                    style,
+                    engaged,
+                    traced,
+                ),
         ),
         distinctUntilChanged(sameWiring),
         shareReplay({ bufferSize: 1, refCount: true }),
@@ -137,7 +178,7 @@ export const stateModeOf = ({
         share(),
     );
 
-    return { mode$, wiringView$, wiringEvents$, wiringCommands$ };
+    return { mode$, traced$, wiringView$, wiringEvents$, wiringCommands$ };
 };
 
 export type StateMode = ReturnType<typeof stateModeOf>;

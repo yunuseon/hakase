@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ICONS } from './shared/ui/icons.ts';
 import { captureStores, commandsOf, pickedOf, steppedSection } from './commands.ts';
 import { inputsFor } from './inputs.fixture.ts';
 import { defaultWorkspace, type Section, type Workspace } from './workspace.ts';
@@ -98,19 +99,33 @@ describe('captures', () => {
                 label: 'Add ticket to Groceries',
                 hint: 'ticket …',
                 keyword: 'ticket',
+                group: 'Capture',
+                icon: ICONS.add,
             },
             {
                 id: 'capture:ticket:tickets',
                 label: 'Add ticket to Main',
                 hint: 'ticket …',
                 keyword: 'ticket',
+                group: 'Capture',
+                icon: ICONS.add,
             },
             {
                 id: 'capture:ticket:store-2',
                 label: 'Add ticket to Errands',
                 hint: 'ticket …',
                 keyword: 'ticket',
+                group: 'Capture',
+                icon: ICONS.add,
             },
+        ]);
+    });
+
+    it('come in contiguous groups, so each group is headed once', () => {
+        const groups = commandsOf([], lists('store-1')).map(({ group }) => group);
+
+        expect(groups.filter((group, index) => group !== groups[index - 1])).toEqual([
+            ...new Set(groups),
         ]);
     });
 

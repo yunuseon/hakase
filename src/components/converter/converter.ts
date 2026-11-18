@@ -6,6 +6,7 @@ export type Choice = { readonly id: string; readonly title: string };
 export type Shape = {
     readonly low: number;
     readonly high: number;
+    readonly fit: boolean;
     readonly invert: boolean;
     readonly curve: number;
     readonly steps: number;

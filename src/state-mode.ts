@@ -5,6 +5,8 @@ import {
     followedStores,
     madeBy,
     SOURCES,
+    spanOf,
+    UNIT_SPAN,
     type Bindings,
     type InputsFor,
 } from './inputs.ts';
@@ -17,8 +19,10 @@ import {
     type WiringView,
 } from './components/state-wiring/wiring.ts';
 import { colourOf, HOLDING, withMain } from './stores.ts';
+import { CONVERTERS, isConverterKind } from './converters.ts';
 import type { Linked } from './shared/signal.ts';
 import type { Box } from './boxes.ts';
+import type { Traced } from './why.ts';
 import { boxOf, ownsInputs, type Draft, type Workspace } from './workspace.ts';
 
 export type StateMode = { readonly active: boolean };
@@ -193,17 +197,31 @@ export const wiringOf = (
     pinNames: ReadonlyMap<string, string> = new Map(),
     style: WireStyle = DEFAULT_WIRE_STYLE,
     engaged: Engaged = disengaged,
+    traced: Traced | null = null,
 ): WiringView | null => {
     const mode = modeOf(session);
     const { processes, stores } = workspace;
-    const focused = mode.active ? undefined : processes.find(({ id }) => id === engaged.focused);
+    const tracing = mode.active ? null : traced;
+    const focused =
+        mode.active || tracing !== null
+            ? undefined
+            : processes.find(({ id }) => id === engaged.focused);
     const sources = focused === undefined ? new Set<string>() : readsFrom(signals, focused);
     const near = (process: (typeof processes)[number]) =>
-        focused !== undefined &&
-        process.id !== focused.id &&
-        (sources.has(process.store) || readsFrom(signals, process).has(focused.store));
+        tracing !== null
+            ? tracing.windows.has(process.id)
+            : focused !== undefined &&
+              process.id !== focused.id &&
+              (sources.has(process.store) || readsFrom(signals, process).has(focused.store));
     const whole = (process: (typeof processes)[number]) =>
-        mode.active || process.id === engaged.hovered || process.id === engaged.focused;
+        mode.active ||
+        (tracing === null && (process.id === engaged.hovered || process.id === engaged.focused));
+    const onPath = (process: (typeof processes)[number], socket: Socket) =>
+        tracing !== null &&
+        (socket.end.kind === 'store'
+            ? tracing.stores.has(socket.end.id)
+            : tracing.stores.has(socket.current) &&
+              (tracing.stores.has(process.store) || socket.key === tracing.socket));
 
     if (!processes.some(process => whole(process) || near(process))) {
         return null;
@@ -220,7 +238,7 @@ export const wiringOf = (
         const inputs = inputsFor(process.program);
         const box = process.program === 'box' ? boxes.get(process.store) : undefined;
         const owned = HOLDING[process.program] !== null && process.program !== 'box';
-        const choices = inputGroups(process, inputs, processes, stores, signals, loops);
+        const choices = inputGroups(process, inputs, processes, stores, signals, loops, true);
         const names = [...new Set(choices.map(group => group.input))];
         const groupOf = (name: string) => {
             const definition = definitionOf(inputs, name);
@@ -296,7 +314,10 @@ export const wiringOf = (
                           ...store,
                           colour: colourOf(store.id),
                           source: '',
+                          via: null,
+                          hint: '',
                       })),
+                      span: UNIT_SPAN,
                       group: null,
                       hidden: false,
                   },
@@ -336,19 +357,28 @@ export const wiringOf = (
                     owner: onStore ? 'store' : 'window',
                     sink: onStore ? store : process.id,
                     input: definition?.from === 'store' ? definition.param : name,
-                    accepts: options.map(choice => choice.source),
+                    accepts: options
+                        .filter(choice => choice.via === null)
+                        .map(choice => choice.source),
                     cuttable: options[0]?.optional === true,
                 },
                 receiver: null,
                 current: current?.id ?? '',
                 optional: options[0]?.optional === true,
-                options: options.flatMap(choice =>
-                    choice.options.map(option => ({
+                options: options
+                    .flatMap(choice => choice.options.map(option => ({ choice, option })))
+                    .sort((a, b) => Number(b.option.current) - Number(a.option.current))
+                    .map(({ choice, option }) => ({
                         ...option,
                         name: options.length > 1 ? `${choice.title} · ${option.name}` : option.name,
                         source: choice.source,
+                        via: choice.via,
+                        hint:
+                            choice.via !== null && isConverterKind(choice.via)
+                                ? (CONVERTERS[choice.via].choices[0]?.title ?? '')
+                                : '',
                     })),
-                ),
+                span: spanOf(definition),
                 group,
                 hidden: false,
             } satisfies Socket;
@@ -394,7 +424,17 @@ export const wiringOf = (
                 receiver: null,
                 current: pin,
                 optional: false,
-                options: [{ id: pin, name: nameOf(pin), colour: colourOf(pin), source: '' }],
+                options: [
+                    {
+                        id: pin,
+                        name: nameOf(pin),
+                        colour: colourOf(pin),
+                        source: '',
+                        via: null,
+                        hint: '',
+                    },
+                ],
+                span: UNIT_SPAN,
                 group: null,
                 hidden: false,
             })),
@@ -453,9 +493,11 @@ export const wiringOf = (
         const kept = whole(process)
             ? all
             : all.filter(socket =>
-                  socket.end.kind === 'store'
-                      ? sources.has(socket.end.id)
-                      : socket.current === focused?.store,
+                  tracing !== null
+                      ? onPath(process, socket)
+                      : socket.end.kind === 'store'
+                        ? sources.has(socket.end.id)
+                        : socket.current === focused?.store,
               );
         const keys = new Set(kept.map(socket => socket.key));
 
@@ -480,6 +522,7 @@ export const wiringOf = (
         wires: wiresOf(sockets, unit, rowHeight, style).filter(
             wire =>
                 mode.active ||
+                tracing !== null ||
                 windowOf.get(wire.from) === engaged.focused ||
                 windowOf.get(wire.to) === engaged.focused,
         ),

@@ -5,6 +5,7 @@ export type KnobView = {
     readonly step: number;
     readonly value: number;
     readonly driven: boolean;
+    readonly chain: string;
 };
 
 export type PedalView = {

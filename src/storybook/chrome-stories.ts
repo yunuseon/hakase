@@ -1,3 +1,4 @@
+import { ICONS } from '../shared/ui/icons.ts';
 import { combineLatest, merge, of } from 'rxjs';
 import { coarsePointer$, fromDocumentEvent$, remScale$ } from '../lib/rx.ts';
 import {
@@ -304,7 +305,7 @@ export const chromeStories: readonly Story[] = [
         title: 'Command palette',
         group: 'Workspace',
         description:
-            'Searchable commands with keyboard navigation and argument completion. Open the preview to try it.',
+            'Searchable commands in groups, with icons, shortcuts, keyboard navigation and argument completion. Open the preview to try it.',
         elements: ['hks-palette'],
         variants: normal,
         controls: [],
@@ -324,9 +325,38 @@ export const chromeStories: readonly Story[] = [
                 element,
                 run$: element.connect$(
                     of([
-                        { id: 'new-ticket', label: 'New ticket', hint: 'Plan', keyword: null },
-                        { id: 'new-note', label: 'New note', hint: 'Plan', keyword: null },
-                        { id: 'find', label: 'Find a ticket…', hint: 'Search', keyword: 'find' },
+                        {
+                            id: 'find',
+                            label: 'Find a ticket…',
+                            hint: 'find …',
+                            keyword: 'find',
+                            group: 'Capture',
+                            icon: ICONS.search,
+                        },
+                        {
+                            id: 'undo',
+                            label: 'Undo',
+                            hint: '⌘Z',
+                            keyword: null,
+                            group: 'Edit',
+                            icon: ICONS.undo,
+                        },
+                        {
+                            id: 'new-ticket',
+                            label: 'New ticket',
+                            hint: '',
+                            keyword: null,
+                            group: 'Create',
+                            icon: ICONS.add,
+                        },
+                        {
+                            id: 'new-note',
+                            label: 'New note',
+                            hint: '',
+                            keyword: null,
+                            group: 'Create',
+                            icon: null,
+                        },
                     ]),
                     open$,
                 ),
@@ -520,8 +550,11 @@ export const chromeStories: readonly Story[] = [
                                     name: 'Sine',
                                     colour: 'var(--accent)',
                                     source: 'signal',
+                                    via: null,
+                                    hint: '',
                                 },
                             ],
+                            span: [0, 1],
                             group: null,
                             hidden: false,
                         },
@@ -554,8 +587,19 @@ export const chromeStories: readonly Story[] = [
                                     name: 'Sine',
                                     colour: 'var(--accent)',
                                     source: 'signal',
+                                    via: null,
+                                    hint: '',
+                                },
+                                {
+                                    id: 'sketch-example',
+                                    name: 'Sketch · Ripple',
+                                    colour: 'var(--label)',
+                                    source: 'sketch',
+                                    via: 'picture-level',
+                                    hint: 'brightness',
                                 },
                             ],
+                            span: [0, 1],
                             group: null,
                             hidden: false,
                         },

@@ -2,6 +2,7 @@ import { isWireStyle, WIRE_STYLES, type WireStyle } from './shared/connections.t
 import { boundsOf, areaContains } from './shared/area.ts';
 import { appearances, isAppearanceName, type AppearanceName } from './appearances.ts';
 import type { Command } from './components/palette/palette.ts';
+import { ICONS } from './shared/ui/icons.ts';
 import { centreOf, worldAt, type Camera, type Extent } from './shared/camera.ts';
 import { isProgramId, type ProgramId } from './program.ts';
 import { withMain, type StoreEntry, type StoreId } from './stores.ts';
@@ -72,8 +73,16 @@ export const captureStores = (program: ProgramId, workspace: Workspace): readonl
     );
 };
 
+const command = (
+    group: string,
+    id: string,
+    label: string,
+    icon: string | null,
+    hint = '',
+): Command => ({ id, label, hint, keyword: null, group, icon });
+
 export const commandsOf = (
-    programs: readonly { readonly id: ProgramId; readonly title: string }[],
+    programs: readonly { readonly id: ProgramId; readonly title: string; readonly icon: string }[],
     workspace: Workspace,
 ): readonly Command[] => [
     ...CAPTURES.flatMap(({ target, program, label }) =>
@@ -82,68 +91,33 @@ export const commandsOf = (
             label: `${label} ${name}`,
             hint: `${target} …`,
             keyword: target,
+            group: 'Capture',
+            icon: programs.find(each => each.id === program)?.icon ?? ICONS.add,
         })),
     ),
-    ...programs.map(({ id, title }) => ({
-        id: `launch:${id}`,
-        label: `New ${title}`,
-        hint: 'open',
-        keyword: null,
-    })),
-    ...workspace.sections.map(({ id, name }) => ({
-        id: `section:${id}`,
-        label: `Go to ${name}`,
-        hint: 'section',
-        keyword: null,
-    })),
-    { id: 'step:next', label: 'Next section', hint: '→', keyword: null },
-    { id: 'step:previous', label: 'Previous section', hint: '←', keyword: null },
-    {
-        id: 'workspace:add-section',
-        label: 'Paint section area',
-        hint: 'section',
-        keyword: null,
-    },
-    {
-        id: 'workspace:erase-sections',
-        label: 'Erase section area',
-        hint: 'workspace area',
-        keyword: null,
-    },
-    {
-        id: 'workspace:select-programs',
-        label: 'Select programs',
-        hint: 'copy or blueprint',
-        keyword: null,
-    },
-    {
-        id: 'workspace:paste',
-        label: 'Paste copied programs',
-        hint: '⌘V',
-        keyword: null,
-    },
-    { id: 'workspace:undo', label: 'Undo', hint: '⌘Z', keyword: null },
-    { id: 'workspace:redo', label: 'Redo', hint: '⇧⌘Z', keyword: null },
-    { id: 'workspace:fit', label: 'Fit everything in view', hint: 'zoom', keyword: null },
-    { id: 'workspace:reset', label: 'Zoom to 100%', hint: 'zoom', keyword: null },
-    {
-        id: 'workspace:minimap',
-        label: 'Expand or collapse workspace controls',
-        hint: 'view',
-        keyword: null,
-    },
-    ...Object.keys(appearances).map(name => ({
-        id: `look:${name}`,
-        label: `Look: ${name}`,
-        hint: 'appearance',
-        keyword: null,
-    })),
-    ...WIRE_STYLES.map(style => ({
-        id: `wires:${style}`,
-        label: `Draw wires as ${style}`,
-        hint: 'appearance',
-        keyword: null,
-    })),
+    ...workspace.sections.map(({ id, name }) =>
+        command('Go to', `section:${id}`, name, ICONS.section),
+    ),
+    command('Go to', 'step:next', 'Next section', ICONS.next, '→'),
+    command('Go to', 'step:previous', 'Previous section', ICONS.previous, '←'),
+    command('Edit', 'workspace:undo', 'Undo', ICONS.undo, '⌘Z'),
+    command('Edit', 'workspace:redo', 'Redo', ICONS.redo, '⇧⌘Z'),
+    command('Edit', 'workspace:select-programs', 'Select programs', ICONS.marquee, '⇧ drag'),
+    command('Edit', 'workspace:paste', 'Paste copied programs', ICONS.paste, '⌘V'),
+    command('Edit', 'workspace:add-section', 'Paint section area', ICONS.area),
+    command('Edit', 'workspace:erase-sections', 'Erase section area', ICONS.erase),
+    command('View', 'workspace:fit', 'Fit everything in view', ICONS.fit),
+    command('View', 'workspace:reset', 'Zoom to 100%', ICONS.zoomIn, '⌘0'),
+    command('View', 'workspace:minimap', 'Expand or collapse the map', ICONS.collapse),
+    ...Object.keys(appearances).map(name =>
+        command('Appearance', `look:${name}`, `Look: ${name}`, ICONS.look),
+    ),
+    ...WIRE_STYLES.map(style =>
+        command('Appearance', `wires:${style}`, `Draw wires as ${style}`, ICONS.wire),
+    ),
+    ...programs.map(({ id, title, icon }) =>
+        command('Create', `launch:${id}`, `New ${title}`, icon),
+    ),
 ];
 
 // Untrusted in the sense that a click target carries it: parsed, never assumed.

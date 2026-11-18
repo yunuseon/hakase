@@ -6,7 +6,7 @@ import { filter, map, mergeMap, tap } from 'rxjs/operators';
 import { renderView, type RenderView } from '../../lib/lit.ts';
 import { styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { controlsSheet } from '../../shared/ui/controls.component.ts';
+import { controlsSheet, whys$ } from '../../shared/ui/controls.component.ts';
 import { readout, type KnobView, type PedalChange, type PedalView } from './pedal.ts';
 import css from './pedal.css?inline';
 
@@ -26,9 +26,18 @@ const knobRow = (knob: KnobView) =>
             step=${knob.step}
             ?disabled=${knob.driven}
             .value=${String(knob.value)}
-        /><output class="read"
-            >${knob.driven ? 'follows' : readout(knob.value, knob.step)}</output
-        ></label
+        />${
+            knob.driven
+                ? html`<button
+                      type="button"
+                      class="ui-driven"
+                      data-why=${knob.name}
+                      data-chain=${knob.chain}
+                  >
+                      follows
+                  </button>`
+                : html`<output class="read">${readout(knob.value, knob.step)}</output>`
+        }</label
     >`;
 
 const TEMPLATE = (view: PedalView) =>
@@ -62,6 +71,7 @@ const TEMPLATE = (view: PedalView) =>
 
 export class HksPedal extends HTMLElement {
     readonly changes$: Observable<PedalChange>;
+    readonly whys$: Observable<string> = whys$(this);
 
     private readonly rendering: RenderView<PedalView>;
 

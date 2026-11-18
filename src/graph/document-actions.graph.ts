@@ -109,18 +109,25 @@ export const documentActions$ = ({
                 }
             }),
         ),
-        wiringCommands$.pipe(
+        merge(
+            wiringCommands$,
+            inputs$.pipe(
+                mergeMap(({ input }) => (input.kind === 'convert' ? [input.command] : [])),
+            ),
+        ).pipe(
             mergeMap((command): DocumentAction[] =>
-                command.kind === 'source'
-                    ? [
-                          {
-                              kind: 'link',
-                              store: command.store,
-                              param: command.param,
-                              source: command.source,
-                          },
-                      ]
-                    : [],
+                command.kind === 'convert'
+                    ? [command]
+                    : command.kind === 'source'
+                      ? [
+                            {
+                                kind: 'link',
+                                store: command.store,
+                                param: command.param,
+                                source: command.source,
+                            },
+                        ]
+                      : [],
             ),
         ),
         placing$.pipe(

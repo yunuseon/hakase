@@ -6,6 +6,7 @@ import { view$ } from '../engine/view.ts';
 import { pedalInputs, playbackInput } from '../inputs.ts';
 import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
 import type { AppInput, Program } from '../program.ts';
+import { chainLine } from '../why.ts';
 import { shownOf } from './output.program.ts';
 
 export const pedalProgram = <K extends PedalKind>(kind: K) => {
@@ -36,6 +37,7 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                     pedal$,
                     linkedDriver$,
                     linkedName$,
+                    chains$,
                     clock$,
                     zoom$,
                     aspect$,
@@ -54,13 +56,14 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                             linkedName$(name).pipe(map(from => ({ name, from }))),
                         ),
                     );
-                    const pedalView$ = combineLatest([pedal$, driven$, inputs$]).pipe(
-                        map(([document, driven, inputs]): PedalView => ({
+                    const pedalView$ = combineLatest([pedal$, driven$, inputs$, chains$]).pipe(
+                        map(([document, driven, inputs, chains]): PedalView => ({
                             summary: spec.summary,
                             knobs: spec.knobs.map((knob, index) => ({
                                 ...knob,
                                 value: valueOf(document, knob.name),
                                 driven: driven[index] ?? false,
+                                chain: chainLine(knob.name, chains),
                             })),
                             choices: spec.choices,
                             choice: document.choice,
@@ -93,6 +96,7 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
                         pedal.changes$.pipe(
                             map((command): AppInput => ({ kind: 'pedal', command })),
                         ),
+                        pedal.whys$.pipe(map((input): AppInput => ({ kind: 'why', input }))),
                     );
                 },
             };

@@ -11,7 +11,7 @@ export const timelineProgram = {
     category: 'make',
     icon: 'M3 12 H21 M7.5 9.5 V14.5 M12 8 V16 M16.5 9.5 V14.5',
     size: { width: 340, height: 136 },
-    minimum: { width: 240, height: 110 },
+    minimum: { width: 310, height: 110 },
     launch: async () => {
         const [{ HksLinearSlider }, { HksTransport }] = await Promise.all([
             import('../components/slider/linear/linear-slider.component.ts'),

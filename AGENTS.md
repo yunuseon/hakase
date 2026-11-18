@@ -449,6 +449,10 @@ into a `launch` action carrying that program's default `size` and the current
 visible viewport, including its offset, and the reducer places the window in screen
 coordinates before converting its position and size through the current camera.
 Every new window is centred in the visible viewport, with no cascade offset.
+The first run's layout (`defaultWorkspace`) starts at the left edge, with no
+margin for the edge toolbar that once lived there, and its editor column is
+never narrower than 320, which the timeline needs for one row of controls
+(its own minimum is 310): narrower, its readout wrapped out of the window.
 The default size stays the same on screen at every zoom and is capped to the
 visible viewport with a 20px margin. Quitting is
 the window's own close button — ordinary window chrome, not a
@@ -583,7 +587,11 @@ sizes grew it. The key count is `--launcher-keys`, which `mountChrome` sets on
 the navigator from the same `categoriesOf` it hands the launcher, because the
 navigator cannot count what is slotted into it; the card's compact width reads
 it too. A literal 4 there wrapped the fifth key, Convert, onto a second row at
-every width.
+every width. **The compact width is the sum of its parts**, each from the token
+that sizes it: the keys and their gaps, `--state-width` (the State button's
+minimum, its icon alone on touch), `--thumb`, the readout's `--space-12`, the
+gaps and the padding. A width written as one number with a margin to spare was
+27 pixels short, and the zoom readout covered a third of the thumbnail.
 
 Category menus use native details with a manual top-layer popover. They prefer
 the space above the card, clamp to the viewport and scroll when necessary;
@@ -662,7 +670,8 @@ about which program it holds.
 bug, firing once with the stale half.
 
 `hks-sketch` exposes two slots: `status` for the fps readout, laid over the canvas
-top left, and `controls` for the parameter bar, **below** the canvas. The
+top left and hidden while no frames are drawn (a paused sketch said `0 fps`, a
+status with nothing to report), and `controls` for the parameter bar, **below** the canvas. The
 controls in turn expose an `animation` slot for their second tab. The bar sat
 over the drawing once and was in the way of the one thing a sketch exists to show;
 only a readout that small may cover it. Draw mode
@@ -769,6 +778,14 @@ without the audit noticing.
   `-overlay`. Their values are the shadows the app already used for a thumb,
   a window, the toolbar's menu and the palette, so the finish converged on
   what looked right instead of inventing depths.
+- **One glyph, one meaning.** Shared action glyphs live in `ICONS`, so the
+  navigator, the palette and a window draw the same mark for the same act, and
+  no two acts share one: selecting programs is a dashed marquee, fitting the
+  view is four corners, painting an area is a square with a plus, never the
+  bare plus that also zooms in.
+- **A heading never repeats what selected it.** A tab's pane does not open
+  with the tab's own name (Parameters was headed PARAMETERS), and a status
+  with nothing to report is hidden rather than reading zero.
 - **One focus ring**, `--focus-ring` at `--focus-offset`; the only other
   offset is an inset ring inside a scrolling list, where an outside ring
   would be clipped. The selected window's accent outline and a gate's
@@ -2131,11 +2148,15 @@ kind, reading, shape, `sources`), a private `stage` store like a pedal's, so
 saving, forking, pruning, undo, blueprints and `linkedOf` handle them all once.
 `CONVERTER_DEFAULTS` is one object per kind, for the pedal defaults' reason.
 
-**Readings and shape are two stages.** `readingIn` in `levels.graph.ts` has
-one case per pair, what it reads through `in` and how its reading makes a
-`Driver`; `conversionIn` then applies the document's **shape** with one pure
+**Readings and shape are two stages.** `readingOf` in `levels.graph.ts` has
+one case per pair, what it reads from a binding and how its reading makes a
+`Driver`; `readingIn` hands it the converter's own `in`, and `offeredIn` a
+binding a converter does not have yet, which is how a tab previews one; `conversionIn` then applies the document's **shape** with one pure
 `shaped(driver, shape)`, so every converter that makes a level has the same
-modifiers: range (low to high), invert, curve (`2 ** (curve * 2)` as a power,
+modifiers: range (low to high), **fit** (the reading stretched to its own
+lowest and highest over the loop before the range applies, so a brightness
+that moves from 0.17 to 0.23 still sweeps the whole range; a one-sample reading
+is left alone), invert, curve (`2 ** (curve * 2)` as a power,
 ease out below 0 and in above), steps (quantised, off below 2), smooth (a
 one-pole slew run round the loop twice, so its start has settled from its end)
 and **grid** (sample and hold: sampled N times a loop, 2 to 64, each value held
@@ -2490,6 +2511,87 @@ duplicated them and sat on top of the chip. Closing a selector or editing a comp
 never exits pinned mode. `sameWiring` compares the applied view field by field so
 editing a signal's numeric values does not rebuild an open selector.
 
+## Sources with a preview
+
+A tab's list of choices is the place a connection is made, so it shows what
+each choice would play. Three rules hold it together:
+
+- **The current choice leads, None sits under it**, then the sources of the
+  input's own type, then every source of another type that a converter can
+  turn into it. `inputGroups(…, offering)` adds those as groups with a `via`,
+  the converter pair (`picture-level`, `sound-level`, `schedule-level`, and
+  the bit pairs for a bit input), and the row is named by the reading it would
+  make (`brightness`, `loudness`, `in a block`). Only the tabs ask for offers;
+  the window's own state menu, which follows by kind, does not. A `via` group is
+  not in the jack's `accepts`, so a plain drop still means a plain link.
+- **Picking an offer is one step that leaves the conversion visible.** A pick,
+  or a wire dropped on such a row, becomes a `convert` command and one documents
+  action (`converted` in `documents.ts`): it opens the converter's window beside
+  the target window, on its left where its output faces the input, reads the
+  source, sets **fit** and the range to the input's **span**, and links the
+  input to it. If either link would be refused (a loop, a kind the input does
+  not take), nothing happens at all. A span is the input's unit, declared on
+  the definition (`span`, read by `spanOf`, 0 to 1 unless said): pan -1 to 1,
+  a sketch's camera pitch ±0.1 turns, distance 3 to 8, focus 0.5 to 2, trails
+  up to 0.9, a voice's pitch one octave. So the Marimba in Light band reads a
+  sketch from its pitch tab in three clicks, and the result is a converter
+  window that can be reshaped like any other, not a hidden coercion.
+- **Only the open list is sampled.** `previewsOf` (`graph/previews.graph.ts`)
+  follows the wiring's `open$`, and for each row of that one socket resolves
+  the driver it would follow, at the target window's clock: `boundIn` for a
+  plain source, `offeredIn` for an offer. It samples 48 points into a path
+  (`sparkOf`, its own bounds, so the shape reads at any scale) and hands the
+  component a map of paths; the playhead mark is one custom property,
+  `--preview-at`, set per frame. Every row starts empty (`startWith(null)`)
+  and fills as its driver arrives, because a picture reading cooks through
+  animation frames and would otherwise hold the whole list back. The paths are
+  applied after every draw, since a redraw builds the rows afresh. Zones and
+  habits pick an item, so their offers have no preview yet.
+
+Two traps the rows found: the tab's label rule was `.socket span`, which reached
+every span inside the list and set the choices in uppercase mono; it is
+`.socket > span` now. And the sheet's bare `svg` rule makes every SVG absolute,
+so a sparkline lives in a positioned `.preview` box with its playhead mark, not
+beside the name with a negative margin, which handed the name the room.
+
+## Why is this moving
+
+**A driven control answers for itself.** Every control another state plays
+(a sketch's knobs, focus, dot size, depth and trails, a pedal's knobs, a
+signal's phase, offset and depth) is replaced by one shared pill, `ui-driven`
+in the controls sheet, reading **follows** and the value it is playing. Hovering
+or focusing it shows its chain as one quiet line, `depth ← Stir ← Lights ←
+Breath`: the control, then each level of what it follows, upward, several
+stores at one level joined by `·`, each store once (`levelsFrom`, `chainsOf` in
+`src/why.ts`). Clicking it lights that path on the canvas and fades every other
+window, as the state map's focus does, until Escape, a click on the ground, or a
+second click on the same pill.
+
+- **The line is drawn across the row, not hung off the pill.** Its `::after` is
+  absolute to the owner's nearest positioned ancestor (the knob, the row, the
+  signal's params), across its full width above it. Hung below the pill it was
+  cut off by the window's own scroll area, and every window is one; so each owner
+  makes its row `position: relative`, and a new driven control must too. It is a
+  whole row tall, the row and the gap above it, so it covers that row rather than
+  cutting it in half (a sketch's first knob halved its reset button); an owner
+  whose gap is wider sets `--driven-reach`, as the signal's params do.
+- **The chain is app state, read through one selector.** `AppState.chains$` maps
+  each driven input of the window's store to its chain text, from the linked
+  documents and the store names, so a component only prefixes its own label.
+  The signal program composes whole lines (`chainLine`), since a component may
+  not import `why.ts`.
+- **What is lit is a fold, and the path is derived.** A click emits a `why`
+  input; `state-mode.graph.ts` folds those, Escape and the ground into one
+  `Why` (`reduceWhy`, a toggle), and `tracedOf` derives the windows and stores
+  on the path from the workspace and the links, so a link let go or a window
+  closed ends it with no case of its own. Each window's `receded` is its own
+  stream now, state mode **or** off the path, and the fade is the window's
+  existing one on the base duration.
+- **Only the path's wires are drawn.** While tracing, `wiringOf` lays out the
+  path's windows like a focused window's neighbours, keeping only the jacks the
+  path runs through, and ignores what is hovered or focused, so nothing else's
+  wires join the picture.
+
 ## The state map
 
 `state` draws the app's dataflow as one graph, inspects any of it and prunes
@@ -2709,7 +2811,7 @@ conditional falls back to the constraint and lets every kind through.
 
 ⌘K (Ctrl+K) opens `hks-palette` from anywhere, in the chrome slot. It is a
 component like any other: `opens$`, `closes$` and `picks$` out, `connect$(commands$,
-open$)` in, and it knows commands only as `{ id, label, hint }`. What exists is
+open$)` in, and it knows commands only as `{ id, label, hint, group, icon }`. What exists is
 derived in `src/commands.ts`: `commandsOf(programs, sections)` lists launches,
 section jumps, slide steps, undo/redo, fit, reset, the minimap, looks and the
 workspace actions, and `pickedOf` parses a picked id back into a `Picked`
@@ -2719,6 +2821,17 @@ own — every command is something another control could already do — and a ne
 command is one entry in `commandsOf` plus one case where it is routed. Filtering
 is every typed word appearing in the label or hint, as a `combineLatest` of the
 commands and the query, not a remembered list.
+
+**The palette reads like Raycast's or Linear's.** Commands come in groups
+(Capture, Go to, Edit, View, Appearance, Create), kept contiguous by
+`commandsOf`, so `entriesOf` heads each run once and a filtered list keeps its
+headings; the group is searched too, so `view` finds the zoom commands. Each row
+carries the glyph its control wears elsewhere (a program's own icon, the
+navigator's from `ICONS`), and the hint on the right is **only a key or a
+keyword** (`⌘Z`, `⇧ drag`, `todo …`), never a category word: `open` repeated on
+sixty rows was read as nothing. A footer names the keys, and is hidden on a
+coarse pointer, which has none. Create comes last because it is sixty rows long
+and the rest would drown under it.
 
 **Quick capture: a command can take the rest of the query.** A `Command` may
 name a `keyword`, and `matched` hands everything after it to that command, so
@@ -2754,7 +2867,8 @@ window. Each tab holds only what is its own:
   the compiled formula reads, under the name its `#define K1 feed_rate` gives it
   (`knobLabelsOf`, read like `STEPS` and `WRAPS`; the macro is never expanded,
   since nothing in GLSL is spelt `K1`), with its motion beside it, and an empty
-  state when the formula reads none.
+  state when the formula reads none. Its reset sits alone at the end of the
+  pane's head, which is hidden with nothing to reset.
 - **Scene** is configuration, in four groups by what they change: **Sampling**
   (lattice, density, focus: where the formula is evaluated), **Space** (how its
   output is read), **Drawing** (mode, dot size, depth, trails, axes) and
@@ -2966,7 +3080,8 @@ belongs to is read from its name instead of its path:
   pens, voices, kits, the circuit table, the converters and the picture
   recipes, kept in one module because they read each other recursively; the
   engine's `pictureFrames$` comes in as a parameter, so no graph module
-  touches GL), `app-state` (`scopedOf`, the `AppState` each
+  touches GL), `previews` (the sparklines of the tab list that is open, which
+  reads the levels and so comes after them), `app-state` (`scopedOf`, the `AppState` each
   window gets, which takes the levels as a parameter), `windows` (one `liveProcess$`
   per process), the two action streams, and `persistence`. A module's parameter
   type is a `Pick` of the records it reads (`Pick<Projections, 'workspace$'>`),

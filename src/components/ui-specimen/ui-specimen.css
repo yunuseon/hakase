@@ -99,3 +99,16 @@ code {
     border-radius: 50%;
     background-color: var(--panel);
 }
+
+.driven-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-block-start: var(--space-6);
+    max-inline-size: calc(var(--spacing) * 64);
+}
+
+.driven-key {
+    color: var(--label);
+}

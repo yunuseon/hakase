@@ -1,5 +1,6 @@
 import { areaFill, areaOutline, boundsOf } from '../../shared/area.ts';
 import { Icon } from '../../shared/ui/icon.component.ts';
+import { ICONS } from '../../shared/ui/icons.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
@@ -101,9 +102,7 @@ const TEMPLATE = (map: MiniMap) =>
             aria-pressed="false"
             title="State mode (hold W)"
         >
-            ${Icon('M3 7a2 2 0 1 0 4 0a2 2 0 1 0-4 0M17 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7 7C13 7 11 17 17 17')}<span
-                >State</span
-            >
+            ${Icon(ICONS.wire)}<span>State</span>
         </button>
         <div class="history expanded-control" role="group" aria-label="History">
             <button
@@ -114,7 +113,7 @@ const TEMPLATE = (map: MiniMap) =>
                 title="Undo (⌘Z)"
                 disabled
             >
-                ${Icon('M9 14L4 9L9 4M4 9H15A5 5 0 0 1 15 19H11')}
+                ${Icon(ICONS.undo)}
             </button>
             <button
                 class="ui-icon key"
@@ -124,7 +123,7 @@ const TEMPLATE = (map: MiniMap) =>
                 title="Redo (⇧⌘Z)"
                 disabled
             >
-                ${Icon('M15 14L20 9L15 4M20 9H9A5 5 0 0 0 9 19H13')}
+                ${Icon(ICONS.redo)}
             </button>
         </div>
         <div class="area-tools expanded-control" role="group" aria-label="Workspace tools">
@@ -134,7 +133,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="paint section area"
                 title="Paint section area"
             >
-                ${Icon('M12 5v14M5 12h14')}
+                ${Icon(ICONS.area)}
             </button>
             <button
                 class="ui-icon erase"
@@ -142,7 +141,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="erase section area"
                 title="Erase section area"
             >
-                ${Icon('M4 16L14 6L20 12L12 20H8ZM10 10L16 16')}
+                ${Icon(ICONS.erase)}
             </button>
             <button
                 class="ui-icon select"
@@ -150,7 +149,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="select programs"
                 title="Select programs to copy or save as blueprint"
             >
-                ${Icon('M8 4H4V8M16 4H20V8M4 16V20H8M20 16V20H16')}
+                ${Icon(ICONS.marquee)}
             </button>
         </div>
         <div class="zoom-controls" role="group" aria-label="Zoom">
@@ -161,7 +160,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="zoom out"
                 title="Zoom out"
             >
-                ${Icon('M7 12H17')}
+                ${Icon(ICONS.zoomOut)}
             </button>
             <button
                 class="ui-button readout"
@@ -179,7 +178,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="zoom in"
                 title="Zoom in"
             >
-                ${Icon('M7 12H17M12 7v10')}
+                ${Icon(ICONS.zoomIn)}
             </button>
             <button
                 class="ui-icon key expanded-control"
@@ -188,7 +187,7 @@ const TEMPLATE = (map: MiniMap) =>
                 aria-label="fit everything"
                 title="Fit everything"
             >
-                ${Icon('M5 9V5H9M15 5H19V9M19 15V19H15M9 19H5V15')}
+                ${Icon(ICONS.fit)}
             </button>
         </div>
         <button
@@ -199,7 +198,7 @@ const TEMPLATE = (map: MiniMap) =>
             aria-expanded="false"
             aria-controls="navigation-map"
         >
-            ${Icon('M7 10l5 5 5-5')}
+            ${Icon(ICONS.collapse)}
         </button>
     </nav>`;
 

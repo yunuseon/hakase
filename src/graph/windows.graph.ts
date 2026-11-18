@@ -68,7 +68,7 @@ type Entry = { readonly process: Process; readonly index: number; readonly last:
 type Reads = Pick<Chrome, 'canvas'> &
     Pick<Projections, 'structure$' | 'index$' | 'ids$' | 'settings$' | 'links$' | 'camera$'> &
     Pick<Selection, 'selectedIds$'> &
-    Pick<StateMode, 'wiringEvents$' | 'mode$'> & { readonly scoped: Scoped };
+    Pick<StateMode, 'wiringEvents$' | 'mode$' | 'traced$'> & { readonly scoped: Scoped };
 
 export const windowsOf = ({
     canvas,
@@ -81,6 +81,7 @@ export const windowsOf = ({
     selectedIds$,
     wiringEvents$,
     mode$,
+    traced$,
     scoped,
 }: Reads) => {
     const entryOf = (id: ProcessId) =>
@@ -234,11 +235,11 @@ export const windowsOf = ({
         }),
     );
 
-    const receded$ = mode$.pipe(
-        map(({ active }) => active),
-        distinctUntilChanged(),
-        shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const recededOf = (id: string) =>
+        combineLatest([mode$, traced$]).pipe(
+            map(([{ active }, traced]) => active || (traced !== null && !traced.windows.has(id))),
+            distinctUntilChanged(),
+        );
 
     const signals$: Observable<ProcessSignal> = appeared$.pipe(
         mergeMap(process => {
@@ -298,7 +299,7 @@ export const windowsOf = ({
                           map(ids => ids.includes(process.id)),
                           distinctUntilChanged(),
                       ),
-                      receded$,
+                      recededOf(process.id),
                       ids$.pipe(filter(ids => !ids.includes(process.id))),
                   );
         }),

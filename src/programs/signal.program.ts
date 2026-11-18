@@ -2,6 +2,7 @@ import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import { playbackInput, signalInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
+import { chainLine } from '../why.ts';
 
 export const signalProgram = {
     id: 'signal',
@@ -17,12 +18,30 @@ export const signalProgram = {
 
         return {
             element: signal,
-            run$: ({ signal$, wave$, playhead$ }) =>
+            run$: ({ signal$, wave$, playhead$, chains$ }) =>
                 merge(
-                    signal.connect$(signal$, wave$, playhead$).pipe(ignoreElements()),
+                    signal
+                        .connect$(
+                            signal$,
+                            wave$,
+                            playhead$,
+                            chains$.pipe(
+                                map(
+                                    chains =>
+                                        new Map(
+                                            [...chains.keys()].map(param => [
+                                                param,
+                                                chainLine(param, chains),
+                                            ]),
+                                        ),
+                                ),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
                     signal.commands$.pipe(
                         map((command): AppInput => ({ kind: 'signal', command })),
                     ),
+                    signal.whys$.pipe(map((input): AppInput => ({ kind: 'why', input }))),
                 ),
         };
     },

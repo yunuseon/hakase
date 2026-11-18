@@ -25,6 +25,8 @@ import { wirePath } from '../../shared/connections.ts';
 import {
     anchorOf,
     connectionOf,
+    SPARK,
+    type Previews,
     type GroupRow,
     type Socket,
     type WiringEvent,
@@ -85,6 +87,14 @@ const socketOf = (row: Socket | GroupRow | undefined): Socket | undefined =>
 const groupOf = (row: Socket | GroupRow | undefined): GroupRow | undefined =>
     row !== undefined && !('end' in row) ? row : undefined;
 
+const withNone = ({ options, current }: Socket) => {
+    const none = { id: '', name: 'None', colour: 'var(--muted)', hint: '' };
+
+    return current === ''
+        ? [none, ...options]
+        : [...options.slice(0, 1), none, ...options.slice(1)];
+};
+
 const SocketRow = (props: { readonly socket: Socket }) =>
     html`<div
         class=${ifDefined(`socket ${props.socket.end.kind === 'store' ? 'output' : 'input'}`)}
@@ -134,9 +144,7 @@ const SocketRow = (props: { readonly socket: Socket }) =>
             data-above=${ifDefined(props.socket.menu.above ? '' : undefined)}
         >
             ${repeat(
-                props.socket.optional
-                    ? [{ id: '', name: 'None', colour: 'var(--muted)' }, ...props.socket.options]
-                    : props.socket.options,
+                props.socket.optional ? withNone(props.socket) : props.socket.options,
                 item => item,
                 option =>
                     html`<button
@@ -148,7 +156,19 @@ const SocketRow = (props: { readonly socket: Socket }) =>
                         aria-selected=${ifDefined(option.id === props.socket.current)}
                         style=${styleMap({ '--choice-colour': option.colour })}
                     >
-                        ${option.name}
+                        <span class="name">${option.name}</span>${
+                            option.hint !== ''
+                                ? html`<small class="via">${option.hint}</small>`
+                                : ''
+                        }<span class="preview" aria-hidden="true"
+                            ><svg
+                                class="spark"
+                                viewBox=${`0 0 ${SPARK.width} ${SPARK.height}`}
+                                preserveAspectRatio="none"
+                            >
+                                <path></path></svg
+                            ><span class="at"></span
+                        ></span>
                     </button>`,
             )}
         </div>
@@ -184,7 +204,7 @@ export class HksStateWiring extends HTMLElement {
     readonly hovered$: Observable<string | null>;
     private readonly shadow: ShadowRoot;
     private readonly drags$: Observable<Drag>;
-    private readonly opened$: Observable<string | null>;
+    readonly open$: Observable<string | null>;
     private readonly choices$: Observable<{ readonly key: string; readonly value: string }>;
 
     private readonly rendering: RenderView<WiringRender>;
@@ -282,7 +302,7 @@ export class HksStateWiring extends HTMLElement {
                     : EMPTY;
             }),
         );
-        this.opened$ = merge(
+        this.open$ = merge(
             fromElementEvent$(ports, 'click').pipe(
                 mergeMap(({ target }) => {
                     const picker =
@@ -315,7 +335,7 @@ export class HksStateWiring extends HTMLElement {
         // Apply choices and drops before releasing their locks, or a released W discards the command.
         this.changes$ = merge(
             this.choices$.pipe(map((choice): WiringEvent => ({ kind: 'select', ...choice }))),
-            this.opened$.pipe(
+            this.open$.pipe(
                 map((open): WiringEvent => ({
                     kind: 'busy',
                     key: 'selector',
@@ -377,7 +397,11 @@ export class HksStateWiring extends HTMLElement {
         );
     }
 
-    connect$(view$: Observable<WiringView | null>): Observable<void> {
+    connect$(
+        view$: Observable<WiringView | null>,
+        previews$: Observable<Previews> = EMPTY,
+        previewAt$: Observable<number> = EMPTY,
+    ): Observable<void> {
         const shadow = this.shadow;
         const ports = requireChild(shadow, '.ports');
         const rubber = requireElement(shadow, '.rubber path', SVGPathElement);
@@ -406,7 +430,7 @@ export class HksStateWiring extends HTMLElement {
             }),
             shareReplay({ bufferSize: 1, refCount: true }),
         );
-        const opened$ = combineLatest([drawn$, this.opened$]).pipe(
+        const opened$ = combineLatest([drawn$, this.open$]).pipe(
             tap(([, open]) => {
                 for (const row of ports.querySelectorAll('[data-socket]')) {
                     const active = row.getAttribute('data-socket') === open;
@@ -461,7 +485,26 @@ export class HksStateWiring extends HTMLElement {
             }),
         );
 
-        return merge(this.rendering.lifetime$, drawn$, dragged$, opened$).pipe(
+        // Applied after every draw: a rebuilt list has fresh, empty sparklines.
+        const previewed$ = combineLatest([drawn$, previews$]).pipe(
+            tap(([, { key, paths }]) => {
+                for (const choice of ports.querySelectorAll('[data-choice]')) {
+                    const path =
+                        choice.getAttribute('data-choice') === key
+                            ? paths.get(choice.getAttribute('data-value') ?? '')
+                            : undefined;
+                    choice.toggleAttribute('data-previewed', path !== undefined);
+                    choice.querySelector('.spark path')?.setAttribute('d', path ?? '');
+                }
+            }),
+        );
+        const marked$ = previewAt$.pipe(
+            tap(at => {
+                this.style.setProperty('--preview-at', String(at));
+            }),
+        );
+
+        return merge(this.rendering.lifetime$, drawn$, dragged$, opened$, previewed$, marked$).pipe(
             map(() => undefined),
         );
     }

@@ -1,12 +1,12 @@
 import { connectChoices$ } from '../../shared/ui/choices.component.ts';
-import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import { html } from 'lit-html';
+import { controlsSheet, whys$ } from '../../shared/ui/controls.component.ts';
+import { html, nothing } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
 
 import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
-import { combineLatest, merge, type Observable } from 'rxjs';
+import { combineLatest, EMPTY, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -149,7 +149,20 @@ const TEMPLATE = () =>
                             inputmode="decimal"
                             spellcheck="false"
                             autocomplete="off"
-                    /></label>`,
+                        />${
+                            isParam(param)
+                                ? html`<button
+                                      type="button"
+                                      class="ui-driven"
+                                      data-why=${param}
+                                      data-chain=""
+                                      hidden
+                                  >
+                                      follows
+                                  </button>`
+                                : nothing
+                        }</label
+                    >`,
             )}
         </div>`;
 
@@ -179,6 +192,7 @@ const fractionIn = (element: Element, { clientX, clientY }: PointerEvent) => {
 
 export class HksSignal extends HTMLElement {
     readonly commands$: Observable<SignalCommand>;
+    readonly whys$: Observable<string> = whys$(this);
 
     private readonly shadow: ShadowRoot;
     private readonly pulls$: Observable<Pull>;
@@ -362,6 +376,7 @@ export class HksSignal extends HTMLElement {
         signal$: Observable<Signal>,
         wave$: Observable<Wave>,
         t$: Observable<number>,
+        lines$: Observable<ReadonlyMap<string, string>> = EMPTY,
     ): Observable<void> {
         const shadow = this.shadow;
         const params = requireChild(shadow, '.params');
@@ -424,7 +439,7 @@ export class HksSignal extends HTMLElement {
 
                     // Not while it is being typed into: the fold's value would overwrite the draft.
                     if (shadow.activeElement !== input) {
-                        input.value = driven ? 'signal' : text;
+                        input.value = text;
                     }
                 }),
             ),
@@ -496,11 +511,21 @@ export class HksSignal extends HTMLElement {
             }),
         );
 
+        const chained$ = lines$.pipe(
+            tap(lines => {
+                for (const button of shadow.querySelectorAll('[data-why]')) {
+                    const line = lines.get(button.getAttribute('data-why') ?? '');
+                    button.setAttribute('data-chain', line ?? '');
+                    button.toggleAttribute('hidden', line === undefined);
+                }
+            }),
+        );
+
         return merge(
             this.rendering.lifetime$,
             connectChoices$(this.shadow),
             this.barView.lifetime$,
-            merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$).pipe(
+            merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$, chained$).pipe(
                 map(() => undefined),
             ),
         );

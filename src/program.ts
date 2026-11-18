@@ -144,15 +144,20 @@ export type AppInput =
     | { readonly kind: 'converter'; readonly command: ConverterCommand }
     | { readonly kind: 'box'; readonly command: BoxCommand }
     | { readonly kind: 'unbox' }
+    | { readonly kind: 'why'; readonly input: string }
     | {
           readonly kind: 'modulate';
           readonly store: string;
           readonly param: string;
           readonly source: string | null;
       }
+    | { readonly kind: 'convert'; readonly command: Extract<StateCommand, { kind: 'convert' }> }
     | {
           readonly kind: 'wiring';
-          readonly command: Exclude<StateCommand, { kind: 'locate' | 'prune' | 'source' }>;
+          readonly command: Exclude<
+              StateCommand,
+              { kind: 'locate' | 'prune' | 'source' | 'convert' }
+          >;
       }
     | { readonly kind: 'bookmark'; readonly command: BookmarkCommand }
     | { readonly kind: 'appearance'; readonly name: AppearanceName; readonly value: Appearance }
@@ -216,6 +221,7 @@ export type AppState = {
     readonly followedImage$: (input: string) => Observable<Image>;
     readonly image$: Observable<Image>;
     readonly linkedName$: (param: string) => Observable<string | null>;
+    readonly chains$: Observable<ReadonlyMap<string, string>>;
     // One stream, not a wave beside a name: a rebind changes both, and two would fire twice.
     readonly followedLevel$: (input: string) => Observable<FollowedLevel | null>;
     readonly bookmarks$: Observable<Bookmarks>;

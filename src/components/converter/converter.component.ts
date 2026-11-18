@@ -92,6 +92,16 @@ const Shape = (shape: ShapeView) =>
                 )}
             </span>
         </div>
+        <label class="row" title="stretch what it reads to fill the range">
+            <span class="key">fit</span>
+            <input
+                class="ui-check"
+                type="checkbox"
+                data-group="shape"
+                data-field="fit"
+                .checked=${shape.fit}
+            />
+        </label>
         <label class="row">
             <span class="key">invert</span>
             <input

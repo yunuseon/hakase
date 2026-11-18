@@ -35,7 +35,6 @@ export type StoreOption = {
     readonly current: boolean;
 };
 
-// Another program's stores a window can run on, the current one marked.
 export type FollowGroup = {
     readonly input: string;
     readonly label: string;
@@ -45,6 +44,7 @@ export type FollowGroup = {
     readonly type: string;
     readonly options: readonly StoreOption[];
     readonly setAside: string | null;
+    readonly via: string | null;
 };
 
 export type SwitchItem = {

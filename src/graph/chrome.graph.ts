@@ -28,6 +28,7 @@ import type { Intents } from './intents.graph.ts';
 import type { Projections } from './projections.graph.ts';
 import type { Selection } from './selection.graph.ts';
 import type { StateMode } from './state-mode.graph.ts';
+import type { PreviewsGraph } from './previews.graph.ts';
 
 export const mountChrome = () => {
     const canvas = new HksCanvas();
@@ -93,7 +94,8 @@ type Shown = Chrome &
         'workspace$' | 'camera$' | 'blueprints$' | 'history$' | 'look$' | 'appearance$'
     > &
     Pick<Selection, 'selectedIds$' | 'clipboard$' | 'placing$'> &
-    Pick<StateMode, 'mode$' | 'wiringView$'>;
+    Pick<StateMode, 'mode$' | 'wiringView$'> &
+    Pick<PreviewsGraph, 'previews$' | 'previewAt$'>;
 
 export const connectChrome$ = ({
     canvas,
@@ -120,6 +122,8 @@ export const connectChrome$ = ({
     placing$,
     mode$,
     wiringView$,
+    previews$,
+    previewAt$,
 }: Shown) =>
     merge(
         canvas.connect$(
@@ -151,7 +155,7 @@ export const connectChrome$ = ({
         ),
         seams.connect$(workspace$.pipe(map(seamsOf))),
         traces.connect$(wiringView$, wiring.hovered$),
-        wiring.connect$(wiringView$),
+        wiring.connect$(wiringView$, previews$, previewAt$),
         placement.connect$(
             combineLatest([placing$, camera$, blueprints$]).pipe(
                 map(([placing, camera, blueprints]) => {

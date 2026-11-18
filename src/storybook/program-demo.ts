@@ -175,6 +175,7 @@ export const programDemo = (
         }),
         box$: of({ name: 'component', ticks: 16, inputs: [], outputs: [] }),
         linkedName$: () => of(null),
+        chains$: of(new Map<string, string>()),
         followedLevel$: input =>
             empty || input !== 'a'
                 ? of(null)

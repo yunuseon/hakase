@@ -162,6 +162,18 @@ describe('shaping a level', () => {
         expect(at({ invert: true, low: -1, high: 1 }, 1 - 1 / CURVE_SAMPLES)).toBeCloseTo(-1, 1);
     });
 
+    it('fits a narrow reading to the whole range before mapping it', () => {
+        const narrow = curveOf(t => 0.17 + 0.06 * t);
+        const fitted = shaped(narrow, { ...UNSHAPED, fit: true, low: -1, high: 1 });
+
+        expect(driverAt(fitted, 0)).toBeCloseTo(-1);
+        expect(driverAt(fitted, 0.5)).toBeCloseTo(0, 1);
+        expect(driverAt(fitted, 1 - 1 / CURVE_SAMPLES)).toBeCloseTo(1, 1);
+        expect(
+            driverAt(shaped({ samples: Float32Array.of(0.3) }, { ...UNSHAPED, fit: true }), 0),
+        ).toBeCloseTo(0.3);
+    });
+
     it('eases in or out, and steps', () => {
         expect(at({ curve: 0.5 }, 0.5)).toBeCloseTo(0.25);
         expect(at({ curve: -0.5 }, 0.25)).toBeCloseTo(0.5);

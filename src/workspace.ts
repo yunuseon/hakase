@@ -172,8 +172,8 @@ const FLOATING_AT = 96;
 
 export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor): Workspace => {
     const gutter = 16;
-    const left = 88;
-    const editorWidth = Math.min(360, Math.round(width * 0.26));
+    const left = 2 * gutter;
+    const editorWidth = Math.min(360, Math.max(320, Math.round(width * 0.26)));
     const timelineHeight = 136;
     const dialSize = 200;
     const editorHeight = Math.max(320, height - timelineHeight - 3 * gutter);

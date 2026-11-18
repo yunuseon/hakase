@@ -29,7 +29,10 @@ export type Socket = {
         readonly name: string;
         readonly colour: string;
         readonly source: string;
+        readonly via: string | null;
+        readonly hint: string;
     }[];
+    readonly span: readonly [number, number];
     readonly group: string | null;
     readonly hidden: boolean;
 };
@@ -96,8 +99,18 @@ export const connectionOf = (from: Socket, to: Socket) => {
     const [source, target] = from.end.kind === 'store' ? [from, to] : [to, from];
     const end = source.end;
 
-    if (end.kind !== 'store' || !target.options.some(option => option.id === end.id)) {
+    if (end.kind !== 'store') {
         return null;
+    }
+
+    const option = target.options.find(each => each.id === end.id);
+
+    if (option === undefined) {
+        return null;
+    }
+
+    if (option.via !== null) {
+        return selectionOf(target, option.id);
     }
 
     return (
@@ -112,6 +125,22 @@ export const selectionOf = (socket: Socket, value: string) => {
     }
 
     const option = socket.options.find(option => option.id === value);
+
+    if (option?.via != null && socket.end.kind === 'port') {
+        const [low, high] = socket.span;
+
+        return {
+            kind: 'convert',
+            converter: option.via,
+            source: option.id,
+            owner: socket.end.owner,
+            sink: socket.end.sink,
+            input: socket.end.input,
+            window: socket.window,
+            low,
+            high,
+        } satisfies StateCommand;
+    }
 
     return option === undefined
         ? null
@@ -233,6 +262,8 @@ const sameSocket = (a: Socket, b: Socket) =>
     a.optional === b.optional &&
     a.group === b.group &&
     a.hidden === b.hidden &&
+    a.span[0] === b.span[0] &&
+    a.span[1] === b.span[1] &&
     sameEnd(a.end, b.end) &&
     (a.receiver === null || b.receiver === null
         ? a.receiver === b.receiver
@@ -246,7 +277,9 @@ const sameSocket = (a: Socket, b: Socket) =>
             option.id === other.id &&
             option.name === other.name &&
             option.colour === other.colour &&
-            option.source === other.source
+            option.source === other.source &&
+            option.via === other.via &&
+            option.hint === other.hint
         );
     });
 
@@ -296,3 +329,28 @@ export const sameWiring = (a: WiringView | null, b: WiringView | null) =>
                   wire.to === other.to
               );
           });
+
+export const SPARK = { width: 48, height: 16, samples: 48 } as const;
+
+export const sparkOf = (values: readonly number[]): string => {
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    const span = high > low ? high - low : 1;
+    const inset = 1.5;
+    const y = (value: number) =>
+        high > low
+            ? SPARK.height - inset - ((value - low) / span) * (SPARK.height - 2 * inset)
+            : SPARK.height / 2;
+
+    return values
+        .map(
+            (value, index) =>
+                `${index === 0 ? 'M' : 'L'}${((index / Math.max(1, values.length - 1)) * SPARK.width).toFixed(1)} ${y(value).toFixed(1)}`,
+        )
+        .join(' ');
+};
+
+export type Previews = {
+    readonly key: string | null;
+    readonly paths: ReadonlyMap<string, string>;
+};
