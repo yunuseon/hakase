@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "lib": ["ES2022"],
+        "types": ["node", "vite/client"]
+    },
+    "include": ["src/model", "src/layout"],
+    "files": [
+        "src/core.ts",
+        "src/declarations.ts",
+        "src/input-actions.ts",
+        "src/protocol.ts",
+        "src/ports.ts"
+    ]
+}

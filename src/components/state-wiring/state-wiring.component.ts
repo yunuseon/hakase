@@ -20,7 +20,8 @@ import {
 } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$, fromDocumentEvent$ } from '../../lib/rx.ts';
-import { pointerGesture$, type Phase } from '../../shared/drag.ts';
+import { pointerGesture$ } from '../../shared/drag.ts';
+import { type Phase } from '../../shared/phase.ts';
 import { wirePath } from '../../shared/connections.ts';
 import {
     anchorOf,

@@ -3077,9 +3077,33 @@ module that imports the DOM, or runs browser code as it loads, fails it. That
 is also why `viewport$` in `lib/rx.ts` is deferred: built at load it reached for
 `window`, and every module that imported `lib/rx.ts` failed in Node.
 
+**Lint keeps it so** (`npm run check:layers`, part of `npm run lint`). The core is
+`tsconfig.core.json`'s entry points (`core.ts`, `declarations.ts`,
+`input-actions.ts`, `protocol.ts`, `ports.ts`) plus every file in `model/` and
+`layout/`, tests included, and everything they import. Two checks hold it:
+
+- **`scripts/check-layers.mjs` walks its imports**, type imports too, with
+  TypeScript's own parser, and fails on anything of the browser's
+  (`components/`, `programs/`, `engine/`, `storybook/`, `program.ts`,
+  `programs.ts`, `process.ts`, `main.ts`, `browser-ports.ts`, and `lib/`'s
+  `dom`, `rx` and `storage`), on lit, a stylesheet, a Node-only module, or
+  rxjs's `animationFrames`, which is the `frames$` port's job. Each finding
+  prints the chain of imports that reached it.
+- **`tsconfig.core.json` compiles the same files with no DOM lib**, only ES and
+  the types every runtime shares (Node's and `vite/client`'s `?raw`), so a
+  `window`, `HTMLElement` or `devicePixelRatio` anywhere in the core fails. The
+  walk runs first: a pure sibling of a component has no DOM to trip the
+  compiler, and an import of a component reads better as its chain than as the
+  component's own errors.
+
+Both were proven by planting each kind of violation. Making them pass found
+one real leak: `protocol.ts` took the scrub `Phase` from `shared/drag.ts`, the
+pointer adapter, which pulled `lib/dom.ts` and `lib/rx.ts` into the core;
+`Phase` lives in `shared/phase.ts` now. `URL`, `TextEncoder` and `btoa` are
+allowed, being in every runtime.
+
 What is still to do is in the backlog under "A core any client could drive":
-the layers are not yet checked by lint, and the store registry still lives in
-the workspace beside window frames.
+the store registry still lives in the workspace beside window frames.
 
 ## The model and the layout
 
@@ -3695,8 +3719,8 @@ to the preview stage; they never change the app's selected look.
 - **Prefer conventional, idiomatic setups over clever ones.** An unusual
   arrangement will be questioned and should be justified or dropped. If the
   ecosystem has a standard way to do something, use it.
-- Before reporting done: `npm run typecheck`, `npm run lint`, `npm run format`,
-  `npm test`.
+- Before reporting done: `npm run typecheck`, `npm run lint` (which runs the
+  UI audit and the layer check too), `npm run format`, `npm test`.
 - **Tests are Vitest, beside the module they cover** (`shared/tickets.ts` → `shared/tickets.test.ts`),
   and only for pure code: folds, geometry, the muxers. That is the payoff of the
   layering — anything worth testing is a function of its arguments, so a test

@@ -9,7 +9,7 @@ import {
     switchMap,
 } from 'rxjs/operators';
 import { wrap01 } from '../lib/math.ts';
-import type { Phase } from './drag.ts';
+import type { Phase } from './phase.ts';
 
 export type TransportCommand = 'toggle' | 'stop' | 'loop';
 

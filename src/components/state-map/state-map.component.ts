@@ -30,7 +30,8 @@ import {
 } from 'rxjs/operators';
 import { remScale, requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$, observeResize$, remScale$ } from '../../lib/rx.ts';
-import { notTouch, pointerGesture$, touchGesture$, type Phase } from '../../shared/drag.ts';
+import { notTouch, pointerGesture$, touchGesture$ } from '../../shared/drag.ts';
+import { type Phase } from '../../shared/phase.ts';
 import { wheelGesture, type ViewGesture } from '../../shared/wheel.ts';
 import {
     closesLoop,

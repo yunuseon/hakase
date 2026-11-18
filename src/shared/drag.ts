@@ -15,11 +15,9 @@ import { fromDocumentEvent$, fromElementEvent$ } from '../lib/rx.ts';
 import type { Point } from './camera.ts';
 import { NO_TOUCHES, reduceTouches, type TouchInput } from './pinch.ts';
 import type { ViewGesture } from './wheel.ts';
+import type { Phase } from './phase.ts';
 
 const always = (): boolean => true;
-
-export const PHASES = ['grab', 'move', 'release'] as const;
-export type Phase = (typeof PHASES)[number];
 
 export type PointerPhase = {
     readonly phase: Phase;

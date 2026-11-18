@@ -1,5 +1,5 @@
 import type { WireStyle } from './shared/connections.ts';
-import type { Phase } from './shared/drag.ts';
+import type { Phase } from './shared/phase.ts';
 import type { Appearance } from './appearance.ts';
 import type { AppearanceName } from './appearances.ts';
 import type { FormulaId, LibraryCommand } from './library.ts';

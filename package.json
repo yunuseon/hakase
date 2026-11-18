@@ -15,14 +15,15 @@
         "preview": "vite preview",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
-        "lint": "eslint . && npm run check:ui",
+        "lint": "eslint . && npm run check:ui && npm run check:layers",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "docker:dev": "docker compose up dev --build",
         "docker:build": "docker build --target export --output type=local,dest=dist .",
         "docker:preview": "docker compose --profile preview up preview --build",
-        "check:ui": "node scripts/check-ui.mjs"
+        "check:ui": "node scripts/check-ui.mjs",
+        "check:layers": "node scripts/check-layers.mjs && tsc --noEmit -p tsconfig.core.json"
     },
     "dependencies": {
         "@fontsource-variable/geist": "^5.3.0",

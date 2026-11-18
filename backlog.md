@@ -56,13 +56,9 @@ at 41% and running off the screen at 100%.
 
 ## A core any client could drive
 
-The core boots in Node and imports no view (see "The core, with no client" and
-"The model and the layout" in `AGENTS.md`). What is left, in order:
+The core boots in Node, imports no view, and lint keeps it so (see "The core,
+with no client" and "The model and the layout" in `AGENTS.md`). What is left:
 
-- **The layers are checked.** A check in lint fails when a core module (the
-  root modules, `graph/` modules the core composes, `shared/` outside `ui/`)
-  imports `components/`, lit or a browser global, as the comment ceiling is
-  checked. Done when a stray import fails `npm run lint`.
 - **The store registry leaves the workspace.** Which stores exist and their
   names sit in `Workspace` beside window frames and the camera, so a client
   with no windows still carries a layout. Moving them into the documents

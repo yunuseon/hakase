@@ -11,7 +11,8 @@ import { combineLatest, merge, type Observable } from 'rxjs';
 import { distinctUntilChanged, map, mergeMap, share, shareReplay, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
-import { pointerGesture$, type Phase } from '../../shared/drag.ts';
+import { pointerGesture$ } from '../../shared/drag.ts';
+import { type Phase } from '../../shared/phase.ts';
 import {
     atOf,
     boundsOf,
