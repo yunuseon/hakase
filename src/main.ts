@@ -1,67 +1,46 @@
 import { defer, merge } from 'rxjs';
 import './styles.css';
+import { browserPorts } from './browser-ports.ts';
 import { chime$ } from './chime.ts';
+import { coreOf } from './core.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
-import { levelsOf } from './graph/levels.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
 import { connectChrome$, mountChrome } from './graph/chrome.graph.ts';
 import { documentActions$ } from './graph/document-actions.graph.ts';
-import { begunFrom, historyOf } from './graph/history.graph.ts';
 import { intentsOf } from './graph/intents.graph.ts';
 import { navigationOf } from './graph/navigation.graph.ts';
-import { persisted$ } from './graph/persistence.graph.ts';
-import { projectionsOf } from './graph/projections.graph.ts';
 import { selectionOf } from './graph/selection.graph.ts';
 import { stateModeOf } from './graph/state-mode.graph.ts';
 import { previewsOf } from './graph/previews.graph.ts';
-import { timekeepingOf } from './graph/timekeeping.graph.ts';
 import { windowsOf } from './graph/windows.graph.ts';
 import { workspaceActions$ } from './graph/workspace-actions.graph.ts';
-import { inputsFor } from './programs.ts';
-import { restoreState } from './state-store.ts';
 
 const bootstrap = () => {
     const chrome = mountChrome();
     const intents = intentsOf(chrome);
-    const stored = restoreState(inputsFor);
 
     // The cycle: windows open from the history their own output folds. Every back edge is read lazily, here and nowhere else.
     const signals$ = defer(() => windows.signals$);
     const inputs$ = defer(() => windows.inputs$);
-    const history$ = historyOf(
-        begunFrom(stored),
-        defer(() => workspaceActions),
-        defer(() => documentActions),
+    const core = coreOf({
+        ports: browserPorts(),
         inputs$,
-    );
+        workspaceActions$: defer(() => workspaceActions),
+        documentActions$: defer(() => documentActions),
+        pictureFrames$,
+    });
 
-    const projected = projectionsOf(history$);
-    const timekeeping = timekeepingOf({ ...projected, stored, inputs$ });
-    const selection = selectionOf({
-        ...chrome,
-        ...intents,
-        ...projected,
-        ...timekeeping,
-        signals$,
-        inputs$,
-    });
-    const navigation = navigationOf({ ...chrome, ...intents, ...projected, inputs$ });
-    const stateMode = stateModeOf({ ...chrome, ...projected, signals$ });
-    const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$ });
-    const previews = previewsOf({
-        ...chrome,
-        ...stateMode,
-        ...projected,
-        ...timekeeping,
-        ...levels,
-    });
-    const scoped = scopedOf({ ...projected, ...timekeeping, ...levels, inputs$ });
-    const windows = windowsOf({ ...chrome, ...projected, ...selection, ...stateMode, scoped });
+    const selection = selectionOf({ ...chrome, ...intents, ...core, signals$, inputs$ });
+    const navigation = navigationOf({ ...chrome, ...intents, ...core, inputs$ });
+    const stateMode = stateModeOf({ ...chrome, ...core, signals$ });
+    const previews = previewsOf({ ...chrome, ...stateMode, ...core });
+    const scoped = scopedOf({ ...core, inputs$ });
+    const windows = windowsOf({ ...chrome, ...core, ...selection, ...stateMode, scoped });
 
     const workspaceActions = workspaceActions$({
         ...chrome,
         ...intents,
-        ...projected,
+        ...core,
         ...selection,
         ...navigation,
         ...stateMode,
@@ -70,19 +49,18 @@ const bootstrap = () => {
     });
     const documentActions = documentActions$({
         ...intents,
-        ...projected,
+        ...core,
         ...selection,
         ...stateMode,
-        inputs$,
     });
 
     return merge(
-        chime$(timekeeping.timers$, timekeeping.plans$),
-        persisted$({ ...projected, ...timekeeping }),
+        chime$(core.timers$, core.plans$),
+        core.persisted$,
         connectChrome$({
             ...chrome,
             ...intents,
-            ...projected,
+            ...core,
             ...selection,
             ...stateMode,
             ...previews,

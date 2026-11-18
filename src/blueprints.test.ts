@@ -2,7 +2,7 @@ import { unlinkedSketch } from './components/sketch/links.ts';
 import { describe, expect, it } from 'vitest';
 import { defaultVoice } from './components/voice/voice.ts';
 import { documentsKit, reduceHistory, seqFloor, type Documents } from './documents.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import {
     emptyBlueprints,

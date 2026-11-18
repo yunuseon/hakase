@@ -1,12 +1,10 @@
-import { merge, type Observable } from 'rxjs';
+import { merge } from 'rxjs';
 import { filter, map, mergeMap, withLatestFrom } from 'rxjs/operators';
 import { capturedActions } from '../capture.ts';
 import type { DocumentAction } from '../documents.ts';
 import { footprintAt } from '../placing.ts';
-import type { AppSignal } from '../process.ts';
 import { sharedFormulas$ } from '../share.ts';
 import { blueprintIn } from '../starters.ts';
-import { settingsKey } from '../stores.ts';
 import type { Intents } from './intents.graph.ts';
 import type { Projections } from './projections.graph.ts';
 import type { Selection } from './selection.graph.ts';
@@ -15,7 +13,7 @@ import type { StateMode } from './state-mode.graph.ts';
 type Reads = Pick<Intents, 'picked$' | 'selectionCommands$'> &
     Pick<Projections, 'documents$'> &
     Pick<Selection, 'placing$' | 'captures$' | 'selectedIds$'> &
-    Pick<StateMode, 'wiringCommands$'> & { readonly inputs$: Observable<AppSignal> };
+    Pick<StateMode, 'wiringCommands$'>;
 
 export const documentActions$ = ({
     picked$,
@@ -25,96 +23,9 @@ export const documentActions$ = ({
     placing$,
     captures$,
     wiringCommands$,
-    inputs$,
 }: Reads) =>
     merge(
-        inputs$.pipe(
-            mergeMap(({ program, store, from: id, input }): DocumentAction[] => {
-                switch (input.kind) {
-                    case 'settings':
-                        return [
-                            {
-                                kind: 'settings',
-                                key: settingsKey(program, store, id),
-                                settings: input.settings,
-                            },
-                        ];
-                    case 'ticket':
-                        return [{ kind: 'tickets', store, command: input.command }];
-                    case 'note':
-                        return [{ kind: 'notes', store, command: input.command }];
-                    case 'agenda':
-                        return [{ kind: 'agendas', store, command: input.command }];
-                    case 'habit':
-                        return [{ kind: 'habits', store, command: input.command }];
-                    case 'clock':
-                        return [{ kind: 'clocks', store, command: input.command }];
-                    case 'bookmark':
-                        return [{ kind: 'bookmarks', store, command: input.command }];
-                    case 'signal':
-                        return [{ kind: 'signals', store, command: input.command }];
-                    case 'paint':
-                        return [{ kind: 'paintings', store, command: input.command }];
-                    case 'pen':
-                        return [{ kind: 'pens', store, command: input.command }];
-                    case 'voice':
-                        return [{ kind: 'voices', store, command: input.command }];
-                    case 'gate':
-                        return [{ kind: 'gates', store, command: input.command }];
-                    case 'converter':
-                        return [{ kind: 'converters', store, command: input.command }];
-                    case 'box':
-                        return [{ kind: 'boxes', store, command: input.command }];
-                    case 'unbox':
-                        return [{ kind: 'unbox', id }];
-                    case 'pedal':
-                        return [{ kind: 'pedals', store, command: input.command }];
-                    case 'drums':
-                        return [{ kind: 'drums', store, command: input.command }];
-                    case 'modulate':
-                        return [
-                            {
-                                kind: 'link',
-                                store: input.store,
-                                param: input.param,
-                                source: input.source,
-                            },
-                        ];
-                    case 'library':
-                        return [{ kind: 'library', command: input.command }];
-                    case 'blueprint':
-                        return [{ kind: 'blueprints', command: input.command }];
-                    case 'source':
-                        return [
-                            { kind: 'formula', formula: input.formula, text: input.text, from: id },
-                        ];
-                    case 'theme':
-                        return [
-                            { kind: 'theme', theme: input.theme, value: input.value, from: id },
-                        ];
-                    case 'appearance':
-                        return [
-                            { kind: 'appearance', name: input.name, value: input.value, from: id },
-                        ];
-                    case 'look':
-                        return [{ kind: 'look', name: input.name }];
-                    case 'aspect':
-                        return [{ kind: 'aspect', aspect: input.aspect }];
-                    case 'wires':
-                        return [{ kind: 'wires', wires: input.wires }];
-                    case 'prune':
-                        return [{ kind: 'prune' }];
-                    default:
-                        return [];
-                }
-            }),
-        ),
-        merge(
-            wiringCommands$,
-            inputs$.pipe(
-                mergeMap(({ input }) => (input.kind === 'convert' ? [input.command] : [])),
-            ),
-        ).pipe(
+        wiringCommands$.pipe(
             mergeMap((command): DocumentAction[] =>
                 command.kind === 'convert'
                     ? [command]

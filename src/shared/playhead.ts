@@ -1,4 +1,4 @@
-import { animationFrames, defer, EMPTY, merge, type Observable } from 'rxjs';
+import { defer, EMPTY, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     map,
@@ -242,6 +242,7 @@ export const createClocks$ = (
     initial: Clocks,
     // Where the day stands now, 0 to 1: passed in, since the wall clock lives at the edge.
     day$: Observable<number>,
+    frames$: Observable<number>,
 ): Observable<Clocks> => {
     const clocks$: Observable<Clocks> = merge(
         commands$.pipe(map((stamped): ClocksAction => ({ kind: 'clock', ...stamped }))),
@@ -254,9 +255,9 @@ export const createClocks$ = (
             // Deltas, not elapsed: pausing then playing must resume, not jump.
             switchMap(any =>
                 any
-                    ? animationFrames().pipe(
+                    ? frames$.pipe(
                           pairwise(),
-                          map(([previous, frame]) => frame.elapsed - previous.elapsed),
+                          map(([previous, frame]) => frame - previous),
                       )
                     : EMPTY,
             ),

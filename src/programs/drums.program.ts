@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, EMPTY, merge } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -14,18 +15,13 @@ import {
 import { applyVolume, drumBus$, type DrumBus } from '../components/drums/audio/bus.ts';
 import { hit } from '../components/drums/audio/hit.ts';
 import { hitsOf, swellOf, type Hit } from '../components/drums/drums.ts';
-import { drumsInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 import { frameOf, scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
 
 type Scheduling = { readonly schedule: Schedule; readonly strikes: readonly Strike<Hit>[] };
 
 export const drumsProgram = {
-    id: 'drums',
-    inputs: { playback: playbackInput, ...drumsInputs },
-    title: 'drums',
-    category: 'make',
-    icon: 'M4 9 A8 3 0 0 1 20 9 V15 A8 3 0 0 1 4 15 Z M4 9 A8 3 0 0 0 20 9 M7 4 L11 8 M17 4 L13 8',
+    ...declarations.drums,
     size: { width: 560, height: 400 },
     minimum: { width: 260, height: 300 },
     audible: true,

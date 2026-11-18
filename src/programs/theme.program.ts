@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { EMPTY, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -20,11 +21,7 @@ const sameShape = (a: Theme, b: Theme): boolean =>
     a.blend === b.blend && a.stops.length === b.stops.length;
 
 export const themeProgram = {
-    id: 'theme',
-    inputs: {},
-    title: 'theme',
-    category: 'make',
-    icon: 'M4 6 H20 V18 H4 Z M10 6 V18 M15 6 V18',
+    ...declarations.theme,
     size: { width: 300, height: 260 },
     minimum: { width: 240, height: 200 },
     launch: async () => {

@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { asyncScheduler, combineLatest, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -30,11 +31,7 @@ const READ_MS = 250;
 const keyOf = (target: string, path: string) => `${target}\n${path}`;
 
 export const stateProgram = {
-    id: 'state',
-    inputs: {},
-    title: 'state',
-    category: 'system',
-    icon: 'M5 6 h3 M5 12 h3 M5 18 h3 M16 6 h3 M16 12 h3 M16 18 h3 M8 6 C 12 6, 12 12, 16 12 M8 18 C 12 18, 12 6, 16 6',
+    ...declarations.state,
     size: { width: 520, height: 560 },
     minimum: { width: 240, height: 260 },
     launch: async () => {

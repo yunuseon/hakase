@@ -63,11 +63,13 @@ export const devicePixelRatio$: Observable<number> = defer(() => {
     );
 });
 
-export const viewport$: Observable<Viewport> = fromEvent(window, 'resize').pipe(
-    map(() => viewportSize()),
-    startWith(viewportSize()),
-    shareReplay({ bufferSize: 1, refCount: false }),
-);
+// Deferred: a module that only imports this must load where there is no window.
+export const viewport$: Observable<Viewport> = defer(() =>
+    fromEvent(window, 'resize').pipe(
+        map(() => viewportSize()),
+        startWith(viewportSize()),
+    ),
+).pipe(shareReplay({ bufferSize: 1, refCount: false }));
 
 export const wallClock$: Observable<number> = timer(0, 1000).pipe(
     map(() => Date.now()),

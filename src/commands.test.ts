@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ICONS } from './shared/ui/icons.ts';
 import { captureStores, commandsOf, pickedOf, steppedSection } from './commands.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { defaultWorkspace, type Section, type Workspace } from './workspace.ts';
 
 const section = (id: string, x: number, y: number): Section => ({

@@ -1,10 +1,10 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import { tickAt } from '../circuit.ts';
 import type { Pin } from '../boxes.ts';
 import type { BoxView, PinView } from '../components/box/box.ts';
 import type { Bit } from '../gates.ts';
-import { loosePlaybackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 const pinView =
@@ -17,11 +17,7 @@ const pinView =
     });
 
 export const boxProgram = {
-    id: 'box',
-    inputs: { playback: loosePlaybackInput },
-    title: 'component',
-    category: 'logic',
-    icon: 'M4 6h16v12H4zM2 10h2M2 14h2M20 12h2M8 10h8M8 14h5',
+    ...declarations.box,
     size: { width: 240, height: 192 },
     minimum: { width: 200, height: 150 },
     launch: async () => {

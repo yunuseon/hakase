@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import type { BlueprintCard } from '../components/blueprints/blueprints.ts';
@@ -19,11 +20,7 @@ const cardOf = ({ id, name, size, windows }: Blueprint, summary: string | null):
 });
 
 export const blueprintsProgram = {
-    id: 'blueprints',
-    inputs: {},
-    title: 'blueprints',
-    category: 'make',
-    icon: 'M4 5 H11 V12 H4 Z M13 5 H20 V9 H13 Z M13 11 H20 V19 H13 Z M4 14 H11 V19 H4 Z',
+    ...declarations.blueprints,
     size: { width: 360, height: 420 },
     minimum: { width: 260, height: 220 },
     launch: async () => {

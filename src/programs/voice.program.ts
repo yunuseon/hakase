@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, EMPTY, merge } from 'rxjs';
 import {
     ignoreElements,
@@ -21,15 +22,10 @@ import {
     type Heard,
     type Planning,
 } from '../components/voice/voice.ts';
-import { playbackInput, voiceInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 export const voiceProgram = {
-    id: 'voice',
-    inputs: { playback: playbackInput, ...voiceInputs },
-    title: 'voice',
-    category: 'make',
-    icon: 'M9 18 V6 L19 4 V16 M9 18 A2.5 2.5 0 1 1 4 18 A2.5 2.5 0 1 1 9 18 M19 16 A2.5 2.5 0 1 1 14 16 A2.5 2.5 0 1 1 19 16',
+    ...declarations.voice,
     size: { width: 400, height: 360 },
     minimum: { width: 300, height: 300 },
     audible: true,

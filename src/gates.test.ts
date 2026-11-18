@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GATE_DEFAULTS, loopEdges, parseGate, reduceGate, sourceOfGate } from './gates.ts';
 import { progressBinding } from './inputs.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { processFrom, storeFrom } from './workspace.ts';
 
 describe('gate documents', () => {

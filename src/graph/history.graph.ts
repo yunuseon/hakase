@@ -9,19 +9,19 @@ import {
     type History,
     type TimeCommand,
 } from '../documents.ts';
-import { viewportSize } from '../lib/dom.ts';
+import type { Ports } from '../ports.ts';
 import type { AppSignal } from '../process.ts';
 import { restored } from '../program.ts';
-import { inputsFor } from '../programs.ts';
+import { inputsFor } from '../declarations.ts';
 import type { Restored } from '../state-store.ts';
 import { startTimeline } from '../timeline.ts';
 import { defaultWorkspace, type WorkspaceAction } from '../workspace.ts';
 
 const reduced = reduceHistory(documentsKit(inputsFor));
 
-export const begunFrom = (stored: Restored): History => {
+export const begunFrom = (stored: Restored, viewport: Ports['viewport']): History => {
     const started: Documents = {
-        workspace: stored.workspace ?? defaultWorkspace(viewportSize(), inputsFor),
+        workspace: stored.workspace ?? defaultWorkspace(viewport, inputsFor),
         settings: stored.settings,
         tickets: stored.tickets,
         notes: stored.notes,

@@ -22,7 +22,8 @@ import { followedStores, playbackBinding, type Bindings, type PlaybackBinding } 
 import { liveProcess$, type ProcessSignal } from '../process.ts';
 import { windowZ } from '../state-mode.ts';
 import { CATEGORIES, type ProcessId, type Slot } from '../program.ts';
-import { inputsFor, programList, programOf } from '../programs.ts';
+import { inputsFor } from '../declarations.ts';
+import { programList, programOf } from '../programs.ts';
 import type { Linked } from '../shared/signal.ts';
 import { colourOf, HOLDING, settingsKey, withMain, type StoreId } from '../stores.ts';
 import { boxOf, onScreen, type Process } from '../workspace.ts';

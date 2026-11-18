@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -8,18 +9,13 @@ import {
     withLatestFrom,
 } from 'rxjs/operators';
 import type { PaintView } from '../components/paint/paint.ts';
-import { playbackInput } from '../inputs.ts';
 import { paintInputsOf, workingFrame } from '../painting.ts';
 import type { Program } from '../program.ts';
 import { asPaint } from '../settings.ts';
 import { frameAt } from '../shared/picture.ts';
 
 export const paintProgram = {
-    id: 'paint',
-    inputs: { playback: playbackInput },
-    title: 'paint',
-    category: 'make',
-    icon: 'M5 19 C5 15 8 14 10 14 L18 6 L20 8 L12 16 C12 18 10 20 5 19 Z',
+    ...declarations.paint,
     size: { width: 460, height: 580 },
     minimum: { width: 320, height: 420 },
     launch: async () => {

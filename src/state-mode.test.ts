@@ -23,7 +23,7 @@ import {
     sparkOf,
     windowOfGroup,
 } from './components/state-wiring/wiring.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { defaultWorkspace, reduceWorkspace, type WorkspaceAction } from './workspace.ts';
 import { tracedOf } from './why.ts';

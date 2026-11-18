@@ -17,7 +17,7 @@ import {
 } from '../components/state-wiring/wiring.ts';
 import { coarsePointer$, remScale$ } from '../lib/rx.ts';
 import type { ProcessSignal } from '../process.ts';
-import { inputsFor } from '../programs.ts';
+import { inputsFor } from '../declarations.ts';
 import type { StateCommand } from '../shared/connections.ts';
 import {
     defaultSession,

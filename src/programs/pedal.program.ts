@@ -1,9 +1,9 @@
+import { pedalDeclaration } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map } from 'rxjs/operators';
 import type { PedalView } from '../components/pedal/pedal.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$ } from '../engine/view.ts';
-import { pedalInputs, playbackInput } from '../inputs.ts';
 import { PEDALS, valueOf, type PedalKind } from '../pedals.ts';
 import type { AppInput, Program } from '../program.ts';
 import { chainLine } from '../why.ts';
@@ -13,11 +13,7 @@ export const pedalProgram = <K extends PedalKind>(kind: K) => {
     const spec = PEDALS[kind];
 
     return {
-        id: kind,
-        inputs: { playback: playbackInput, ...pedalInputs(kind) },
-        title: spec.title.toLowerCase(),
-        category: 'make',
-        icon: spec.icon,
+        ...pedalDeclaration(kind),
         size: { width: 300, height: 380 },
         minimum: { width: 200, height: 280 },
         launch: async () => {

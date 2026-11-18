@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -38,7 +39,6 @@ import type {
 import { imageExport$, imageStill$ } from '../engine/export.ts';
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { view$, type View } from '../engine/view.ts';
-import { imageInput, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 import { asOutput } from '../settings.ts';
 
@@ -53,11 +53,7 @@ export const shownOf =
 const ASPECT_SIDE = 2160;
 
 export const outputProgram = {
-    id: 'output',
-    inputs: { playback: playbackInput, in: imageInput('in') },
-    title: 'output',
-    category: 'make',
-    icon: 'M3 5h18v12H3zM8 21h8M12 17v4',
+    ...declarations.output,
     size: { width: 480, height: 620 },
     minimum: { width: 260, height: 460 },
     launch: async () => {

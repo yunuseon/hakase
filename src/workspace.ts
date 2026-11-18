@@ -17,7 +17,7 @@ import {
     type InputsFor,
 } from './inputs.ts';
 import { reachedFrom, type Linked } from './shared/signal.ts';
-import type { programs } from './programs.ts';
+import type { declarations } from './declarations.ts';
 import {
     centredOn,
     centreOf,
@@ -71,7 +71,7 @@ type ProcessBase = {
 
 type ProcessOf<K extends ProgramId> = ProcessBase & {
     readonly program: K;
-    readonly follows: BindingsOf<(typeof programs)[K]['inputs']>;
+    readonly follows: BindingsOf<(typeof declarations)[K]['inputs']>;
 };
 
 export type Process = { readonly [K in ProgramId]: ProcessOf<K> }[ProgramId];

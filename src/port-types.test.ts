@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { madeBy, progressBinding, sourceProgram, SOURCES } from './inputs.ts';
 import { HOLDING } from './stores.ts';
 import { PROGRAM_IDS } from './program.ts';

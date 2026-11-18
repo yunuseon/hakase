@@ -1,15 +1,11 @@
-import { ownPlaybackInput } from '../inputs.ts';
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import type { AppInput, Program } from '../program.ts';
 import { elapsedLabel, timeOfDayLabel } from '../shared/playhead.ts';
 
 export const timelineProgram = {
-    id: 'timeline',
-    inputs: { playback: ownPlaybackInput },
-    title: 'timeline',
-    category: 'make',
-    icon: 'M3 12 H21 M7.5 9.5 V14.5 M12 8 V16 M16.5 9.5 V14.5',
+    ...declarations.timeline,
     size: { width: 340, height: 136 },
     minimum: { width: 310, height: 110 },
     launch: async () => {

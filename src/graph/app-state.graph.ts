@@ -27,7 +27,7 @@ import { devicePixelRatio$, viewport$, wallClock$ } from '../lib/rx.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../process.ts';
 import { isProgramId, type AppState, type ProgramId, type Task } from '../program.ts';
-import { inputsFor, programOf } from '../programs.ts';
+import { declarationOf, inputsFor } from '../declarations.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import { TIME } from '../shared/signal.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
@@ -202,7 +202,7 @@ export const scopedOf = ({
         inspect$: (id: string) => inspected$(id),
         graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
-                graphOf(workspace, inputsFor, programOf, held, signals),
+                graphOf(workspace, inputsFor, declarationOf, held, signals),
             ),
             distinctUntilChanged(sameGraph),
         ),
@@ -216,19 +216,17 @@ export const scopedOf = ({
             ),
             map(processes =>
                 listed(processes).flatMap(({ process, ordinal, focused }): Task[] => {
-                    const program = programOf(process.program);
+                    const program = declarationOf(process.program);
 
-                    return program === undefined
-                        ? []
-                        : [
-                              {
-                                  id: process.id,
-                                  title: program.title,
-                                  icon: program.icon,
-                                  ordinal,
-                                  focused,
-                              },
-                          ];
+                    return [
+                        {
+                            id: process.id,
+                            title: program.title,
+                            icon: program.icon,
+                            ordinal,
+                            focused,
+                        },
+                    ];
                 }),
             ),
         ),

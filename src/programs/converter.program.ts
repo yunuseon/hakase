@@ -1,14 +1,9 @@
+import { converterDeclaration } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, mergeMap } from 'rxjs/operators';
 import { converterView } from '../components/converter/converter.ts';
-import {
-    converterTitle,
-    CONVERTERS,
-    isBitField,
-    isShapeField,
-    type ConverterKind,
-} from '../converters.ts';
-import { converterInputs, playbackInput } from '../inputs.ts';
+import { CONVERTERS, isBitField, isShapeField, type ConverterKind } from '../converters.ts';
+import { converterInputs } from '../inputs.ts';
 import { CONVERSIONS } from '../port-types.ts';
 import type { AppInput, Program } from '../program.ts';
 import { curveOf } from '../shared/curve.ts';
@@ -30,11 +25,7 @@ export const converterProgram = <K extends ConverterKind>(kind: K) => {
     const spec = CONVERTERS[kind];
 
     return {
-        id: kind,
-        inputs: { playback: playbackInput, ...converterInputs(kind) },
-        title: converterTitle(kind),
-        category: 'convert',
-        icon: spec.icon,
+        ...converterDeclaration(kind),
         size: spec.size,
         minimum: { width: 220, height: 180 },
         launch: async () => {

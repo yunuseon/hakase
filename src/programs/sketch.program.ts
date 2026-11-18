@@ -1,4 +1,4 @@
-import { knobInputs, paintInput, playbackInput, sceneInputs } from '../inputs.ts';
+import { declarations } from '../declarations.ts';
 import { asapScheduler, combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -58,11 +58,7 @@ import type { Size } from '../components/window/frame.ts';
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 
 export const sketchProgram = {
-    id: 'sketch',
-    inputs: { playback: playbackInput, ...knobInputs, ...sceneInputs, paint: paintInput },
-    title: 'sketch',
-    category: 'make',
-    icon: 'M3 14 Q 7.5 5.5 12 13 T 21 11',
+    ...declarations.sketch,
     size: { width: 640, height: 820 },
     minimum: { width: 320, height: 420 },
     launch: async () => {

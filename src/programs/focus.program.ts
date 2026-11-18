@@ -1,15 +1,11 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
 import { focusView } from '../components/focus/focus.ts';
-import { focusInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 export const focusProgram = {
-    id: 'focus',
-    inputs: { ...focusInputs },
-    title: 'focus',
-    category: 'plan',
-    icon: 'M12 5 A7.5 7.5 0 1 1 12 20 A7.5 7.5 0 1 1 12 5 M12 9 V12.5 L14.5 14.5 M10 2.5 H14',
+    ...declarations.focus,
     size: { width: 260, height: 340 },
     minimum: { width: 200, height: 260 },
     launch: async () => {

@@ -9,7 +9,7 @@ import {
     type History,
     type TimeCommand,
 } from './documents.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import { emptyBlueprints } from './blueprints.ts';
 import { defaultSketch } from './settings.ts';

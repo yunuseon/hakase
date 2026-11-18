@@ -60,7 +60,7 @@ import { samePanel, type Drive } from '../components/sketch/params.ts';
 import { sameOrbit } from '../components/sketch/space.ts';
 import { isThemeName, themes } from '../components/sketch/themes/registry.ts';
 import { dayOf } from '../lib/day.ts';
-import { wallClock$ } from '../lib/rx.ts';
+import type { Ports } from '../ports.ts';
 import { curveOf, type Driver } from '../shared/curve.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import {
@@ -114,6 +114,7 @@ type Reads = Pick<
 > &
     Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
         readonly pictureFrames$: PictureFrames;
+        readonly ports: Pick<Ports, 'wall$'>;
     };
 
 export const levelsOf = ({
@@ -138,6 +139,7 @@ export const levelsOf = ({
     timers$,
     planIn,
     playbackIn,
+    ports: { wall$ },
     pictureFrames$,
 }: Reads) => {
     const ticketsIn = inStore(tickets$, defaultTickets);
@@ -302,7 +304,7 @@ export const levelsOf = ({
             distinctUntilChanged(),
         );
 
-    const today$ = wallClock$.pipe(
+    const today$ = wall$.pipe(
         map(dayOf),
         distinctUntilChanged(),
         shareReplay({ bufferSize: 1, refCount: true }),
@@ -474,7 +476,7 @@ export const levelsOf = ({
         linkIn(store, 'in').pipe(
             switchMap((binding): Observable<Read> => {
                 if (binding?.kind === 'clocks') {
-                    return combineLatest([clocksIn(binding.store), wallClock$]).pipe(
+                    return combineLatest([clocksIn(binding.store), wall$]).pipe(
                         map(([{ zones }, now]) => {
                             const zone = zones.find(each => each === item) ?? zones[0];
 

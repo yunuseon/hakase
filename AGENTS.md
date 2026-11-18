@@ -2775,12 +2775,11 @@ conditional falls back to the constraint and lets every kind through.
   last drag's step even when it changes nothing.
 - **The workspace asks, it does not import.** `reduceWorkspace`,
   `reduceHistory`, `parseWorkspace`, `defaultWorkspace` and `restoreState` take
-  an `inputsFor(program)`; `programs.ts` builds it from the program table, and tests
-  use `src/inputs.fixture.ts`, because the program modules pull in the DOM.
-  `inputs.fixture.render.test.ts` loads the real table under Happy DOM and fails
-  when the fixture disagrees with it, which it once did for paint unnoticed. The
-  declarations are plain data, so building the table never evaluates the
-  reactive cycle early.
+  an `inputsFor(program)`; `declarations.ts` builds it from the declarations
+  (see "The core, with no client"), which load in Node, so tests read the real
+  inputs. They once read a hand-kept fixture, because the program modules pull
+  in the DOM, and it fell out of step for paint unnoticed. The declarations are
+  plain data, so building the table never evaluates the reactive cycle early.
 - **A follow is a tagged binding**, `{ kind, store }`, one per followed input,
   and the `follow` gesture names the input it binds. Every follower starts with
   an explicit binding to the main clock, so counting
@@ -3037,6 +3036,49 @@ timecode is a signed 16-bit offset from its cluster, which is why a cluster
 starts at every key frame. MP4 is not offered: its muxer is too large to
 hand-write sensibly. Mediabunny did this briefly and was removed for that reason.
 
+## The core, with no client
+
+**Hakase is a core any client could drive; the browser is one client.** The
+core is `coreOf` in `src/core.ts`: the documents fold and its projections, the
+clocks, focus timers and plans, every level and picture recipe, and saving.
+It is built from four streams and the platform's ports, and nothing in it
+reaches for a browser:
+
+- **`inputs$`**, what each process said, in the `AppInput` language any client
+  speaks. The core turns them into document actions itself (`documentActionsOf`
+  in `input-actions.ts`, pure, one case per input), so a terminal that says
+  `{ kind: 'ticket', command: { kind: 'add', … } }` changes the tickets exactly
+  as a window does.
+- **`documentActions$` and `workspaceActions$`**, what the client asks beyond its
+  processes' inputs: a palette capture, a placed blueprint, a window dragged.
+- **`pictureFrames$`**, the engine's picture reader, passed in so the core never
+  touches GL; without a GPU it is `() => of(null)`.
+- **`ports`** (`src/ports.ts`): `frames$`, a timestamp per frame, subscribed only
+  while a clock plays; `wall$`, epoch milliseconds at least once a second;
+  `viewport`, where a first run lays out its windows; and `storage`, read and
+  write by key. `browserPorts()` in `browser-ports.ts` is the browser's:
+  `animationFrames`, `wallClock$`, the window's size and `localStorage`.
+
+**What a program is splits the same way.** `declarations.ts` holds what every
+client knows of one: id, title, category, icon and inputs, in toolbar order,
+with `pedalDeclaration`, `gateDeclaration` and `converterDeclaration` for the
+tables. A program file spreads its declaration and adds the browser's part, its
+size, minimum, `audible` and `launch`. `inputsFor`, the task list and the
+`Process` type read the declarations, never `programs.ts`, which is the
+browser's table and imports every component's program.
+
+**`core.test.ts` is the proof, and the rule**: it drives `coreOf` in Node with
+scripted inputs and fake ports, adds a ticket, sets a signal, plays a clock on
+scripted frames, saves to a `Map`, and restores it in a second core. A core
+module that imports the DOM, or runs browser code as it loads, fails it. That
+is also why `viewport$` in `lib/rx.ts` is deferred: built at load it reached for
+`window`, and every module that imported `lib/rx.ts` failed in Node.
+
+What is still to do is in the backlog under "A core any client could drive":
+the model still lives in component folders, `program.ts` still mixes the
+command language with the web contract, and the store registry still lives in
+the workspace beside window frames.
+
 ## Layering
 
 One rule, and the folders no longer carry it: **a view never derives, a model
@@ -3066,7 +3108,8 @@ belongs to is read from its name instead of its path:
   `program.ts` beside `Program` and `ProgramId`: splitting it out again brings
   back a type-only import cycle, since `Program.connect$` takes an `AppState` and
   `AppState.frame$` takes a `ProgramId`.
-- **`src/main.ts`** — the graph and nothing else: it calls the `*.graph.ts`
+- **`src/main.ts`** — the browser client and nothing else: it mounts the
+  chrome, builds the core with `browserPorts()`, calls the web `*.graph.ts`
   modules in dependency order, closes the cycle, and subscribes once. It reads
   as the app's dataflow diagram, and it should stay about a screen long.
 - **`src/graph/*.graph.ts`** — the sub-graphs `main.ts` composes, each a

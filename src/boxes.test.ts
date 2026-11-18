@@ -13,7 +13,7 @@ import {
     type TimeCommand,
 } from './documents.ts';
 import { GATE_DEFAULTS, isGateKind, type Gate, type GateKind } from './gates.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import { startTimeline } from './timeline.ts';
 import { defaultWorkspace } from './workspace.ts';

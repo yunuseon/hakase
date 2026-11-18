@@ -1,3 +1,4 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -24,11 +25,7 @@ import type { AppInput, Program } from '../program.ts';
 import { asTickets } from '../settings.ts';
 
 export const ticketsProgram = {
-    id: 'tickets',
-    inputs: {},
-    title: 'tickets',
-    category: 'plan',
-    icon: 'M4 6.5 H20 V10 A2 2 0 0 0 20 14 V17.5 H4 V14 A2 2 0 0 0 4 10 Z M9.5 6.5 V17.5',
+    ...declarations.tickets,
     size: { width: 360, height: 420 },
     minimum: { width: 240, height: 220 },
     launch: async () => {

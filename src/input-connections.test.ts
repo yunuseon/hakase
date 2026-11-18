@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { inputGroups, storeInputCommand } from './input-connections.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { fits, initialFollows } from './inputs.ts';
 import { defaultSignal } from './shared/signal.ts';
 import { mainStore } from './stores.ts';

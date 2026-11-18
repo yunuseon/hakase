@@ -54,6 +54,32 @@ at 41% and running off the screen at 100%.
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
 
+## A core any client could drive
+
+The core boots in Node (see "The core, with no client" in `AGENTS.md`). What
+still ties the data to the browser, in order:
+
+- **The model leaves the view folders.** The core imports about forty modules
+  from `components/`: the document types, reducers and parsers of notes, focus,
+  agenda, habits, clocks, bookmarks, paint, pen, voice, drums, the sketch's
+  params, themes and formula registry, readings, `Frame`, and `HistoryEntry`
+  from a `.component.ts`. Each moves to a home outside `components/`, and
+  components import it from there. Done when no core module imports
+  `components/`.
+- **`program.ts` splits in two.** The command and state language (`ProgramId`,
+  `AppInput`, `AppState`, `AppSignal` from `process.ts`) moves to a core module;
+  `Program` and `ProcessView`, which return an `HTMLElement`, stay with the
+  browser. Done when the core imports neither `program.ts` nor `process.ts`.
+- **The layers are checked.** A check in lint fails when a core module (the
+  root modules, `graph/` modules the core composes, `shared/` outside `ui/`)
+  imports `components/`, lit or a browser global, as the comment ceiling is
+  checked. Done when a stray import fails `npm run lint`.
+- **The store registry leaves the workspace.** Which stores exist and their
+  names sit in `Workspace` beside window frames and the camera, so a client
+  with no windows still carries a layout. Moving them into the documents
+  touches the saved shape, so it migrates the snapshot. Done when a client can
+  make and name a store with no window at all.
+
 ## Typed ports and converters
 
 ### Why

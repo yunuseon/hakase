@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseSnapshot } from './state-store.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { defaultWorkspace } from './workspace.ts';
 import { ticketsIn } from './shared/tickets.ts';
 

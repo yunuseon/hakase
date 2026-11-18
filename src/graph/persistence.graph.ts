@@ -3,6 +3,7 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 import { valuesOf } from '../program.ts';
 import { persistState$ } from '../state-store.ts';
 import type { Projections } from './projections.graph.ts';
+import type { Ports } from '../ports.ts';
 import type { Timekeeping } from './timekeeping.graph.ts';
 
 type Saved = Pick<
@@ -36,7 +37,9 @@ type Saved = Pick<
     | 'library$'
     | 'blueprints$'
 > &
-    Pick<Timekeeping, 'timersRested$' | 'playbacksRested$'>;
+    Pick<Timekeeping, 'timersRested$' | 'playbacksRested$'> & {
+        readonly ports: Pick<Ports, 'storage'>;
+    };
 
 export const persisted$ = ({
     history$,
@@ -69,6 +72,7 @@ export const persisted$ = ({
     blueprints$,
     timersRested$,
     playbacksRested$,
+    ports: { storage },
 }: Saved) =>
     persistState$(
         combineLatest({
@@ -106,4 +110,5 @@ export const persisted$ = ({
                 distinctUntilChanged(),
             ),
         }),
+        storage,
     );

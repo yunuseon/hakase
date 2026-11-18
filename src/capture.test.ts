@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { capturedActions } from './capture.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { defaultWorkspace } from './workspace.ts';
 
 const base = defaultWorkspace({ width: 1400, height: 900 }, inputsFor);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { selectedIn, selectionView } from './selection.ts';
 import { defaultWorkspace } from './workspace.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 const initial = defaultWorkspace({ width: 1400, height: 900 }, inputsFor);
 const workspace = {
     ...initial,

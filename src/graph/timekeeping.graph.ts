@@ -21,10 +21,10 @@ import {
 } from '../components/focus/focus.ts';
 import { playbackBinding } from '../inputs.ts';
 import { dayFractionOf, dayOf, minuteOfDay } from '../lib/day.ts';
-import { wallClock$ } from '../lib/rx.ts';
+import type { Ports } from '../ports.ts';
 import { routePlayback$ } from '../playback-routing.ts';
 import type { AppSignal } from '../process.ts';
-import { inputsFor } from '../programs.ts';
+import { inputsFor } from '../declarations.ts';
 import { plansOf } from '../readings.ts';
 import { createClocks$, initialClock, restedClocks } from '../shared/playhead.ts';
 import { reachedFrom } from '../shared/signal.ts';
@@ -39,6 +39,7 @@ type Reads = Pick<
 > & {
     readonly stored: Pick<Restored, 'focus' | 'playback'>;
     readonly inputs$: Observable<AppSignal>;
+    readonly ports: Pick<Ports, 'frames$' | 'wall$'>;
 };
 
 export const timekeepingOf = ({
@@ -49,6 +50,7 @@ export const timekeepingOf = ({
     agendas$,
     stored,
     inputs$,
+    ports: { frames$, wall$ },
 }: Reads) => {
     // A split-off store is seeded once, from the store it was split from, as it first appears.
     const storeEvents$: Observable<StoreEvent> = merge(
@@ -84,7 +86,7 @@ export const timekeepingOf = ({
     const plans$ = focusLinks$.pipe(
         switchMap(links =>
             [...links.values()].some(({ sources }) => sources.agenda !== null)
-                ? combineLatest([agendas$, wallClock$]).pipe(
+                ? combineLatest([agendas$, wall$]).pipe(
                       map(([agendas, now]) =>
                           plansOf(links, agendas, dayOf(now), minuteOfDay(now)),
                       ),
@@ -156,7 +158,8 @@ export const timekeepingOf = ({
         ),
         merge(storeEvents$, seeds$),
         stored.playback,
-        wallClock$.pipe(map(dayFractionOf)),
+        wall$.pipe(map(dayFractionOf)),
+        frames$,
     );
 
     // Where each clock last rested: storage need not follow the playhead every frame it runs.

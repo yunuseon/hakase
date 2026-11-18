@@ -14,7 +14,7 @@ import {
     type WorkspaceAction,
     onScreen,
 } from './workspace.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { defaultSignal } from './shared/signal.ts';
 
 const viewport = { width: 1400, height: 900 };

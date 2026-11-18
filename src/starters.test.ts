@@ -1,7 +1,7 @@
 import { parseTickets } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import type { Documents } from './documents.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { emptyLibrary } from './library.ts';
 import { emptyBlueprints, parseBlueprints, placed } from './blueprints.ts';
 import { blueprintIn, RHYTHM, STARTERS } from './starters.ts';

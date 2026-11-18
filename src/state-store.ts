@@ -30,7 +30,7 @@ import { parseBookmarks, type Bookmarks } from './components/bookmarks/bookmarks
 import { parseSignal, type Signal } from './shared/signal.ts';
 import { parseTickets, type Tickets } from './shared/tickets.ts';
 import { isThemeName, type ThemeName } from './components/sketch/themes/registry.ts';
-import { readStored, writeStored } from './lib/storage.ts';
+import type { Storage } from './ports.ts';
 import type { ProcessId } from './program.ts';
 import { keptStores, renamedStore, type StoreId } from './stores.ts';
 import { parseSettings, type Settings } from './settings.ts';
@@ -210,12 +210,12 @@ const fresh: Restored = {
     seq: 0,
 };
 
-const legacy = (inputsFor: InputsFor): Restored => {
-    const appearance = readStored(LEGACY_APPEARANCE);
+const legacy = (inputsFor: InputsFor, storage: Storage): Restored => {
+    const appearance = storage.read(LEGACY_APPEARANCE);
 
     return {
         ...fresh,
-        workspace: parseWorkspace(readStored(LEGACY_WORKSPACE), inputsFor),
+        workspace: parseWorkspace(storage.read(LEGACY_WORKSPACE), inputsFor),
         look: lookFrom(field(appearance, 'look')),
         looks: looksFrom(field(appearance, 'edits')),
     };
@@ -392,8 +392,8 @@ const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
     };
 };
 
-export const restoreState = (inputsFor: InputsFor): Restored =>
-    parseSnapshot(readStored(KEY), inputsFor) ?? legacy(inputsFor);
+export const restoreState = (inputsFor: InputsFor, storage: Storage): Restored =>
+    parseSnapshot(storage.read(KEY), inputsFor) ?? legacy(inputsFor, storage);
 
 const serialised = (snapshot: Snapshot): unknown => {
     const { stores } = snapshot.workspace;
@@ -440,11 +440,14 @@ const serialised = (snapshot: Snapshot): unknown => {
     };
 };
 
-export const persistState$ = (snapshot$: Observable<Snapshot>): Observable<void> =>
+export const persistState$ = (
+    snapshot$: Observable<Snapshot>,
+    storage: Storage,
+): Observable<void> =>
     snapshot$.pipe(
         debounceTime(SETTLE_MS),
         tap(snapshot => {
-            writeStored(KEY, serialised(snapshot));
+            storage.write(KEY, serialised(snapshot));
         }),
         map(() => undefined),
     );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { graphOf } from './state-graph.ts';
 import { defaultWorkspace, reduceWorkspace, type WorkspaceAction } from './workspace.ts';
 

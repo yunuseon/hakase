@@ -1,15 +1,11 @@
+import { declarations } from '../declarations.ts';
 import { merge } from 'rxjs';
 import { ignoreElements, map } from 'rxjs/operators';
-import { playbackInput, signalInputs } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 import { chainLine } from '../why.ts';
 
 export const signalProgram = {
-    id: 'signal',
-    inputs: { playback: playbackInput, ...signalInputs },
-    title: 'signal',
-    category: 'make',
-    icon: 'M3 12 C 6 3, 9 3, 12 12 S 18 21, 21 12',
+    ...declarations.signal,
     size: { width: 300, height: 300 },
     minimum: { width: 220, height: 240 },
     launch: async () => {

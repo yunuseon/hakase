@@ -34,7 +34,7 @@ import type { BookmarkCommand, Bookmarks } from './components/bookmarks/bookmark
 import type { HistoryEntry } from './components/history/history.component.ts';
 import type { TicketCommand, Tickets } from './shared/tickets.ts';
 import type { Settings } from './settings.ts';
-import type { ProgramInputs } from './inputs.ts';
+import type { Declaration } from './declarations.ts';
 import type { PlaybackBinding } from './inputs.ts';
 import type { Reading } from './components/progress-bar/progress-bar.ts';
 import type { TransportCommand } from './shared/playhead.ts';
@@ -315,12 +315,7 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
-export type Program<K extends ProgramId = ProgramId> = {
-    readonly inputs: ProgramInputs;
-    readonly id: K;
-    readonly title: string;
-    readonly category: CategoryId;
-    readonly icon: string;
+export type Program<K extends ProgramId = ProgramId> = Declaration<K> & {
     readonly size: Size;
     // The smallest window its content still lays out in; the workspace clamps every resize to it.
     readonly minimum: Size;

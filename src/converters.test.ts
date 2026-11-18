@@ -35,7 +35,7 @@ import {
     type Shape,
     type ShapeField,
 } from './converters.ts';
-import { inputsFor } from './inputs.fixture.ts';
+import { inputsFor } from './declarations.ts';
 import { converterInputs } from './inputs.ts';
 import { processFrom, storeFrom } from './workspace.ts';
 import { CURVE_SAMPLES, curveOf, type Driver } from './shared/curve.ts';

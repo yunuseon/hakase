@@ -1,20 +1,16 @@
+import { declarations } from '../declarations.ts';
 import { combineLatest, merge } from 'rxjs';
 import { distinctUntilChanged, ignoreElements, map, shareReplay, switchMap } from 'rxjs/operators';
 import { sheet$ } from '../engine/view.ts';
 import { parseHexColor } from '../lib/color.ts';
 import { dabsAt } from '../shared/stroke.ts';
 import { strokeOf } from '../components/pen/pen.ts';
-import { penInputs, playbackInput } from '../inputs.ts';
 import type { AppInput, Program } from '../program.ts';
 
 const FAINT = 0.22;
 
 export const penProgram = {
-    id: 'pen',
-    inputs: { playback: playbackInput, ...penInputs },
-    title: 'pen',
-    category: 'make',
-    icon: 'M4 20 C8 8 12 16 15 9 S 19 6 20 4 M17 3 L21 7',
+    ...declarations.pen,
     size: { width: 380, height: 480 },
     minimum: { width: 280, height: 360 },
     launch: async () => {
