@@ -43,9 +43,24 @@ at 41% and running off the screen at 100%.
 ### In order
 
 - **Graphs you can hold.** Placing a blueprint flies the camera to fit what
-  was placed. Any window folds to its title row, its pins still live and its
-  traces still landing, saved with the window. Done when Light band can be
-  folded down to its sketch and plot without losing a sound or a wire.
+  was placed. Any window **folds** to a strip, and a folded window keeps
+  running (a voice sounds, a signal drives), saved with the window and undone
+  like a move. Decided (sketched 2026-11-19):
+    - Every strip is **the same width and height**, whatever the program or its
+      unfolded size: icon, name (cut short when long) and state chip, one line,
+      so folded windows line up uniformly. It folds in place at the window's
+      top-left corner and unfolds to its old frame.
+    - **One bundled jack per side** (the closed group's jack: a second ring
+      behind it), with the number of wired inputs after the name. Every input
+      wire lands on the left bundle, every output leaves the right one. It
+      **never expands on hover**.
+    - Dropping a wire on a bundle connects at once when exactly one input
+      accepts it; otherwise it opens the window's state menu at the inputs
+      that do. Anything else means unfolding.
+    - Folding and unfolding are a chevron in the title strip and a
+      double-click on the title.
+      Done when Light band can be folded down to its sketch and plot without
+      losing a sound or a wire.
 - **A first run that invites.** An empty canvas offers the starters as quiet
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
