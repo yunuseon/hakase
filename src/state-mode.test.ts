@@ -587,3 +587,79 @@ describe('sources of another type', () => {
         expect(sparkOf([3, 3])).toBe('M0.0 8.0 L48.0 8.0');
     });
 });
+
+describe('a folded window', () => {
+    const sketchLaunch: WorkspaceAction = {
+        kind: 'launch',
+        program: 'sketch',
+        size: { width: 320, height: 420 },
+        viewport,
+    };
+    const signals = new Map([['signal', defaultSignal]]);
+    const foldedSketch = () => {
+        const opened = run([sketchLaunch, launch]);
+        const sketch = opened.processes.find(({ program }) => program === 'sketch');
+        if (sketch === undefined) throw new Error('No sketch');
+        const workspace = reduceWorkspace(opened, { kind: 'fold', id: sketch.id }, inputsFor);
+        return { workspace, sketch };
+    };
+
+    it('bundles every input on one jack on its left edge, which never opens', () => {
+        const { workspace, sketch } = foldedSketch();
+        const session = { ...on, open: [groupKey(sketch.id, 'Knobs')] };
+        const view = wiringOf(workspace, signals, inputsFor, session, 1);
+        const groups = view?.groups.filter(row => row.window === sketch.id) ?? [];
+        const shown = view?.sockets.filter(s => s.window === sketch.id && !s.hidden) ?? [];
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0]).toMatchObject({ folded: true, open: false, side: 'left' });
+        expect(groups[0]?.total).toBe(
+            view?.sockets.filter(s => s.window === sketch.id && s.side === 'left').length,
+        );
+        expect(shown.every(socket => socket.side === 'right')).toBe(true);
+        expect(
+            commandFor(view, { kind: 'toggle', group: groupKey(sketch.id, 'inputs') }),
+        ).toBeNull();
+    });
+
+    it('takes a dropped wire into the one input that accepts it, or opens its menu', () => {
+        const { workspace, sketch } = foldedSketch();
+        const view = wiringOf(workspace, signals, inputsFor, on, 1);
+        const signalWindow = workspace.processes.find(({ program }) => program === 'signal');
+        const signal = view?.sockets.find(
+            socket => socket.end.kind === 'store' && socket.window === signalWindow?.id,
+        );
+        if (signal === undefined) throw new Error('No signal output');
+        const drop = commandFor(view, {
+            kind: 'drop',
+            group: groupKey(sketch.id, 'inputs'),
+            from: signal.key,
+        });
+
+        expect(drop).toEqual({ kind: 'manage', window: sketch.id });
+    });
+
+    it('wires a drop straight in when only one input takes it', () => {
+        const opened = run([
+            { kind: 'launch', program: 'focus', size: { width: 260, height: 340 }, viewport },
+            { kind: 'launch', program: 'agenda', size: { width: 320, height: 460 }, viewport },
+        ]);
+        const focus = opened.processes.find(({ program }) => program === 'focus');
+        const agenda = opened.processes.find(({ program }) => program === 'agenda');
+        if (focus === undefined || agenda === undefined) throw new Error('Missing windows');
+        const workspace = reduceWorkspace(opened, { kind: 'fold', id: focus.id }, inputsFor);
+        const view = wiringOf(workspace, new Map(), inputsFor, on, 1);
+        const output = view?.sockets.find(
+            socket => socket.end.kind === 'store' && socket.window === agenda.id,
+        );
+        if (output === undefined) throw new Error('No agenda output');
+
+        expect(
+            commandFor(view, {
+                kind: 'drop',
+                group: groupKey(focus.id, 'inputs'),
+                from: output.key,
+            }),
+        ).toMatchObject({ kind: 'wire' });
+    });
+});

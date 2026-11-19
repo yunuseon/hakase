@@ -182,6 +182,7 @@ const GroupPill = (props: { readonly group: GroupRow }) =>
         data-group=${ifDefined(props.group.key)}
         data-side=${ifDefined(props.group.side)}
         data-bound=${ifDefined(props.group.bound > 0 ? '' : undefined)}
+        ?data-folded=${props.group.folded}
         style=${styleMap({
             left: `${props.group.x}px`,
             top: `${props.group.y}px`,
@@ -345,12 +346,13 @@ export class HksStateWiring extends HTMLElement {
             ),
             this.drags$.pipe(
                 mergeMap((drag): WiringEvent[] =>
-                    drag.phase === 'release' &&
-                    !drag.cancelled &&
-                    drag.start !== null &&
-                    drag.over !== null
-                        ? [{ kind: 'drag', from: drag.start, to: drag.over }]
-                        : [],
+                    drag.phase !== 'release' || drag.cancelled || drag.start === null
+                        ? []
+                        : drag.over !== null
+                          ? [{ kind: 'drag', from: drag.start, to: drag.over }]
+                          : drag.group !== null
+                            ? [{ kind: 'drop', from: drag.start, group: drag.group }]
+                            : [],
                 ),
             ),
             this.drags$.pipe(

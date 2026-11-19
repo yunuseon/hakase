@@ -58,12 +58,14 @@ export const liveProcess$ = (
             distinctUntilChanged(),
         );
         const view$ = combineLatest([self.slot$, selected$, receded$]).pipe(
-            map(([{ frame, focused }, selected, receded]): WindowView => ({
+            map(([{ frame, focused, folded, wired }, selected, receded]): WindowView => ({
                 kind: 'floating',
                 frame,
                 focused,
                 selected,
                 receded,
+                folded,
+                wired,
             })),
         );
 

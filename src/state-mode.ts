@@ -158,6 +158,14 @@ const behindWindow = (index: number) => windowZ(index) - 1;
 
 const TAB_WIDTH = 150;
 
+export const wiredCount = (
+    linked: ReadonlyMap<string, Linked>,
+    process: { readonly store: string; readonly follows: Bindings },
+): number =>
+    Object.entries(process.follows).filter(([name]) => name !== 'playback').length +
+    Object.values(linked.get(process.store)?.sources ?? {}).filter(source => source !== null)
+        .length;
+
 const readsFrom = (
     linked: ReadonlyMap<string, Linked>,
     process: { readonly store: string; readonly follows: Bindings },
@@ -248,32 +256,47 @@ export const wiringOf = (
         const membersOf = (group: string) => names.filter(name => groupOf(name) === group);
         const open = openGroupIn(session, process.id);
 
-        const rows = names.flatMap((name): Row[] => {
-            const group = groupOf(name);
-
-            if (group === null || membersOf(group).length < 2) {
-                return [{ kind: 'input', name, group: null }];
-            }
-
-            const key = groupKey(process.id, group);
-
-            return membersOf(group)[0] !== name
+        const folded = process.folded === true;
+        const bundled: Row[] =
+            names.length === 0
                 ? []
                 : [
-                      { kind: 'group', key, title: group, members: membersOf(group) },
-                      ...(open === key
-                          ? membersOf(group).map((member): Row => ({
-                                kind: 'input',
-                                name: member,
-                                group: key,
-                            }))
-                          : []),
+                      {
+                          kind: 'group',
+                          key: groupKey(process.id, 'inputs'),
+                          title: 'inputs',
+                          members: names,
+                      },
                   ];
-        });
+        const rows = folded
+            ? bundled
+            : names.flatMap((name): Row[] => {
+                  const group = groupOf(name);
+
+                  if (group === null || membersOf(group).length < 2) {
+                      return [{ kind: 'input', name, group: null }];
+                  }
+
+                  const key = groupKey(process.id, group);
+
+                  return membersOf(group)[0] !== name
+                      ? []
+                      : [
+                            { kind: 'group', key, title: group, members: membersOf(group) },
+                            ...(open === key
+                                ? membersOf(group).map((member): Row => ({
+                                      kind: 'input',
+                                      name: member,
+                                      group: key,
+                                  }))
+                                : []),
+                        ];
+              });
         const pitch = rowHeight + 2 * unit;
         const clearance = (touch ? 56 : 40) * unit;
         const width = TAB_WIDTH * unit;
-        const rowAt = (row: number) => frame.y + clearance + row * pitch;
+        const rowAt = (row: number) =>
+            folded ? frame.y + (frame.height - rowHeight) / 2 : frame.y + clearance + row * pitch;
         const menu = { above: false, height: 160 * unit };
         const inputAt = (index: number) => ({ x: frame.x - width + 10 * unit, y: rowAt(index) });
         const outputAt = (index: number) => ({
@@ -449,7 +472,7 @@ export const wiringOf = (
                 return { sockets: [socketOf(row.name, row.group, at)], groups: [] };
             }
 
-            const collapsed = open !== row.key;
+            const collapsed = folded || open !== row.key;
             // A closed group's members still exist, drawn at its jack, so wires into them land somewhere.
             const members = collapsed
                 ? row.members.map(name => ({
@@ -461,7 +484,7 @@ export const wiringOf = (
                 : [];
             const bound = row.members
                 .map(name => socketOf(name, row.key, at))
-                .filter(socket => socket.current !== '');
+                .filter(socket => socket.current !== '' && !(folded && socket.type === 'clock'));
 
             return {
                 sockets: members,
@@ -480,6 +503,7 @@ export const wiringOf = (
                         total: row.members.length,
                         colour: bound[0]?.colour ?? 'var(--muted)',
                         members: row.members.map(name => `${process.id}:input:${name}`),
+                        folded,
                     } satisfies GroupRow,
                 ],
             };
@@ -488,7 +512,11 @@ export const wiringOf = (
         const all = [
             ...output,
             ...placed.flatMap(entry => entry.sockets),
-            ...(box === undefined ? [] : pinSockets(box)),
+            ...(box === undefined
+                ? []
+                : pinSockets(box).map(socket =>
+                      folded && socket.side === 'left' ? { ...socket, hidden: true } : socket,
+                  )),
         ];
         const kept = whole(process)
             ? all

@@ -40,6 +40,7 @@ import type { SeamView } from './layout/seams.ts';
 import type { SectionGesture } from './layout/sections.ts';
 import { isEdge, type Edge, type Placement } from './layout/toolbar.ts';
 import {
+    FOLDED,
     frameFrom,
     moved,
     resized,
@@ -68,6 +69,7 @@ type ProcessBase = {
     readonly frame: Frame;
     readonly store: StoreId;
     readonly measured: Size;
+    readonly folded?: true;
 };
 
 type ProcessOf<K extends ProgramId> = ProcessBase & {
@@ -320,12 +322,17 @@ const SNAP_REACH = 10;
 const TOUCHING = 0.5;
 const MIN_SEAM = 24;
 
-export const boxOf = ({ frame, measured }: Process): Rect => ({
+export const openBoxOf = ({ frame, measured }: Process): Rect => ({
     x: frame.x,
     y: frame.y,
     width: measured.width,
     height: measured.height,
 });
+
+export const boxOf = (process: Process): Rect =>
+    process.folded === true
+        ? { x: process.frame.x, y: process.frame.y, ...FOLDED }
+        : openBoxOf(process);
 
 const overlap = (start: number, end: number, otherStart: number, otherEnd: number): number =>
     Math.min(end, otherEnd) - Math.max(start, otherStart);
@@ -418,6 +425,8 @@ export const groupOf = (links: readonly Link[], id: ProcessId): ReadonlySet<Proc
 const sameLink = (link: Link, a: ProcessId, b: ProcessId): boolean =>
     (link.a === a && link.b === b) || (link.a === b && link.b === a);
 
+const unfolded = ({ folded: _, ...process }: Process): Process => process;
+
 const touching = (processes: readonly Process[], { a, b }: Link): boolean => {
     const first = processes.find(({ id }) => id === a);
     const second = processes.find(({ id }) => id === b);
@@ -425,7 +434,7 @@ const touching = (processes: readonly Process[], { a, b }: Link): boolean => {
     return (
         first !== undefined &&
         second !== undefined &&
-        seamBetween(boxOf(first), boxOf(second)) !== null
+        seamBetween(openBoxOf(first), openBoxOf(second)) !== null
     );
 };
 
@@ -986,15 +995,32 @@ const step = (
         }
         case 'toggle-link':
             return { ...workspace, links: toggledLink(workspace, action.a, action.b) };
-        case 'measure':
+        case 'fold':
             return {
                 ...workspace,
+                drift: null,
                 processes: workspace.processes.map(process =>
-                    process.id === action.id
-                        ? { ...process, measured: { width: action.width, height: action.height } }
-                        : process,
+                    process.id !== action.id
+                        ? process
+                        : process.folded === true
+                          ? unfolded(process)
+                          : { ...process, folded: true },
                 ),
             };
+        case 'measure':
+            return workspace.processes.some(({ id, folded }) => id === action.id && folded)
+                ? workspace
+                : {
+                      ...workspace,
+                      processes: workspace.processes.map(process =>
+                          process.id === action.id
+                              ? {
+                                    ...process,
+                                    measured: { width: action.width, height: action.height },
+                                }
+                              : process,
+                      ),
+                  };
         case 'quit':
             return {
                 ...workspace,
@@ -1035,14 +1061,16 @@ const step = (
         case 'resize': {
             const { zoom } = workspace.camera;
 
-            return resizedToNeighbours(
-                workspace,
-                action.id,
-                action.edge,
-                action.minimum,
-                action.dx / zoom,
-                action.dy / zoom,
-            );
+            return workspace.processes.some(({ id, folded }) => id === action.id && folded)
+                ? workspace
+                : resizedToNeighbours(
+                      workspace,
+                      action.id,
+                      action.edge,
+                      action.minimum,
+                      action.dx / zoom,
+                      action.dy / zoom,
+                  );
         }
     }
 };
@@ -1197,6 +1225,7 @@ export const processFrom = (value: unknown, inputsFor: InputsFor): Draft | null 
                   ? value.id
                   : program),
         measured: { width: measured.width, height: measured.height },
+        ...('folded' in value && value.folded === true ? { folded: true as const } : {}),
     };
 };
 
@@ -1550,7 +1579,10 @@ export const seamsOf = ({ processes, links }: Workspace): readonly SeamView[] =>
         const first = processes[p];
         const second = processes[q];
         const seam =
-            first === undefined || second === undefined
+            first === undefined ||
+            second === undefined ||
+            first.folded === true ||
+            second.folded === true
                 ? null
                 : seamBetween(boxOf(first), boxOf(second));
 
@@ -1583,6 +1615,7 @@ export const stepOf = (action: WorkspaceAction): Step | null => {
             return { key: `${action.kind}:${action.id}`, joins: true };
         case 'launch':
         case 'quit':
+        case 'fold':
         case 'close-others':
         case 'close-selection':
         case 'toggle-link':
@@ -1620,6 +1653,10 @@ export const labelOf = (action: WorkspaceAction, before: Workspace): string => {
             return `Opened ${action.program}`;
         case 'quit':
             return `Closed ${programOf(before, action.id)}`;
+        case 'fold':
+            return before.processes.some(({ id, folded }) => id === action.id && folded)
+                ? `Unfolded ${programOf(before, action.id)}`
+                : `Folded ${programOf(before, action.id)}`;
         case 'close-others':
             return 'Closed all other windows';
         case 'close-selection':

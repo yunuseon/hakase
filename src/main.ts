@@ -33,7 +33,7 @@ const bootstrap = () => {
     });
 
     const selection = selectionOf({ ...chrome, ...intents, ...core, signals$, inputs$ });
-    const navigation = navigationOf({ ...chrome, ...intents, ...core, inputs$ });
+    const navigation = navigationOf({ ...chrome, ...intents, ...core, ...selection, inputs$ });
     const stateMode = stateModeOf({ ...chrome, ...core, signals$ });
     const previews = previewsOf({ ...chrome, ...stateMode, ...core });
     const sound = soundOf({ ...chrome, inputs$ });

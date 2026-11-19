@@ -562,3 +562,7 @@ path.shared {
 .group[data-compatible] .pill {
     opacity: 1;
 }
+
+.group[data-folded] .chevron {
+    display: none;
+}

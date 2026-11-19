@@ -16,12 +16,19 @@ import { boxOf, type WorkspaceAction } from '../workspace.ts';
 import type { Chrome } from './chrome.graph.ts';
 import type { Intents } from './intents.graph.ts';
 import type { Projections } from './projections.graph.ts';
+import type { Selection } from './selection.graph.ts';
+import { blueprintIn } from '../starters.ts';
+import { footprintAt } from '../placing.ts';
+import type { Rect } from '../shared/camera.ts';
 
-type Jump = { readonly kind: 'section' | 'window'; readonly id: string };
+type Jump =
+    | { readonly kind: 'section' | 'window'; readonly id: string }
+    | { readonly kind: 'area'; readonly rect: Rect };
 
 type Reads = Pick<Chrome, 'canvas' | 'navigator'> &
     Pick<Intents, 'picked$' | 'zoomSteps$'> &
-    Pick<Projections, 'workspace$'> & { readonly inputs$: Observable<AppSignal> };
+    Pick<Projections, 'workspace$' | 'blueprints$'> &
+    Pick<Selection, 'placing$'> & { readonly inputs$: Observable<AppSignal> };
 
 export const navigationOf = ({
     canvas,
@@ -29,6 +36,8 @@ export const navigationOf = ({
     picked$,
     zoomSteps$,
     workspace$,
+    blueprints$,
+    placing$,
     inputs$,
 }: Reads) => {
     const interrupted$ = merge(canvas.gestures$, zoomSteps$);
@@ -38,8 +47,22 @@ export const navigationOf = ({
         share(),
     );
 
+    const placed$ = placing$.pipe(
+        mergeMap(placing => (placing.mode === 'dropped' ? [placing] : [])),
+        withLatestFrom(blueprints$, workspace$),
+        mergeMap(([{ blueprint, at }, blueprints, { camera }]): Jump[] => {
+            const chosen =
+                typeof blueprint === 'string' ? blueprintIn(blueprints, blueprint) : blueprint;
+
+            return chosen === undefined
+                ? []
+                : [{ kind: 'area', rect: footprintAt(chosen.size, at, camera) }];
+        }),
+    );
+
     const jumps$: Observable<Jump> = merge(
         located$.pipe(map((id): Jump => ({ kind: 'window', id }))),
+        placed$,
         merge(
             navigator.jumps$,
             picked$.pipe(mergeMap(picked => (picked.kind === 'section' ? of(picked.id) : EMPTY))),
@@ -62,19 +85,23 @@ export const navigationOf = ({
     const flights$: Observable<WorkspaceAction> = jumps$.pipe(
         withLatestFrom(workspace$, viewport$),
         mergeMap(([jump, { sections: all, processes, camera }, viewport]) => {
-            const section = all.find(
-                candidate => jump.kind === 'section' && candidate.id === jump.id,
-            );
-            const process = processes.find(
-                candidate => jump.kind === 'window' && candidate.id === jump.id,
-            );
-            // At 100% unless the window would not fit: where the view stood says nothing about how to read it.
+            const section =
+                jump.kind === 'section'
+                    ? all.find(candidate => candidate.id === jump.id)
+                    : undefined;
+            const process =
+                jump.kind === 'window'
+                    ? processes.find(candidate => candidate.id === jump.id)
+                    : undefined;
+            // At 100% unless it would not fit: where the view stood says nothing about how to read it.
             const target =
-                section !== undefined
-                    ? fitted(section.rects, viewport)
-                    : process !== undefined
-                      ? centredOn(IDENTITY, boxOf(process), viewport)
-                      : null;
+                jump.kind === 'area'
+                    ? centredOn(IDENTITY, jump.rect, viewport)
+                    : section !== undefined
+                      ? fitted(section.rects, viewport)
+                      : process !== undefined
+                        ? centredOn(IDENTITY, boxOf(process), viewport)
+                        : null;
 
             return target === null ? EMPTY : of(flight(camera, target, viewport));
         }),

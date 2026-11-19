@@ -271,6 +271,8 @@ export const programDemo = (
         slot$: of({
             frame: { x: 0, y: 0, z: 1, width: program.size.width, height: program.size.height },
             focused: true,
+            folded: false,
+            wired: 0,
         }),
         store$: of('storybook-preview'),
         clock$: of(null),

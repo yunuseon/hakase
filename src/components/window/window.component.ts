@@ -45,6 +45,7 @@ import { fromDocumentEvent$, fromElementEvent$, observeResize$ } from '../../lib
 import { pointerDelta$ } from '../../shared/drag.ts';
 import {
     RESIZE_EDGES,
+    FOLDED,
     opensAbove,
     tooSmall,
     type ResizeEdge,
@@ -96,9 +97,19 @@ const TEMPLATE = () =>
                 aria-expanded="false"
                 title="change program"
             ></button
-            ><slot name="actions"></slot
+            ><span class="wired" aria-label="wired inputs"></span><slot name="actions"></slot
             ><button class="store" type="button" aria-haspopup="true" aria-expanded="false" hidden>
                 <span class="dot"></span><span class="store-name"></span></button
+            ><button
+                class="ui-icon fold"
+                type="button"
+                aria-label="fold"
+                aria-pressed="false"
+                title="Fold to a strip (double-click the title)"
+            >
+                <svg viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M3.5 5 L6 7.5 L8.5 5"></path>
+                </svg></button
             ><button class="ui-icon close" type="button" aria-label="quit">
                 <svg viewBox="0 0 12 12" aria-hidden="true">
                     <path d="M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5"></path>
@@ -403,7 +414,9 @@ const sameView = (a: WindowView, b: WindowView): boolean =>
     a.frame === b.frame &&
     a.focused === b.focused &&
     a.selected === b.selected &&
-    a.receded === b.receded;
+    a.receded === b.receded &&
+    a.folded === b.folded &&
+    a.wired === b.wired;
 
 export class HksWindow extends HTMLElement {
     readonly gestures$: Observable<WindowGesture>;
@@ -637,7 +650,21 @@ export class HksWindow extends HTMLElement {
                 map((): WindowGesture => ({ kind: 'raise' })),
             ),
             // The button sits inside the drag handle; its press must not also drag.
-            fromElementEvent$(requireChild(shadow, '.close'), 'pointerdown').pipe(
+            fromElementEvent$(requireChild(shadow, '.fold'), 'click').pipe(
+                map((): WindowGesture => ({ kind: 'fold' })),
+            ),
+            fromElementEvent$(requireChild(shadow, '.title'), 'dblclick').pipe(
+                filter(({ target }) =>
+                    target instanceof Element
+                        ? target.closest('.store, .close, .fold, slot') === null
+                        : true,
+                ),
+                map((): WindowGesture => ({ kind: 'fold' })),
+            ),
+            merge(
+                fromElementEvent$(requireChild(shadow, '.close'), 'pointerdown'),
+                fromElementEvent$(requireChild(shadow, '.fold'), 'pointerdown'),
+            ).pipe(
                 tap(event => {
                     event.stopPropagation();
                 }),
@@ -962,24 +989,43 @@ export class HksWindow extends HTMLElement {
                 ),
                 view$.pipe(
                     distinctUntilChanged(sameView),
-                    tap(({ kind, frame, focused, selected = false, receded = false }) => {
-                        this.toggleAttribute('data-receded', receded);
-                        this.toggleAttribute('data-focused', focused);
-                        this.toggleAttribute('data-selected', selected);
-                        this.toggleAttribute('data-fitted', kind === 'fitted');
-                        this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
-                        this.style.zIndex = frame.z.toFixed(0);
+                    tap(
+                        ({
+                            kind,
+                            frame,
+                            focused,
+                            selected = false,
+                            receded = false,
+                            folded = false,
+                            wired = 0,
+                        }) => {
+                            this.toggleAttribute('data-folded', folded);
+                            requireChild(this.shadow, '.fold').setAttribute(
+                                'aria-pressed',
+                                String(folded),
+                            );
+                            requireChild(this.shadow, '.wired').textContent =
+                                folded && wired > 0 ? String(wired) : '';
+                            this.toggleAttribute('data-receded', receded);
+                            this.toggleAttribute('data-focused', focused);
+                            this.toggleAttribute('data-selected', selected);
+                            this.toggleAttribute('data-fitted', kind === 'fitted');
+                            this.style.transform = `translate(${frame.x.toFixed(0)}px, ${frame.y.toFixed(0)}px)`;
+                            this.style.zIndex = frame.z.toFixed(0);
 
-                        if (kind === 'fitted') {
-                            this.style.removeProperty('width');
-                            this.style.removeProperty('height');
+                            if (kind === 'fitted') {
+                                this.style.removeProperty('width');
+                                this.style.removeProperty('height');
 
-                            return;
-                        }
+                                return;
+                            }
 
-                        this.style.width = `${frame.width.toFixed(0)}px`;
-                        this.style.height = `${frame.height.toFixed(0)}px`;
-                    }),
+                            this.style.setProperty('--open-width', `${frame.width.toFixed(0)}px`);
+                            this.style.setProperty('--open-height', `${frame.height.toFixed(0)}px`);
+                            this.style.width = `${(folded ? FOLDED.width : frame.width).toFixed(0)}px`;
+                            this.style.height = `${(folded ? FOLDED.height : frame.height).toFixed(0)}px`;
+                        },
+                    ),
                 ),
             ).pipe(map(() => undefined)),
         );

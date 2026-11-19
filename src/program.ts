@@ -147,6 +147,8 @@ export const seenBy =
 export type Slot = {
     readonly frame: Frame;
     readonly focused: boolean;
+    readonly folded: boolean;
+    readonly wired: number;
 };
 
 export type Self = {

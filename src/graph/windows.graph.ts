@@ -15,7 +15,7 @@ import type { FollowGroup, StoreOption, SwitchGroup, SwitchItem } from '../layou
 import { inputGroups } from '../input-connections.ts';
 import { followedStores, playbackBinding, type Bindings, type PlaybackBinding } from '../inputs.ts';
 import { liveProcess$, type ProcessSignal } from '../process.ts';
-import { windowZ } from '../state-mode.ts';
+import { windowZ, wiredCount } from '../state-mode.ts';
 import { type Slot } from '../program.ts';
 import { CATEGORIES, type ProcessId } from '../protocol.ts';
 import { inputsFor } from '../declarations.ts';
@@ -30,8 +30,13 @@ import type { Projections } from './projections.graph.ts';
 import type { Selection } from './selection.graph.ts';
 import type { StateMode } from './state-mode.graph.ts';
 
-const sameSlot = ({ frame: a, focused }: Slot, { frame: b, focused: other }: Slot): boolean =>
+const sameSlot = (
+    { frame: a, focused, folded, wired }: Slot,
+    { frame: b, focused: other, folded: was, wired: had }: Slot,
+): boolean =>
     focused === other &&
+    folded === was &&
+    wired === had &&
     a.x === b.x &&
     a.y === b.y &&
     a.z === b.z &&
@@ -95,17 +100,22 @@ export const windowsOf = ({
         );
 
     const slotOf = (entry$: Observable<Entry>): Observable<Slot> =>
-        entry$.pipe(
-            map(({ process, index, last }) => ({
+        combineLatest([entry$, links$.pipe(map(({ linked }) => linked))]).pipe(
+            map(([{ process, index, last }, linked]) => ({
                 frame: { ...process.frame, z: windowZ(index) },
                 focused: index === last,
+                folded: process.folded === true,
+                wired: wiredCount(linked, process),
             })),
             distinctUntilChanged(sameSlot),
         );
 
     const shownOf = (entry$: Observable<Entry>): Observable<boolean> =>
         combineLatest([entry$, camera$, viewport$]).pipe(
-            map(([{ process }, camera, viewport]) => onScreen(boxOf(process), camera, viewport)),
+            map(
+                ([{ process }, camera, viewport]) =>
+                    process.folded !== true && onScreen(boxOf(process), camera, viewport),
+            ),
             distinctUntilChanged(),
         );
 

@@ -1029,3 +1029,81 @@ describe('many windows', () => {
         expect(ordinals).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     });
 });
+
+describe('folding a window', () => {
+    const initial = defaultWorkspace(viewport, inputsFor);
+    const workspace = {
+        ...initial,
+        processes: initial.processes.map((process, i) => ({
+            ...process,
+            frame: { x: i * 200, y: 0, z: 0, width: 200, height: 300 },
+            measured: { width: 200, height: 300 },
+        })),
+    };
+    const first = workspace.processes[0]?.id ?? '';
+    const second = workspace.processes[1]?.id ?? '';
+    const attached = { ...workspace, links: [{ a: first, b: second }] };
+    const fold: WorkspaceAction = { kind: 'fold', id: first };
+
+    it('becomes the one strip every folded window is, and unfolds to the box it had', () => {
+        const folded = reduceWorkspace(workspace, fold, inputsFor);
+        const window = folded.processes.find(({ id }) => id === first);
+
+        expect(window === undefined ? null : boxOf(window)).toEqual({
+            x: 0,
+            y: 0,
+            width: 208,
+            height: 40,
+        });
+
+        const back = reduceWorkspace(folded, fold, inputsFor).processes.find(
+            ({ id }) => id === first,
+        );
+
+        expect(back === undefined ? null : boxOf(back)).toEqual({
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 300,
+        });
+        expect(back?.folded).toBeUndefined();
+    });
+
+    it('stays attached to what it was attached to, and refuses a resize', () => {
+        const folded = reduceWorkspace(attached, fold, inputsFor);
+
+        expect(folded.links).toEqual([{ a: first, b: second }]);
+        expect(
+            reduceWorkspace(
+                folded,
+                {
+                    kind: 'resize',
+                    id: first,
+                    edge: 'e',
+                    dx: 40,
+                    dy: 0,
+                    minimum: { width: 100, height: 100 },
+                },
+                inputsFor,
+            ),
+        ).toBe(folded);
+        expect(seamsOf(folded).filter(({ a, b }) => a === first || b === first)).toEqual([]);
+    });
+
+    it('keeps the size it unfolds to while laid out as a strip, and reads back folded', () => {
+        const folded = reduceWorkspace(workspace, fold, inputsFor);
+
+        expect(
+            reduceWorkspace(
+                folded,
+                { kind: 'measure', id: first, width: 208, height: 40 },
+                inputsFor,
+            ),
+        ).toBe(folded);
+        expect(labelOf(fold, workspace)).toMatch(/^Folded /);
+        expect(labelOf(fold, folded)).toMatch(/^Unfolded /);
+        expect(
+            parseWorkspace(JSON.parse(JSON.stringify(folded)), inputsFor)?.processes[0]?.folded,
+        ).toBe(true);
+    });
+});

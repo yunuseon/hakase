@@ -51,6 +51,7 @@ export type GroupRow = {
     readonly total: number;
     readonly colour: string;
     readonly members: readonly string[];
+    readonly folded: boolean;
 };
 
 const GROUP = ':group:';
@@ -88,6 +89,7 @@ export type WiringEvent =
     | { readonly kind: 'drag'; readonly from: string; readonly to: string }
     | { readonly kind: 'toggle'; readonly group: string }
     | { readonly kind: 'hover'; readonly group: string; readonly from: string }
+    | { readonly kind: 'drop'; readonly group: string; readonly from: string }
     | { readonly kind: 'land'; readonly to: string | null };
 
 export const anchorOf = (socket: Socket, unit: number, rowHeight = 28 * unit) => ({
@@ -167,27 +169,43 @@ export const commandFor = (view: WiringView | null, event: WiringEvent): WiringC
     const socketAt = (key: string | null) => view.sockets.find(socket => socket.key === key);
     const groupAt = (key: string) => view.groups.find(group => group.key === key);
 
+    const takers = (group: GroupRow, from: Socket) =>
+        group.members.flatMap(key => {
+            const member = socketAt(key);
+            const command = member === undefined ? null : connectionOf(from, member);
+
+            return command === null ? [] : [command];
+        });
+
     if (event.kind === 'toggle') {
         const group = groupAt(event.group);
 
-        return group === undefined ? null : { kind: 'expand', key: group.key, open: !group.open };
+        return group === undefined || group.folded
+            ? null
+            : { kind: 'expand', key: group.key, open: !group.open };
     }
 
     if (event.kind === 'hover') {
         const group = groupAt(event.group);
         const from = socketAt(event.from);
-        const takes =
-            group !== undefined &&
-            from !== undefined &&
-            group.members.some(key => {
-                const member = socketAt(key);
+        const takes = group !== undefined && from !== undefined && takers(group, from).length > 0;
 
-                return member !== undefined && connectionOf(from, member) !== null;
-            });
-
-        return group === undefined || !takes || group.open
+        return group === undefined || !takes || group.open || group.folded
             ? null
             : { kind: 'spring', key: group.key };
+    }
+
+    if (event.kind === 'drop') {
+        const group = groupAt(event.group);
+        const from = socketAt(event.from);
+        const commands = group === undefined || from === undefined ? [] : takers(group, from);
+        const [only] = commands;
+
+        return group === undefined || !group.folded || commands.length === 0
+            ? null
+            : commands.length === 1 && only !== undefined
+              ? { kind: 'wire', command: only }
+              : { kind: 'manage', window: group.window };
     }
 
     if (event.kind === 'land') {
@@ -296,6 +314,7 @@ const sameGroup = (a: GroupRow, b: GroupRow) =>
     a.bound === b.bound &&
     a.total === b.total &&
     a.colour === b.colour &&
+    a.folded === b.folded &&
     a.members.join() === b.members.join();
 
 export const sameWiring = (a: WiringView | null, b: WiringView | null) =>

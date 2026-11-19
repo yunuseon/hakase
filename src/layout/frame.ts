@@ -24,6 +24,8 @@ export type WindowView = {
     readonly focused: boolean;
     readonly selected?: boolean;
     readonly receded?: boolean;
+    readonly folded?: boolean;
+    readonly wired?: number;
 };
 
 export type StoreOption = {
@@ -72,6 +74,7 @@ export type WindowGesture =
       }
     | { readonly kind: 'raise' }
     | { readonly kind: 'quit' }
+    | { readonly kind: 'fold' }
     | { readonly kind: 'measure'; readonly width: number; readonly height: number }
     | { readonly kind: 'bind-store'; readonly store: string }
     | { readonly kind: 'add-store'; readonly copy: boolean }
@@ -167,3 +170,5 @@ export const frameFrom = (value: unknown): Frame | null => {
 
     return { x, y, z, width, height };
 };
+
+export const FOLDED: Size = { width: 208, height: 40 };

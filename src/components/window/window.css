@@ -109,7 +109,8 @@
     cursor: grabbing;
 }
 
-.close {
+.close,
+.fold {
     display: flex;
     flex: none;
     align-items: center;
@@ -126,8 +127,8 @@
     transition: opacity var(--duration-quick) var(--ease-out);
 }
 
-:host(:hover) .close,
-.close:focus-visible {
+:host(:hover) :is(.close, .fold),
+:is(.close, .fold):focus-visible {
     opacity: 1;
 }
 
@@ -147,7 +148,12 @@ slot[name='actions']::slotted([data-open]) {
     background: var(--accent);
 }
 
-.close svg {
+.fold:hover {
+    color: var(--ink);
+}
+
+.close svg,
+.fold svg {
     inline-size: var(--space-2-5);
     block-size: var(--space-2-5);
     fill: none;
@@ -247,6 +253,7 @@ slot[name='actions']::slotted([data-open]) {
 
 @media (any-pointer: coarse) {
     .close,
+    .fold,
     slot[name='actions']::slotted(*) {
         opacity: 1;
     }
@@ -782,4 +789,47 @@ input.option-name:focus-visible {
 :host([data-receded]) .body {
     opacity: 0.4;
     filter: grayscale(0.6);
+}
+
+.fold svg {
+    transition: rotate var(--duration-quick) var(--ease-out);
+}
+
+.wired {
+    flex: none;
+    font: var(--text-xs) var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+
+.wired:empty {
+    display: none;
+}
+
+/* A strip: the body stays laid out at the size it unfolds to, hidden, so its program never sees a resize. */
+:host([data-folded]) .body {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    inline-size: var(--open-width);
+    block-size: var(--open-height);
+    box-sizing: border-box;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+:host([data-folded]) .handle {
+    display: none;
+}
+
+:host([data-folded]) .fold svg {
+    rotate: -90deg;
+}
+
+.name:has(+ .wired:not(:empty)) {
+    margin-inline-end: 0;
+}
+
+.wired:not(:empty) {
+    margin-inline-end: auto;
 }

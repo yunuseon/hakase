@@ -1433,6 +1433,36 @@ the deltas. Pairing has to happen _inside_ the gesture; pairing the flattened
 stream would make the first move of each drag jump from wherever the last one
 ended.
 
+**Any window folds to a strip.** The chevron beside close, or a double-click
+on the title, folds it (`fold`, a step of its own, saved as `folded` on the
+process); the same unfolds it to the frame it had. Every strip is the same
+208 × 40 (`FOLDED`), whatever the program, so folded windows line up
+uniformly: icon, name, how many inputs are wired (`wiredCount`: follows and
+store links, the clock aside, since almost every window has one), the state
+chip down to its dot, chevron and close. Five choices hold it together:
+
+- **Two boxes.** `boxOf` is what is on screen, the strip while folded, and
+  snapping, fit, the minimap, selection and `onScreen` read it; `openBoxOf`
+  is the unfolded box, which link pruning reads, so a fold never detaches a
+  window from its group. Seams are not drawn on a strip, and a strip refuses
+  a resize; its `measure` is ignored, so it keeps the size it unfolds to.
+- **The body keeps its size, hidden.** A folded window's body is laid out
+  absolutely at `--open-width` × `--open-height` with `visibility: hidden`, so
+  the program inside never sees a resize (a sketch would reallocate its
+  target for a 40-pixel window), and the strip is only the title.
+- **A folded window does no per-frame work but keeps running.** `shown` is
+  false for it, so its clock is withheld like an off-screen window's, and what
+  it is for runs anyway: sound plays from the stores (see "Voice"), signals
+  and gates are documents that their followers evaluate.
+- **One bundled jack per side.** `wiringOf` lays every input of a folded
+  window into one group row (`folded` on the `GroupRow`), centred on the
+  strip's left edge, with every member a hidden socket on it so each wire
+  still lands; outputs sit on the right edge at the same height. The bundle
+  **never opens**: a toggle and a drag's spring both pass it by.
+- **A wire dropped on a bundle** (`drop`, a release over a group rather than a
+  socket) connects at once when exactly one input takes it, and otherwise
+  opens the window's state menu (`manage`) to choose among them.
+
 **Windows snap and attach.** Dragging a window within 10 screen pixels of
 another's edge snaps it flush or aligned, and wherever two windows touch,
 `hks-seams` puts a pill on the middle of the shared edge, oriented along it like
@@ -2548,7 +2578,10 @@ in the chrome slot, under the navigator and toolbar so zoom and fit still work,
 taking every other pointer event so nothing beneath is clicked by accident. It
 carries `data-ground`, which the canvas reads as ground, so the wheel still
 pans and zooms while placing. Nothing of it is saved or undone; only the drop
-is a step.
+is a step. **The camera then flies to what was placed** (a paste too): the
+drop's own footprint is a jump (`area` in `navigation.graph.ts`), framed at
+100% unless it would not fit, the way locating a window is, so a blueprint
+larger than the view is seen whole once it lands.
 
 A blueprint from storage is untrusted like the rest of the snapshot:
 `parseBlueprints` reads windows with the workspace's own `processFrom`, stores with
