@@ -27,6 +27,7 @@ const Strip = (strip: StripView) =>
             <span class="meter" aria-hidden="true"><span class="fill"></span></span>
             <input
                 class="ui-range fader"
+                data-orient="vertical"
                 type="range"
                 min="0"
                 max="1"

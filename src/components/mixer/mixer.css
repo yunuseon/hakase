@@ -94,14 +94,6 @@
     border-radius: inherit;
 }
 
-/* Upright: up is louder, as on a desk. */
-.fader {
-    inline-size: auto;
-    block-size: 100%;
-    writing-mode: vertical-lr;
-    direction: rtl;
-}
-
 .value {
     font: 500 var(--text-xs) var(--font-mono);
     font-variant-numeric: tabular-nums;

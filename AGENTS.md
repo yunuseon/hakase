@@ -1076,8 +1076,16 @@ and the existing `data-*` routing keep their browser semantics.
 The shared sheet owns the control face, focus ring, disabled state and colour
 tokens. Component sheets keep layout and specialised widget geometry. Its base
 selectors use `:where` so deliberate local variants remain possible; do not copy
-a primitive's entire CSS to make a variant. Ranges have standard and precision
-variants; colour fields have round and rectangular variants. The shared
+a primitive's entire CSS to make a variant. **Every range looks like the
+timeline's slider**: a rounded track in the well, tinted with the accent up to
+the value, with a 3px accent bar at the value instead of a round thumb. It is
+still a native `<input type="range">` (keyboard, focus, `input` events), drawn
+in CSS alone: the thumb is the bar, and a wide box-shadow behind it, clipped by
+the track, is the fill (`::-moz-range-progress` in Firefox), so nothing in
+script keeps a custom property in step with the value. A precision range is the
+same, shorter; `data-orient="vertical"` stands it upright (the mixer's faders),
+its logical sizes turning with it and only the fill's physical shadow running
+down instead of left. Colour fields have round and rectangular variants. The shared
 `ui-listen` face and `ListenIcon()` serve Voice and Drums. `Icon()` renders action
 paths from `ICONS`; `SymmetryIcon()` marks its SVG with `ui-symmetry-icon` so Paint,
 Pen and the catalogue share its styling.
