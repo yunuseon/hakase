@@ -10,6 +10,7 @@ import { HksVoice } from '../components/voice/voice.component.ts';
 import { voiceCommandOf, voiceSections } from '../components/voice/voice-controls.ts';
 import { defaultVoice, notesOf, reduceVoice, soundingOf } from '../model/voice.ts';
 import { HksDrums } from '../components/drums/drums.component.ts';
+import { drumsCommandOf, drumsSections } from '../components/drums/drums-controls.ts';
 import { defaultDrums, reduceDrums } from '../model/drums.ts';
 import { converterSections, type ConverterControls } from '../components/converter/converter.ts';
 import { HksProperties } from '../shared/ui/properties.component.ts';
@@ -293,30 +294,40 @@ export const controlStories: readonly Story[] = [
         defaults,
         height: 420,
         action: null,
-        code: 'const drums = new HksDrums();\nconst lifetime$ = drums.connect$(pattern$, position$, listening$);\nconst requests$ = drums.changes$;',
+        code: "const drums = new HksDrums();\nconst properties = new HksProperties();\nproperties.slot = 'controls';\ndrums.append(properties);\nconst lifetime$ = merge(drums.connect$(pattern$, position$, listening$), properties.connect$(pattern$.pipe(map(drumsSections))));\nconst commands$ = properties.changes$.pipe(mergeMap(drumsCommandOf));",
         create: ({ args$, variant }) => {
             const element = new HksDrums();
+            const properties = new HksProperties();
+            properties.slot = 'controls';
+            element.append(properties);
             if (variant === 'compact') {
                 element.style.inlineSize = 'min(100%, 240px)';
                 element.style.blockSize = '300px';
             }
             const events$ = element.changes$.pipe(share());
-            const pattern$ = events$.pipe(
-                scan(
-                    (pattern, event) =>
-                        event.kind === 'command' ? reduceDrums(pattern, event.command) : pattern,
-                    defaultDrums,
-                ),
+            const commands$ = merge(
+                events$.pipe(mergeMap(event => (event.kind === 'command' ? [event.command] : []))),
+                properties.changes$.pipe(mergeMap(drumsCommandOf)),
+            ).pipe(share());
+            const pattern$ = commands$.pipe(
+                scan(reduceDrums, defaultDrums),
                 startWith(defaultDrums),
+                shareReplay({ bufferSize: 1, refCount: true }),
             );
             return {
                 element,
-                run$: element.connect$(
-                    pattern$,
-                    args$.pipe(map(args => args.value / 100)),
-                    of(false),
+                run$: merge(
+                    element.connect$(
+                        pattern$,
+                        args$.pipe(map(args => args.value / 100)),
+                        of(false),
+                    ),
+                    properties.connect$(pattern$.pipe(map(drumsSections))),
                 ),
-                events$: events$.pipe(map(event => recorded(event.kind, event))),
+                events$: merge(
+                    events$.pipe(map(event => recorded(event.kind, event))),
+                    commands$.pipe(map(command => recorded('command', command))),
+                ),
             };
         },
     },

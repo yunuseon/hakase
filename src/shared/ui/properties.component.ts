@@ -4,7 +4,16 @@ import { ref } from 'lit-html/directives/ref.js';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
 import { asapScheduler, combineLatest, merge, type Observable } from 'rxjs';
-import { map, mergeMap, observeOn, scan, share, startWith, tap } from 'rxjs/operators';
+import {
+    distinctUntilChanged,
+    map,
+    mergeMap,
+    observeOn,
+    scan,
+    share,
+    startWith,
+    tap,
+} from 'rxjs/operators';
 import { styleSheet } from '../../lib/dom.ts';
 import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
@@ -26,6 +35,17 @@ import css from './properties.css?inline';
 const sheet = styleSheet(css);
 
 type View = { readonly sections: readonly Section[]; readonly open: ReadonlySet<string> };
+
+// Only what changes how wide a row of choices is: a range moving every frame must not measure every frame.
+const layoutKey = (sections: readonly Section[]): string =>
+    sections
+        .flatMap(({ properties }) => properties)
+        .flatMap(property =>
+            property.kind === 'choice'
+                ? [`${property.id}:${property.options.map(({ label }) => label).join(',')}`]
+                : [],
+        )
+        .join(';');
 
 const unfilled: View = { sections: [], open: new Set() };
 
@@ -97,23 +117,46 @@ const Row = (property: Property) => {
                     ?disabled=${property.driven !== undefined}
                     .value=${String(property.value)}
                 />
-                ${
-                    property.driven === undefined
-                        ? html`<output class="value">${property.text}</output>`
-                        : html`<button
-                              type="button"
-                              class="ui-driven"
-                              data-why=${property.driven.why}
-                              data-chain=${property.driven.chain}
-                          >
-                              follows
-                          </button>`
-                }
+                <span class="value">
+                    ${
+                        property.driven === undefined
+                            ? html`<output>${property.text}</output>`
+                            : html`<button
+                                  type="button"
+                                  class="ui-driven"
+                                  data-why=${property.driven.why}
+                                  data-chain=${property.driven.chain}
+                              >
+                                  ${property.driven.text ?? 'follows'}
+                              </button>`
+                    }${
+                        property.aside === undefined
+                            ? nothing
+                            : html`<hks-select
+                                  class="ui-field aside"
+                                  data-id=${property.aside.id}
+                                  aria-label=${property.aside.label}
+                                  title=${ifDefined(property.aside.hint)}
+                                  .value=${property.aside.value}
+                                  .disabled=${property.driven !== undefined}
+                                  >${property.aside.options.map(
+                                      option =>
+                                          html`<option .value=${option.value}>
+                                              ${option.label}
+                                          </option>`,
+                                  )}</hks-select
+                              >`
+                    }
+                </span>
             </label>`;
         case 'number':
             return html`<label class="row" data-kind="number" title=${ifDefined(hint)}>
                 <span class="key">${label}</span>
-                ${field({ id, label, value: property.value }, property.step)}
+                ${field({ id, label, value: property.value }, property.step)}${
+                    property.unit === undefined
+                        ? nothing
+                        : html`<span class="value">${property.unit}</span>`
+                }
             </label>`;
         case 'span':
             return html`<div
@@ -136,6 +179,11 @@ const Row = (property: Property) => {
                 <span class="key">${label}</span>
                 <input class="ui-check" type="checkbox" data-id=${id} .checked=${property.value} />
             </label>`;
+        case 'colour':
+            return html`<label class="row" data-kind="colour" title=${ifDefined(hint)}>
+                <span class="key">${label}</span>
+                <input class="ui-colour" type="color" data-id=${id} .value=${property.value} />
+            </label>`;
         case 'text':
             return html`<label class="row" data-kind="text" title=${ifDefined(hint)}>
                 <span class="key">${label}</span>
@@ -151,8 +199,16 @@ const Row = (property: Property) => {
             </label>`;
         case 'action':
             return html`<div class="row" data-kind="action">
-                <button class="ui-button" type="button" data-action=${id} title=${ifDefined(hint)}>
-                    ${label}
+                <button
+                    class="ui-button"
+                    type="button"
+                    data-action=${id}
+                    title=${ifDefined(hint)}
+                    ?disabled=${property.disabled === true}
+                >
+                    ${property.glyph === undefined ? nothing : Icon(property.glyph)}<span
+                        >${label}</span
+                    >
                 </button>
             </div>`;
     }
@@ -162,7 +218,7 @@ const TEMPLATE = ({ sections, open }: View) =>
     repeat(
         sections,
         ({ id }) => id,
-        ({ id, title, fold, properties }) =>
+        ({ id, title, fold, properties, action }) =>
             html`<section
                 class="section"
                 aria-label=${ifDefined(title ?? undefined)}
@@ -181,6 +237,19 @@ const TEMPLATE = ({ sections, open }: View) =>
                               >
                                   <span>${title}</span>${Icon(ICONS.collapse)}
                               </button>`
+                }${
+                    action === undefined
+                        ? nothing
+                        : html`<button
+                              class="ui-icon reset"
+                              type="button"
+                              data-action=${action.id}
+                              aria-label=${action.label}
+                              title=${action.label}
+                              ?disabled=${action.disabled}
+                          >
+                              ${Icon(action.glyph)}
+                          </button>`
                 }
                 ${repeat(properties, ({ id: key }) => key, Row)}
             </section>`,
@@ -197,10 +266,14 @@ const changeOf = (target: EventTarget | null, live: boolean): PropertyChange[] =
     }
 
     const id = target.getAttribute('data-id');
-    const range = target.type === 'range';
+    const moving = target.type === 'range' || target.type === 'color';
 
-    if (id === null || range !== live) {
+    if (id === null || moving !== live) {
         return [];
+    }
+
+    if (target.type === 'color') {
+        return [{ id, value: target.value }];
     }
 
     if (target.type === 'checkbox') {
@@ -284,7 +357,13 @@ export class HksProperties extends HTMLElement {
             this.rendering.lifetime$,
             connectChoices$(this.shadow),
             connectSelects$(this.shadow),
-            merge(rendered$, observeResize$(this)).pipe(
+            merge(
+                rendered$.pipe(
+                    map(([sections, open]) => `${[...open].join()}|${layoutKey(sections)}`),
+                    distinctUntilChanged(),
+                ),
+                observeResize$(this),
+            ).pipe(
                 observeOn(asapScheduler),
                 map(() =>
                     [...this.root.querySelectorAll('.fit')].map(cell => ({

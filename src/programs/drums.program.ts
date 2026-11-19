@@ -1,5 +1,5 @@
 import { declarations } from '../declarations.ts';
-import { combineLatest, EMPTY, merge } from 'rxjs';
+import { combineLatest, EMPTY, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
     ignoreElements,
@@ -17,6 +17,12 @@ import { hit } from '../components/drums/audio/hit.ts';
 import { hitsOf, swellOf, type Hit } from '../model/drums.ts';
 import type { Program } from '../program.ts';
 import type { AppInput } from '../protocol.ts';
+import {
+    drumsCommandOf,
+    drumsMenu,
+    drumsMenuCommandOf,
+    drumsSections,
+} from '../components/drums/drums-controls.ts';
 import { frameOf, scheduled, unscheduled, type Schedule, type Strike } from '../shared/schedule.ts';
 
 type Scheduling = { readonly schedule: Schedule; readonly strikes: readonly Strike<Hit>[] };
@@ -27,11 +33,20 @@ export const drumsProgram = {
     minimum: { width: 220, height: 180 },
     audible: true,
     launch: async () => {
-        const { HksDrums } = await import('../components/drums/drums.component.ts');
+        const [{ HksDrums }, { HksProperties }, { HksMenu }] = await Promise.all([
+            import('../components/drums/drums.component.ts'),
+            import('../shared/ui/properties.component.ts'),
+            import('../shared/ui/menu.component.ts'),
+        ]);
         const drums = new HksDrums();
+        const properties = new HksProperties();
+        properties.slot = 'controls';
+        drums.append(properties);
+        const menu = new HksMenu();
 
         return {
             element: drums,
+            actions: menu,
             run$: ({ kit$, playhead$, clock$ }) => {
                 // Together: hits derived beside the kit would reach the combineLatest below by two paths.
                 const heard$ = kit$.pipe(
@@ -89,6 +104,20 @@ export const drumsProgram = {
                         switchMap(on => (on ? drumBus$.pipe(switchMap(played$)) : EMPTY)),
                         ignoreElements(),
                     ),
+                    properties
+                        .connect$(
+                            kit$.pipe(
+                                map(({ drums: pattern }) => pattern),
+                                distinctUntilChanged(),
+                                map(drumsSections),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
+                    menu.connect$(of(drumsMenu), 'pattern actions').pipe(ignoreElements()),
+                    merge(
+                        properties.changes$.pipe(mergeMap(drumsCommandOf)),
+                        menu.picks$.pipe(mergeMap(drumsMenuCommandOf)),
+                    ).pipe(map((command): AppInput => ({ kind: 'drums', command }))),
                     events$.pipe(
                         mergeMap((event): AppInput[] =>
                             event.kind === 'command'

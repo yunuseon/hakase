@@ -37,14 +37,13 @@ same controls from the same description.
 
 ### In order
 
-- **Properties everywhere.** The audit is clean, but only converters, voices
-  and pedals describe their controls as `Section`s; the sketch's Scene tab,
-  the drum machine's settings, the focus timer's lengths, the export panel and
-  the theme and appearance editors still hand-build their rows. Move each onto
-  `hks-properties` (adding a property kind where one is missing, such as a
-  drag-number for the signal's instrument-like fields), deleting its row CSS.
-  Done when no component outside `shared/ui` styles a label and value row of
-  its own.
+- **The last hand-built rows.** Converters, voices, pedals, drums, the focus
+  timer, the export panel, the sketch's Parameters and Scene and the theme and
+  appearance editors describe their controls as `Section`s. Still by hand: the
+  signal's drag-numbers (which want a drag-number property kind, with the
+  driven pill), paint's and pen's brush dials, and the sketch's formula and
+  theme pickers in its header. Done when no component outside `shared/ui`
+  styles a label and value row of its own.
 
 ## The finish
 

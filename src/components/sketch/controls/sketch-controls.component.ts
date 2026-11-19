@@ -1,150 +1,32 @@
-import { Icon } from '../../../shared/ui/icon.component.ts';
-import { ICONS } from '../../../shared/ui/icons.ts';
 import { controlsSheet, whys$ } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { renderOptions, type SelectChoice } from '../../../shared/select/options.component.ts';
 
-import { mountView, withValue, type RenderView, type Rendering } from '../../../lib/lit.ts';
+import { mountView, type RenderView, type Rendering } from '../../../lib/lit.ts';
 import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
 import { combineLatest, EMPTY, merge, of, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, mergeMap, share, startWith, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
-import {
-    CYCLES,
-    DRAW_MODES,
-    KNOBS,
-    defaultPanel,
-    isKnob,
-    type DrawMode,
-    type Knob,
-} from '../../../model/sketch/params.ts';
-import { FITS, LATTICES, LENSES, SPACES } from '../../../model/sketch/space.ts';
 import { TABS } from '../../../model/sketch/export.ts';
 import {
-    FLAGS,
-    GROUPS,
-    NUMERIC_FIELDS,
-    isFlag,
-    isGroup,
-    isNumericField,
-    numberOf,
     type ControlChange,
     type ControlsView,
-    type Group,
     type KnobView,
-    type NumericField,
     sameKnobViews,
 } from '../../../model/sketch/controls.ts';
+import { HksProperties } from '../../../shared/ui/properties.component.ts';
+import {
+    controlChangeOf,
+    parameterSections,
+    sceneSections,
+    VIEW,
+    type SceneInput,
+} from './sketch-sections.ts';
 import css from './sketch-controls.css?inline';
 
 const sheet = styleSheet(css);
-
-const DRIVEN_FIELDS = [
-    ['focus', 'focus', 'focus'],
-    ['size', 'baseSize', 'dot size'],
-    ['depth', 'depthScalar', 'depth'],
-    ['trails', 'trails', 'trails'],
-] as const;
-
-const slider = (
-    key: string,
-    label: string,
-    hint: string,
-    min: number,
-    max: number,
-    step: number,
-    value: number,
-    only: DrawMode | null = null,
-) =>
-    html`<label class="row" data-only=${ifDefined(only ?? undefined)} title=${ifDefined(hint)}
-        ><span class="key">${label}</span
-        ><input
-            class="ui-range dial"
-            data-field=${ifDefined(key)}
-            type="range"
-            min=${ifDefined(min)}
-            max=${ifDefined(max)}
-            step=${ifDefined(step)}
-            .value=${value}
-        /><output class="read" data-read=${ifDefined(key)}></output>${withValue(
-            DRIVEN_FIELDS.find(([, field]) => field === key)?.[0],
-            drive =>
-                html`<button
-                    type="button"
-                    class="ui-driven driven"
-                    data-why=${drive}
-                    data-chain=""
-                    hidden
-                >
-                    follows
-                </button>`,
-        )}</label
-    >`;
-
-const knobRow = (knob: Knob) =>
-    html`<div class="knob" data-knob=${ifDefined(knob)} hidden>
-        <label class="row"
-            ><span class="key" data-label=${ifDefined(knob)}>${knob}</span
-            ><input
-                class="ui-range dial"
-                data-field=${ifDefined(knob)}
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                .value=${defaultPanel.knobs[knob]} /><output
-                class="read"
-                data-read=${ifDefined(knob)}
-            ></output></label
-        ><button type="button" class="ui-driven driven" data-why=${ifDefined(knob)} data-chain="">
-            follows</button
-        ><hks-select
-            class="ui-field pick motion"
-            data-cycles=${ifDefined(knob)}
-            aria-label=${ifDefined(`${knob} motion`)}
-            title="let it swing from 0 to its value and back, a whole number of times per loop"
-            >${CYCLES.map(
-                count =>
-                    html`<option .value=${count}>
-                        ${count === 0 ? 'still' : `${count}× per loop`}
-                    </option>`,
-            )}</hks-select
-        >
-    </div>`;
-
-const segments = (name: string, label: string, values: readonly string[], hint: string) =>
-    html`<div class="row" title=${ifDefined(hint)}>
-        <span class="key">${label}</span>
-        <div class="ui-choices segments" role="radiogroup" aria-label=${ifDefined(label)}>
-            ${values.map(
-                value =>
-                    html`<label class="ui-segment segment"
-                        ><input type="radio" name=${ifDefined(name)} .value=${value} /><span
-                            >${value}</span
-                        ></label
-                    >`,
-            )}
-        </div>
-    </div>`;
-
-const option = (key: string, label: string, values: readonly string[], hint: string) =>
-    html`<label class="row" title=${ifDefined(hint)}
-        ><span class="key">${label}</span
-        ><hks-select
-            class="ui-field pick"
-            data-pick=${ifDefined(key)}
-            aria-label=${ifDefined(label)}
-            >${values.map(value => html`<option .value=${value}>${value}</option>`)}</hks-select
-        ></label
-    >`;
-
-const flag = (key: string, label: string, hint: string) =>
-    html`<label class="row" title=${ifDefined(hint)}
-        ><span class="key">${label}</span
-        ><input class="ui-check switch" data-flag=${ifDefined(key)} type="checkbox"
-    /></label>`;
 
 const choice = (key: string, label: string) =>
     html`<label class="item"
@@ -155,27 +37,6 @@ const choice = (key: string, label: string) =>
             aria-label=${ifDefined(label)}
         ></hks-select
     ></label>`;
-
-const reset = (group: Group, what: string) =>
-    html`<button
-        class="ui-button reset"
-        type="button"
-        data-reset=${ifDefined(group)}
-        title=${ifDefined(`reset ${what}`)}
-        aria-label=${ifDefined(`reset ${what}`)}
-        disabled
-    >
-        ${Icon(ICONS.reset)}
-    </button>`;
-
-const group = (name: Group, title: string, rows: unknown) =>
-    html`<section class="group" aria-label=${ifDefined(title)}>
-        <header class="group-head">
-            <h3>${title}</h3>
-            ${reset(name, title.toLowerCase())}
-        </header>
-        ${rows}
-    </section>`;
 
 const tabs = () =>
     TABS.map(
@@ -201,108 +62,12 @@ const TEMPLATE = () =>
         </div>
         <div class="panes">
             <section class="pane" data-pane="parameters" aria-label="the formula's parameters">
-                <header class="group-head knobs-head">
-                    <button
-                        class="ui-button reset labelled"
-                        type="button"
-                        data-reset="parameters"
-                        disabled
-                    >
-                        ${Icon(ICONS.reset)}<span>reset parameters</span>
-                    </button>
-                </header>
-                <div class="knobs">${KNOBS.map(knobRow)}</div>
+                <div class="parameters"></div>
                 <p class="empty">
                     This formula reads no knobs. Use k1 to k4 in its code and they appear here.
                 </p>
             </section>
-            <div class="pane groups" data-pane="scene" hidden>
-                ${group(
-                    'sampling',
-                    'Sampling',
-                    html`${option('lattice', 'lattice', LATTICES, 'where the formula is evaluated')}${slider(
-                        'dimension',
-                        'density',
-                        'how many points: the lattice has twice this many on a side',
-                        1,
-                        128,
-                        1,
-                        defaultPanel.dimension,
-                    )}${slider(
-                        'focus',
-                        'focus',
-                        'bunch the points toward the middle (above 1) or the edges (below 1)',
-                        0.3,
-                        3,
-                        0.05,
-                        defaultPanel.focus,
-                    )}`,
-                )}${group(
-                    'drawing',
-                    'Drawing',
-                    html`${segments('mode', 'mode', DRAW_MODES, 'how each point is drawn')}${slider(
-                        'baseSize',
-                        'dot size',
-                        'the size of a dot at the camera target, in screen pixels',
-                        1,
-                        20,
-                        1,
-                        defaultPanel.baseSize,
-                        'dots',
-                    )}${slider(
-                        'depthScalar',
-                        'depth',
-                        'how much nearer dots grow and farther ones shrink',
-                        0.01,
-                        2,
-                        0.01,
-                        defaultPanel.depthScalar,
-                        'dots',
-                    )}${slider(
-                        'trails',
-                        'trails',
-                        'fade each frame into the next instead of clearing it',
-                        0,
-                        0.97,
-                        0.01,
-                        defaultPanel.trails,
-                    )}${flag('axes', 'axes', 'draw x, y and z and the -1 to 1 square')}`,
-                )}${group(
-                    'space',
-                    'Space',
-                    option(
-                        'space',
-                        'space',
-                        SPACES,
-                        'the coordinate system the formula output is read in',
-                    ),
-                )}${group(
-                    'camera',
-                    'Camera',
-                    html`${segments(
-                            'lens',
-                            'lens',
-                            LENSES,
-                            'perspective shrinks what is far away; orthographic keeps sizes',
-                        )}${segments(
-                            'fit',
-                            'fit',
-                            FITS,
-                            'how the -1 to 1 square meets a canvas that is not square',
-                        )}
-                        <div class="row">
-                            <span class="key">view</span
-                            ><button
-                                class="ui-button view"
-                                type="button"
-                                title="undo your own turning and zooming of the camera"
-                                disabled
-                            >
-                                ${Icon(ICONS.reset)}<span>reset view</span>
-                            </button>
-                        </div>`,
-                )}
-            </div>
+            <div class="pane scene" data-pane="scene" hidden></div>
             <div class="pane animation" data-pane="animation" hidden>
                 <slot name="animation"></slot>
             </div>
@@ -313,19 +78,15 @@ export type PresetOption = {
     readonly label: string;
 };
 
-const readout = (field: NumericField, value: number): string =>
-    field === 'dimension' || field === 'baseSize' ? String(value) : value.toFixed(2);
-
-const RADIOS = ['mode', 'lens', 'fit'] as const;
-
 export class HksSketchControls extends HTMLElement {
     readonly changes$: Observable<ControlChange>;
     readonly whys$: Observable<string> = whys$(this);
     readonly resets$: Observable<void>;
 
     private readonly shadow: ShadowRoot;
-    private readonly view: HTMLButtonElement;
     private readonly empty: HTMLElement;
+    private readonly parameters: HksProperties;
+    private readonly scene: HksProperties;
 
     private readonly rendering: Rendering;
 
@@ -341,10 +102,16 @@ export class HksSketchControls extends HTMLElement {
 
         this.themeOptions = renderOptions(this.pick('theme'));
         this.formulaOptions = renderOptions(this.pick('formula'));
-        const panes = requireChild(this.shadow, '.panes');
         this.empty = requireChild(this.shadow, '.empty');
-        this.view = requireElement(this.shadow, '.view', HTMLButtonElement);
-        this.resets$ = fromElementEvent$(this.view, 'click').pipe(map(() => undefined));
+        this.parameters = new HksProperties();
+        this.scene = new HksProperties();
+        requireChild(this.shadow, '.parameters').append(this.parameters);
+        requireChild(this.shadow, '.scene').append(this.scene);
+        const edits$ = merge(this.parameters.changes$, this.scene.changes$).pipe(share());
+        this.resets$ = edits$.pipe(
+            filter(({ id }) => id === VIEW),
+            map(() => undefined),
+        );
 
         this.changes$ = merge(
             fromElementEvent$(requireChild(this.shadow, '.head'), 'change').pipe(
@@ -360,63 +127,7 @@ export class HksSketchControls extends HTMLElement {
                         : EMPTY;
                 }),
             ),
-            fromElementEvent$(panes, 'click').pipe(
-                mergeMap(({ target }): Observable<ControlChange> => {
-                    const button =
-                        target instanceof Element ? target.closest('[data-reset]') : null;
-                    const name =
-                        button instanceof HTMLElement ? button.dataset['reset'] : undefined;
-
-                    return name !== undefined && isGroup(name)
-                        ? of({ field: 'reset', group: name })
-                        : EMPTY;
-                }),
-            ),
-            fromElementEvent$(panes, 'input').pipe(
-                mergeMap(({ target }): Observable<ControlChange> => {
-                    const field =
-                        target instanceof HTMLInputElement ? target.dataset['field'] : undefined;
-
-                    return target instanceof HTMLInputElement &&
-                        field !== undefined &&
-                        isNumericField(field)
-                        ? of({ field, value: Number(target.value) })
-                        : EMPTY;
-                }),
-            ),
-            fromElementEvent$(panes, 'change').pipe(
-                mergeMap(({ target }): Observable<ControlChange> => {
-                    if (target instanceof HksSelect) {
-                        const knob = target.dataset['cycles'];
-
-                        if (knob !== undefined && isKnob(knob)) {
-                            return of({ field: 'cycles', knob, value: Number(target.value) });
-                        }
-
-                        const pick = target.dataset['pick'];
-
-                        return pick === 'lattice' || pick === 'space'
-                            ? of({ field: pick, value: target.value })
-                            : EMPTY;
-                    }
-
-                    if (!(target instanceof HTMLInputElement)) {
-                        return EMPTY;
-                    }
-
-                    const radio = RADIOS.find(name => name === target.name);
-
-                    if (radio !== undefined) {
-                        return of({ field: radio, value: target.value });
-                    }
-
-                    const flag = target.dataset['flag'];
-
-                    return flag !== undefined && isFlag(flag)
-                        ? of({ field: flag, value: target.checked })
-                        : EMPTY;
-                }),
-            ),
+            edits$.pipe(mergeMap(controlChangeOf)),
         );
     }
 
@@ -430,8 +141,8 @@ export class HksSketchControls extends HTMLElement {
         return requireElement(this.shadow, `[data-pick="${key}"]`, HksSelect);
     }
 
-    private checkRadio(name: string, value: string): void {
-        for (const radio of this.shadow.querySelectorAll(`input[name="${name}"]`)) {
+    private checkTab(value: string): void {
+        for (const radio of this.shadow.querySelectorAll('input[name="tab"]')) {
             if (radio instanceof HTMLInputElement) {
                 radio.checked = radio.value === value;
             }
@@ -456,189 +167,36 @@ export class HksSketchControls extends HTMLElement {
             }),
         );
 
-        const picks$ = (['theme', 'lattice', 'space'] as const).map(key =>
-            view$.pipe(
-                map(view => view[key]),
-                distinctUntilChanged(),
-                tap(value => {
-                    this.pick(key).value = value;
-                }),
-            ),
-        );
-
-        const radios$ = RADIOS.map(name =>
-            view$.pipe(
-                map(view => view[name]),
-                distinctUntilChanged(),
-                tap(value => {
-                    this.checkRadio(name, value);
-                }),
-            ),
-        );
-
-        const numbers$ = NUMERIC_FIELDS.map(field =>
-            view$.pipe(
-                map(view => numberOf(view, field)),
-                distinctUntilChanged(),
-                tap(value => {
-                    requireElement(this.shadow, `[data-field="${field}"]`, HTMLInputElement).value =
-                        String(value);
-                    requireElement(
-                        this.shadow,
-                        `[data-read="${field}"]`,
-                        HTMLOutputElement,
-                    ).textContent = readout(field, value);
-                }),
-            ),
-        );
-
-        const motion$ = KNOBS.map(knob =>
-            view$.pipe(
-                map(({ motion }) => String(motion[knob])),
-                distinctUntilChanged(),
-                tap(value => {
-                    requireElement(this.shadow, `[data-cycles="${knob}"]`, HksSelect).value = value;
-                }),
-            ),
-        );
-
-        const only$ = view$.pipe(
-            map(({ mode }) => mode),
+        const theme$ = view$.pipe(
+            map(({ theme }) => theme),
             distinctUntilChanged(),
-            tap(mode => {
-                for (const row of this.shadow.querySelectorAll('[data-only]')) {
-                    if (row instanceof HTMLElement) {
-                        row.hidden = row.dataset['only'] !== mode;
-                    }
-                }
+            tap(value => {
+                this.pick('theme').value = value;
             }),
         );
 
-        const flags$ = FLAGS.map(flag =>
-            view$.pipe(
-                map(view => view[flag]),
-                distinctUntilChanged(),
-                tap(on => {
-                    requireElement(this.shadow, `[data-flag="${flag}"]`, HTMLInputElement).checked =
-                        on;
-                }),
-            ),
+        const input$ = combineLatest([
+            view$,
+            knobs$.pipe(startWith([]), distinctUntilChanged(sameKnobViews)),
+            driven$,
+            live$,
+            chains$.pipe(startWith(new Map<string, string>())),
+        ]).pipe(
+            map(([view, knobs, driven, live, chains]): SceneInput => ({
+                view,
+                knobs,
+                driven,
+                live,
+                chains,
+            })),
+            share(),
         );
 
-        const shown$ = knobs$.pipe(
-            distinctUntilChanged(sameKnobViews),
-            tap(knobs => {
-                for (const row of this.shadow.querySelectorAll('[data-knob]')) {
-                    if (row instanceof HTMLElement) {
-                        const used = knobs.find(({ knob }) => knob === row.dataset['knob']);
-                        row.hidden = used === undefined;
-                        requireChild(row, '.key').textContent = used?.label ?? '';
-                    }
-                }
-
-                this.empty.hidden = knobs.length > 0;
-            }),
-        );
-
-        const drivers$ = driven$.pipe(
-            map(drives => drives.join()),
+        const emptied$ = knobs$.pipe(
+            map(knobs => knobs.length === 0),
             distinctUntilChanged(),
-            tap(joined => {
-                const knobs = joined.split(',');
-
-                for (const [drive, field] of DRIVEN_FIELDS) {
-                    const input = requireElement(
-                        this.shadow,
-                        `[data-field="${field}"]`,
-                        HTMLInputElement,
-                    );
-                    input.disabled = knobs.includes(drive);
-                    requireElement(
-                        this.shadow,
-                        `[data-read="${field}"]`,
-                        HTMLOutputElement,
-                    ).toggleAttribute('data-driven', input.disabled);
-                    requireElement(this.shadow, `[data-why="${drive}"]`, HTMLButtonElement).hidden =
-                        !input.disabled;
-                }
-
-                for (const knob of KNOBS) {
-                    const driven = knobs.includes(knob);
-                    requireChild(this.shadow, `[data-knob="${knob}"]`).toggleAttribute(
-                        'data-driven',
-                        driven,
-                    );
-                    requireElement(
-                        this.shadow,
-                        `[data-field="${knob}"]`,
-                        HTMLInputElement,
-                    ).disabled = driven;
-                    requireElement(this.shadow, `[data-cycles="${knob}"]`, HksSelect).disabled =
-                        driven;
-                }
-            }),
-        );
-
-        const readings$ = live$.pipe(
-            map(values => [...values]),
-            distinctUntilChanged((a, b) => a.join() === b.join()),
-            tap(values => {
-                const valueOf = (field: string) => values.find(([key]) => key === field)?.[1];
-
-                for (const knob of KNOBS) {
-                    const value = valueOf(knob);
-                    requireChild(this.shadow, `[data-knob="${knob}"] .driven`).textContent =
-                        value === undefined ? 'follows' : `follows · ${value}`;
-                }
-
-                for (const [drive, field] of DRIVEN_FIELDS) {
-                    const value = valueOf(field);
-                    requireElement(
-                        this.shadow,
-                        `[data-why="${drive}"]`,
-                        HTMLButtonElement,
-                    ).textContent = value === undefined ? 'follows' : `follows · ${value}`;
-                }
-            }),
-        );
-
-        const chained$ = combineLatest([chains$, knobs$]).pipe(
-            tap(([chains, knobs]) => {
-                for (const button of this.shadow.querySelectorAll('[data-why]')) {
-                    const input = button.getAttribute('data-why') ?? '';
-                    const chain = chains.get(input);
-                    const label =
-                        knobs.find(({ knob }) => knob === input)?.label ??
-                        DRIVEN_FIELDS.find(([drive]) => drive === input)?.[2] ??
-                        input;
-
-                    button.setAttribute(
-                        'data-chain',
-                        chain === undefined ? '' : `${label} ← ${chain}`,
-                    );
-                }
-            }),
-        );
-
-        const resets$ = GROUPS.map(name =>
-            view$.pipe(
-                map(({ changed }) => changed[name]),
-                distinctUntilChanged(),
-                tap(changed => {
-                    for (const button of this.shadow.querySelectorAll(`[data-reset="${name}"]`)) {
-                        if (button instanceof HTMLButtonElement) {
-                            button.disabled = !changed;
-                        }
-                    }
-                }),
-            ),
-        );
-
-        const turned$ = view$.pipe(
-            map(({ turned }) => turned),
-            distinctUntilChanged(),
-            tap(turned => {
-                this.view.disabled = !turned;
+            tap(empty => {
+                this.empty.hidden = !empty;
             }),
         );
 
@@ -646,7 +204,7 @@ export class HksSketchControls extends HTMLElement {
             map(({ tab }) => tab),
             distinctUntilChanged(),
             tap(tab => {
-                this.checkRadio('tab', tab);
+                this.checkTab(tab);
 
                 for (const pane of this.shadow.querySelectorAll('[data-pane]')) {
                     if (pane instanceof HTMLElement) {
@@ -660,23 +218,11 @@ export class HksSketchControls extends HTMLElement {
             this.rendering.lifetime$,
             this.themeOptions.lifetime$,
             this.formulaOptions.lifetime$,
-            merge(
-                connectSelects$(this.shadow),
-                tab$,
-                formula$,
-                ...picks$,
-                ...radios$,
-                ...numbers$,
-                ...flags$,
-                ...motion$,
-                ...resets$,
-                only$,
-                shown$,
-                drivers$,
-                readings$,
-                chained$,
-                turned$,
-            ).pipe(map(() => undefined)),
+            this.parameters.connect$(input$.pipe(map(parameterSections))),
+            this.scene.connect$(input$.pipe(map(sceneSections))),
+            merge(connectSelects$(this.shadow), tab$, formula$, theme$, emptied$).pipe(
+                map(() => undefined),
+            ),
         );
     }
 }

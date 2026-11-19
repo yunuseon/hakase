@@ -2,7 +2,22 @@ export type Option = { readonly value: string; readonly label: string; readonly 
 
 type Named = { readonly id: string; readonly label: string; readonly hint?: string };
 
-export type Driven = { readonly why: string; readonly chain: string };
+export type Driven = { readonly why: string; readonly chain: string; readonly text?: string };
+
+export type Aside = {
+    readonly id: string;
+    readonly label: string;
+    readonly value: string;
+    readonly options: readonly Option[];
+    readonly hint?: string;
+};
+
+export type SectionAction = {
+    readonly id: string;
+    readonly label: string;
+    readonly glyph: string;
+    readonly disabled: boolean;
+};
 
 export type End = { readonly id: string; readonly label: string; readonly value: number };
 
@@ -20,8 +35,14 @@ export type Property =
           readonly step: number;
           readonly text: string;
           readonly driven?: Driven;
+          readonly aside?: Aside;
       })
-    | (Named & { readonly kind: 'number'; readonly value: number; readonly step: number })
+    | (Named & {
+          readonly kind: 'number';
+          readonly value: number;
+          readonly step: number;
+          readonly unit?: string;
+      })
     | (Named & {
           readonly kind: 'span';
           readonly low: End;
@@ -29,8 +50,13 @@ export type Property =
           readonly step: number;
       })
     | (Named & { readonly kind: 'toggle'; readonly value: boolean })
+    | (Named & { readonly kind: 'colour'; readonly value: string })
     | (Named & { readonly kind: 'text'; readonly value: string; readonly placeholder: string })
-    | (Named & { readonly kind: 'action' });
+    | (Named & {
+          readonly kind: 'action';
+          readonly glyph?: string;
+          readonly disabled?: boolean;
+      });
 
 export type PropertyKind = Property['kind'];
 
@@ -39,6 +65,7 @@ export type Section = {
     readonly title: string | null;
     readonly fold: boolean;
     readonly properties: readonly Property[];
+    readonly action?: SectionAction;
 };
 
 export type PropertyChange = { readonly id: string; readonly value: string | number | boolean };
@@ -48,7 +75,11 @@ export const section = (
     title: string | null,
     properties: readonly Property[],
     fold = title !== null,
-): Section => ({ id, title, fold, properties });
+    action?: SectionAction,
+): Section =>
+    action === undefined
+        ? { id, title, fold, properties }
+        : { id, title, fold, properties, action };
 
 export const numberOf = ({ value }: PropertyChange): number | null =>
     typeof value === 'number' ? value : typeof value === 'boolean' ? Number(value) : null;

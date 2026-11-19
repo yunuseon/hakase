@@ -1,16 +1,22 @@
 import { declarations } from '../declarations.ts';
-import { EMPTY, merge, of } from 'rxjs';
+import { combineLatest, merge } from 'rxjs';
 import {
     distinctUntilChanged,
     ignoreElements,
     map,
     mergeMap,
     scan,
+    share,
     shareReplay,
     switchMap,
     withLatestFrom,
 } from 'rxjs/operators';
 import type { Theme } from '../model/sketch/theme.ts';
+import {
+    editedTheme,
+    themeSections,
+    type ThemeEdit,
+} from '../components/theme-editor/theme-edit.ts';
 import { isThemeName, themes } from '../model/sketch/themes/registry.ts';
 import { seenBy, unseen, type Program } from '../program.ts';
 import { type AppInput } from '../protocol.ts';
@@ -26,9 +32,13 @@ export const themeProgram = {
     size: { width: 300, height: 260 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const { HksThemeEditor } =
-            await import('../components/theme-editor/theme-editor.component.ts');
-        const editor = new HksThemeEditor().presets(options);
+        const [{ HksThemeEditor }, { HksProperties }] = await Promise.all([
+            import('../components/theme-editor/theme-editor.component.ts'),
+            import('../shared/ui/properties.component.ts'),
+        ]);
+        const editor = new HksThemeEditor();
+        const properties = new HksProperties();
+        editor.append(properties);
 
         return {
             element: editor,
@@ -57,18 +67,56 @@ export const themeProgram = {
                     shareReplay({ bufferSize: 1, refCount: true }),
                 );
 
+                const current$ = chosen$.pipe(
+                    switchMap(name => theme$(name)),
+                    map(({ value }) => value),
+                    shareReplay({ bufferSize: 1, refCount: true }),
+                );
+                const changes$ = properties.changes$.pipe(share());
+                const edited$ = merge(
+                    editor.edits$,
+                    changes$.pipe(
+                        mergeMap(({ id, value }): ThemeEdit[] =>
+                            id === 'blend' && (value === 'smooth' || value === 'steps')
+                                ? [{ kind: 'blend', blend: value }]
+                                : [],
+                        ),
+                    ),
+                ).pipe(
+                    withLatestFrom(current$),
+                    map(([edit, theme]) => editedTheme(theme, edit)),
+                    share(),
+                );
+
                 return merge(
-                    editor
-                        .connect$(chosen$, rows$, merge(rows$, editor.changes$))
+                    editor.connect$(rows$, merge(rows$, edited$)).pipe(ignoreElements()),
+                    properties
+                        .connect$(
+                            combineLatest([
+                                chosen$,
+                                current$.pipe(
+                                    map(({ blend }) => blend),
+                                    distinctUntilChanged(),
+                                ),
+                            ]).pipe(
+                                map(([theme, blend]) =>
+                                    themeSections({ theme, themes: options, blend }),
+                                ),
+                            ),
+                        )
                         .pipe(ignoreElements()),
-                    editor.selections$.pipe(
-                        mergeMap(name => (isThemeName(name) ? of(name) : EMPTY)),
+                    changes$.pipe(
+                        mergeMap(({ id, value }) =>
+                            id === 'theme' && typeof value === 'string' && isThemeName(value)
+                                ? [value]
+                                : [],
+                        ),
                         map((theme): AppInput => ({
                             kind: 'settings',
                             settings: { kind: 'theme', theme },
                         })),
                     ),
-                    editor.changes$.pipe(
+                    edited$.pipe(
                         withLatestFrom(chosen$),
                         map(([value, theme]): AppInput => ({ kind: 'theme', theme, value })),
                     ),

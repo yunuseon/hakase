@@ -51,11 +51,11 @@ every mode and none of them knows which one it is in. `DRAW_MODES`' order is the
 union discriminated by `mode`, and only `DotStyle` carries `baseSize` and
 `depthScalar`, so reading them in lines mode is a type error rather than a dead
 slider. The panel follows the type: `panelParams` builds only the selected mode's
-own `DrawStyle` from the flat `Panel`, and `connect$` hides every row whose
-`data-only` names another mode. The inputs keep their values while hidden, so
-switching back to dots restores the size you left. A new mode-specific knob is a
-field on its member of the union plus a `data-only` row, never an optional field
-on all of them.
+own `DrawStyle` from the flat `Panel`, and `sceneSections` leaves out every row
+that belongs to another mode. The `Panel` keeps their values while they are not
+shown, so switching back to dots restores the size you left. A new
+mode-specific knob is a field on its member of the union plus a row only that
+mode's sections list, never an optional field on all of them.
 
 **The sketch is a real 3D space.** A formula returns a point, not a screen
 position, and the camera is computed **in the shader**, because a formula may
@@ -962,18 +962,22 @@ it. `ui-staged` in the controls sheet lays them out by size class: stacked,
 stage first, in compact and regular; side by side, the controls a column of
 `min(18rem, 40%)`, when the window is wide; the stage alone at a glance,
 because the controls region is `data-detail`. The stage is `[data-stage]`, a
-flex column that grows and never shrinks below `--stage-minimum`; the controls
+flex column that grows from `--stage-minimum` and shrinks only to what its
+content needs (a scroller inside it that should give way, like the drum grid,
+takes `contain: size`, or its rows would hold the stage open); the controls
 are a `slot name="controls"` or a `[data-controls]` element, and that one
 element is the scroll region, so a short window scrolls its controls and never
 itself. The slot is styled as a flex column on purpose: a slot is `display:
 contents` by default, and two slotted parts (an Output's strip and its export
 panel) would each have become a column of their own when wide. Converters,
-voices, pedals, Output, signals and paint follow it.
+voices, drums, the focus timer, pedals, Output, signals and paint follow it.
 
 **Controls are data: `hks-properties`.** A program describes its settings as
 `Section`s of `Property`s (`shared/properties.ts`: choice, range, number, span,
 toggle, text, action), built by a pure function beside its component
-(`converterSections`, `voiceSections`, `pedalSections`), and one component
+(`converterSections`, `voiceSections`, `pedalSections`, `drumsSections`,
+`focusSections`, `exportSections`, `sceneSections`, `themeSections`,
+`appearanceSections`), and one component
 renders them, so the layout rules live once and a client with no browser can
 list the same controls from the same description. It emits `{ id, value }`, and
 the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
@@ -995,6 +999,16 @@ the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
 - **A setting exists only where it matters**: the builder leaves out a row
   that does not apply (a voice's synth section for a preset instrument, decay
   for a drone, the item picker with nothing to pick) rather than hiding it.
+- **Two columns of sections where the panel has room** (`properties`, its own
+  inline-size container, at 34rem): each section spans one column's three
+  tracks and never splits, so the sketch's Scene reads as it did.
+- **A section may carry one action** (a group's reset) in its head, and a
+  range an `aside` (a knob's motion select) in its value cell, disabled while
+  the range is driven. A number may carry a `unit`, and `colour` is its own
+  kind, applying as it moves like a range.
+- **It measures only when choices change.** The fit check reads layout, so it
+  runs on resize and when an id or label of a row of choices changes, never on
+  a render that only moved a value: a driven sketch re-renders every frame.
 - **In compact, titled sections fold** into a row that opens in place; which
   are open is the component's own fold of its toggles, not saved, and in
   regular every section is open with its title as a plain heading.
@@ -3030,15 +3044,17 @@ window. Each tab holds only what is its own:
 - **Parameters** is the formula's own numbers and nothing else: one row per knob
   the compiled formula reads, under the name its `#define K1 feed_rate` gives it
   (`knobLabelsOf`, read like `STEPS` and `WRAPS`; the macro is never expanded,
-  since nothing in GLSL is spelt `K1`), with its motion beside it, and an empty
-  state when the formula reads none. Its reset sits alone at the end of the
-  pane's head, which is hidden with nothing to reset.
+  since nothing in GLSL is spelt `K1`), with its motion beside it (a range
+  property's `aside`), and an empty state when the formula reads none. Its
+  reset is the section's action, alone in its head.
 - **Scene** is configuration, in four groups by what they change: **Sampling**
   (lattice, density, focus: where the formula is evaluated), **Space** (how its
   output is read), **Drawing** (mode, dot size, depth, trails, axes) and
-  **Camera** (lens, fit, the view). Rows share one grid of label, control and
-  value, so controls line up down a group, and the groups flow into two columns
-  where the window has room.
+  **Camera** (lens, fit, the view). Both panes are `hks-properties` inside the
+  controls' shadow (`parameterSections`, `sceneSections`, `controlChangeOf` in
+  `sketch-sections.ts`), so the component's own API did not change; a group's
+  reset is its section's action, and a driven range's pill reads
+  `follows · 3.6`.
 - **Animation** is the strip and the export.
 
 **Every control belongs to exactly one group, and a group resets as a whole.**
@@ -3678,10 +3694,13 @@ which is thrown away on every recompile.
 doubled positions that make `steps` hard in CSS. Preview and render are two
 readings of one theme; if you change one rule, change both or they will drift.
 
-The editor never edits its own DOM. Add and remove compute a whole new theme from
-the current one and emit it; the rows come back through `connect$`. That keeps the
-component a pure source, and it is why `rows$` rebuilds on a **shape** change
-(stop count or blend) but not on a value the user is currently dragging.
+The editor never edits its own DOM. It emits **edits** (`ThemeEdit`: the stops
+as its rows hold them, a blend, add, remove), and the program applies each to
+the theme as it stands with the pure `editedTheme`; the rows come back through
+`connect$`. It once rebuilt the whole theme from its own inputs, blend
+included, which could not survive the blend moving into `hks-properties`, where
+the theme picker now sits beside it. `rows$` still rebuilds on a **shape**
+change (stop count or blend) but not on a value the user is currently dragging.
 
 ## Appearance
 
@@ -3700,8 +3719,9 @@ token rather than rejecting the whole record — a token added later must not wi
 user's stored edits.
 
 **No component knows what an appearance is.** The model lives at the program
-layer; the editor receives its token names through `tokens()` and its presets
-through `presets()`, and the canvas receives a plain `ReadonlyMap` of custom
+layer; the editor receives its token names through `tokens()` for its swatch
+strip, the program builds its look, wires and colour rows as `Section`s
+(`appearanceSections`), and the canvas receives a plain `ReadonlyMap` of custom
 properties and sets them on its host, where every window, the toolbar and every
 shadow root below inherit them. That is why the registry is the only definition
 of a colour: there is no palette in `styles.css` to drift from it. The formula

@@ -1,43 +1,22 @@
 :host {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: block;
     block-size: 100%;
     min-block-size: 0;
     font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
     min-inline-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
     container-type: inline-size;
 }
 
-.bar,
-.settings {
+.bar {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1-5) var(--space-2-5);
     align-items: center;
 }
 
-.presets,
-.steps,
-.repeats {
-    flex-wrap: wrap;
-}
-
 button {
     color: inherit;
-}
-
-.presets button,
-.steps button,
-.repeats button {
-    block-size: var(--control-sm);
-}
-
-.presets button:hover {
-    background: var(--panel);
 }
 
 svg {
@@ -51,6 +30,7 @@ svg {
 }
 
 .grid {
+    contain: size;
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -113,35 +93,11 @@ svg {
     border-color: var(--rule);
 }
 
-.dial {
-    display: flex;
-    gap: var(--space-1-5);
-    align-items: center;
-    color: var(--muted);
-}
-
-.dial input {
-    inline-size: var(--space-16);
-    accent-color: var(--accent);
-}
-
-.dial output {
-    min-inline-size: 4ch;
-    font: 500 var(--text-xs) var(--font-mono);
-    color: var(--ink);
-}
-
-.bar,
-.settings {
+.bar {
     flex: none;
 }
 .grid {
     min-block-size: 6rem;
-}
-.dial {
-    flex-wrap: wrap;
-    min-inline-size: 0;
-    max-inline-size: 100%;
 }
 @media (any-pointer: coarse) {
     :host {

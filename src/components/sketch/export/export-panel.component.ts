@@ -1,66 +1,23 @@
 import { controlsSheet } from '../../../shared/ui/controls.component.ts';
 import { html } from 'lit-html';
-import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { mountView, type Rendering } from '../../../lib/lit.ts';
-import { HksSelect, connectSelects$ } from '../../../shared/select/select.component.ts';
-import { merge, type Observable } from 'rxjs';
-import { distinctUntilChanged, map, mergeMap, tap } from 'rxjs/operators';
+import { combineLatest, merge, type Observable } from 'rxjs';
+import { distinctUntilChanged, map, mergeMap, share, tap } from 'rxjs/operators';
 import { requireChild, requireElement, saveFile, styleSheet } from '../../../lib/dom.ts';
 import { fromElementEvent$ } from '../../../lib/rx.ts';
 import {
-    ASPECTS,
-    EXPORT_SIZES,
-    isAspect,
     type Aspect,
-    FRAME_RATES,
-    QUALITIES,
     type ExportChange,
     type ExportSettings,
 } from '../../../model/sketch/export.ts';
+import { HksProperties } from '../../../shared/ui/properties.component.ts';
+import { aspectOf, exportChangeOf, exportSections } from './export-sections.ts';
 import css from './export-panel.css?inline';
 
 const sheet = styleSheet(css);
 
-const select = (field: string, label: string, options: readonly (readonly [string, string])[]) =>
-    html`<label
-        class="item"
-        data-video=${ifDefined(field === 'quality' ? '' : undefined)}
-        data-aspect=${ifDefined(field === 'aspect' ? '' : undefined)}
-        ?hidden=${field === 'aspect'}
-        ><span class="key">${label}</span
-        ><hks-select
-            class="ui-field pick"
-            data-field=${ifDefined(field)}
-            aria-label=${ifDefined(label)}
-            >${options.map(
-                ([value, text]) => html`<option .value=${value}>${text}</option>`,
-            )}</hks-select
-        ></label
-    >`;
-
 const TEMPLATE = () =>
-    html`<div class="row">
-            ${select(
-                'aspect',
-                'aspect',
-                ASPECTS.map(aspect => [aspect, aspect]),
-            )}${select('format', 'format', [
-                ['webm', 'WebM video'],
-                ['png', 'PNG frames (zip)'],
-            ])}${select(
-                'fps',
-                'fps',
-                FRAME_RATES.map(rate => [String(rate), String(rate)]),
-            )}${select(
-                'size',
-                'size',
-                EXPORT_SIZES.map(size => [String(size), `${size} px`]),
-            )}${select(
-                'quality',
-                'quality',
-                QUALITIES.map(quality => [quality, quality]),
-            )}
-        </div>
+    html`<div class="settings"></div>
         <div class="row actions">
             <span class="summary"></span><span class="status" role="status"></span
             ><button class="ui-button button cancel" type="button" hidden>Cancel</button
@@ -83,9 +40,6 @@ export type ExportStatus =
     | { readonly kind: 'running'; readonly done: number }
     | { readonly kind: 'failed'; readonly message: string };
 
-const NUMERIC = ['fps', 'size'] as const;
-const TEXT = ['format', 'quality'] as const;
-
 export class HksExportPanel extends HTMLElement {
     readonly changes$: Observable<ExportChange>;
     readonly aspects$: Observable<Aspect>;
@@ -93,11 +47,11 @@ export class HksExportPanel extends HTMLElement {
     readonly cancels$: Observable<void>;
     readonly stills$: Observable<void>;
 
-    private readonly shadow: ShadowRoot;
     private readonly start: HTMLButtonElement;
     private readonly cancel: HTMLButtonElement;
     private readonly summary: HTMLElement;
     private readonly status: HTMLElement;
+    private readonly properties: HksProperties;
 
     private readonly rendering: Rendering;
 
@@ -105,7 +59,6 @@ export class HksExportPanel extends HTMLElement {
         super();
 
         const shadow = this.attachShadow({ mode: 'open' });
-        this.shadow = shadow;
         shadow.adoptedStyleSheets = [controlsSheet, sheet];
         this.rendering = mountView(shadow, () => TEMPLATE());
 
@@ -121,38 +74,11 @@ export class HksExportPanel extends HTMLElement {
             'click',
         ).pipe(map(() => undefined));
 
-        // On the row inside the shadow root: change is not composed, so it never reaches the host.
-        this.changes$ = fromElementEvent$(requireChild(shadow, '.row'), 'change').pipe(
-            mergeMap(({ target }): ExportChange[] => {
-                const field = target instanceof HksSelect ? target.dataset['field'] : undefined;
-
-                if (!(target instanceof HksSelect) || field === undefined) {
-                    return [];
-                }
-
-                const numeric = NUMERIC.find(name => name === field);
-                const text = TEXT.find(name => name === field);
-
-                if (numeric !== undefined) {
-                    return [{ field: numeric, value: Number(target.value) }];
-                }
-
-                return text === undefined ? [] : [{ field: text, value: target.value }];
-            }),
-        );
-        this.aspects$ = fromElementEvent$(requireChild(shadow, '.row'), 'change').pipe(
-            mergeMap(({ target }) =>
-                target instanceof HksSelect &&
-                target.dataset['field'] === 'aspect' &&
-                isAspect(target.value)
-                    ? [target.value]
-                    : [],
-            ),
-        );
-    }
-
-    private pick(field: string): HksSelect {
-        return requireElement(this.shadow, `[data-field="${field}"]`, HksSelect);
+        this.properties = new HksProperties();
+        requireChild(shadow, '.settings').append(this.properties);
+        const changes$ = this.properties.changes$.pipe(share());
+        this.changes$ = changes$.pipe(mergeMap(exportChangeOf));
+        this.aspects$ = changes$.pipe(mergeMap(aspectOf));
     }
 
     connect$(
@@ -162,33 +88,9 @@ export class HksExportPanel extends HTMLElement {
         files$: Observable<SavedFile>,
         aspect$: Observable<Aspect | null>,
     ): Observable<void> {
-        const fields$ = [...NUMERIC, ...TEXT].map(field =>
-            settings$.pipe(
-                map(settings => String(settings[field])),
-                distinctUntilChanged(),
-                tap(value => {
-                    this.pick(field).value = value;
-                }),
-            ),
-        );
-
-        const video$ = settings$.pipe(
-            map(({ format }) => format === 'webm'),
-            distinctUntilChanged(),
-            tap(video => {
-                requireElement(this.shadow, '[data-video]', HTMLElement).hidden = !video;
-            }),
-        );
-
         // Only a chain's picture has the app's aspect; a sketch's window frames its own.
-        const aspected$ = aspect$.pipe(
-            distinctUntilChanged(),
-            tap(aspect => {
-                requireElement(this.shadow, '[data-aspect]', HTMLElement).hidden = aspect === null;
-                if (aspect !== null) {
-                    this.pick('aspect').value = aspect;
-                }
-            }),
+        const sections$ = combineLatest([settings$, aspect$]).pipe(
+            map(([settings, aspect]) => exportSections(settings, aspect)),
         );
 
         const summarised$ = summary$.pipe(
@@ -222,15 +124,8 @@ export class HksExportPanel extends HTMLElement {
 
         return merge(
             this.rendering.lifetime$,
-            merge(
-                connectSelects$(this.shadow),
-                ...fields$,
-                video$,
-                aspected$,
-                summarised$,
-                shown$,
-                saved$,
-            ).pipe(map(() => undefined)),
+            this.properties.connect$(sections$).pipe(map(() => undefined)),
+            merge(summarised$, shown$, saved$).pipe(map(() => undefined)),
         );
     }
 }

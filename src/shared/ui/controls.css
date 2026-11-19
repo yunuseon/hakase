@@ -513,7 +513,7 @@
 }
 :where(.ui-staged) > :where([data-stage]) {
     display: flex;
-    flex: 1 0 var(--stage-minimum, var(--space-20));
+    flex: 1 1 var(--stage-minimum, var(--space-20));
     flex-direction: column;
     gap: var(--space-2);
     min-inline-size: 0;

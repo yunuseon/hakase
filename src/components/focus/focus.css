@@ -1,16 +1,15 @@
 :host {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2-5);
+    display: block;
     block-size: 100%;
     min-block-size: 0;
     container-type: size;
     font: var(--text-md)/1.35 var(--font-ui);
     color: var(--ink);
     min-inline-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
+}
+
+[data-stage] {
+    align-items: center;
 }
 
 .dial {
@@ -123,38 +122,7 @@ svg {
     background: var(--well);
 }
 
-.lengths {
-    flex: none;
-    align-self: stretch;
-    font-size: var(--text-sm);
-    color: var(--muted);
-}
-
-.lengths summary {
-    cursor: pointer;
-}
-
-.lengths label {
-    display: flex;
-    gap: var(--space-1-5);
-    align-items: center;
-    margin-block-start: var(--space-1-5);
-}
-
-.lengths input {
-    inline-size: var(--space-14);
-    margin-inline-start: auto;
-    padding: calc(var(--spacing) * 0.75) var(--space-1-5);
-    font: var(--text-sm) var(--font-mono);
-    color: var(--ink);
-    background: var(--well);
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-}
-
-button:focus-visible,
-summary:focus-visible,
-.lengths input:focus-visible {
+button:focus-visible {
     outline: var(--focus-ring);
     outline-offset: var(--focus-offset);
 }
@@ -165,12 +133,4 @@ summary:focus-visible,
 .controls {
     flex-wrap: wrap;
     justify-content: center;
-}
-.lengths label {
-    flex-wrap: wrap;
-}
-.lengths input {
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    box-sizing: border-box;
 }

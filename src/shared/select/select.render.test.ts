@@ -14,9 +14,9 @@ describe('lit-html custom select integration', () => {
         const root = controls.shadowRoot ?? controls;
         const theme = requireElement(root, '[data-pick="theme"]', HksSelect);
         expect(theme.options[0]?.textContent).toBe('Paper');
-        expect(
-            requireElement(root, '[data-cycles="k1"]', HksSelect).options.length,
-        ).toBeGreaterThan(0);
+        expect(requireElement(root, '[data-pick="formula"]', HksSelect).localName).toBe(
+            'hks-select',
+        );
         // The process must dispose even a component that was never attached.
         const running = controls.connect$(of(), of(), of(), of(), of()).subscribe();
         running.unsubscribe();
