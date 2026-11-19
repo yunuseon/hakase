@@ -6,6 +6,7 @@ import { styleMap } from 'lit-html/directives/style-map.js';
 import { asapScheduler, combineLatest, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
+    filter,
     map,
     mergeMap,
     observeOn,
@@ -17,8 +18,13 @@ import {
 import { styleSheet } from '../../lib/dom.ts';
 import { displayValue, renderView, type RenderView } from '../../lib/lit.ts';
 import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
+import { pointerGesture$ } from '../drag.ts';
+import type { Phase } from '../phase.ts';
 import {
     charsFor,
+    MOVE_SLOP,
+    pulled,
+    type Pull,
     toggled,
     type End,
     type Property,
@@ -179,6 +185,36 @@ const Row = (property: Property) => {
                 <span class="key">${label}</span>
                 <input class="ui-check" type="checkbox" data-id=${id} .checked=${property.value} />
             </label>`;
+        case 'drag':
+            return html`<label class="row" data-kind="drag" title=${ifDefined(hint)}>
+                <span class="key">${label}</span>
+                <input
+                    class="ui-field drag"
+                    type="text"
+                    inputmode="decimal"
+                    spellcheck="false"
+                    autocomplete="off"
+                    data-drag=${id}
+                    data-step=${property.step}
+                    data-fine=${property.fine}
+                    aria-label=${label}
+                    ?disabled=${property.driven !== undefined}
+                    ${ref(element => {
+                        shown(element, property.text);
+                    })}
+                />${
+                    property.driven === undefined
+                        ? nothing
+                        : html`<button
+                              type="button"
+                              class="ui-driven"
+                              data-why=${property.driven.why}
+                              data-chain=${property.driven.chain}
+                          >
+                              ${property.driven.text ?? 'follows'}
+                          </button>`
+                }
+            </label>`;
         case 'colour':
             return html`<label class="row" data-kind="colour" title=${ifDefined(hint)}>
                 <span class="key">${label}</span>
@@ -218,8 +254,9 @@ const TEMPLATE = ({ sections, open }: View) =>
     repeat(
         sections,
         ({ id }) => id,
-        ({ id, title, fold, properties, action }) =>
+        ({ id, title, fold, properties, action, inline }) =>
             html`<section
+                ?data-inline=${inline === true}
                 class="section"
                 aria-label=${ifDefined(title ?? undefined)}
                 ?data-fold=${fold}
@@ -287,6 +324,18 @@ const changeOf = (target: EventTarget | null, live: boolean): PropertyChange[] =
     return Number.isFinite(target.valueAsNumber) ? [{ id, value: target.valueAsNumber }] : [];
 };
 
+const dragOf = (target: EventTarget | null): HTMLInputElement | null =>
+    target instanceof HTMLInputElement && target.hasAttribute('data-drag') ? target : null;
+
+const stepOf = (input: HTMLInputElement | null, fine: boolean): number =>
+    Number(input?.getAttribute(fine ? 'data-fine' : 'data-step')) || 0;
+
+const still: Pull = { id: null, x: 0, y: 0, moved: 0, by: 0 };
+
+type Pulling = { readonly phase: Phase; readonly pull: Pull };
+
+const resting: Pulling = { phase: 'release', pull: still };
+
 const attributeOf = (target: EventTarget | null, name: string): Element | null =>
     target instanceof Element ? target.closest(`[${name}]`) : null;
 
@@ -296,6 +345,7 @@ export class HksProperties extends HTMLElement {
     private readonly shadow: ShadowRoot;
     private readonly root: HTMLElement;
     private readonly folds$: Observable<string>;
+    private readonly pulls$: Observable<Pulling>;
     private readonly rendering: RenderView<View>;
 
     constructor() {
@@ -319,7 +369,66 @@ export class HksProperties extends HTMLElement {
             }),
         );
 
+        // Shared: the nudges and the click that opens a field for typing must read one gesture.
+        this.pulls$ = pointerGesture$(root, ({ target }) => {
+            const input = dragOf(target);
+            return input !== null && !input.disabled && shadow.activeElement !== input;
+        }).pipe(
+            scan(({ pull }: Pulling, { phase, event }): Pulling => {
+                const at = { x: event.clientX, y: event.clientY };
+                const input = dragOf(event.target);
+
+                return {
+                    phase,
+                    pull:
+                        phase === 'grab'
+                            ? { ...still, id: input?.getAttribute('data-drag') ?? null, ...at }
+                            : pulled(
+                                  pull,
+                                  at,
+                                  stepOf(
+                                      root.querySelector(`[data-drag="${pull.id ?? ''}"]`),
+                                      event.shiftKey,
+                                  ),
+                              ),
+                };
+            }, resting),
+            share(),
+        );
+
         this.changes$ = merge(
+            this.pulls$.pipe(
+                mergeMap(({ phase, pull: { id, moved, by } }): PropertyChange[] =>
+                    phase === 'move' && id !== null && moved >= MOVE_SLOP && by !== 0
+                        ? [{ id, value: by, nudge: true }]
+                        : [],
+                ),
+            ),
+            fromElementEvent$(root, 'keydown').pipe(
+                mergeMap(event => {
+                    const input = dragOf(event.target);
+                    const way = event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0;
+                    const id = input?.getAttribute('data-drag');
+
+                    return way === 0 || typeof id !== 'string'
+                        ? []
+                        : [{ event, id, by: way * 10 * stepOf(input, event.shiftKey) }];
+                }),
+                // Taken, or the canvas reads the arrow as a step between sections.
+                tap(({ event }) => {
+                    event.preventDefault();
+                }),
+                map(({ id, by }): PropertyChange => ({ id, value: by, nudge: true })),
+            ),
+            fromElementEvent$(root, 'change').pipe(
+                mergeMap(({ target }): PropertyChange[] => {
+                    const input = dragOf(target);
+                    const id = input?.getAttribute('data-drag');
+                    return input === null || typeof id !== 'string'
+                        ? []
+                        : [{ id, value: input.value }];
+                }),
+            ),
             clicks$.pipe(
                 mergeMap(({ target }): PropertyChange[] => {
                     const radio = attributeOf(target, 'data-value');
@@ -346,15 +455,49 @@ export class HksProperties extends HTMLElement {
             scan(toggled, new Set<string>()),
             startWith(new Set<string>()),
         );
-        const rendered$ = combineLatest([sections$, open$]).pipe(
+        // A field that loses focus is written again, so Escape or a refused entry shows the value it had.
+        const left$ = fromElementEvent$(this.root, 'focusout').pipe(startWith(null));
+        const rendered$ = combineLatest([sections$, open$, left$]).pipe(
+            map(([sections, open]) => [sections, open] as const),
             tap(([sections, open]) => {
                 this.rendering.update({ sections, open });
             }),
             share(),
         );
 
+        const typing$ = this.pulls$.pipe(
+            filter(
+                ({ phase, pull }) =>
+                    phase === 'release' && pull.id !== null && pull.moved < MOVE_SLOP,
+            ),
+            tap(({ pull }) => {
+                const input = this.root.querySelector(`[data-drag="${pull.id ?? ''}"]`);
+
+                if (input instanceof HTMLInputElement) {
+                    input.focus();
+                    input.select();
+                }
+            }),
+        );
+
+        const keys$ = fromElementEvent$(this.root, 'keydown').pipe(
+            tap(({ key, target }) => {
+                const input = dragOf(target);
+
+                if (input !== null && (key === 'Enter' || key === 'Escape')) {
+                    // Escape empties it first, so the change that the blur raises is refused.
+                    if (key === 'Escape') {
+                        input.value = '';
+                    }
+
+                    input.blur();
+                }
+            }),
+        );
+
         return merge(
             this.rendering.lifetime$,
+            merge(typing$, keys$).pipe(map(() => undefined)),
             connectChoices$(this.shadow),
             connectSelects$(this.shadow),
             merge(

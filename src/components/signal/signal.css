@@ -113,18 +113,8 @@
     stroke-linecap: round;
 }
 
-.params {
-    --driven-reach: calc(var(--control-lg) + var(--space-2-5));
-    position: relative;
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: var(--space-1-5);
-}
-
 /* The rows below set their own display, which would otherwise win over the hidden attribute. */
-.steps[hidden],
-.param[hidden] {
+.steps[hidden] {
     display: none;
 }
 
@@ -175,58 +165,11 @@
     font-size: var(--text-2xs);
 }
 
-.param {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-0-5);
-    padding: calc(var(--spacing) * 1.25) var(--space-2) var(--space-1-5);
-    background: var(--well);
-    border-radius: var(--radius-xl);
-}
-
-.key {
-    font-size: var(--text-2xs);
-    color: var(--muted);
-}
-
-/* Reads as a value, not a text box: it is dragged first and typed into only on a click. */
-.num {
-    inline-size: 100%;
-    padding: 0;
-    font: 500 var(--text-base) var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--ink);
-    background: transparent;
-    border: none;
-    outline: none;
-    cursor: ns-resize;
-}
-
-.num:focus {
-    cursor: text;
-}
-
-.param:focus-within {
-    box-shadow: 0 0 0 2px var(--highlight);
-}
-
-.param[data-driven] .num {
-    display: none;
-}
-
-.param > .ui-driven {
-    align-self: flex-start;
-}
-
 .shapes,
 .rates {
     flex-wrap: wrap;
 }
 @container (max-width: 16rem) {
-    .params {
-        grid-auto-flow: row;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     .steps {
         flex-wrap: wrap;
     }

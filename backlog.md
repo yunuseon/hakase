@@ -5,46 +5,6 @@ says what done looks like. When an item lands, delete it here and describe the
 result in `AGENTS.md`, which says how the app _is_; this file says what is
 next. An idea that is not decided yet belongs in a conversation, not here.
 
-## Programs that fit any window
-
-### Why
-
-Program contents have no layout system of their own. Each component hand-rolls
-its rows, widths and breakpoints (most stylesheets have no container query, or
-one), each program's `minimum` is a number someone typed rather than what its
-content needs, and a window body that scrolls hides whatever does not fit.
-
-The layout audit (Storybook, Foundations) measures every program at its
-minimum, compact and regular size. Its first run, on 2026-11-18: **18 of 56
-programs fail, 33 findings.** Converters are 17 of them: every one makes its
-window scroll at its 220 × 180 minimum, by up to 198px; sound → level's reading
-chips push it sideways by 82 to 182px at every size, picture → level's by 9 to
-29px; level → bit's threshold is 3px narrower than its value at every size.
-Focus scrolls sideways by 3px in compact. Size classes, glance layouts, the
-stage and controls layout and `hks-properties` (see `AGENTS.md`) have since
-taken it to **0 of 56**. A first scripted look also blamed
-Voice and Paint, but the screen's edge had cut them, not their frames, which is
-why the audit measures inside a frame of its own.
-
-The answer is the one the big systems give: a few designed layouts per window
-size class rather than one layout squeezed (Material's window size classes,
-Apple's compact and regular), the first layout that fits rather than one that
-clips (SwiftUI's `ViewThatFits`), and one aligned label and value grid with
-detail behind disclosure (Notion's properties). Made the app's way: a
-program's controls become **data** a single component renders, so the layout
-rules live in one place, and a client without a browser can list and set the
-same controls from the same description.
-
-### In order
-
-- **The last hand-built rows.** Converters, voices, pedals, drums, the focus
-  timer, the export panel, the sketch's Parameters and Scene and the theme and
-  appearance editors describe their controls as `Section`s. Still by hand: the
-  signal's drag-numbers (which want a drag-number property kind, with the
-  driven pill), paint's and pen's brush dials, and the sketch's formula and
-  theme pickers in its header. Done when no component outside `shared/ui`
-  styles a label and value row of its own.
-
 ## The finish
 
 The app gained a lot of capability and too little finish. The goal now is

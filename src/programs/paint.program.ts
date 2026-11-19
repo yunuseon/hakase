@@ -10,6 +10,7 @@ import {
 } from 'rxjs/operators';
 import type { PaintView } from '../model/paint.ts';
 import { paintEventOf, paintMenu } from '../components/paint/paint-menu.ts';
+import { paintEventOfChange, paintSections } from '../components/paint/paint-controls.ts';
 import { paintInputsOf, workingFrame } from '../painting.ts';
 import type { Program } from '../program.ts';
 import { asPaint } from '../settings.ts';
@@ -20,12 +21,15 @@ export const paintProgram = {
     size: { width: 460, height: 580 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const [{ HksPaint }, { HksMenu }] = await Promise.all([
+        const [{ HksPaint }, { HksMenu }, { HksProperties }] = await Promise.all([
             import('../components/paint/paint.component.ts'),
             import('../shared/ui/menu.component.ts'),
+            import('../shared/ui/properties.component.ts'),
         ]);
         const paint = new HksPaint();
         const menu = new HksMenu();
+        const properties = new HksProperties();
+        paint.append(properties);
 
         return {
             element: paint,
@@ -56,7 +60,12 @@ export const paintProgram = {
                 return merge(
                     paint.connect$(view$, playing$).pipe(ignoreElements()),
                     menu.connect$(of(paintMenu), 'frame actions').pipe(ignoreElements()),
-                    merge(paint.changes$, menu.picks$.pipe(mergeMap(paintEventOf))).pipe(
+                    properties.connect$(view$.pipe(map(paintSections))).pipe(ignoreElements()),
+                    merge(
+                        paint.changes$,
+                        menu.picks$.pipe(mergeMap(paintEventOf)),
+                        properties.changes$.pipe(mergeMap(paintEventOfChange)),
+                    ).pipe(
                         withLatestFrom(settings$, picture$),
                         mergeMap(([event, settings, picture]) =>
                             paintInputsOf(event, settings, picture),

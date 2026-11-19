@@ -230,3 +230,55 @@
         border-inline-end: 1px solid var(--rule);
     }
 }
+
+/* Reads as a value, not a text box: it is dragged first and typed into only on a click. */
+.drag {
+    justify-self: start;
+    inline-size: 12ch;
+    padding-block: var(--space-0-5);
+    font: 500 var(--text-sm) var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    cursor: ns-resize;
+    touch-action: none;
+    user-select: none;
+}
+
+.drag:hover:not(:disabled),
+.drag:focus {
+    background: var(--well);
+}
+
+.drag:focus {
+    cursor: text;
+    user-select: text;
+}
+
+.drag:disabled {
+    cursor: default;
+}
+
+.row[data-kind='drag'] > .ui-driven {
+    grid-column: 3;
+}
+
+/* A header's pickers: rows side by side, each its own label and control, wrapping when narrow. */
+.section[data-inline] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+}
+
+.section[data-inline] > .row {
+    display: flex;
+    flex: 0 1 auto;
+    gap: var(--space-1-5);
+    align-items: center;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+}
+
+.section[data-inline] .fit {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+}

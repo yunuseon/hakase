@@ -1,20 +1,18 @@
 import { connectChoices$ } from '../../shared/ui/choices.component.ts';
 import { controlsSheet, whys$ } from '../../shared/ui/controls.component.ts';
-import { html, nothing } from 'lit-html';
+import { html } from 'lit-html';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { styleMap } from 'lit-html/directives/style-map.js';
 
 import { mountView, renderView, type RenderView, type Rendering } from '../../lib/lit.ts';
-import { combineLatest, EMPTY, merge, type Observable } from 'rxjs';
+import { combineLatest, merge, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
     map,
     mergeMap,
     pairwise,
-    scan,
-    share,
     shareReplay,
     startWith,
     tap,
@@ -22,29 +20,23 @@ import {
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$ } from '../../shared/drag.ts';
-import { type Phase } from '../../shared/phase.ts';
 import {
-    FIELDS,
-    isField,
-    isParam,
     isRate,
     isShape,
     isStepCount,
     RATES,
     SHAPES,
     STEP_COUNTS,
-    type Field,
     type Shape,
     type Signal,
     stepAt,
     type SignalCommand,
     type Wave,
 } from '../../shared/signal.ts';
-import { dragStep, HEIGHT, markerOf, plotOf, typedValue, valueText, WIDTH } from './signal.ts';
+import { HEIGHT, markerOf, plotOf, valueText, WIDTH } from './signal.ts';
 import css from './signal.css?inline';
 
 const sheet = styleSheet(css);
-const MOVE_SLOP = 3;
 
 const GLYPHS: Readonly<Record<Shape, string>> = {
     sine: 'M1 6 C5 -1 7 -1 12 6 S19 13 23 6',
@@ -53,13 +45,6 @@ const GLYPHS: Readonly<Record<Shape, string>> = {
     square: 'M1 10 V2 H12 V10 H23 V2',
     noise: 'M1 7 L4 3 L7 8 L10 5 L13 9 L16 2 L19 6 L23 4',
     steps: 'M1 10 V5 H7 V8 H13 V2 H19 V6 H23',
-};
-
-const HINTS: Readonly<Record<Field, string>> = {
-    phase: 'where in its cycle the loop starts: drag, or click to type degrees',
-    offset: 'the centre the wave swings around: drag, or click to type any number',
-    depth: 'how far the wave swings either side, negative flips it: drag, or click to type',
-    glide: 'how much of each step eases into the next: drag, or click to type a percentage',
 };
 
 const TEMPLATE = () =>
@@ -140,54 +125,9 @@ const TEMPLATE = () =>
                     )}
                 </div>
             </div>
-            <div class="params">
-                ${FIELDS.map(
-                    param =>
-                        html`<label
-                            class="param"
-                            title=${ifDefined(HINTS[param])}
-                            data-only=${ifDefined(param === 'glide' ? 'steps' : undefined)}
-                            ><span class="key">${param}</span
-                            ><input
-                                class="ui-field num"
-                                data-param=${ifDefined(param)}
-                                type="text"
-                                inputmode="decimal"
-                                spellcheck="false"
-                                autocomplete="off"
-                            />${
-                                isParam(param)
-                                    ? html`<button
-                                          type="button"
-                                          class="ui-driven"
-                                          data-why=${param}
-                                          data-chain=""
-                                          hidden
-                                      >
-                                          follows
-                                      </button>`
-                                    : nothing
-                            }</label
-                        >`,
-                )}
-            </div>
+            <slot></slot>
         </div>
     </div>`;
-
-type Pull = {
-    readonly phase: Phase;
-    readonly param: Field | null;
-    readonly x: number;
-    readonly y: number;
-    readonly moved: number;
-    readonly by: number;
-};
-
-const paramOf = (target: EventTarget | null): Field | null => {
-    const param = target instanceof HTMLElement ? target.dataset['param'] : undefined;
-
-    return param !== undefined && isField(param) ? param : null;
-};
 
 const fractionIn = (element: Element, { clientX, clientY }: PointerEvent) => {
     const rect = element.getBoundingClientRect();
@@ -203,7 +143,6 @@ export class HksSignal extends HTMLElement {
     readonly whys$: Observable<string> = whys$(this);
 
     private readonly shadow: ShadowRoot;
-    private readonly pulls$: Observable<Pull>;
 
     private readonly rendering: Rendering;
 
@@ -237,44 +176,6 @@ export class HksSignal extends HTMLElement {
 
         const bars = requireChild(shadow, '.bars');
         const scope = requireChild(shadow, '.scope');
-        const params = requireChild(shadow, '.params');
-
-        // Shared: the nudges and the click that opens the field for typing must read one gesture.
-        this.pulls$ = pointerGesture$(
-            params,
-            ({ target }) =>
-                paramOf(target) !== null &&
-                !(target instanceof HTMLInputElement && target.disabled) &&
-                shadow.activeElement !== target,
-        ).pipe(
-            scan(
-                (pull: Pull, { phase, event }): Pull =>
-                    phase === 'grab'
-                        ? {
-                              phase,
-                              param: paramOf(event.target),
-                              x: event.clientX,
-                              y: event.clientY,
-                              moved: 0,
-                              by: 0,
-                          }
-                        : {
-                              ...pull,
-                              phase,
-                              x: event.clientX,
-                              y: event.clientY,
-                              moved:
-                                  pull.moved +
-                                  Math.abs(event.clientX - pull.x) +
-                                  Math.abs(event.clientY - pull.y),
-                              by:
-                                  (event.clientX - pull.x - (event.clientY - pull.y)) *
-                                  (pull.param === null ? 0 : dragStep(pull.param, event.shiftKey)),
-                          },
-                { phase: 'release', param: null, x: 0, y: 0, moved: 0, by: 0 },
-            ),
-            share(),
-        );
 
         this.commands$ = merge(
             fromElementEvent$(requireChild(shadow, '.shapes'), 'click').pipe(
@@ -320,45 +221,6 @@ export class HksSignal extends HTMLElement {
                     return isRate(rate) ? [{ kind: 'rate', rate }] : [];
                 }),
             ),
-            this.pulls$.pipe(
-                mergeMap(({ phase, param, moved, by }): SignalCommand[] =>
-                    phase === 'move' && param !== null && moved >= MOVE_SLOP && by !== 0
-                        ? [{ kind: 'nudge', param, by }]
-                        : [],
-                ),
-            ),
-            fromElementEvent$(params, 'change').pipe(
-                mergeMap(({ target }): SignalCommand[] => {
-                    const param = paramOf(target);
-                    const value =
-                        param !== null && target instanceof HTMLInputElement
-                            ? typedValue(param, target.value)
-                            : null;
-
-                    return param === null || value === null ? [] : [{ kind: 'set', param, value }];
-                }),
-            ),
-            fromElementEvent$(params, 'keydown').pipe(
-                mergeMap(event => {
-                    const param = paramOf(event.target);
-                    const step = event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0;
-                    const command: SignalCommand | null =
-                        param === null || step === 0
-                            ? null
-                            : {
-                                  kind: 'nudge',
-                                  param,
-                                  by: step * dragStep(param, event.shiftKey) * 10,
-                              };
-
-                    return command === null ? [] : [{ event, claimed: command }];
-                }),
-                // Taken, or the canvas reads the arrow as a step between sections.
-                tap(({ event }) => {
-                    event.preventDefault();
-                }),
-                map(({ claimed }) => claimed),
-            ),
             pointerGesture$(scope).pipe(
                 map(({ phase, event }) => {
                     const rect = scope.getBoundingClientRect();
@@ -384,10 +246,8 @@ export class HksSignal extends HTMLElement {
         signal$: Observable<Signal>,
         wave$: Observable<Wave>,
         t$: Observable<number>,
-        lines$: Observable<ReadonlyMap<string, string>> = EMPTY,
     ): Observable<void> {
         const shadow = this.shadow;
-        const params = requireChild(shadow, '.params');
         const line = requireElement(shadow, '.wave', SVGPathElement);
         const now = requireElement(shadow, '.now', SVGLineElement);
         const zero = requireElement(shadow, '.zero', SVGLineElement);
@@ -422,62 +282,6 @@ export class HksSignal extends HTMLElement {
             distinctUntilChanged(),
             tap(rate => {
                 checked('[data-rate]', 'rate', rate);
-            }),
-        );
-
-        // A field that loses focus is written again, so Escape or a refused entry shows the value it had.
-        const left$ = fromElementEvent$(params, 'focusout').pipe(startWith(null));
-
-        const fields$ = FIELDS.map(param =>
-            combineLatest([
-                combineLatest([
-                    signal$.pipe(map(signal => valueText(param, signal[param]))),
-                    wave$.pipe(map(({ mods }) => isParam(param) && mods[param] !== null)),
-                ]).pipe(distinctUntilChanged(([a, x], [b, y]) => a === b && x === y)),
-                left$,
-            ]).pipe(
-                tap(([[text, driven]]) => {
-                    const input = requireElement(
-                        shadow,
-                        `[data-param="${param}"]`,
-                        HTMLInputElement,
-                    );
-                    input.disabled = driven;
-                    input.closest('.param')?.toggleAttribute('data-driven', driven);
-
-                    // Not while it is being typed into: the fold's value would overwrite the draft.
-                    if (shadow.activeElement !== input) {
-                        input.value = text;
-                    }
-                }),
-            ),
-        );
-
-        const typing$ = this.pulls$.pipe(
-            filter(
-                ({ phase, param, moved }) =>
-                    phase === 'release' && param !== null && moved < MOVE_SLOP,
-            ),
-            tap(({ param }) => {
-                const input = shadow.querySelector(`[data-param="${param}"]`);
-
-                if (input instanceof HTMLInputElement) {
-                    input.focus();
-                    input.select();
-                }
-            }),
-        );
-
-        const keys$ = fromElementEvent$(params, 'keydown').pipe(
-            tap(({ key, target }) => {
-                if (target instanceof HTMLInputElement && (key === 'Enter' || key === 'Escape')) {
-                    // Escape empties it first, so the change that the blur raises is refused.
-                    if (key === 'Escape') {
-                        target.value = '';
-                    }
-
-                    target.blur();
-                }
             }),
         );
 
@@ -519,23 +323,11 @@ export class HksSignal extends HTMLElement {
             }),
         );
 
-        const chained$ = lines$.pipe(
-            tap(lines => {
-                for (const button of shadow.querySelectorAll('[data-why]')) {
-                    const line = lines.get(button.getAttribute('data-why') ?? '');
-                    button.setAttribute('data-chain', line ?? '');
-                    button.toggleAttribute('hidden', line === undefined);
-                }
-            }),
-        );
-
         return merge(
             this.rendering.lifetime$,
             connectChoices$(this.shadow),
             this.barView.lifetime$,
-            merge(shape$, steps$, rate$, ...fields$, typing$, keys$, plot$, marker$, chained$).pipe(
-                map(() => undefined),
-            ),
+            merge(shape$, steps$, rate$, plot$, marker$).pipe(map(() => undefined)),
         );
     }
 }

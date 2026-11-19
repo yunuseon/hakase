@@ -1,14 +1,10 @@
 :host {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: block;
     block-size: 100%;
     min-block-size: 0;
     font: var(--text-sm)/1.3 var(--font-ui);
     color: var(--label);
     min-inline-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
 }
 
 .bar {
@@ -18,32 +14,9 @@
     align-items: center;
 }
 
-.modes button,
-.symmetries button {
-    padding: 0 var(--space-2);
-}
-
 .symmetries button {
     padding: 0 var(--space-1);
     font-family: var(--font-mono);
-}
-
-.dial {
-    display: flex;
-    gap: var(--space-1-5);
-    align-items: center;
-    color: var(--muted);
-}
-
-.dial input {
-    inline-size: calc(var(--spacing) * 18);
-    accent-color: var(--accent);
-}
-
-.dial output {
-    min-inline-size: 3ch;
-    font: 500 var(--text-xs) var(--font-mono);
-    color: var(--ink);
 }
 
 .stage {
@@ -98,17 +71,8 @@
     transform: translate(-50%, -50%);
 }
 
-.foot {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1-5) var(--space-3);
-    align-items: center;
-    justify-content: space-between;
-}
-
 .hint {
-    flex: 1;
-    min-inline-size: min(100%, var(--spacing) * 45);
+    margin: 0;
 }
 
 .hint b {
@@ -120,22 +84,10 @@
     display: none;
 }
 
-.bar > *,
-.dial {
+.bar > * {
     min-inline-size: 0;
     max-inline-size: 100%;
 }
-.dial {
-    flex-wrap: wrap;
-}
-.modes,
 .symmetries {
     flex-wrap: wrap;
-}
-.foot {
-    flex-wrap: wrap;
-}
-.foot hks-select {
-    min-inline-size: 0;
-    max-inline-size: 100%;
 }

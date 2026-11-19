@@ -11,83 +11,50 @@ import { map, mergeMap, tap } from 'rxjs/operators';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { guidesOf, isSymmetry, SYMMETRIES } from '../../shared/brush.ts';
-import {
-    isMode,
-    MAX_WEIGHT,
-    MIN_WEIGHT,
-    MODES,
-    penAt,
-    type Drawing,
-    type PenCommand,
-} from '../../model/pen.ts';
+import { penAt, type Drawing, type PenCommand } from '../../model/pen.ts';
 import css from './pen.css?inline';
 
 const sheet = styleSheet(css);
 
 const TEMPLATE = () =>
-    html`<div class="bar" data-detail>
-            <div class="ui-choices modes" role="radiogroup" aria-label="mode">
-                ${MODES.map(
-                    mode =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-mode=${ifDefined(mode)}
-                            title=${ifDefined(
-                                mode === 'draw'
-                                    ? 'the line is drawn across the loop, and starts again with it'
-                                    : 'the whole figure at once',
-                            )}
-                        >
-                            ${mode}
-                        </button>`,
-                )}
+    html`<div class="ui-staged">
+        <div data-stage>
+            <div class="bar" data-detail>
+                <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
+                    ${SYMMETRIES.map(
+                        symmetry =>
+                            html`<button
+                                class="ui-choice"
+                                type="button"
+                                role="radio"
+                                data-symmetry=${ifDefined(symmetry)}
+                                aria-label=${ifDefined(symmetry)}
+                                title=${ifDefined(symmetry)}
+                            >
+                                ${SymmetryIcon({ symmetry: symmetry })}
+                            </button>`,
+                    )}
+                </div>
             </div>
-            <label class="dial" title="how thick the line is; a size signal swells it"
-                ><span>weight</span
-                ><input
-                    class="ui-range"
-                    type="range"
-                    data-weight
-                    min=${ifDefined(MIN_WEIGHT)}
-                    max=${ifDefined(MAX_WEIGHT)}
-                    step="0.25" /><output></output
-            ></label>
-            <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
-                ${SYMMETRIES.map(
-                    symmetry =>
-                        html`<button
-                            class="ui-choice"
-                            type="button"
-                            role="radio"
-                            data-symmetry=${ifDefined(symmetry)}
-                            aria-label=${ifDefined(symmetry)}
-                            title=${ifDefined(symmetry)}
-                        >
-                            ${SymmetryIcon({ symmetry: symmetry })}
-                        </button>`,
-                )}
+            <div class="stage">
+                <div class="sheet">
+                    <canvas class="ink"></canvas
+                    ><svg
+                        class="guides"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    ></svg
+                    ><span class="tip"></span>
+                </div>
             </div>
-        </div>
-        <div class="stage">
-            <div class="sheet">
-                <canvas class="ink"></canvas
-                ><svg
-                    class="guides"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                ></svg
-                ><span class="tip"></span>
-            </div>
-        </div>
-        <div class="foot" data-detail>
-            <p class="ui-hint hint">
+            <p class="ui-hint hint" data-detail>
                 Plug signals into <b>x</b> and <b>y</b> in the state menu or in state mode, and the
                 pen follows them. Unplugged, it goes round in a circle.
             </p>
-        </div>`;
+        </div>
+        <slot name="controls" data-detail></slot>
+    </div>`;
 
 const dataOf = (target: EventTarget | null, name: string) =>
     target instanceof Element
@@ -125,26 +92,15 @@ export class HksPen extends HTMLElement {
         const picked$ = fromElementEvent$(this, 'click').pipe(
             mergeMap((event): PenCommand[] => {
                 const target = event.composedPath()[0] ?? null;
-                const mode = dataOf(target, 'mode');
                 const symmetry = dataOf(target, 'symmetry');
 
-                return mode !== null && isMode(mode)
-                    ? [{ kind: 'mode', mode }]
-                    : symmetry !== null && isSymmetry(symmetry)
-                      ? [{ kind: 'symmetry', symmetry }]
-                      : [];
+                return symmetry !== null && isSymmetry(symmetry)
+                    ? [{ kind: 'symmetry', symmetry }]
+                    : [];
             }),
         );
 
-        const weighed$ = fromElementEvent$(requireChild(shadow, '.bar'), 'input').pipe(
-            mergeMap(({ target }): PenCommand[] =>
-                target instanceof HTMLInputElement && target.dataset['weight'] !== undefined
-                    ? [{ kind: 'weight', weight: Number(target.value) }]
-                    : [],
-            ),
-        );
-
-        this.changes$ = merge(picked$, weighed$);
+        this.changes$ = picked$;
     }
 
     connect$(
@@ -169,16 +125,7 @@ export class HksPen extends HTMLElement {
         const controls$ = drawing$.pipe(
             map(({ pen, waves }) => ({ pen, plugged: waves.x !== null && waves.y !== null })),
             tap(({ pen, plugged }) => {
-                checked('mode', pen.mode);
                 checked('symmetry', pen.symmetry);
-
-                const weight = requireElement(shadow, '[data-weight]', HTMLInputElement);
-
-                if (weight.value !== String(pen.weight)) {
-                    weight.value = String(pen.weight);
-                }
-
-                requireChild(shadow, '.dial output').textContent = pen.weight.toFixed(1);
                 hint.hidden = plugged;
                 this.guideView.update(guidesOf(pen.symmetry));
             }),

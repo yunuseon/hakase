@@ -1,6 +1,14 @@
 import { declarations } from '../declarations.ts';
+import { penCommandOf, penSections } from '../components/pen/pen-controls.ts';
 import { combineLatest, merge } from 'rxjs';
-import { distinctUntilChanged, ignoreElements, map, shareReplay, switchMap } from 'rxjs/operators';
+import {
+    distinctUntilChanged,
+    ignoreElements,
+    map,
+    mergeMap,
+    shareReplay,
+    switchMap,
+} from 'rxjs/operators';
 import { sheet$ } from '../engine/view.ts';
 import { parseHexColor } from '../lib/color.ts';
 import { dabsAt } from '../shared/stroke.ts';
@@ -15,8 +23,14 @@ export const penProgram = {
     size: { width: 380, height: 480 },
     minimum: { width: 220, height: 180 },
     launch: async () => {
-        const { HksPen } = await import('../components/pen/pen.component.ts');
+        const [{ HksPen }, { HksProperties }] = await Promise.all([
+            import('../components/pen/pen.component.ts'),
+            import('../shared/ui/properties.component.ts'),
+        ]);
         const pen = new HksPen();
+        const properties = new HksProperties();
+        properties.slot = 'controls';
+        pen.append(properties);
 
         return {
             element: pen,
@@ -61,7 +75,18 @@ export const penProgram = {
                             playhead$,
                         )
                         .pipe(ignoreElements()),
-                    pen.changes$.pipe(map((command): AppInput => ({ kind: 'pen', command }))),
+                    properties
+                        .connect$(
+                            shared$.pipe(
+                                map(({ pen: document }) => document),
+                                distinctUntilChanged(),
+                                map(penSections),
+                            ),
+                        )
+                        .pipe(ignoreElements()),
+                    merge(pen.changes$, properties.changes$.pipe(mergeMap(penCommandOf))).pipe(
+                        map((command): AppInput => ({ kind: 'pen', command })),
+                    ),
                 );
             },
         };

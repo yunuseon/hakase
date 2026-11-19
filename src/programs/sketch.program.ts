@@ -17,7 +17,6 @@ import {
 } from 'rxjs/operators';
 import { reduceOrbit, type OrbitAction } from '../model/sketch/space.ts';
 import { optionsOf } from '../library.ts';
-import { themes } from '../model/sketch/themes/registry.ts';
 import type { Program } from '../program.ts';
 import type { AppInput } from '../protocol.ts';
 import { liveReadouts } from '../model/sketch/controls.ts';
@@ -79,9 +78,7 @@ export const sketchProgram = {
         const fpsCounter = new HksFpsCounter();
         fpsCounter.slot = 'status';
 
-        const controls = new HksSketchControls().presets(
-            Object.keys(themes).map(value => ({ value, label: value })),
-        );
+        const controls = new HksSketchControls();
         controls.slot = 'controls';
 
         const strip = new HksFrameStrip();

@@ -10,12 +10,9 @@ afterEach(() => document.body.replaceChildren());
 describe('lit-html custom select integration', () => {
     it('constructs disconnected nested controls with explicit routing attributes', () => {
         const controls = new HksSketchControls();
-        controls.presets([{ value: 'paper', label: 'Paper' }]);
         const root = controls.shadowRoot ?? controls;
-        const theme = requireElement(root, '[data-pick="theme"]', HksSelect);
-        expect(theme.options[0]?.textContent).toBe('Paper');
-        expect(requireElement(root, '[data-pick="formula"]', HksSelect).localName).toBe(
-            'hks-select',
+        expect(requireElement(root, '.document hks-properties', HTMLElement).localName).toBe(
+            'hks-properties',
         );
         // The process must dispose even a component that was never attached.
         const running = controls.connect$(of(), of(), of(), of(), of()).subscribe();

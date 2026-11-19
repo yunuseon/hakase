@@ -12,16 +12,8 @@ import { parseHexColor } from '../../lib/color.ts';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
 import { fromElementEvent$ } from '../../lib/rx.ts';
 import { pointerGesture$ } from '../../shared/drag.ts';
-import { isSide, SIZES, type Frame } from '../../shared/picture.ts';
-import {
-    isBrushField,
-    isTool,
-    MAX_BRUSH,
-    TOOLS,
-    type PaintEvent,
-    type PaintView,
-    type Tool,
-} from '../../model/paint.ts';
+import { type Frame } from '../../shared/picture.ts';
+import { isTool, TOOLS, type PaintEvent, type PaintView, type Tool } from '../../model/paint.ts';
 import { guidesOf, isSymmetry, SYMMETRIES, type Point, type Symmetry } from '../../shared/brush.ts';
 import css from './paint.css?inline';
 
@@ -50,18 +42,6 @@ const SYMMETRY_TITLES: Readonly<Record<Symmetry, string>> = {
     kaleido: 'kaleidoscope: six turns, mirrored',
 };
 
-const dial = (field: string, label: string, min: number, max: number, step: number) =>
-    html`<label class="dial" title=${ifDefined(label)}
-        ><span>${label}</span
-        ><input
-            class="ui-range"
-            type="range"
-            data-brush=${ifDefined(field)}
-            min=${ifDefined(min)}
-            max=${ifDefined(max)}
-            step=${ifDefined(step)} /><output data-read=${ifDefined(field)}></output
-    ></label>`;
-
 const TEMPLATE = () =>
     html`<div class="ui-staged">
         <div data-stage>
@@ -83,7 +63,6 @@ const TEMPLATE = () =>
                             </button>`,
                     )}
                 </div>
-                ${dial('size', 'size', 1, MAX_BRUSH, 1)}${dial('hardness', 'edge', 0, 1, 0.05)}${dial('flow', 'flow', 0.05, 1, 0.05)}
                 <div class="ui-choices symmetries" role="radiogroup" aria-label="symmetry">
                     ${SYMMETRIES.map(
                         symmetry =>
@@ -119,6 +98,7 @@ const TEMPLATE = () =>
             </div>
         </div>
         <div class="controls" data-controls data-detail>
+            <slot></slot>
             <div class="frames">
                 <ol class="strip" aria-label="frames"></ol>
                 <button
@@ -154,22 +134,6 @@ const TEMPLATE = () =>
                 >
                     onion
                 </button>
-            </div>
-            <div class="foot">
-                <div class="ui-choices sides" role="radiogroup" aria-label="resolution">
-                    ${SIZES.map(
-                        size =>
-                            html`<button
-                                class="ui-choice"
-                                type="button"
-                                role="radio"
-                                data-side=${ifDefined(size)}
-                                title=${ifDefined(`${size} × ${size} pixels`)}
-                            >
-                                ${size}
-                            </button>`,
-                    )}
-                </div>
             </div>
         </div>
     </div>`;
@@ -328,43 +292,27 @@ export class HksPaint extends HTMLElement {
             mergeMap((target): PaintEvent[] => {
                 const tool = dataOf(target, 'tool');
                 const symmetry = dataOf(target, 'symmetry');
-                const side = Number(dataOf(target, 'side'));
                 const frame = dataOf(target, 'frame');
 
                 return tool !== null && isTool(tool)
                     ? [{ kind: 'tool', tool }]
                     : symmetry !== null && isSymmetry(symmetry)
                       ? [{ kind: 'symmetry', symmetry }]
-                      : isSide(side)
-                        ? [{ kind: 'side', side }]
-                        : frame !== null
-                          ? [{ kind: 'select', frame: Number(frame) }]
-                          : dataOf(target, 'add') !== null
-                            ? [{ kind: 'add-frame' }]
-                            : dataOf(target, 'remove') !== null
-                              ? [{ kind: 'remove-frame' }]
-                              : dataOf(target, 'fade') !== null
-                                ? [{ kind: 'fade' }]
-                                : dataOf(target, 'onion') !== null
-                                  ? [{ kind: 'onion' }]
-                                  : [];
+                      : frame !== null
+                        ? [{ kind: 'select', frame: Number(frame) }]
+                        : dataOf(target, 'add') !== null
+                          ? [{ kind: 'add-frame' }]
+                          : dataOf(target, 'remove') !== null
+                            ? [{ kind: 'remove-frame' }]
+                            : dataOf(target, 'fade') !== null
+                              ? [{ kind: 'fade' }]
+                              : dataOf(target, 'onion') !== null
+                                ? [{ kind: 'onion' }]
+                                : [];
             }),
         );
 
-        const brushed$ = fromElementEvent$(requireChild(shadow, '.bar'), 'input').pipe(
-            mergeMap(({ target }): PaintEvent[] => {
-                const field =
-                    target instanceof HTMLInputElement ? target.dataset['brush'] : undefined;
-
-                return field !== undefined &&
-                    isBrushField(field) &&
-                    target instanceof HTMLInputElement
-                    ? [{ kind: 'brush', field, value: Number(target.value) }]
-                    : [];
-            }),
-        );
-
-        this.changes$ = merge(strokes$, keys$, picked$, brushed$);
+        this.changes$ = merge(strokes$, keys$, picked$);
     }
 
     connect$(view$: Observable<PaintView>, playing$: Observable<number>): Observable<void> {
@@ -440,10 +388,9 @@ export class HksPaint extends HTMLElement {
         );
 
         const controls$ = view$.pipe(
-            tap(({ tool, size, hardness, flow, symmetry, picture, onion: showing }) => {
+            tap(({ tool, symmetry, picture, onion: showing }) => {
                 checked('tool', tool);
                 checked('symmetry', symmetry);
-                checked('side', String(picture.side));
                 requireChild(shadow, '[data-fade]').setAttribute(
                     'aria-pressed',
                     String(picture.fade),
@@ -451,23 +398,6 @@ export class HksPaint extends HTMLElement {
                 requireChild(shadow, '[data-onion]').setAttribute('aria-pressed', String(showing));
                 requireElement(shadow, '[data-remove]', HTMLButtonElement).disabled =
                     picture.frames.length <= 1;
-
-                const values = { size, hardness, flow };
-
-                for (const [field, value] of Object.entries(values)) {
-                    const input = requireElement(
-                        shadow,
-                        `[data-brush="${field}"]`,
-                        HTMLInputElement,
-                    );
-
-                    if (input.value !== String(value)) {
-                        input.value = String(value);
-                    }
-
-                    requireChild(shadow, `[data-read="${field}"]`).textContent =
-                        field === 'size' ? String(value) : value.toFixed(2);
-                }
 
                 this.guideView.update(guidesOf(symmetry));
                 paper.dataset['tool'] = tool;

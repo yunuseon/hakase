@@ -21,6 +21,7 @@ import {
     type Section,
 } from '../../../shared/properties.ts';
 import { ICONS } from '../../../shared/ui/icons.ts';
+import { themes } from '../../../model/sketch/themes/registry.ts';
 
 export type SceneInput = {
     readonly view: ControlsView;
@@ -300,6 +301,8 @@ export const controlChangeOf = (change: PropertyChange): ControlChange[] => {
     }
 
     switch (id) {
+        case 'formula':
+        case 'theme':
         case 'mode':
         case 'fit':
         case 'lens':
@@ -310,3 +313,31 @@ export const controlChangeOf = (change: PropertyChange): ControlChange[] => {
             return [];
     }
 };
+
+export const headSections = (
+    view: ControlsView,
+    formulas: readonly { readonly value: string; readonly label: string }[],
+): readonly Section[] => [
+    {
+        id: 'document',
+        title: null,
+        fold: false,
+        inline: true,
+        properties: [
+            {
+                kind: 'choice',
+                id: 'formula',
+                label: 'formula',
+                value: view.formula,
+                options: formulas,
+            },
+            {
+                kind: 'choice',
+                id: 'theme',
+                label: 'theme',
+                value: view.theme,
+                options: Object.keys(themes).map(value => ({ value, label: value })),
+            },
+        ],
+    },
+];

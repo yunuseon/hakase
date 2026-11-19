@@ -970,14 +970,17 @@ element is the scroll region, so a short window scrolls its controls and never
 itself. The slot is styled as a flex column on purpose: a slot is `display:
 contents` by default, and two slotted parts (an Output's strip and its export
 panel) would each have become a column of their own when wide. Converters,
-voices, drums, the focus timer, pedals, Output, signals and paint follow it.
+voices, drums, the focus timer, pedals, Output, signals, paint and pen follow
+it; paint's and pen's tools and symmetry stay in the stage, as its toolbar, and
+their brush settings are properties.
 
 **Controls are data: `hks-properties`.** A program describes its settings as
 `Section`s of `Property`s (`shared/properties.ts`: choice, range, number, span,
 toggle, text, action), built by a pure function beside its component
 (`converterSections`, `voiceSections`, `pedalSections`, `drumsSections`,
-`focusSections`, `exportSections`, `sceneSections`, `themeSections`,
-`appearanceSections`), and one component
+`focusSections`, `exportSections`, `sceneSections`, `headSections`,
+`themeSections`, `appearanceSections`, `signalSections`, `paintSections`,
+`penSections`), and one component
 renders them, so the layout rules live once and a client with no browser can
 list the same controls from the same description. It emits `{ id, value }`, and
 the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
@@ -999,6 +1002,10 @@ the program maps an id to a command (`converterInputsOf`, `voiceCommandOf`,
 - **A setting exists only where it matters**: the builder leaves out a row
   that does not apply (a voice's synth section for a preset instrument, decay
   for a drone, the item picker with nothing to pick) rather than hiding it.
+- **An inline section** (`inline: true`) lays its rows side by side for a
+  header's pickers, and each row shrinks with it, so a row of choices still
+  measures as too wide and becomes a select. The panel is a size container
+  and has no width of its own, so an owner in a flex row gives it one.
 - **Two columns of sections where the panel has room** (`properties`, its own
   inline-size container, at 34rem): each section spans one column's three
   tracks and never splits, so the sketch's Scene reads as it did.
@@ -1706,13 +1713,17 @@ itself to whatever the wave reaches and labels its bounds, and the wave can be
 **grabbed**: up and down moves the offset by the plot's span, left and right
 slides the phase by the cycle (`drag-wave`, as fractions of the scope, so the
 fold does the scaling). Shapes are glyph buttons and rates a row of chips. The
-three values are **drag-numbers**: drag up or right to raise one (shift is ten
-times finer, `dragStep`), a click without a drag opens it for typing (degrees
-for the phase, `typedValue`), the arrow keys nudge it. A drag is reported as a
-`nudge`, how far, never as a value read from the field, because a control must
-not reach for the value the fold owns. A field being typed into is not written
-over, and leaving it writes the fold's value back, which is how Escape and a
-refused entry restore it.
+three values are **drag-numbers**, the `drag` property kind of
+`hks-properties` (`signalSections`, `signalCommandOf`): drag up or right to
+raise one (shift is ten times finer, the property's `step` and `fine`, from
+`dragStep`), a click without a drag opens it for typing (degrees for the phase,
+read by `typedValue`), the arrow keys nudge it. A drag is reported as a change
+with `nudge: true`, how far, never as a value read from the field, because a
+control must not reach for the value the fold owns; a typed entry arrives as
+its text. A field being typed into is not written over, and leaving it renders
+the fold's value again, which is how Escape and a refused entry restore it. The
+gesture and the click that opens a field read one shared fold (`pulled`), or a
+drag would also open the field.
 
 **A step sequencer is a shape, not a program.** `steps` reads the wave from a
 table of 4 to 16 values in 0 to 1 (`STEP_COUNTS`), each held for its share of
@@ -3067,7 +3078,9 @@ panel with `samePanel`, and `controlsView` hands the five answers to the view.
 A new control is a field in one group's reset, or it never resets.
 
 The **Formula and theme sit above both**, in the header row
-beside the tab switch, because they decide what the sketch shows and so what the
+beside the tab switch, as an inline section of a third `hks-properties`
+(`headSections`: rows side by side, each wrapping on its own, the formula a
+select once its choices outgrow the row), because they decide what the sketch shows and so what the
 animation exports; inside Parameters they read as drawing settings. The
 Animation tab is two components the program slots into the controls'
 `animation` slot: `hks-frame-strip`, a Photoshop-style frame strip, and
@@ -3557,7 +3570,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and seventy-three of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and seventy of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 

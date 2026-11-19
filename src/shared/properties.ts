@@ -51,6 +51,13 @@ export type Property =
       })
     | (Named & { readonly kind: 'toggle'; readonly value: boolean })
     | (Named & { readonly kind: 'colour'; readonly value: string })
+    | (Named & {
+          readonly kind: 'drag';
+          readonly text: string;
+          readonly step: number;
+          readonly fine: number;
+          readonly driven?: Driven;
+      })
     | (Named & { readonly kind: 'text'; readonly value: string; readonly placeholder: string })
     | (Named & {
           readonly kind: 'action';
@@ -66,9 +73,36 @@ export type Section = {
     readonly fold: boolean;
     readonly properties: readonly Property[];
     readonly action?: SectionAction;
+    readonly inline?: true;
 };
 
-export type PropertyChange = { readonly id: string; readonly value: string | number | boolean };
+export type PropertyChange = {
+    readonly id: string;
+    readonly value: string | number | boolean;
+    readonly nudge?: true;
+};
+
+export type Pull = {
+    readonly id: string | null;
+    readonly x: number;
+    readonly y: number;
+    readonly moved: number;
+    readonly by: number;
+};
+
+export const MOVE_SLOP = 3;
+
+export const pulled = (
+    pull: Pull,
+    at: { readonly x: number; readonly y: number },
+    step: number,
+): Pull => ({
+    ...pull,
+    x: at.x,
+    y: at.y,
+    moved: pull.moved + Math.abs(at.x - pull.x) + Math.abs(at.y - pull.y),
+    by: (at.x - pull.x - (at.y - pull.y)) * step,
+});
 
 export const section = (
     id: string,
