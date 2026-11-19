@@ -145,6 +145,13 @@ export const declarations = {
         icon: 'M4 9 A8 3 0 0 1 20 9 V15 A8 3 0 0 1 4 15 Z M4 9 A8 3 0 0 0 20 9 M7 4 L11 8 M17 4 L13 8',
         inputs: { playback: playbackInput, ...drumsInputs },
     },
+    mixer: {
+        id: 'mixer',
+        title: 'mixer',
+        category: 'make',
+        icon: 'M6 4 V20 M12 4 V20 M18 4 V20 M4 14 H8 M10 8 H14 M16 12 H20',
+        inputs: {},
+    },
     output: {
         id: 'output',
         title: 'output',

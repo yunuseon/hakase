@@ -1,3 +1,4 @@
+import type { Sound } from './mix.ts';
 import type { WireStyle } from './shared/connections.ts';
 import type { Image } from './image.ts';
 import type { Observable } from 'rxjs';
@@ -45,7 +46,22 @@ export type Task = {
     readonly focused: boolean;
 };
 
+export type MixStrip = {
+    readonly store: string;
+    readonly program: Sound;
+    readonly name: string;
+    readonly colour: string;
+    readonly volume: number;
+    readonly muted: boolean;
+    // What plays its level, when something does; null while the fader is the user's.
+    readonly chain: string | null;
+};
+
 export type AppState = {
+    readonly listening$: Observable<boolean>;
+    readonly soloed$: Observable<ReadonlySet<string>>;
+    readonly mix$: Observable<readonly MixStrip[]>;
+    readonly meter$: (store: string) => Observable<number>;
     readonly reading$: Observable<Reading>;
     readonly plan$: Observable<Plan | null>;
     readonly playhead$: Observable<number>;
@@ -152,8 +168,6 @@ export type Program<K extends ProgramId = ProgramId> = Declaration<K> & {
     readonly size: Size;
     // The smallest window its content still lays out in; the workspace clamps every resize to it.
     readonly minimum: Size;
-    // Off screen, a window's clock stops reaching it; one that is heard as well as seen keeps it.
-    readonly audible?: true;
     // A factory, not an element: two processes of one program need two elements. A promise, so a program's component loads with its first window.
     readonly launch: () => Promise<ProcessView>;
 };

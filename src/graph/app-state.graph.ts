@@ -26,13 +26,15 @@ import { parseTarget, type Global } from '../inventory.ts';
 import { devicePixelRatio$, viewport$, wallClock$ } from '../lib/rx.ts';
 import { sourceOf, type FormulaId } from '../library.ts';
 import type { AppSignal } from '../protocol.ts';
-import { type AppState, type Task } from '../program.ts';
+import { type AppState, type MixStrip, type Task } from '../program.ts';
+import type { Mix } from './mix.graph.ts';
+import type { SoundState } from './sound.graph.ts';
 import { isProgramId, type ProgramId } from '../protocol.ts';
 import { declarationOf, inputsFor } from '../declarations.ts';
 import { secondsOf } from '../shared/playhead.ts';
 import { TIME } from '../shared/signal.ts';
 import { graphOf, sameGraph } from '../state-graph.ts';
-import { colourOf, inStore, MAIN, type StoreId } from '../stores.ts';
+import { colourOf, inStore, MAIN, type StoreEntry, type StoreId } from '../stores.ts';
 import { entriesOf } from '../timeline.ts';
 import { chainsOf, sameChains } from '../why.ts';
 import { listed } from '../workspace.ts';
@@ -81,7 +83,9 @@ type StoreKey =
 type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
     Pick<Timekeeping, 'timers$' | 'planIn' | 'playbackIn'> & {
         readonly inputs$: Observable<AppSignal>;
-    } & Levels;
+    } & Levels &
+    Pick<Mix, 'strips$' | 'meterIn'> &
+    SoundState;
 
 export const scopedOf = ({
     history$,
@@ -140,7 +144,51 @@ export const scopedOf = ({
     pedalIn,
     sheetIn,
     imageIn,
+    strips$,
+    meterIn,
+    listening$,
+    soloed$,
 }: Reads) => {
+    const nameOf = (stores: readonly StoreEntry[]) => (id: StoreId) =>
+        stores.find(entry => entry.id === id)?.name ?? (isProgramId(id) ? MAIN : id);
+    const mix$ = combineLatest([strips$, linked$, stores$]).pipe(
+        switchMap(([strips, linked, stores]) =>
+            strips.length === 0
+                ? of([])
+                : combineLatest(
+                      strips.map(strip =>
+                          (strip.program === 'voice'
+                              ? voiceIn(strip.store).pipe(
+                                    map(({ volume, muted }) => ({ volume, muted })),
+                                )
+                              : drumsIn(strip.store).pipe(
+                                    map(({ volume, muted }) => ({ volume, muted })),
+                                )
+                          ).pipe(
+                              map(({ volume, muted }): MixStrip => ({
+                                  store: strip.store,
+                                  program: strip.program,
+                                  name: strip.name,
+                                  colour: colourOf(strip.store),
+                                  volume,
+                                  muted,
+                                  chain:
+                                      chainsOf(linked, strip.store, nameOf(stores)).get('volume') ??
+                                      null,
+                              })),
+                          ),
+                      ),
+                  ),
+        ),
+        shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const meter$ = (store: StoreId) =>
+        strips$.pipe(
+            map(strips => strips.find(strip => strip.store === store) ?? null),
+            distinctUntilChanged(),
+            switchMap(strip => (strip === null ? of(0) : meterIn(strip))),
+        );
+
     const previewSide$ = combineLatest([workspace$, viewport$, devicePixelRatio$]).pipe(
         map(([workspace, viewport, ratio]) => previewSideOf(workspace, viewport, ratio)),
         distinctUntilChanged(),
@@ -180,6 +228,10 @@ export const scopedOf = ({
     );
 
     const state: Omit<AppState, StoreKey> = {
+        listening$,
+        soloed$,
+        mix$,
+        meter$,
         zoom$: camera$.pipe(
             map(({ zoom }) => zoom),
             distinctUntilChanged(),

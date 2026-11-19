@@ -265,12 +265,7 @@ export const windowsOf = ({
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(
-                          store$,
-                          clock$,
-                          followsOf(entry$),
-                          'audible' in program ? of(true) : shownOf(entry$),
-                      ),
+                      scoped(store$, clock$, followsOf(entry$), shownOf(entry$)),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(

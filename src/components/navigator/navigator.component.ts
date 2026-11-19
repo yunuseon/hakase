@@ -1,5 +1,5 @@
 import { areaFill, areaOutline, boundsOf } from '../../shared/area.ts';
-import { Icon } from '../../shared/ui/icon.component.ts';
+import { Icon, ListenIcon } from '../../shared/ui/icon.component.ts';
 import { ICONS } from '../../shared/ui/icons.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
 import { html, svg } from 'lit-html';
@@ -98,6 +98,15 @@ const TEMPLATE = (map: MiniMap) =>
             title="State mode (hold W)"
         >
             ${Icon(ICONS.wire)}<span>State</span>
+        </button>
+        <button
+            class="ui-listen listen"
+            type="button"
+            aria-label="listen"
+            aria-pressed="false"
+            title="Listen: every voice and drum machine plays"
+        >
+            ${ListenIcon()}
         </button>
         <div class="history expanded-control" role="group" aria-label="History">
             <button
@@ -199,6 +208,7 @@ const TEMPLATE = (map: MiniMap) =>
 
 export class HksNavigator extends HTMLElement {
     readonly modes$: Observable<void>;
+    readonly listens$: Observable<void>;
     readonly zooms$: Observable<ZoomCommand>;
     readonly toggles$: Observable<void>;
     readonly jumps$: Observable<string>;
@@ -271,6 +281,9 @@ export class HksNavigator extends HTMLElement {
         this.modes$ = fromElementEvent$(requireChild(shadow, '.state-mode'), 'click').pipe(
             map(() => undefined),
         );
+        this.listens$ = fromElementEvent$(requireChild(shadow, '.listen'), 'click').pipe(
+            map(() => undefined),
+        );
         this.shadow = shadow;
     }
 
@@ -280,6 +293,7 @@ export class HksNavigator extends HTMLElement {
         open$: Observable<boolean>,
         history$: Observable<Undoable>,
         mode$: Observable<boolean>,
+        listening$: Observable<boolean> = of(false),
     ): Observable<void> {
         const launcher = requireElement(this.shadow, 'slot[name="launcher"]', HTMLSlotElement);
         const undo = requireElement(this.shadow, '[data-edit="undo"]', HTMLButtonElement);
@@ -297,6 +311,15 @@ export class HksNavigator extends HTMLElement {
                 map(() => undefined),
             ),
             merge(
+                listening$.pipe(
+                    distinctUntilChanged(),
+                    tap(on => {
+                        requireChild(this.shadow, '.listen').setAttribute(
+                            'aria-pressed',
+                            String(on),
+                        );
+                    }),
+                ),
                 mode$.pipe(
                     distinctUntilChanged(),
                     tap(active => {

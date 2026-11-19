@@ -63,6 +63,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     pen: document,
     voice: document,
     drums: document,
+    mixer: null,
     blueprints: null,
     tasks: null,
     tickets: document,

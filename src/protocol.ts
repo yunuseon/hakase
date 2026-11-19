@@ -1,3 +1,4 @@
+import type { Sound } from './mix.ts';
 import type { WireStyle } from './shared/connections.ts';
 import type { Phase } from './shared/phase.ts';
 import type { Appearance } from './appearance.ts';
@@ -41,6 +42,7 @@ export const PROGRAM_IDS = [
     'pen',
     'voice',
     'drums',
+    'mixer',
     'output',
     'colourmap',
     'kaleido',
@@ -128,6 +130,14 @@ export type AppInput =
     | { readonly kind: 'pen'; readonly command: PenCommand }
     | { readonly kind: 'voice'; readonly command: VoiceCommand }
     | { readonly kind: 'drums'; readonly command: DrumsCommand }
+    | {
+          readonly kind: 'strip';
+          readonly store: string;
+          readonly program: Sound;
+          readonly command: StripCommand;
+      }
+    | { readonly kind: 'listen' }
+    | { readonly kind: 'solo'; readonly store: string }
     | { readonly kind: 'pedal'; readonly command: PedalCommand }
     | { readonly kind: 'gate'; readonly command: GateCommand }
     | { readonly kind: 'converter'; readonly command: ConverterCommand }
@@ -157,6 +167,10 @@ export type AppInput =
       };
 
 export type TaskCommand = 'reveal' | 'close';
+
+export type StripCommand =
+    | { readonly kind: 'volume'; readonly volume: number }
+    | { readonly kind: 'mute'; readonly muted: boolean };
 
 // Stamped as it leaves a process: who said it, from which store, on which clock.
 export type AppSignal = {

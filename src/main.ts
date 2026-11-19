@@ -13,6 +13,8 @@ import { selectionOf } from './graph/selection.graph.ts';
 import { stateModeOf } from './graph/state-mode.graph.ts';
 import { previewsOf } from './graph/previews.graph.ts';
 import { windowsOf } from './graph/windows.graph.ts';
+import { soundOf } from './graph/sound.graph.ts';
+import { sound$ } from './sound.ts';
 import { workspaceActions$ } from './graph/workspace-actions.graph.ts';
 
 const bootstrap = () => {
@@ -34,7 +36,8 @@ const bootstrap = () => {
     const navigation = navigationOf({ ...chrome, ...intents, ...core, inputs$ });
     const stateMode = stateModeOf({ ...chrome, ...core, signals$ });
     const previews = previewsOf({ ...chrome, ...stateMode, ...core });
-    const scoped = scopedOf({ ...core, inputs$ });
+    const sound = soundOf({ ...chrome, inputs$ });
+    const scoped = scopedOf({ ...core, ...sound, inputs$ });
     const windows = windowsOf({ ...chrome, ...core, ...selection, ...stateMode, scoped });
 
     const workspaceActions = workspaceActions$({
@@ -56,6 +59,7 @@ const bootstrap = () => {
 
     return merge(
         chime$(core.timers$, core.plans$),
+        sound$(core, sound.listening$, sound.soloed$),
         core.persisted$,
         connectChrome$({
             ...chrome,
@@ -64,6 +68,7 @@ const bootstrap = () => {
             ...selection,
             ...stateMode,
             ...previews,
+            ...sound,
         }),
     ).subscribe();
 };

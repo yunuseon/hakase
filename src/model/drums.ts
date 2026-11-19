@@ -37,6 +37,7 @@ export type Drums = {
     readonly repeat: Repeat;
     readonly swing: number;
     readonly volume: number;
+    readonly muted: boolean;
     readonly pattern: Pattern;
     readonly sources: { readonly volume: string | null };
 };
@@ -96,6 +97,7 @@ export const defaultDrums: Drums = {
     repeat: 1,
     swing: 0,
     volume: 0.8,
+    muted: false,
     pattern: PRESETS.backbeat,
     sources: { volume: null },
 };
@@ -112,6 +114,7 @@ export type DrumsCommand =
     | { readonly kind: 'repeat'; readonly repeat: Repeat }
     | { readonly kind: 'swing'; readonly swing: number }
     | { readonly kind: 'volume'; readonly volume: number }
+    | { readonly kind: 'mute'; readonly muted: boolean }
     | { readonly kind: 'preset'; readonly preset: PresetName }
     | { readonly kind: 'clear' }
     | { readonly kind: 'source'; readonly param: 'volume'; readonly source: string | null };
@@ -199,6 +202,8 @@ export const reduceDrums = (drums: Drums, command: DrumsCommand): Drums => {
 
             return volume === null || volume === drums.volume ? drums : { ...drums, volume };
         }
+        case 'mute':
+            return command.muted === drums.muted ? drums : { ...drums, muted: command.muted };
         case 'preset':
             return {
                 ...drums,
@@ -351,6 +356,7 @@ export const parseDrums = (value: unknown): Drums => {
                       bell: row('bell'),
                   }
                 : resampled(defaultDrums.pattern, 16, count),
+        muted: field(value, 'muted') === true,
         sources: { volume: typeof source === 'string' ? source : null },
     };
 };

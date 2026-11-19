@@ -80,6 +80,34 @@ export const programDemo = (
         state$.pipe(map(read), distinctUntilChanged());
     const clock$ = select(state => state.clock);
     const app: AppState = {
+        listening$: of(false),
+        soloed$: of(new Set<string>()),
+        mix$: of([
+            {
+                store: 'voice',
+                program: 'voice',
+                name: 'Lead',
+                colour: '#c8553d',
+                volume: 0.6,
+                muted: false,
+                chain: null,
+            },
+            {
+                store: 'drums',
+                program: 'drums',
+                name: 'Kit',
+                colour: '#4a7c74',
+                volume: 0.8,
+                muted: true,
+                chain: 'volume ← Swell',
+            },
+        ]),
+        meter$: store =>
+            clock$.pipe(
+                map(clock =>
+                    store === 'drums' ? 0 : 0.35 + 0.3 * Math.sin(clock.at * Math.PI * 2),
+                ),
+            ),
         reading$: select(state => ({
             kind: 'count',
             title: 'Component catalogue',

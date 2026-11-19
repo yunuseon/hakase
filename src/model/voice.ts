@@ -54,6 +54,7 @@ export type Voice = {
     readonly decay: number;
     readonly glide: number;
     readonly volume: number;
+    readonly muted: boolean;
     readonly sources: Readonly<Record<VoiceParam, string | null>>;
 };
 
@@ -66,6 +67,7 @@ export const defaultVoice: Voice = {
     decay: 0.35,
     glide: 0.02,
     volume: 0.6,
+    muted: false,
     sources: { pitch: null, volume: null, filter: null, pan: null },
 };
 
@@ -78,6 +80,7 @@ export type VoiceCommand =
     | { readonly kind: 'decay'; readonly decay: number }
     | { readonly kind: 'glide'; readonly glide: number }
     | { readonly kind: 'volume'; readonly volume: number }
+    | { readonly kind: 'mute'; readonly muted: boolean }
     | { readonly kind: 'source'; readonly param: VoiceParam; readonly source: string | null };
 
 const within = (value: number, low: number, high: number) =>
@@ -120,6 +123,8 @@ export const reduceVoice = (voice: Voice, command: VoiceCommand): Voice => {
 
             return volume === null ? voice : withNumber(voice, 'volume', volume);
         }
+        case 'mute':
+            return command.muted === voice.muted ? voice : { ...voice, muted: command.muted };
         case 'source':
             return voice.sources[command.param] === command.source
                 ? voice
@@ -448,6 +453,7 @@ export const parseVoice = (value: unknown): Voice => {
         decay: numberIn(field(value, 'decay'), DECAY.low, DECAY.high, defaultVoice.decay),
         glide: numberIn(field(value, 'glide'), GLIDE.low, GLIDE.high, defaultVoice.glide),
         volume: numberIn(field(value, 'volume'), 0, 1, defaultVoice.volume),
+        muted: field(value, 'muted') === true,
         sources: {
             pitch: source('pitch'),
             volume: source('volume'),

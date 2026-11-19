@@ -42,10 +42,6 @@ at 41% and running off the screen at 100%.
 
 ### In order
 
-- **One sound switch.** One Listen in the navigator that unlocks audio for
-  every voice and drum machine in view, with a small mixer for each one's
-  level and mute. A window's own Listen stays, as a solo. Done when Light
-  band sounds after one click.
 - **Graphs you can hold.** Placing a blueprint flies the camera to fit what
   was placed. Any window folds to its title row, its pins still live and its
   traces still landing, saved with the window. Done when Light band can be

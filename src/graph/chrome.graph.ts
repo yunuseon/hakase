@@ -3,6 +3,7 @@ import { map, switchMap } from 'rxjs/operators';
 import { variables } from '../appearance.ts';
 import { HksCanvas } from '../components/canvas/canvas.component.ts';
 import { HksNavigator } from '../components/navigator/navigator.component.ts';
+import type { SoundState } from './sound.graph.ts';
 import { minimapOf } from '../components/navigator/navigator.ts';
 import { HksPalette } from '../components/palette/palette.component.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
@@ -95,7 +96,8 @@ type Shown = Chrome &
     > &
     Pick<Selection, 'selectedIds$' | 'clipboard$' | 'placing$'> &
     Pick<StateMode, 'mode$' | 'wiringView$'> &
-    Pick<PreviewsGraph, 'previews$' | 'previewAt$'>;
+    Pick<PreviewsGraph, 'previews$' | 'previewAt$'> &
+    Pick<SoundState, 'listening$'>;
 
 export const connectChrome$ = ({
     canvas,
@@ -124,6 +126,7 @@ export const connectChrome$ = ({
     wiringView$,
     previews$,
     previewAt$,
+    listening$,
 }: Shown) =>
     merge(
         canvas.connect$(
@@ -195,5 +198,6 @@ export const connectChrome$ = ({
                 map(({ cursor, steps }) => ({ undo: cursor > 0, redo: cursor < steps.length })),
             ),
             mode$.pipe(map(mode => mode.active)),
+            listening$,
         ),
     );

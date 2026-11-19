@@ -49,6 +49,10 @@ export const documentActionsOf = ({
             return [{ kind: 'pedals', store, command: input.command }];
         case 'drums':
             return [{ kind: 'drums', store, command: input.command }];
+        case 'strip':
+            return input.program === 'voice'
+                ? [{ kind: 'voices', store: input.store, command: input.command }]
+                : [{ kind: 'drums', store: input.store, command: input.command }];
         case 'modulate':
             return [
                 {

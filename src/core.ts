@@ -4,6 +4,7 @@ import { inputsFor } from './declarations.ts';
 import type { DocumentAction } from './documents.ts';
 import { begunFrom, historyOf } from './graph/history.graph.ts';
 import { levelsOf } from './graph/levels.graph.ts';
+import { mixOf } from './graph/mix.graph.ts';
 import { persisted$ } from './graph/persistence.graph.ts';
 import { projectionsOf } from './graph/projections.graph.ts';
 import { timekeepingOf } from './graph/timekeeping.graph.ts';
@@ -38,11 +39,13 @@ export const coreOf = ({
     const projected = projectionsOf(history$);
     const timekeeping = timekeepingOf({ ...projected, stored, inputs$, ports });
     const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$, ports });
+    const mix = mixOf({ ...projected, ...timekeeping, ...levels });
 
     return {
         ...projected,
         ...timekeeping,
         ...levels,
+        ...mix,
         persisted$: persisted$({ ...projected, ...timekeeping, ports }),
     };
 };

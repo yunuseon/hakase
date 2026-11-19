@@ -2,7 +2,8 @@
     --thumb: calc(var(--spacing) * 15);
     --state-width: calc(var(--spacing) * 17);
     --compact-rest: calc(
-        var(--state-width) + var(--thumb) + var(--space-12) + var(--space-1-5) + 2px
+        var(--state-width) + var(--control-lg) + var(--space-2) + var(--thumb) + var(--space-12) +
+            var(--space-1-5) + 2px
     );
     position: fixed;
     inset-block-start: calc(
@@ -258,16 +259,16 @@
 
 :host(:not([data-open])) .navigator {
     display: grid;
-    grid-template-columns: auto auto var(--thumb) minmax(0, 1fr);
-    grid-template-areas: 'launcher state thumb zoom';
+    grid-template-columns: auto auto auto var(--thumb) minmax(0, 1fr);
+    grid-template-areas: 'launcher state listen thumb zoom';
     align-items: center;
     column-gap: var(--space-2);
     block-size: auto;
     padding: var(--space-1-5) var(--space-1-5) var(--space-1-5) var(--space-2);
 }
 :host(:not([data-open]):not([data-launcher])) .navigator {
-    grid-template-columns: auto var(--thumb) minmax(0, 1fr);
-    grid-template-areas: 'state thumb zoom';
+    grid-template-columns: auto auto var(--thumb) minmax(0, 1fr);
+    grid-template-areas: 'state listen thumb zoom';
 }
 :host(:not([data-launcher])) .launcher {
     display: none;
@@ -277,6 +278,9 @@
 }
 :host(:not([data-open])) .launcher {
     grid-area: launcher;
+}
+:host(:not([data-open])) .listen {
+    grid-area: listen;
 }
 :host(:not([data-open])) .state-mode {
     grid-area: state;
@@ -312,7 +316,7 @@
         grid-template-columns: auto minmax(0, 1fr) auto;
         grid-template-areas:
             'launcher state state'
-            'thumb thumb zoom';
+            'thumb listen zoom';
         row-gap: var(--space-1-5);
     }
 }
@@ -389,6 +393,9 @@
     order: 1;
     min-block-size: var(--control-lg);
 }
+:host([data-open]) .listen {
+    order: 1;
+}
 :host([data-open]) .history {
     order: 2;
     margin-inline-start: auto;
@@ -415,18 +422,25 @@
 }
 @media (any-pointer: coarse) {
     :host(:not([data-open])) .navigator {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas: 'launcher state' 'thumb zoom';
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: 'launcher launcher state' 'thumb listen zoom';
         row-gap: var(--space-1-5);
     }
 }
 @container (max-width: 17.5rem) {
     :host(:not([data-open])) .navigator {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas: 'launcher launcher' 'state thumb' 'zoom zoom';
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-areas: 'launcher launcher launcher' 'state listen thumb' 'zoom zoom zoom';
         row-gap: var(--space-1-5);
     }
     :host([data-open]) .zoom-controls {
         flex-basis: 100%;
     }
+}
+
+.listen {
+    inline-size: var(--control-lg);
+    block-size: var(--control-lg);
+    padding: 0;
+    justify-content: center;
 }

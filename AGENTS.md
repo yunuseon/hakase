@@ -574,10 +574,12 @@ zoom and the live map. Neither component imports the other. `categoriesOf` in
 `program-categories.ts` derives the menu contents from program definitions for
 both the app and Storybook, so previews cannot silently omit programs.
 
-The compact card shows category icons, State, the map thumbnail and zoom. The
-expanded card keeps those icons in its upper-left corner and adds history, map
-section targets and navigation controls. Narrow cards wrap the compact view into
-two rows. There is no separate edge toolbar, hide tab or position menu.
+The compact card shows category icons, State, Listen (the one switch for every
+sound, see "Voice"), the map thumbnail and zoom. The expanded card keeps those
+icons in its upper-left corner and adds history, map section targets and
+navigation controls. Narrow cards wrap the compact view into two rows, and
+Listen moves into the lower one beside the map, or it would push the
+launcher's last key onto a row of its own. There is no separate edge toolbar, hide tab or position menu.
 
 **The compact card is a grid; the expanded card is placed by hand.** The
 compact row's areas (launcher, State, thumbnail, zoom) let a larger control push
@@ -591,7 +593,7 @@ the navigator from the same `categoriesOf` it hands the launcher, because the
 navigator cannot count what is slotted into it; the card's compact width reads
 it too. A literal 4 there wrapped the fifth key, Convert, onto a second row at
 every width. **The compact width is the sum of its parts**, each from the token
-that sizes it: the keys and their gaps, `--state-width` (the State button's
+that sizes it: the keys and their gaps, Listen's `--control-lg`, `--state-width` (the State button's
 minimum, its icon alone on touch), `--thumb`, the readout's `--space-12`, the
 gaps and the padding. A width written as one number with a margin to spare was
 27 pixels short, and the zoom readout covered a third of the thumbnail.
@@ -2064,19 +2066,46 @@ row reads **follows** now, since it may not be a signal. **Chladni**, in the
 library, is the worked example: the melody picks the plate's mode, so each note
 has its own figure, and the level shakes the plate and lights it on each strike.
 
-**Sound is the window's, and only while it listens.** Nothing reads a voice
-as data, so its output is a side effect of its open window, like a sketch's
-GL draws, and two windows on one voice play it twice. **Listen** is view state
-(not saved): a browser refuses to start audio outside a gesture, so the
-`AudioContext` is created inside the click's own subscription, never on load.
+**Sound is the store's, not the window's.** Every voice and drum machine in
+the registry plays, with or without a window, like a picture a pedal reads
+with its sketch's window closed. It was a side effect of each open window once:
+Light band took one Listen per voice and drum machine, two windows on one voice
+played it twice, and closing a window silenced a voice the sketch beside it
+still followed. Three pieces now:
+
+- **The core lists the strips** (`mixOf` in `graph/mix.graph.ts`, `stripsOf`
+  in `mix.ts`): one per sound store, each with its clock, the clock of the
+  first window bound to it, or the main clock, so a patch that put its band on
+  a clock of its own keeps its tempo. `playedIn` resolves what a strip plays
+  (notes or hits, and its loudness curve) through the store's links, exactly as
+  a window's `sounding$` did, and `meterIn` reads the loudness at the playhead.
+- **One effect plays them** (`sound$` in `src/sound.ts`, beside `chime$`). Per
+  strip it builds the voice graph or the drum bus and schedules ahead on the
+  audio clock, as the windows did; strips are followed one by one
+  (`pairwise` over the list, `takeUntil` the strip leaves), so a new voice
+  never restarts the others.
+- **Listen and solo are temporary folds** (`soundOf` in
+  `graph/sound.graph.ts`), never saved, since a browser starts audio only
+  inside a click: the `AudioContext` is created inside the click's own
+  subscription, which every Listen (the navigator's, the mixer's, a voice's or
+  drum machine's own) toggles alike. Listen off is silence everywhere. A strip
+  sounds unless muted; while any is soloed, only the soloed do (`audible`).
+
+**The mixer** (`mixer`, Make) is a window with no store: one strip per sound
+store, with its colour, a meter, an upright fader, mute and solo. The fader is
+the store's own volume, so it is the port the open question asked for at no
+cost: a signal on the volume input moves it, and the strip shows **follows**
+with the chain instead. Mute is saved on the voice or drum document
+(`muted`), so a blueprint carries its balance; solo is not. A strip names its
+store in its input (`strip`, with the program), since the mixer has no store
+of its own to be stamped with.
+
 It is one context for every voice (`context$`, `shareReplay` with refCount; a
-page may hold only a few), closed a moment after the last voice stops so the
-release fades are not cut off. Each listening window builds an oscillator →
-lowpass → gain → panner graph in `voiceGraph$`, torn down with a short release,
-and `applyLevel` sets each parameter with `setTargetAtTime` once per frame, so
-a voice sounds only while its clock plays and goes quiet when it pauses.
-Frame-rate updates mean a pluck can land up to a frame late; scheduling
-ahead of the playhead is the next step if that is ever heard.
+page may hold only a few), closed a moment after the last strip stops so the
+release fades are not cut off. A voice graph is oscillator → lowpass → gain →
+panner (`voiceGraph$`), torn down with a short release, and `applyLevel` sets
+each parameter with `setTargetAtTime` once per frame, so a voice sounds only
+while its clock plays and goes quiet when it pauses.
 
 **Store inputs are one mechanism for every document that has them.** A
 document with sources is `Linked` (`{ sources }`), and a `link` action is
@@ -3257,7 +3286,7 @@ reaches for a browser:
 client knows of one: id, title, category, icon and inputs, in toolbar order,
 with `pedalDeclaration`, `gateDeclaration` and `converterDeclaration` for the
 tables. A program file spreads its declaration and adds the browser's part, its
-size, minimum, `audible` and `launch`. `inputsFor`, the task list and the
+size, minimum and `launch`. `inputsFor`, the task list and the
 `Process` type read the declarations, never `programs.ts`, which is the
 browser's table and imports every component's program.
 
@@ -3570,7 +3599,7 @@ shareReplay({...})` — write the operator at the call site instead. It costs a
 that tears the row out of the panel.` If it needs a paragraph, the paragraph
     goes here and the code gets a sentence.
 
-    Four hundred and seventy of them survive in `src/` today, every one a single line. Treat that
+    Four hundred and seventy-four of them survive in `src/` today, every one a single line. Treat that
     as the ceiling, not the target: adding one means arguing it past the bar, and
     finding two that describe rather than warn means deleting them.
 
@@ -3965,9 +3994,8 @@ derived from the camera, the viewport and its box (`onScreen`, with a margin of
 `scoped` withholds its clock while it is false: the playhead, the clock, the
 pace and everything built on them stop arriving, so a sketch, a pedal view, a
 signal, a plot or a gate pauses with no code of its own and picks up at the
-current moment when it comes back. Programs that are heard as well as seen
-(voice and drums) are `audible` and keep their clock, or panning away would
-stop the music. An export snapshots its request when it starts, so leaving
+current moment when it comes back. Sound needs no exception: it is played
+from the stores, not from windows (see "Voice"). An export snapshots its request when it starts, so leaving
 the view does not stall it. With four clocks playing, script per frame went
 from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
 

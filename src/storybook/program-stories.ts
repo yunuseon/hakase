@@ -23,6 +23,7 @@ const timingProgram = converterProgram('schedule-level');
 import { signalProgram } from '../programs/signal.program.ts';
 import { sketchProgram } from '../programs/sketch.program.ts';
 import { tasksProgram } from '../programs/tasks.program.ts';
+import { mixerProgram } from '../programs/mixer.program.ts';
 import { themeProgram } from '../programs/theme.program.ts';
 import { timelineProgram } from '../programs/timeline.program.ts';
 import { ticketsProgram } from '../programs/tickets.program.ts';
@@ -249,6 +250,14 @@ const specs: readonly Spec[] = [
         elements: ['hks-blueprints'],
         description:
             'Starter layouts and miniature workspace previews. Placement requests are logged.',
+        variants: normal,
+    },
+    {
+        program: mixerProgram,
+        title: 'Mixer',
+        elements: ['hks-mixer', 'MixStrip', 'mixerView'],
+        description:
+            'One strip per voice and drum machine: a meter, a level fader (a driven one says what plays it), mute and solo, and the one Listen that turns every sound on. Fixture strips; nothing sounds.',
         variants: normal,
     },
     {

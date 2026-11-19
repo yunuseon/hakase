@@ -16,6 +16,7 @@ import { paintProgram } from './programs/paint.program.ts';
 import { penProgram } from './programs/pen.program.ts';
 import { voiceProgram } from './programs/voice.program.ts';
 import { drumsProgram } from './programs/drums.program.ts';
+import { mixerProgram } from './programs/mixer.program.ts';
 import { blueprintsProgram } from './programs/blueprints.program.ts';
 import { progressProgram } from './programs/progress.program.ts';
 import { plotProgram } from './programs/plot.program.ts';
@@ -44,6 +45,7 @@ export const programs = {
     pen: penProgram,
     voice: voiceProgram,
     drums: drumsProgram,
+    mixer: mixerProgram,
     output: outputProgram,
     colourmap: pedalProgram('colourmap'),
     kaleido: pedalProgram('kaleido'),
