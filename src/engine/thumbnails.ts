@@ -9,7 +9,7 @@ import { stagesOf, stillOf, type Image } from '../image.ts';
 import { backdropOf, cook, filmed, filmFor, framedIn } from './engine.ts';
 import { engine$ } from './view.ts';
 
-const TILE_SAMPLES = 4;
+const TILE_SAMPLES = 1;
 
 const SETTLE_MS = 250;
 

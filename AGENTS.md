@@ -2338,8 +2338,14 @@ march step and adds a shadow ray per bounce. Two rules came out of it:
 - **A strip tile is traced at its own size** (`traceSide` in `filmstrip$`),
   never at the 8x the strip supersamples for a sketch's small dots: a tile
   took 177 ms that way, and the Output's strip redraws whenever it pages with
-  the playhead, so playback stalled for a second at every page. It takes 11
-  ms now.
+  the playhead, so playback stalled for a second at every page. It takes 3
+  ms now, at one sample (`TILE_SAMPLES`): four cost 11 ms a tile, and a page
+  of eight still stalled playback 100 ms every second.
+
+Measured in the app (Still life at 69%, Scene, Output and its strip in view):
+idle once converged holds 60 fps; playing holds 60, one frame over 25 ms in
+eight seconds; refining after a pause runs at about 45 for the few seconds it
+takes, since one sample at 384 is the least a refining frame can add.
 
 A light's shadow ray stops at the light (`march`'s `far`), not at `FAR`.
 
