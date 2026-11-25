@@ -3,6 +3,7 @@ import { defaultSignal, type Signal } from './shared/signal.ts';
 import { defaultVoice, type Voice } from './model/voice.ts';
 import { ACCENT, defaultDrums, NORMAL, PRESETS } from './model/drums.ts';
 import { defaultPanel } from './model/sketch/params.ts';
+import { defaultScene, sceneObject } from './model/scene.ts';
 import { unlinkedSketch } from './model/sketch/links.ts';
 import { defaultPedal, type Pedal, type PedalKind } from './pedals.ts';
 import { GATE_DEFAULTS, GATES, type Bit, type Gate, type GateKind } from './gates.ts';
@@ -34,6 +35,7 @@ const held = {
     signals: [],
     paintings: [],
     pens: [],
+    scenes: [],
     voices: [],
     drums: [],
     pedals: [],
@@ -117,6 +119,15 @@ const TICK = { playback: { kind: 'playback', store: 'tick' } } as const;
 const SHOW = { playback: { kind: 'playback', store: 'show' } } as const;
 
 const BAND = { playback: { kind: 'playback', store: 'band' } } as const;
+
+const STUDIO = { playback: { kind: 'playback', store: 'studio' } } as const;
+
+const ORB = `Hit custom(vec3 p, float t) {
+    float a = k1 * 6.2832;
+    vec3 at = vec3(cos(a) * 1.6, 0.4, sin(a) * 1.6);
+    return glowing(sdSphere(p - at, 0.22), 0.95, 9.0);
+}
+`;
 
 const CHORDS = [-3, -7, 0, -5];
 
@@ -563,6 +574,57 @@ export const STARTERS: readonly Starter[] = [
             { a: 'fold', b: 'tint' },
             { a: 'tint', b: 'out' },
             { a: 'source', b: 'spin' },
+        ],
+    },
+    {
+        id: 'starter-still-life',
+        name: 'Still life',
+        summary:
+            'A path-traced scene: a glass ball, a metal ring and a glowing orb a signal carries round them on k1, written as code beside the objects. Press play to see it noisy and moving; pause, and it refines.',
+        size: { width: 1448, height: 752 },
+        windows: [
+            opened('studio', 'timeline', 'studio', { x: 24, y: 48, width: 360, height: 120 }),
+            opened('round', 'signal', 'round', { x: 24, y: 168, width: 360, height: 236 }, STUDIO),
+            opened('still', 'scene', 'still', { x: 384, y: 48, width: 560, height: 680 }, STUDIO),
+            opened(
+                'print',
+                'output',
+                'output',
+                { x: 944, y: 48, width: 480, height: 620 },
+                { ...STUDIO, in: { kind: 'scene', store: 'still' } },
+            ),
+        ],
+        stores: [
+            { ...own('studio', 'timeline', 'Still life'), clock: { duration: 8, looping: true } },
+            own('round', 'signal', 'Round'),
+            own('still', 'scene', 'Still life'),
+        ],
+        held: {
+            ...held,
+            signals: [
+                ['round', { ...defaultSignal, shape: 'saw', rate: 1, offset: 0.5, depth: 0.5 }],
+            ],
+            scenes: [
+                [
+                    'still',
+                    {
+                        ...defaultScene,
+                        objects: [
+                            ...defaultScene.objects.filter(({ id }) => id !== 'lamp'),
+                            sceneObject('orb', 'code', 'light', { y: 0.6 }),
+                        ],
+                        code: ORB,
+                        light: 1.2,
+                        sources: { ...defaultScene.sources, k1: 'round' },
+                    },
+                ],
+            ],
+        },
+        formulas: [],
+        links: [
+            { a: 'studio', b: 'round' },
+            { a: 'studio', b: 'still' },
+            { a: 'still', b: 'print' },
         ],
     },
     {

@@ -26,6 +26,7 @@ const scene = (): Documents => ({
     signals: new Map(),
     paintings: new Map(),
     pens: new Map(),
+    scenes: new Map(),
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),

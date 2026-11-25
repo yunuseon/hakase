@@ -24,6 +24,7 @@ import type { Drawing } from './model/pen.ts';
 import type { Sounding } from './model/voice.ts';
 import type { Kit } from './model/drums.ts';
 import type { Pedal } from './pedals.ts';
+import type { Scene } from './model/scene.ts';
 import type { Gate } from './gates.ts';
 import type { Conversion } from './converters.ts';
 import type { BoxReading } from './boxes.ts';
@@ -96,6 +97,7 @@ export type AppState = {
     readonly sounding$: Observable<Sounding>;
     readonly kit$: Observable<Kit>;
     readonly pedal$: Observable<Pedal>;
+    readonly scene$: Observable<Scene>;
     readonly gate$: Observable<Gate>;
     readonly conversion$: Observable<Conversion>;
     readonly bits$: Observable<Uint8Array>;
@@ -168,7 +170,6 @@ export type ProcessView = {
 
 export type Program<K extends ProgramId = ProgramId> = Declaration<K> & {
     readonly size: Size;
-    // The smallest window its content still lays out in; the workspace clamps every resize to it.
     readonly minimum: Size;
     // A factory, not an element: two processes of one program need two elements. A promise, so a program's component loads with its first window.
     readonly launch: () => Promise<ProcessView>;

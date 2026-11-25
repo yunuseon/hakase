@@ -1,6 +1,7 @@
 import { DEFAULT_ASPECT, isAspect, type Aspect } from './model/sketch/export.ts';
 import { DEFAULT_WIRE_STYLE, isWireStyle, type WireStyle } from './shared/connections.ts';
 import { parsePen, type Pen } from './model/pen.ts';
+import { parseScene, type Scene } from './model/scene.ts';
 import { parseVoice, type Voice } from './model/voice.ts';
 import { parseDrums, type Drums } from './model/drums.ts';
 import { parsePicture, type Picture } from './shared/picture.ts';
@@ -73,6 +74,7 @@ export type Snapshot = {
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly paint: ReadonlyMap<StoreId, Picture>;
     readonly pens: ReadonlyMap<StoreId, Pen>;
+    readonly scenes: ReadonlyMap<StoreId, Scene>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
@@ -205,6 +207,7 @@ const fresh: Restored = {
     signals: new Map(),
     paint: new Map(),
     pens: new Map(),
+    scenes: new Map(),
     voices: new Map(),
     drums: new Map(),
     focusLinks: new Map(),
@@ -362,6 +365,7 @@ const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
         signals: byStore(field(stored, 'signals'), 'signal', parseSignal),
         paint: byStore(field(stored, 'paint'), 'paint', parsePicture),
         pens: byStore(field(stored, 'pens'), 'pen', parsePen),
+        scenes: byStore(field(stored, 'scenes'), 'scene', parseScene),
         voices: byStore(field(stored, 'voices'), 'voice', parseVoice),
         drums: byStore(field(stored, 'drums'), 'drums', parseDrums),
         gates: new Map([
@@ -433,6 +437,7 @@ const serialised = (snapshot: Snapshot): unknown => {
         signals: saved(snapshot.signals),
         paint: saved(snapshot.paint),
         pens: saved(snapshot.pens),
+        scenes: saved(snapshot.scenes),
         voices: saved(snapshot.voices),
         drums: saved(snapshot.drums),
         focusLinks: saved(snapshot.focusLinks),

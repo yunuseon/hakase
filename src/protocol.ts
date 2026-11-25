@@ -16,6 +16,7 @@ import type { ClockCommand } from './model/clocks.ts';
 import type { SignalCommand } from './shared/signal.ts';
 import type { PaintCommand } from './model/paint.ts';
 import type { PenCommand } from './model/pen.ts';
+import type { SceneCommand } from './model/scene.ts';
 import type { VoiceCommand } from './model/voice.ts';
 import type { DrumsCommand } from './model/drums.ts';
 import type { PedalCommand } from './pedals.ts';
@@ -40,6 +41,7 @@ export const PROGRAM_IDS = [
     'plot',
     'paint',
     'pen',
+    'scene',
     'voice',
     'drums',
     'mixer',
@@ -97,7 +99,6 @@ export const isProgramId = (value: string): value is ProgramId =>
 
 export type ProcessId = string;
 
-// Collected from whichever processes run, so feeding app state needs no singleton.
 export type AppInput =
     | { readonly kind: 'scrub'; readonly phase: Phase; readonly at: number }
     | { readonly kind: 'transport'; readonly command: TransportCommand }
@@ -128,6 +129,7 @@ export type AppInput =
     | { readonly kind: 'signal'; readonly command: SignalCommand }
     | { readonly kind: 'paint'; readonly command: PaintCommand }
     | { readonly kind: 'pen'; readonly command: PenCommand }
+    | { readonly kind: 'scene'; readonly command: SceneCommand }
     | { readonly kind: 'voice'; readonly command: VoiceCommand }
     | { readonly kind: 'drums'; readonly command: DrumsCommand }
     | {

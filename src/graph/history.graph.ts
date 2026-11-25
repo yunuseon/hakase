@@ -33,6 +33,7 @@ export const begunFrom = (stored: Restored, viewport: Ports['viewport']): Histor
         signals: stored.signals,
         paintings: stored.paint,
         pens: stored.pens,
+        scenes: stored.scenes,
         voices: stored.voices,
         drums: stored.drums,
         pedals: stored.pedals,

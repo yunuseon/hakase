@@ -9,7 +9,7 @@ import {
 import { messageOf, writer$, type ExportEvent } from '../components/sketch/export/export.ts';
 import { centre } from '../model/sketch/params.ts';
 import type { Size } from '../layout/frame.ts';
-import { hasHistory, type Image } from '../image.ts';
+import { hasHistory, samplesWanted, type Image } from '../image.ts';
 import { cook, createEngine, drawn, releaseEngine, type Engine } from './engine.ts';
 
 export type ImageExport = {
@@ -48,6 +48,8 @@ const frameAt = (
             frame: framed ? size : null,
             dotScale: 1,
             lane: '',
+            samples: samplesWanted(image, 'export'),
+            traceSide: null,
         },
         performance.now(),
     );

@@ -4,7 +4,9 @@ import { merge, of, type Observable } from 'rxjs';
 import { filter, map, tap } from 'rxjs/operators';
 import { mountView, type Rendering } from '../../lib/lit.ts';
 import { requireChild, requireElement, styleSheet } from '../../lib/dom.ts';
-import { observeResize$ } from '../../lib/rx.ts';
+import { fromElementEvent$, observeResize$ } from '../../lib/rx.ts';
+import { pointerDelta$ } from '../../shared/drag.ts';
+import type { OrbitAction } from '../../model/sketch/space.ts';
 import type { Size } from '../../layout/frame.ts';
 import type { Shown } from '../../shared/shown.ts';
 import css from './image-view.css?inline';
@@ -16,15 +18,18 @@ const TEMPLATE = () =>
         <div class="viewport" data-stage>
             <canvas></canvas>
             <p class="message" hidden></p>
+            <span class="samples" hidden></span>
         </div>
         <slot name="controls" data-detail></slot>
     </div>`;
 
 export class HksImageView extends HTMLElement {
     readonly sizes$: Observable<Size>;
+    readonly orbits$: Observable<OrbitAction>;
 
     private readonly canvas: HTMLCanvasElement;
     private readonly message: HTMLElement;
+    private readonly samples: HTMLElement;
     private readonly rendering: Rendering;
 
     constructor() {
@@ -37,10 +42,25 @@ export class HksImageView extends HTMLElement {
         const viewport = requireChild(shadow, '.viewport');
         this.canvas = requireElement(shadow, 'canvas', HTMLCanvasElement);
         this.message = requireChild(shadow, '.message');
+        this.samples = requireChild(shadow, '.samples');
 
         this.sizes$ = merge(of(undefined), observeResize$(viewport)).pipe(
             map((): Size => ({ width: viewport.clientWidth, height: viewport.clientHeight })),
             filter(({ width, height }) => width > 0 && height > 0),
+        );
+
+        this.orbits$ = merge(
+            pointerDelta$(this.canvas).pipe(
+                map(({ dx, dy }): OrbitAction => ({ kind: 'turn', dx, dy })),
+            ),
+            fromElementEvent$(this.canvas, 'wheel').pipe(
+                // A pinch arrives as ctrl+wheel and belongs to the canvas zoom, not the camera.
+                filter(event => !event.ctrlKey && !event.metaKey),
+                map((event): OrbitAction => ({ kind: 'dolly', delta: event.deltaY })),
+            ),
+            fromElementEvent$(this.canvas, 'dblclick').pipe(
+                map((): OrbitAction => ({ kind: 'reset' })),
+            ),
         );
     }
 
@@ -52,6 +72,9 @@ export class HksImageView extends HTMLElement {
             shown$.pipe(
                 tap(shown => {
                     this.message.hidden = shown.kind === 'frame';
+                    const samples = shown.kind === 'frame' ? (shown.samples ?? null) : null;
+                    this.samples.hidden = samples === null;
+                    this.samples.textContent = samples === null ? '' : `${samples} spp`;
 
                     if (shown.kind === 'frame') {
                         context?.transferFromImageBitmap(shown.bitmap);

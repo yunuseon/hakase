@@ -175,26 +175,38 @@ export const programDemo = (
         linkedDriver$: () => of(null),
         followedImage$: () => of(NONE),
         pedal$: of(defaultPedal('mix')),
-        image$: select(state => state.settings).pipe(
-            map((stored): Image => {
-                if (stored?.kind !== 'sketch') {
-                    return NONE;
-                }
+        scene$: select(state => state.scene),
+        image$:
+            program.id === 'scene'
+                ? select(state => state.scene).pipe(
+                      map((scene): Image => ({
+                          kind: 'traced',
+                          store: 'storybook-scene',
+                          scene,
+                          theme: themes[scene.theme],
+                          drivers: { k1: null, k2: null, k3: null, k4: null },
+                      })),
+                  )
+                : select(state => state.settings).pipe(
+                      map((stored): Image => {
+                          if (stored?.kind !== 'sketch') {
+                              return NONE;
+                          }
 
-                const sketch = asSketch(stored);
+                          const sketch = asSketch(stored);
 
-                return {
-                    kind: 'points',
-                    store: 'storybook-preview',
-                    source: sourceOf(sketch.formula, emptyLibrary),
-                    panel: sketch.panel,
-                    theme: themes[sketch.theme],
-                    orbit: sketch.orbit,
-                    drivers: UNDRIVEN,
-                    sheet: null,
-                };
-            }),
-        ),
+                          return {
+                              kind: 'points',
+                              store: 'storybook-preview',
+                              source: sourceOf(sketch.formula, emptyLibrary),
+                              panel: sketch.panel,
+                              theme: themes[sketch.theme],
+                              orbit: sketch.orbit,
+                              drivers: UNDRIVEN,
+                              sheet: null,
+                          };
+                      }),
+                  ),
         gate$: of(GATE_DEFAULTS.switch),
         bits$: of(new Uint8Array(16)),
         conversion$: of({

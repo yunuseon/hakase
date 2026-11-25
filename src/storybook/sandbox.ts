@@ -16,6 +16,7 @@ import { defaultSignal, reduceSignal } from '../shared/signal.ts';
 import { defaultPicture } from '../shared/picture.ts';
 import { reducePicture } from '../model/paint.ts';
 import { defaultPen, reducePen } from '../model/pen.ts';
+import { defaultScene, reduceScene } from '../model/scene.ts';
 import { initialClock, reduceTransport } from '../shared/playhead.ts';
 import type { Appearance } from '../appearance.ts';
 import type { Theme } from '../model/sketch/theme.ts';
@@ -83,6 +84,7 @@ export const sandboxSeed = (settings: Settings | undefined, empty = false) => ({
     signal: defaultSignal,
     picture: defaultPicture,
     pen: defaultPen,
+    scene: defaultScene,
     clock: initialClock,
     library: emptyLibrary,
     look: defaultLook,
@@ -143,6 +145,8 @@ export const reduceSandbox = (state: Sandbox, input: SandboxInput): Sandbox => {
             return { ...state, picture: reducePicture(state.picture, input.command) };
         case 'pen':
             return { ...state, pen: reducePen(state.pen, input.command) };
+        case 'scene':
+            return { ...state, scene: reduceScene(state.scene, input.command) };
         case 'library':
             return { ...state, library: reduceLibrary(state.library, input.command) };
         case 'look':

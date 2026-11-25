@@ -14,6 +14,7 @@ import { noteProgram } from '../programs/note.program.ts';
 import { playheadProgram } from '../programs/playhead.program.ts';
 import { paintProgram } from '../programs/paint.program.ts';
 import { penProgram } from '../programs/pen.program.ts';
+import { sceneProgram } from '../programs/scene.program.ts';
 import { blueprintsProgram } from '../programs/blueprints.program.ts';
 import { progressProgram } from '../programs/progress.program.ts';
 import { plotProgram } from '../programs/plot.program.ts';
@@ -195,6 +196,14 @@ const specs: readonly Spec[] = [
         title: 'Pen',
         elements: ['hks-pen'],
         description: 'Stroke preview and signal-driven pen controls.',
+        variants: normal,
+    },
+    {
+        program: sceneProgram,
+        title: 'Scene',
+        elements: ['hks-scene-controls'],
+        description:
+            'A path-traced scene: objects and code in one distance field, refining while it holds still. Only the selected story holds GPU resources.',
         variants: normal,
     },
     {

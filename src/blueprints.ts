@@ -5,6 +5,7 @@ import { parseClocks } from './model/clocks.ts';
 import { parseHabits } from './model/habits.ts';
 import { parseNotes } from './model/note.ts';
 import { parsePen, type Pen } from './model/pen.ts';
+import { parseScene, type Scene } from './model/scene.ts';
 import { formulas as registry } from './model/sketch/formulas/registry.ts';
 import { parseTickets } from './shared/tickets.ts';
 import { parseVoice, type Voice } from './model/voice.ts';
@@ -63,6 +64,7 @@ type HeldKind =
     | 'signals'
     | 'paintings'
     | 'pens'
+    | 'scenes'
     | 'voices'
     | 'drums'
     | 'pedals'
@@ -138,6 +140,7 @@ export const reduceBlueprints = (
 const linkedOf = ({
     signals,
     pens,
+    scenes,
     voices,
     drums,
     pedals,
@@ -151,6 +154,7 @@ const linkedOf = ({
         ...boxes,
         ...signals,
         ...pens,
+        ...scenes,
         ...voices,
         ...drums,
         ...pedals,
@@ -263,6 +267,7 @@ export const blueprintOf = (
             signals: picked(documents.signals, stores),
             paintings: picked(documents.paintings, stores),
             pens: picked(documents.pens, stores),
+            scenes: picked(documents.scenes, stores),
             voices: picked(documents.voices, stores),
             drums: picked(documents.drums, stores),
             pedals: picked(documents.pedals, stores),
@@ -425,6 +430,15 @@ export const placed = (
                 ink: sourceOf(pen.sources.ink),
             },
         })),
+        scenes: into(documents.scenes, held.scenes, (scene): Scene => ({
+            ...scene,
+            sources: {
+                k1: sourceOf(scene.sources.k1),
+                k2: sourceOf(scene.sources.k2),
+                k3: sourceOf(scene.sources.k3),
+                k4: sourceOf(scene.sources.k4),
+            },
+        })),
         voices: into(documents.voices, held.voices, (voice): Voice => ({
             ...voice,
             sources: {
@@ -575,6 +589,7 @@ const blueprintFrom = (value: unknown, inputsFor: InputsFor): Blueprint[] => {
                 signals: entriesOf(heldOf('signals'), parseSignal),
                 paintings: entriesOf(heldOf('paintings'), parsePicture),
                 pens: entriesOf(heldOf('pens'), parsePen),
+                scenes: entriesOf(heldOf('scenes'), parseScene),
                 voices: entriesOf(heldOf('voices'), parseVoice),
                 drums: entriesOf(heldOf('drums'), parseDrums),
                 gates: entriesOf(heldOf('gates'), parseGate).flatMap(

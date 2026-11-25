@@ -26,6 +26,7 @@ type Saved = Pick<
     | 'waves$'
     | 'paintings$'
     | 'pens$'
+    | 'scenes$'
     | 'voices$'
     | 'drums$'
     | 'pedals$'
@@ -60,6 +61,7 @@ export const persisted$ = ({
     waves$,
     paintings$,
     pens$,
+    scenes$,
     voices$,
     drums$,
     pedals$,
@@ -95,6 +97,7 @@ export const persisted$ = ({
             signals: waves$,
             paint: paintings$,
             pens: pens$,
+            scenes: scenes$,
             voices: voices$,
             drums: drums$,
             pedals: pedals$,

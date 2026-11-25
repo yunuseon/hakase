@@ -6,6 +6,7 @@ import { type Driver } from './shared/curve.ts';
 import { driverAt } from './shared/signal.ts';
 import { sameWave } from './shared/signal.ts';
 import type { Sheet } from './shared/stroke.ts';
+import { SCENE_KNOBS, type Scene, type SceneKnob } from './model/scene.ts';
 
 export type PointsImage = {
     readonly kind: 'points';
@@ -27,7 +28,17 @@ export type PedalImage = {
     readonly inputs: readonly Image[];
 };
 
-export type Image = { readonly kind: 'none' } | PointsImage | PedalImage;
+export type TracedImage = {
+    readonly kind: 'traced';
+    readonly store: string;
+    readonly scene: Scene;
+    readonly theme: Theme;
+    readonly drivers: Readonly<Record<SceneKnob, Driver | null>>;
+};
+
+export type Stage = PointsImage | PedalImage | TracedImage;
+
+export type Image = { readonly kind: 'none' } | Stage;
 
 export const NONE: Image = { kind: 'none' };
 
@@ -57,6 +68,14 @@ export const sameImage = (a: Image, b: Image): boolean => {
                 a.sheet === b.sheet &&
                 DRIVES.every(drive => sameDriver(a.drivers[drive], b.drivers[drive]))
             );
+        case 'traced':
+            return (
+                b.kind === 'traced' &&
+                a.store === b.store &&
+                a.scene === b.scene &&
+                sameTheme(a.theme, b.theme) &&
+                SCENE_KNOBS.every(knob => sameDriver(a.drivers[knob], b.drivers[knob]))
+            );
         case 'pedal':
             return (
                 b.kind === 'pedal' &&
@@ -78,16 +97,13 @@ export const sameImage = (a: Image, b: Image): boolean => {
     }
 };
 
-export const stagesOf = (image: Image): readonly (PointsImage | PedalImage)[] => {
-    const visit = (
-        stages: readonly (PointsImage | PedalImage)[],
-        node: Image,
-    ): readonly (PointsImage | PedalImage)[] => {
+export const stagesOf = (image: Image): readonly Stage[] => {
+    const visit = (stages: readonly Stage[], node: Image): readonly Stage[] => {
         if (node.kind === 'none' || stages.some(({ store }) => store === node.store)) {
             return stages;
         }
 
-        return node.kind === 'points'
+        return node.kind !== 'pedal'
             ? [...stages, node]
             : [...node.inputs.reduce(visit, stages), node];
     };
@@ -111,6 +127,7 @@ export const knobAt = (image: PedalImage, name: string, t: number): number => {
 export const stillOf = (image: Image): Image => {
     switch (image.kind) {
         case 'none':
+        case 'traced':
             return image;
         case 'points':
             return {
@@ -127,5 +144,22 @@ export const hasHistory = (image: Image): boolean =>
     stagesOf(image).some(stage =>
         stage.kind === 'pedal'
             ? stage.pedal.kind === 'feedback'
-            : stage.panel.trails > 0 || stage.drivers.trails !== null,
+            : stage.kind === 'points' && (stage.panel.trails > 0 || stage.drivers.trails !== null),
     );
+
+export const sceneKnobAt = (image: TracedImage, knob: SceneKnob, t: number): number => {
+    const driver = image.drivers[knob];
+
+    return driver === null ? image.scene.knobs[knob] : driverAt(driver, t);
+};
+
+export const samplesWanted = (image: Image, purpose: 'preview' | 'export'): number =>
+    stagesOf(image).reduce(
+        (most, stage) => (stage.kind === 'traced' ? Math.max(most, stage.scene[purpose]) : most),
+        1,
+    );
+
+export const SAMPLE_BUDGET = 1 << 17;
+
+export const samplesAt = (frame: number, pixels: number, cap: number): number =>
+    Math.min(cap, (frame + 1) * Math.max(1, Math.floor(SAMPLE_BUDGET / Math.max(1, pixels))));

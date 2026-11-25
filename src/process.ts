@@ -28,7 +28,6 @@ export type ProcessSignal =
     | { readonly to: 'hover'; readonly id: ProcessId; readonly over: boolean }
     | AppSignal;
 
-// Two subscriptions mean two processes: defer launches and opens, finalize closes.
 export const liveProcess$ = (
     program: Program,
     self: Self,

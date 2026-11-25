@@ -1,4 +1,5 @@
 import {
+    animationFrames,
     animationFrameScheduler,
     combineLatest,
     EMPTY,
@@ -6,12 +7,22 @@ import {
     Observable,
     type ObservableInput,
 } from 'rxjs';
-import { auditTime, concatMap, map, repeat, shareReplay, switchMap } from 'rxjs/operators';
-import type { Image } from '../image.ts';
+import {
+    auditTime,
+    concatMap,
+    map,
+    repeat,
+    shareReplay,
+    switchMap,
+    startWith,
+    takeWhile,
+} from 'rxjs/operators';
+import { samplesAt, samplesWanted, type Image } from '../image.ts';
 import type { Stroke } from '../shared/stroke.ts';
 import {
     backdropOf,
     checkFormula,
+    checkScene,
     cook,
     sheetOf,
     createEngine,
@@ -19,12 +30,13 @@ import {
     releaseEngine,
     type Engine,
     type FormulaCheck,
+    type SceneCheck,
 } from './engine.ts';
 import type { Showing } from './moment.ts';
 
 export type View =
     | { readonly kind: 'empty' }
-    | { readonly kind: 'frame'; readonly bitmap: ImageBitmap }
+    | { readonly kind: 'frame'; readonly bitmap: ImageBitmap; readonly samples: number | null }
     | { readonly kind: 'failed'; readonly message: string };
 
 const RECREATE_MS = 100;
@@ -61,11 +73,32 @@ const framed = (engine: Engine, image: Image, { moment, slot }: Showing): Observ
         const picture = cook(engine, image, moment, performance.now());
 
         return presented(engine, picture, slot.width, slot.height, backdropOf(image))
-            .then((bitmap): View => ({ kind: 'frame', bitmap }))
+            .then((bitmap): View => ({
+                kind: 'frame',
+                bitmap,
+                samples: traces(image) ? moment.samples : null,
+            }))
             .catch(failed);
     } catch (error) {
         return [failed(error)];
     }
+};
+
+const traces = (image: Image): boolean => samplesWanted(image, 'preview') > 1;
+
+const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
+    const cap = samplesWanted(image, 'preview');
+    const { width, height, traceSide } = showing.moment;
+    const pixels = Math.min(width * height, traceSide === null ? Infinity : traceSide * traceSide);
+
+    return cap <= 1
+        ? from([showing])
+        : animationFrames().pipe(
+              map((_, frame) => samplesAt(frame + 1, pixels, cap)),
+              startWith(samplesAt(0, pixels, cap)),
+              takeWhile(samples => samples < cap, true),
+              map(samples => ({ ...showing, moment: { ...showing.moment, samples } })),
+          );
 };
 
 export const view$ = (image$: Observable<Image>, showing$: Observable<Showing>): Observable<View> =>
@@ -75,10 +108,12 @@ export const view$ = (image$: Observable<Image>, showing$: Observable<Showing>):
                 ? from([{ kind: 'failed', message: engine.message } as const])
                 : combineLatest([image$, showing$]).pipe(
                       auditTime(0, animationFrameScheduler),
-                      concatMap(([image, showing]) =>
+                      switchMap(([image, showing]) =>
                           image.kind === 'none'
-                              ? [{ kind: 'empty' } as const]
-                              : framed(engine, image, showing),
+                              ? from([{ kind: 'empty' } as const])
+                              : refined$(image, showing).pipe(
+                                    concatMap(each => framed(engine, image, each)),
+                                ),
                       ),
                   ),
         ),
@@ -90,6 +125,15 @@ export const checked$ = (text$: Observable<string>): Observable<FormulaCheck> =>
             engine instanceof Error
                 ? from([{ ok: false, message: engine.message } as const])
                 : text$.pipe(map(text => checkFormula(engine, text))),
+        ),
+    );
+
+export const sceneChecked$ = (code$: Observable<string>): Observable<SceneCheck> =>
+    engine$.pipe(
+        switchMap(engine =>
+            engine instanceof Error
+                ? from([{ ok: false, message: engine.message } as const])
+                : code$.pipe(map(code => checkScene(engine, code))),
         ),
     );
 

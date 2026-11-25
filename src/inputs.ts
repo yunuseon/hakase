@@ -23,6 +23,7 @@ export type PenBinding = { readonly kind: 'pen'; readonly store: StoreId };
 export type VoiceBinding = { readonly kind: 'voice'; readonly store: StoreId };
 export type DrumsBinding = { readonly kind: 'drums'; readonly store: StoreId };
 export type SketchBinding = { readonly kind: 'sketch'; readonly store: StoreId };
+export type SceneBinding = { readonly kind: 'scene'; readonly store: StoreId };
 export type PedalBinding = { readonly kind: PedalKind; readonly store: StoreId };
 export type GateBinding = { readonly kind: GateKind; readonly store: StoreId };
 export type ConverterBinding = { readonly kind: ConverterKind; readonly store: StoreId };
@@ -39,6 +40,7 @@ export type Follow =
     | VoiceBinding
     | DrumsBinding
     | SketchBinding
+    | SceneBinding
     | PedalBinding
     | GateBinding
     | ConverterBinding
@@ -159,11 +161,20 @@ const sketchSource = {
     access: 'read',
 } as const;
 
+const sceneSource = {
+    kind: 'scene',
+    makes: 'picture',
+    program: 'scene',
+    title: 'Scene',
+    access: 'read',
+} as const;
+
 const pedalSource = <K extends PedalKind>(kind: K) =>
     ({ kind, makes: 'picture', program: kind, title: PEDALS[kind].title, access: 'read' }) as const;
 
 export const IMAGE_SOURCES = [
     sketchSource,
+    sceneSource,
     pedalSource('colourmap'),
     pedalSource('kaleido'),
     pedalSource('feedback'),
@@ -614,6 +625,8 @@ export const sourceProgram = (kind: Follow['kind']) => {
             return drumsSource.program;
         case 'sketch':
             return sketchSource.program;
+        case 'scene':
+            return sceneSource.program;
         case 'colourmap':
         case 'kaleido':
         case 'feedback':
@@ -678,6 +691,8 @@ export const progressBinding = (kind: string, store: StoreId) => {
         case 'drums':
             return { kind, store };
         case 'sketch':
+            return { kind, store };
+        case 'scene':
             return { kind, store };
         case 'colourmap':
         case 'kaleido':

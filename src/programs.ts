@@ -14,6 +14,7 @@ import { noteProgram } from './programs/note.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
 import { paintProgram } from './programs/paint.program.ts';
 import { penProgram } from './programs/pen.program.ts';
+import { sceneProgram } from './programs/scene.program.ts';
 import { voiceProgram } from './programs/voice.program.ts';
 import { drumsProgram } from './programs/drums.program.ts';
 import { mixerProgram } from './programs/mixer.program.ts';
@@ -43,6 +44,7 @@ export const programs = {
     plot: plotProgram,
     paint: paintProgram,
     pen: penProgram,
+    scene: sceneProgram,
     voice: voiceProgram,
     drums: drumsProgram,
     mixer: mixerProgram,

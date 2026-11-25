@@ -9,10 +9,14 @@ import { stagesOf, stillOf, type Image } from '../image.ts';
 import { backdropOf, cook, filmed, filmFor, framedIn } from './engine.ts';
 import { engine$ } from './view.ts';
 
+const TILE_SAMPLES = 4;
+
 const SETTLE_MS = 250;
 
 const replays = (image: Image): boolean =>
-    stagesOf(image).some(stage => stage.kind === 'points' && evolves(stage.source));
+    stagesOf(image).some(
+        stage => stage.kind === 'traced' || (stage.kind === 'points' && evolves(stage.source)),
+    );
 
 export type Framing = { readonly frame: Size | null; readonly shape: Size };
 
@@ -110,6 +114,8 @@ export const filmstrip$ = (
                                     pass: 0,
                                     frame,
                                     dotScale,
+                                    samples: TILE_SAMPLES,
+                                    traceSide: null,
                                     lane: 'strip',
                                 },
                                 now,

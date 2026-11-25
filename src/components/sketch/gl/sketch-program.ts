@@ -96,7 +96,7 @@ export const adapterFor = (formula: string): string =>
     ].join('\n');
 const LOG_LOCATION = /^(ERROR|WARNING): \d+:(\d+):/gm;
 
-const readableLog = (log: string, offset: number): string =>
+export const readableLog = (log: string, offset: number): string =>
     log
         .replace(NULL_TERMINATOR, '')
         .trimEnd()

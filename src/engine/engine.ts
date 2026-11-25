@@ -25,11 +25,14 @@ import { buildRamp, RAMP_SIZE, type Theme } from '../model/sketch/theme.ts';
 import { themes } from '../model/sketch/themes/registry.ts';
 import {
     knobAt,
+    SAMPLE_BUDGET,
     sameImage,
     stagesOf,
     type Image,
     type PedalImage,
     type PointsImage,
+    type Stage,
+    type TracedImage,
 } from '../image.ts';
 import { PEDALS, type PedalKind } from '../pedals.ts';
 import type { Size } from '../layout/frame.ts';
@@ -46,7 +49,10 @@ import pass from './shaders/pass.vert?raw';
 import downsample from './shaders/downsample.frag?raw';
 import present from './shaders/present.frag?raw';
 import sheet from './shaders/sheet.frag?raw';
+import tonemap from './shaders/tonemap.frag?raw';
+import { createTracer, traceBatch, type Tracer } from './trace.ts';
 import {
+    createFloatTarget,
     createMultisampled,
     createTarget,
     releaseTarget,
@@ -68,7 +74,11 @@ export type Moment = {
     readonly dotScale: number;
     // Readers in different lanes keep apart simulations, or a strip's replay would reset the live one every frame.
     readonly lane: string;
+    readonly samples: number;
+    readonly traceSide: number | null;
 };
+
+export type SceneCheck = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 export type FormulaCheck =
     | { readonly ok: true; readonly knobs: ReturnType<typeof knobsUsed> }
@@ -113,8 +123,27 @@ export type Picture = {
     readonly height: number;
 };
 
+type Accumulation = {
+    front: Target;
+    back: Target;
+    readonly toned: Target | null;
+    done: number;
+};
+
+const traceSizeOf = ({ width, height, traceSide }: Moment) => {
+    const scale = traceSide === null ? 1 : Math.min(1, traceSide / Math.max(width, height));
+
+    return {
+        width: Math.max(1, Math.round(width * scale)),
+        height: Math.max(1, Math.round(height * scale)),
+    };
+};
+
+type Trace = { code: string | null; tracer: Tracer | null };
+
 type Entry = {
     output: Target;
+    accumulation: Accumulation | null;
     readonly samples: Multisampled | null;
     spare: Target | null;
     palette: { readonly texture: WebGLTexture; theme: Theme | null } | null;
@@ -127,14 +156,18 @@ export type Engine = {
     readonly gl: WebGL2RenderingContext;
     readonly vao: WebGLVertexArrayObject;
     readonly blank: WebGLTexture;
-    readonly passes: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample', Pass>>;
+    readonly passes: Readonly<Record<PassKind, Pass>>;
     readonly ink: InkPass;
     readonly sheets: Map<string, Sheet>;
     readonly films: Map<'strip' | 'level' | 'level-cell', Film>;
     readonly sources: Map<string, Source>;
     readonly entries: Map<string, Entry>;
     readonly checks: Map<string, FormulaCheck>;
+    readonly traces: Map<string, Trace>;
+    readonly sceneChecks: Map<string, SceneCheck>;
 };
+
+type PassKind = PedalKind | 'present' | 'sheet' | 'downsample' | 'tonemap';
 
 const REFERENCE_SIDE = 640;
 const INPUT_UNIT = 3;
@@ -154,7 +187,7 @@ export const SHEET_SIDE = 768;
 
 type Film = { readonly target: Target; used: number };
 
-const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample', string>> = {
+const FRAGMENTS: Readonly<Record<PassKind, string>> = {
     colourmap,
     kaleido,
     feedback,
@@ -163,6 +196,7 @@ const FRAGMENTS: Readonly<Record<PedalKind | 'present' | 'sheet' | 'downsample',
     present,
     sheet,
     downsample,
+    tonemap,
 };
 
 const passOf = (gl: WebGL2RenderingContext, fragment: string): Pass => {
@@ -207,6 +241,7 @@ export const createEngine = (): Engine => {
             present: passOf(gl, FRAGMENTS.present),
             sheet: passOf(gl, FRAGMENTS.sheet),
             downsample: passOf(gl, FRAGMENTS.downsample),
+            tonemap: passOf(gl, FRAGMENTS.tonemap),
         },
         ink: createInkPass(gl),
         sheets: new Map(),
@@ -214,6 +249,8 @@ export const createEngine = (): Engine => {
         sources: new Map(),
         entries: new Map(),
         checks: new Map(),
+        traces: new Map(),
+        sceneChecks: new Map(),
     };
 };
 
@@ -239,6 +276,28 @@ export const checkFormula = (engine: Engine, text: string): FormulaCheck => {
         .slice(0, Math.max(0, engine.checks.size - CHECKS_KEPT + 1))
         .forEach(old => engine.checks.delete(old));
     engine.checks.set(text, check);
+
+    return check;
+};
+
+export const checkScene = (engine: Engine, code: string): SceneCheck => {
+    const known = engine.sceneChecks.get(code);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const result = createTracer(engine.gl, code);
+    const check: SceneCheck = result.ok ? { ok: true } : { ok: false, message: result.message };
+
+    if (result.ok) {
+        engine.gl.deleteProgram(result.tracer.program);
+    }
+
+    [...engine.sceneChecks.keys()]
+        .slice(0, Math.max(0, engine.sceneChecks.size - CHECKS_KEPT + 1))
+        .forEach(old => engine.sceneChecks.delete(old));
+    engine.sceneChecks.set(code, check);
 
     return check;
 };
@@ -279,7 +338,7 @@ const releaseSource = (gl: WebGL2RenderingContext, source: Source): void => {
     }
 };
 
-const entryOf = (engine: Engine, stage: PointsImage | PedalImage, moment: Moment): Entry => {
+const entryOf = (engine: Engine, stage: Stage, moment: Moment): Entry => {
     const key = `${keyOf(stage.store, moment.lane)}@${moment.width}x${moment.height}`;
     const known = engine.entries.get(key);
 
@@ -292,6 +351,7 @@ const entryOf = (engine: Engine, stage: PointsImage | PedalImage, moment: Moment
         stage.kind === 'points' ? createMultisampled(gl, moment.width, moment.height) : null;
     const made: Entry = {
         output: samples ?? createTarget(gl, moment.width, moment.height),
+        accumulation: null,
         samples,
         spare:
             stage.kind === 'pedal' &&
@@ -431,6 +491,130 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
     }
 };
 
+// A failed edit keeps the last program that linked, so the picture never blanks while code is typed.
+const traceOf = (engine: Engine, key: string, code: string): Tracer | null => {
+    const { gl } = engine;
+    const trace = engine.traces.get(key) ?? { code: null, tracer: null };
+    engine.traces.set(key, trace);
+
+    if (trace.code !== code) {
+        trace.code = code;
+        const result = createTracer(gl, code);
+
+        if (result.ok) {
+            if (trace.tracer !== null) {
+                gl.deleteProgram(trace.tracer.program);
+            }
+            trace.tracer = result.tracer;
+        }
+    }
+
+    return trace.tracer;
+};
+
+const MAX_BATCH = 16;
+
+const drawTraced = (
+    engine: Engine,
+    entry: Entry,
+    image: TracedImage,
+    moment: Moment,
+    restart: boolean,
+): void => {
+    const { gl } = engine;
+    const tracer = traceOf(engine, keyOf(image.store, moment.lane), image.scene.code);
+
+    if (tracer === null) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, entry.output.framebuffer);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        return;
+    }
+
+    const size = traceSizeOf(moment);
+    const known =
+        entry.accumulation?.front.width === size.width &&
+        entry.accumulation.front.height === size.height
+            ? entry.accumulation
+            : null;
+
+    if (known === null && entry.accumulation !== null) {
+        releaseAccumulation(gl, entry.accumulation);
+    }
+
+    const accumulation = known ?? {
+        front: createFloatTarget(gl, size.width, size.height),
+        back: createFloatTarget(gl, size.width, size.height),
+        toned:
+            size.width === moment.width && size.height === moment.height
+                ? null
+                : createTarget(gl, size.width, size.height),
+        done: 0,
+    };
+    entry.accumulation = accumulation;
+
+    if (restart) {
+        accumulation.done = 0;
+    }
+
+    paletteOf(engine, entry, image.theme);
+    const pixels = size.width * size.height;
+    const each = Math.min(MAX_BATCH, Math.max(1, Math.floor(SAMPLE_BUDGET / pixels)));
+
+    while (accumulation.done < moment.samples) {
+        const batch = Math.min(each, moment.samples - accumulation.done);
+        traceBatch(
+            gl,
+            tracer,
+            image,
+            accumulation.back,
+            accumulation.front,
+            { unit: PALETTE_UNIT },
+            { t: moment.t, done: accumulation.done, batch },
+            engine.vao,
+        );
+        const front = accumulation.back;
+        accumulation.back = accumulation.front;
+        accumulation.front = front;
+        accumulation.done += batch;
+    }
+
+    const shader = engine.passes.tonemap;
+    gl.useProgram(shader.program);
+    bindInput(engine, 0, accumulation.front.texture);
+    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
+    gl.uniform1f(shader.at('uExposure'), image.scene.exposure);
+    drawPass(engine, accumulation.toned ?? entry.output);
+    gl.activeTexture(gl.TEXTURE0);
+
+    if (accumulation.toned !== null) {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, accumulation.toned.framebuffer);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, entry.output.framebuffer);
+        gl.blitFramebuffer(
+            0,
+            0,
+            size.width,
+            size.height,
+            0,
+            0,
+            moment.width,
+            moment.height,
+            gl.COLOR_BUFFER_BIT,
+            gl.LINEAR,
+        );
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    }
+};
+
+const releaseAccumulation = (gl: WebGL2RenderingContext, accumulation: Accumulation): void => {
+    releaseTarget(gl, accumulation.front);
+    releaseTarget(gl, accumulation.back);
+    if (accumulation.toned !== null) {
+        releaseTarget(gl, accumulation.toned);
+    }
+};
+
 const bindInput = (engine: Engine, slot: number, texture: WebGLTexture | null): void => {
     const { gl } = engine;
     gl.activeTexture(gl.TEXTURE0 + INPUT_UNIT + slot);
@@ -560,6 +744,9 @@ const forget = (engine: Engine, now: number): void => {
             if (entry.palette !== null) {
                 gl.deleteTexture(entry.palette.texture);
             }
+            if (entry.accumulation !== null) {
+                releaseAccumulation(gl, entry.accumulation);
+            }
             engine.entries.delete(key);
         }
     });
@@ -576,6 +763,14 @@ const forget = (engine: Engine, now: number): void => {
             engine.films.delete(key);
         }
     });
+    engine.traces.forEach((trace, store) => {
+        if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
+            if (trace.tracer !== null) {
+                gl.deleteProgram(trace.tracer.program);
+            }
+            engine.traces.delete(store);
+        }
+    });
     engine.sources.forEach((source, store) => {
         if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
             releaseSource(gl, source);
@@ -590,7 +785,7 @@ const sameFrame = (a: Size | null, b: Size | null): boolean =>
 export const cook = (engine: Engine, image: Image, moment: Moment, now: number): Picture | null => {
     const drawn = stagesOf(image).reduce((pictures, stage) => {
         const entry = entryOf(engine, stage, moment);
-        const fresh =
+        const same =
             entry.cooked !== null &&
             entry.cooked.t === moment.t &&
             entry.cooked.pass === moment.pass &&
@@ -598,9 +793,13 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
             sameFrame(entry.cooked.frame, moment.frame) &&
             entry.cooked.dotScale === moment.dotScale &&
             sameImage(entry.cooked.image, stage);
+        const fresh =
+            same && (stage.kind !== 'traced' || (entry.accumulation?.done ?? 0) >= moment.samples);
 
         if (!fresh) {
-            if (stage.kind === 'points') {
+            if (stage.kind === 'traced') {
+                drawTraced(engine, entry, stage, moment, !same);
+            } else if (stage.kind === 'points') {
                 drawPoints(engine, entry, stage, moment);
             } else {
                 drawPedal(
@@ -788,7 +987,7 @@ export const drawn = (
 
 // A tile's slot takes the picture's backdrop, then the picture fitted inside it, the way the window frames it.
 export const backdropOf = (image: Image): readonly [number, number, number] => {
-    if (image.kind !== 'points') {
+    if (image.kind !== 'points' && image.kind !== 'traced') {
         return [0, 0, 0];
     }
 

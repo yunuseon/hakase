@@ -18,7 +18,6 @@ export const RESIZE_EDGES = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as cons
 export type ResizeEdge = (typeof RESIZE_EDGES)[number];
 
 export type WindowView = {
-    // 'fitted' is sized by its content; program windows are 'floating'.
     readonly kind: 'floating' | 'fitted';
     readonly frame: Frame;
     readonly focused: boolean;
@@ -32,7 +31,6 @@ export type StoreOption = {
     readonly id: string;
     readonly name: string;
     readonly colour: string;
-    // How many windows are bound to it, this one included.
     readonly users: number;
     readonly current: boolean;
 };

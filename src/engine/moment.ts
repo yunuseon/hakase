@@ -13,6 +13,8 @@ import { aspectSize, type Aspect } from '../model/sketch/export.ts';
 const MAX_SIDE = 2048;
 const SETTLE_MS = 150;
 
+const PREVIEW_TRACE_SIDE = 384;
+
 const scaleOf = ({ width, height }: Size, ratio: number): number =>
     Math.min(ratio, MAX_SIDE / Math.max(width, height, 1));
 
@@ -42,7 +44,12 @@ const PREVIEW_SIDES = [256, 512, 1024, 2048] as const;
 // One for the app, so every window showing a chain shares one drawing a frame: the widest such window in view, in pixels, rounded up to a step.
 export const previewSideOf = (workspace: Workspace, viewport: Extent, ratio: number): number => {
     const widest = workspace.processes
-        .filter(process => process.program === 'output' || isPedalKind(process.program))
+        .filter(
+            process =>
+                process.program === 'output' ||
+                process.program === 'scene' ||
+                isPedalKind(process.program),
+        )
         .map(boxOf)
         .filter(box => onScreen(box, workspace.camera, viewport))
         .reduce((side, box) => Math.max(side, box.width * workspace.camera.zoom * ratio), 0);
@@ -72,6 +79,8 @@ export const chainShowing$ = (
                     frame: null,
                     dotScale: 1,
                     lane: '',
+                    samples: 1,
+                    traceSide: PREVIEW_TRACE_SIDE,
                 },
                 slot,
             };
@@ -107,6 +116,8 @@ export const windowShowing$ = (
                     frame: size,
                     dotScale: 1,
                     lane: '',
+                    samples: 1,
+                    traceSide: PREVIEW_TRACE_SIDE,
                 },
                 slot: pixels,
             };

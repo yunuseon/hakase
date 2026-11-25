@@ -2248,8 +2248,8 @@ which no recipe said. A sketch's own window still frames by its own size
 (`windowShowing$`): no chain shares that picture.
 
 **The preview size is one for the app, derived from the workspace**
-(`previewSideOf`, `AppState.previewSide$`): the widest pedal or Output window
-in view, in pixels at the current zoom, rounded up to 256, 512, 1024 or 2048.
+(`previewSideOf`, `AppState.previewSide$`): the widest pedal, Scene or Output
+window in view, in pixels at the current zoom, rounded up to 256, 512, 1024 or 2048.
 It sets only how finely a chain is drawn, never what. A fixed 1024 drew up to
 twenty times the pixels a zoomed-out window shows and fell to 45 fps; a size
 per window, even stepped, drew a chain once per step present and held 55; one
@@ -2263,6 +2263,80 @@ turned by a saw, folded and fed back, and a vortex blurred by a kick drum's
 level (an Envelope on the drum machine), screened together by a mix a sine swells, graded by a colour map whose
 offset a saw cycles and whose amount a pattern gate strobes. Its plot draws the
 four signals that move it.
+
+## Path tracing
+
+**A Scene is a picture stage that is path traced.** `scene` (Make) is a
+private stage document like a pedal's (`Scene` in `model/scene.ts`, folded by
+`reduceScene`), and it makes a `picture`, so it goes into pedals, an Output,
+its frame strip, an export and picture → level with no wiring of its own. Its
+recipe is `TracedImage` (`image.ts`), assembled by `tracedIn` in the levels
+graph, and the engine draws it in `drawTraced` (`engine/trace.ts`,
+`shaders/trace.frag`). It never became a fourth draw mode of the sketch: a
+lattice and a distance field share nothing but the camera, and a stage of its
+own is what the toolbox is for.
+
+**Objects and code are one distance field.** A scene holds up to
+`MAX_OBJECTS` objects (sphere, box, torus, cylinder, plane or `code`), each
+with a place, size, turn, material (matte, gloss, metal, glass, light), a tint
+picked from the scene's theme as a formula's is, and roughness or glow only
+where the material has them. Its code may define `Hit custom(vec3 p, float t)`,
+which every `code` object calls, placed and sized by that object, and
+`Camera camera(float t)`; `sceneAdapter` detects both the way `adapterFor`
+detects a formula's hooks and appends defaults, after the code, so error lines
+match the editor. The prelude gives the code `hit`, `glowing`, `smin` and the
+`sd*` shapes, `k1`–`k4` and `t`.
+
+- **The objects are uniforms, not code.** `objectUniforms` packs three `vec4`s
+  per object (place and size; shape, material, tint, rough; turn and glow) and
+  the shader loops over them, so dragging a slider never recompiles. Only an
+  edit of the code does, and the engine keeps the last program that linked
+  (`traceOf`), so a broken edit keeps the last picture while `checkScene`
+  shows the error in the Code tab.
+- **The knobs follow levels** through store inputs (`knobInputs`, the
+  sketch's own), so a signal, gate or converter moves whatever the code reads
+  from them. The **orbit** is part of the document, not a window setting: a
+  chain reads the scene's camera, so turning it is an undoable edit.
+
+**A moment says how many samples it wants.** `Moment.samples` is the samples
+per pixel a traced stage must have reached; `cook` adds to a stage's running
+mean (`Accumulation`, an `RGBA32F` pair ping-ponged, `NEAREST` because a
+linearly filtered float texture reads back black without an extension) when
+its recipe, `t` and size are unchanged, and starts again otherwise. Each batch
+is seeded by pixel, sample index and `t`, so sample n of a moment is always
+the same: a picture at a count is the same however its batches fell. A tone
+map (`tonemap.frag`, ACES) writes the stage's RGBA8 output; the ramp is
+linearised in the tracer and put back there.
+
+**Refining is a stream, not a loop.** `view$` passes every picture through
+`refined$`: a traced picture is cooked again on each animation frame with
+`samplesAt(frame)` more samples, as many per frame as `SAMPLE_BUDGET`
+pixel-samples allow, until the scene's **still** cap, and then the stream
+completes, so a converged picture costs nothing. `switchMap` restarts it on
+any change, which is why a playing clock gets one noisy sample a frame and a
+paused one refines. The readout in the corner (`128 spp`) is the image view's,
+so a pedal or Output showing a traced chain counts too. An export cooks each
+frame at the scene's **export** samples, a thumbnail at `TILE_SAMPLES`, a
+picture → level at two, and a strip of a scene settles before it redraws, as
+an evolving sketch's does.
+
+**A preview is traced small and upscaled.** `Moment.traceSide` caps the
+longer side a trace is drawn at (384 for windows, `null` for exports, strips
+and levels): a 1024 preview at one sample a frame dropped the app to 6 fps,
+capped it refines at 30 and idles at 60. The tone map goes into a target at
+the traced size and is blitted up with a linear filter.
+
+**Image windows give the picture half the window.** `hks-image-view` sets
+`--stage-minimum: 50%` and its stage does not shrink, so a long list of
+objects scrolls in the controls instead of squeezing the picture to a strip.
+Its stage also orbits (`orbits$`: drag, wheel, double-click), which only the
+Scene reads.
+
+The **Still life** starter is the worked example: the default scene (a glass
+ball, a metal ring, a matte floor) with a `code` object whose `custom()` is a
+glowing orb carried round by `k1`, a saw signal on `k1`, and an Output.
+Lights are found only by the paths that happen to hit them (the sun alone has
+next-event estimation), so a small bright orb lights the room noisily.
 
 ## Logic
 

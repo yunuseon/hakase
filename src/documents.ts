@@ -16,6 +16,13 @@ import type { Theme } from './model/sketch/theme.ts';
 import { reducePicture, type PaintCommand } from './model/paint.ts';
 import { defaultPicture, type Picture } from './shared/picture.ts';
 import { defaultPen, isPenParam, reducePen, type Pen, type PenCommand } from './model/pen.ts';
+import {
+    defaultScene,
+    isSceneKnob,
+    reduceScene,
+    type Scene,
+    type SceneCommand,
+} from './model/scene.ts';
 import { defaultDrums, reduceDrums, type Drums, type DrumsCommand } from './model/drums.ts';
 import type { FocusLink } from './model/focus.ts';
 import { defaultPedal, isPedalKind, reducePedal, type Pedal, type PedalCommand } from './pedals.ts';
@@ -133,6 +140,7 @@ export type Documents = {
     readonly signals: ReadonlyMap<StoreId, Signal>;
     readonly paintings: ReadonlyMap<StoreId, Picture>;
     readonly pens: ReadonlyMap<StoreId, Pen>;
+    readonly scenes: ReadonlyMap<StoreId, Scene>;
     readonly voices: ReadonlyMap<StoreId, Voice>;
     readonly drums: ReadonlyMap<StoreId, Drums>;
     readonly pedals: ReadonlyMap<StoreId, Pedal>;
@@ -161,6 +169,7 @@ type StoreCommands = {
     readonly signals: SignalCommand;
     readonly paintings: PaintCommand;
     readonly pens: PenCommand;
+    readonly scenes: SceneCommand;
     readonly voices: VoiceCommand;
     readonly drums: DrumsCommand;
     readonly pedals: PedalCommand;
@@ -250,6 +259,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
     signals: storeEvent(documents.signals, event),
     paintings: storeEvent(documents.paintings, event),
     pens: storeEvent(documents.pens, event),
+    scenes: storeEvent(documents.scenes, event),
     voices: storeEvent(documents.voices, event),
     drums: storeEvent(documents.drums, event),
     pedals: storeEvent(documents.pedals, event),
@@ -263,6 +273,7 @@ const withEvent = (documents: Documents, event: StoreEvent): Documents => ({
 export const linkedOf = ({
     signals,
     pens,
+    scenes,
     voices,
     drums,
     pedals,
@@ -275,6 +286,7 @@ export const linkedOf = ({
     Documents,
     | 'signals'
     | 'pens'
+    | 'scenes'
     | 'voices'
     | 'drums'
     | 'pedals'
@@ -287,6 +299,7 @@ export const linkedOf = ({
     new Map<StoreId, Linked>([
         ...signals,
         ...pens,
+        ...scenes,
         ...voices,
         ...drums,
         ...pedals,
@@ -394,6 +407,14 @@ const linked = (
                 ? reduce(
                       documents,
                       { kind: 'pens', store, command: { kind: 'source', param, source } },
+                      seq,
+                  )
+                : documents;
+        case 'scene':
+            return isSceneKnob(param)
+                ? reduce(
+                      documents,
+                      { kind: 'scenes', store, command: { kind: 'source', param, source } },
                       seq,
                   )
                 : documents;
@@ -743,6 +764,18 @@ export const reduceDocuments =
                         seq,
                     ),
                 };
+            case 'scenes':
+                return {
+                    ...documents,
+                    scenes: commanded(
+                        documents.scenes,
+                        action.store,
+                        defaultScene,
+                        reduceScene,
+                        action.command,
+                        seq,
+                    ),
+                };
             case 'voices':
                 return {
                     ...documents,
@@ -953,6 +986,7 @@ const JOINING: Readonly<Record<StoreDocument, readonly string[]>> = {
     signals: ['nudge', 'drag-wave', 'draw', 'set'],
     paintings: ['shift'],
     pens: ['weight'],
+    scenes: ['object', 'set', 'knob', 'code', 'orbit'],
     voices: ['decay', 'glide', 'volume'],
     drums: ['swing', 'volume'],
     pedals: ['value'],
@@ -1036,6 +1070,7 @@ const TITLES: Readonly<Record<StoreDocument, string>> = {
     signals: 'signal',
     paintings: 'painting',
     pens: 'pen',
+    scenes: 'scene',
     voices: 'voice',
     drums: 'drum machine',
     pedals: 'pedal',

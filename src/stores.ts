@@ -61,6 +61,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     box: stage,
     paint: document,
     pen: document,
+    scene: stage,
     voice: document,
     drums: document,
     mixer: null,

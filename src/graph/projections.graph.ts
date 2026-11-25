@@ -86,6 +86,10 @@ export const projectionsOf = (history$: Observable<History>) => {
         map(({ pens }) => pens),
         distinctUntilChanged(),
     );
+    const scenes$ = documents$.pipe(
+        map(({ scenes }) => scenes),
+        distinctUntilChanged(),
+    );
     const voices$ = documents$.pipe(
         map(({ voices }) => voices),
         distinctUntilChanged(),
@@ -115,6 +119,7 @@ export const projectionsOf = (history$: Observable<History>) => {
             (a, b) =>
                 a.signals === b.signals &&
                 a.pens === b.pens &&
+                a.scenes === b.scenes &&
                 a.voices === b.voices &&
                 a.drums === b.drums &&
                 a.pedals === b.pedals &&
@@ -154,7 +159,6 @@ export const projectionsOf = (history$: Observable<History>) => {
         distinctUntilChanged(),
     );
 
-    // Keyed by formula: one edit reaches every process showing that formula.
     const edits$ = documents$.pipe(
         map(({ formulas }) => formulas),
         distinctUntilChanged(),
@@ -201,6 +205,7 @@ export const projectionsOf = (history$: Observable<History>) => {
         bookmarks$,
         paintings$,
         pens$,
+        scenes$,
         voices$,
         drums$,
         pedals$,

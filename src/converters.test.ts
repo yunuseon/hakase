@@ -388,9 +388,10 @@ describe('a picture converter', () => {
         expect(read('motion')).toEqual([0.072, 1, 0.787, 0.14]);
     });
 
-    it('takes a sketch or a pedal, never a level', () => {
+    it('takes a sketch, a scene or a pedal, never a level', () => {
         expect(converterInputs('picture-level')['in']?.sources.map(({ kind }) => kind)).toEqual([
             'sketch',
+            'scene',
             'colourmap',
             'kaleido',
             'feedback',

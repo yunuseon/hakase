@@ -6,6 +6,7 @@ import { defaultDrums, drumCurve, isDrum, kitCurve, sameKit, type Kit } from '..
 import { focusView, initialFocus } from '../model/focus.ts';
 import { emptyHabits } from '../model/habits.ts';
 import { defaultPen, sameDrawing, strokeOf, type Drawing } from '../model/pen.ts';
+import { defaultScene, type SceneKnob } from '../model/scene.ts';
 import {
     defaultVoice,
     pitchCurve,
@@ -92,6 +93,7 @@ type Reads = Pick<
     | 'clocks$'
     | 'waves$'
     | 'pens$'
+    | 'scenes$'
     | 'voices$'
     | 'drums$'
     | 'gates$'
@@ -117,6 +119,7 @@ export const levelsOf = ({
     clocks$,
     waves$,
     pens$,
+    scenes$,
     voices$,
     drums$,
     gates$,
@@ -140,6 +143,7 @@ export const levelsOf = ({
     const clocksIn = inStore(clocks$, defaultClocks);
     const signalIn = inStore(waves$, defaultSignal);
     const penIn = inStore(pens$, defaultPen);
+    const sceneIn = inStore(scenes$, defaultScene);
     const voiceIn = inStore(voices$, defaultVoice);
     const drumsIn = inStore(drums$, defaultDrums);
     const waveIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen = NONE_SEEN) =>
@@ -741,6 +745,27 @@ export const levelsOf = ({
         }).pipe(map((parts): Image => ({ kind: 'points', store, ...parts })));
     };
 
+    const tracedIn = (store: StoreId, pace$: Observable<Pace>, seen: Seen): Observable<Image> => {
+        const scene$ = sceneIn(store);
+        const knob = (param: SceneKnob) => drivenIn(store, param, pace$, seen);
+
+        return combineLatest({
+            scene: scene$,
+            theme: scene$.pipe(
+                map(({ theme }) => theme),
+                distinctUntilChanged(),
+                switchMap(name => palettes$.pipe(map(all => all.get(name)?.value ?? themes[name]))),
+                distinctUntilChanged(),
+            ),
+            drivers: combineLatest({
+                k1: knob('k1'),
+                k2: knob('k2'),
+                k3: knob('k3'),
+                k4: knob('k4'),
+            }),
+        }).pipe(map((parts): Image => ({ kind: 'traced', store, ...parts })));
+    };
+
     const imageIn = (
         store: StoreId,
         pace$: Observable<Pace>,
@@ -754,9 +779,11 @@ export const levelsOf = ({
                   switchMap(owner =>
                       owner === 'sketch'
                           ? pointsIn(store, pace$, new Set([...seen, store]))
-                          : owner !== null && isPedalKind(owner)
-                            ? stageIn(store, owner, pace$, new Set([...seen, store]))
-                            : of(NONE),
+                          : owner === 'scene'
+                            ? tracedIn(store, pace$, new Set([...seen, store]))
+                            : owner !== null && isPedalKind(owner)
+                              ? stageIn(store, owner, pace$, new Set([...seen, store]))
+                              : of(NONE),
                   ),
                   distinctUntilChanged(sameImage),
               );
@@ -814,6 +841,7 @@ export const levelsOf = ({
         clocksIn,
         signalIn,
         penIn,
+        sceneIn,
         voiceIn,
         drumsIn,
         timerIn,

@@ -35,6 +35,8 @@ export const documentActionsOf = ({
             return [{ kind: 'paintings', store, command: input.command }];
         case 'pen':
             return [{ kind: 'pens', store, command: input.command }];
+        case 'scene':
+            return [{ kind: 'scenes', store, command: input.command }];
         case 'voice':
             return [{ kind: 'voices', store, command: input.command }];
         case 'gate':

@@ -131,6 +131,13 @@ export const declarations = {
         icon: 'M4 20 C8 8 12 16 15 9 S 19 6 20 4 M17 3 L21 7',
         inputs: { playback: playbackInput, ...penInputs },
     },
+    scene: {
+        id: 'scene',
+        title: 'scene',
+        category: 'make',
+        icon: 'M12 3a5 5 0 1 0 0 10a5 5 0 1 0 0-10M3 20h18M7 20l2-5M17 20l-2-5',
+        inputs: { playback: playbackInput, ...knobInputs },
+    },
     voice: {
         id: 'voice',
         title: 'voice',

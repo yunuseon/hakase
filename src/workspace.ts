@@ -1046,7 +1046,6 @@ const step = (
                       processes: raisedGroup(workspace, action.id, action.selected ?? []),
                   }
                 : workspace;
-        // Deltas arrive in screen pixels; the frame is in world units.
         case 'move': {
             const { zoom } = workspace.camera;
 

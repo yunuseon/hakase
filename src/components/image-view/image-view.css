@@ -1,4 +1,6 @@
 :host {
+    /* The picture is what every image window is for, so it keeps half the window however long the controls run. */
+    --stage-minimum: 50%;
     display: block;
     block-size: 100%;
     min-block-size: 0;
@@ -7,7 +9,7 @@
 
 .viewport {
     position: relative;
-    flex: 1;
+    flex-shrink: 0;
     min-block-size: 6rem;
     overflow: hidden;
     background: var(--well);
@@ -36,5 +38,19 @@ canvas {
 }
 
 .message[hidden] {
+    display: none;
+}
+
+.samples {
+    position: absolute;
+    inset-block-start: var(--space-2-5);
+    inset-inline-start: var(--space-2-5);
+    font: var(--text-2xs) var(--font-mono);
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.samples[hidden] {
     display: none;
 }

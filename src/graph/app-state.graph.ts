@@ -72,6 +72,7 @@ type StoreKey =
     | 'sounding$'
     | 'kit$'
     | 'pedal$'
+    | 'scene$'
     | 'gate$'
     | 'conversion$'
     | 'bits$'
@@ -126,6 +127,7 @@ export const scopedOf = ({
     clocksIn,
     signalIn,
     penIn,
+    sceneIn,
     voiceIn,
     drumsIn,
     timerIn,
@@ -306,6 +308,7 @@ export const scopedOf = ({
         signal: signalIn,
         paint: pictureIn,
         pen: penIn,
+        scene: sceneIn,
         voice: voiceIn,
         drums: drumsIn,
         colourmap: pedalIn,
@@ -445,6 +448,7 @@ export const scopedOf = ({
             sounding$: store$.pipe(switchMap(store => soundingIn(store, pace$))),
             kit$: store$.pipe(switchMap(store => kitIn(store, pace$))),
             pedal$: narrowed(pedalIn),
+            scene$: narrowed(sceneIn),
             gate$: narrowed(gateIn),
             conversion$: store$.pipe(switchMap(store => conversionIn(store, pace$))),
             bits$: combineLatest([store$, pace$]).pipe(

@@ -115,6 +115,7 @@ const scene = (extra: readonly Process[] = []): Documents => {
         ]),
         paintings: new Map(),
         pens: new Map(),
+        scenes: new Map(),
         voices: new Map([
             [
                 'voice',

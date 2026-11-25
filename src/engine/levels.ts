@@ -41,6 +41,8 @@ const stepsOf = (image: Image): readonly (readonly Step[])[] => {
     );
 };
 
+const LEVEL_SAMPLES = 2;
+
 const drawSteps = (engine: Engine, image: Image, seconds: number, steps: readonly Step[]) => {
     const now = performance.now();
 
@@ -58,6 +60,8 @@ const drawSteps = (engine: Engine, image: Image, seconds: number, steps: readonl
                 frame: null,
                 dotScale: SIDE / REFERENCE_SIDE,
                 lane: 'level',
+                samples: LEVEL_SAMPLES,
+                traceSide: null,
             },
             now,
         );
