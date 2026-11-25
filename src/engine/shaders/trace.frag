@@ -313,8 +313,11 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
     bool direct = true;
     int sampled = -1;
 
+    int scattered = 0;
+
+    // Glass spends no bounce: a ray through it meets a surface at every pass, and running out left black rings in a lens.
     for (int bounce = 0; bounce < 8; bounce++) {
-        if (bounce >= uBounces) break;
+        if (scattered >= uBounces) break;
 
         float travelled;
         Hit h;
@@ -360,6 +363,7 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
                 if (dot(direction, facing) <= 0.0) direction = mirrored;
                 carried *= h.material == METAL ? albedo : vec3(1.0);
                 direct = h.rough < 0.2;
+                scattered++;
             } else {
                 float lit = max(dot(facing, uSun), 0.0);
                 if (lit > 0.0 && uSunPower > 0.0 && !shadowed(origin, t)) {
@@ -369,6 +373,7 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
                 direction = cosineAround(facing);
                 carried *= albedo;
                 direct = false;
+                scattered++;
             }
         }
 

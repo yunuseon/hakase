@@ -2383,6 +2383,17 @@ takes, since one sample at 384 is the least a refining frame can add.
 
 A light's shadow ray stops at the light (`march`'s `far`), not at `FAR`.
 
+**Glass spends no bounce.** A ray through a glass ball meets a surface at
+every refraction and every internal reflection, and with each one counted
+against Bounces (4 in Lens) the longer routes ran out and came back black: a
+lens showed concentric dark rings, from the angles at which that happens, which
+read like reflections of a dark sky and were not. `traced` counts only matte,
+gloss and metal events (`scattered`) against the scene's Bounces, and the loop
+itself stops at 8 events, so glass gets the rest. The loop limit matters to
+the compiler: at 16 the same scenes ran 15% slower even where no path got that
+long. Interior costs 57 ms a sample at 384 for it (from 50), Room 43 (from 39);
+scenes without glass are unchanged.
+
 **Closed rooms cost the most**, because no ray escapes: one sample at 384 took
 65 ms for Interior and 48 for Room, against 19 for Still life. A ray skimming a
 wall into a corner takes many tiny steps, so `march` counts a hit within
