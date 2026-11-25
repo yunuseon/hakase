@@ -30,6 +30,7 @@ uniform int uBounces;
 uniform vec3 uSun;
 uniform float uSunPower;
 uniform float uSky;
+uniform float uFov;
 uniform float k1;
 uniform float k2;
 uniform float k3;
@@ -400,7 +401,7 @@ void main() {
     vec3 side = cross(forward, normalize(c.up));
     side = length(side) > 1e-5 ? normalize(side) : normalize(cross(forward, forward.yzx + vec3(0.0, 0.0, 1.0)));
     vec3 up = cross(side, forward);
-    float lens = tan(radians(25.0) * 0.5);
+    float lens = tan(radians(uFov) * 0.5);
     float shorter = min(uResolution.x, uResolution.y);
     vec3 sum = vec3(0.0);
 

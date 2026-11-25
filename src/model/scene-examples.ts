@@ -31,6 +31,20 @@ Camera camera(float t) {
 }
 `;
 
+const INTERIOR = `Hit custom(vec3 p, float t) {
+    Hit room = hit(p.y, GLOSS, 0.45, 0.35);
+    room = closer(room, hit(3.0 - p.y, MATTE, 0.0, 1.0));
+    room = closer(room, hit(p.z + 3.2, MATTE, 0.08, 1.0));
+    room = closer(room, hit(3.2 - p.z, MATTE, 0.08, 1.0));
+    room = closer(room, hit(p.x + 2.5, MATTE, 1.0, 1.0));
+    return closer(room, hit(2.5 - p.x, MATTE, 0.08, 1.0));
+}
+
+Camera camera(float t) {
+    return Camera(vec3(0.3, 1.5, 3.0), vec3(-0.2, 0.9, -1.0), vec3(0.0, 1.0, 0.0));
+}
+`;
+
 const CHECKER = `Hit custom(vec3 p, float t) {
     float check = mod(floor(p.x * 2.0) + floor(p.z * 2.0), 2.0);
     return hit(p.y, MATTE, 0.3 + 0.6 * check, 1.0);
@@ -105,6 +119,67 @@ export const SCENE_EXAMPLES = {
             theme: 'ember',
         },
     },
+    interior: {
+        label: 'Interior',
+        summary:
+            'Standing inside a closed room lit by a wide ceiling panel and a glowing orb: soft shadows, light bouncing off a coloured wall, and a glossy floor that catches it all.',
+        scene: {
+            ...defaultScene,
+            sun: 0,
+            height: 0.55,
+            light: 0,
+            sky: 0,
+            bounces: 6,
+            exposure: 0,
+            preview: 512,
+            fov: 62,
+            objects: [
+                sceneObject('room', 'code', 'matte', {}),
+                sceneObject('panel', 'box', 'light', {
+                    y: 3.55,
+                    z: -0.8,
+                    size: 0.65,
+                    tint: 0,
+                    glow: 9,
+                }),
+                sceneObject('orb', 'sphere', 'light', {
+                    x: -1.8,
+                    y: 1.5,
+                    z: -2.4,
+                    size: 0.22,
+                    tint: 0.6,
+                    glow: 16,
+                }),
+                sceneObject('ball', 'sphere', 'glass', {
+                    x: 0.7,
+                    y: 0.5,
+                    z: -1.2,
+                    size: 0.5,
+                    tint: 1,
+                    rough: 0,
+                }),
+                sceneObject('ring', 'torus', 'metal', {
+                    x: -0.7,
+                    y: 0.13,
+                    z: -0.5,
+                    size: 0.4,
+                    tint: 0.8,
+                    rough: 0.2,
+                }),
+                sceneObject('block', 'box', 'matte', {
+                    x: 1.5,
+                    y: 0.45,
+                    z: -2.4,
+                    size: 0.45,
+                    turn: 0.12,
+                    tint: 0.6,
+                    rough: 1,
+                }),
+            ],
+            code: INTERIOR,
+            theme: 'paper',
+        },
+    },
     lens: {
         label: 'Lens',
         summary:
@@ -150,6 +225,7 @@ export const SCENE_EXAMPLE_NAMES = [
     'still',
     'blobs',
     'room',
+    'interior',
     'lens',
     'field',
 ] as const satisfies readonly SceneExampleName[];

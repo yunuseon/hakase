@@ -10,6 +10,7 @@ describe('the scene menu', () => {
             'Start from Still life',
             'Start from Blobs',
             'Start from Room',
+            'Start from Interior',
             'Start from Lens',
             'Start from Field',
         ]);

@@ -169,6 +169,7 @@ export const renderSections = ({ scene, driven }: SceneView): readonly Section[]
         }),
     ),
     section('camera', 'Camera', [
+        sceneRange(scene, 'fov', 'field of view'),
         { kind: 'action', id: 'reset-view', label: 'reset view', glyph: ICONS.reset },
     ]),
 ];

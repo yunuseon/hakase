@@ -76,6 +76,7 @@ export const traceBatch = (
     gl.uniform3f(at('uSun'), ...sunOf(scene.sun, scene.height));
     gl.uniform1f(at('uSunPower'), scene.light);
     gl.uniform1f(at('uSky'), scene.sky);
+    gl.uniform1f(at('uFov'), scene.fov);
     SCENE_KNOBS.forEach(knob => {
         gl.uniform1f(at(knob), sceneKnobAt(image, knob, t));
     });

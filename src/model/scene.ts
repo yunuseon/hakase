@@ -56,6 +56,7 @@ export const SCENE_FIELDS = {
     exposure: range(-3, 3, 0.1),
     preview: range(1, 1024, 1),
     export: range(1, 256, 1),
+    fov: range(15, 100, 1),
 } as const satisfies Record<string, Range>;
 export type SceneField = keyof typeof SCENE_FIELDS;
 export const SCENE_FIELD_NAMES = [
@@ -67,6 +68,7 @@ export const SCENE_FIELD_NAMES = [
     'exposure',
     'preview',
     'export',
+    'fov',
 ] as const satisfies readonly SceneField[];
 export const isSceneField = (value: string): value is SceneField =>
     SCENE_FIELD_NAMES.some(name => name === value);
@@ -128,6 +130,7 @@ export const defaultScene: Scene = {
     bounces: 4,
     exposure: 0,
     preview: 256,
+    fov: 25,
     export: 64,
     knobs: { k1: 0.5, k2: 0.5, k3: 0.5, k4: 0.5 },
     theme: 'dusk',
@@ -289,6 +292,7 @@ const pickedFields = (value: object): Readonly<Record<SceneField, number>> => {
         exposure: read('exposure'),
         preview: read('preview'),
         export: read('export'),
+        fov: read('fov'),
     };
 };
 
