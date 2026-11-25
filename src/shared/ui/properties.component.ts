@@ -455,8 +455,11 @@ export class HksProperties extends HTMLElement {
             scan(toggled, new Set<string>()),
             startWith(new Set<string>()),
         );
-        // A field that loses focus is written again, so Escape or a refused entry shows the value it had.
-        const left$ = fromElementEvent$(this.root, 'focusout').pipe(startWith(null));
+        // Rewritten on blur so Escape shows the old value, but not synchronously: removing the focused row blurs mid-render, and a nested render throws.
+        const left$ = fromElementEvent$(this.root, 'focusout').pipe(
+            observeOn(asapScheduler),
+            startWith(null),
+        );
         const rendered$ = combineLatest([sections$, open$, left$]).pipe(
             map(([sections, open]) => [sections, open] as const),
             tap(([sections, open]) => {
