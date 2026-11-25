@@ -6,9 +6,7 @@ import {
     knobAt,
     NONE,
     sameImage,
-    samplesAt,
     samplesWanted,
-    SAMPLE_BUDGET,
     sceneKnobAt,
     stagesOf,
     stillOf,
@@ -159,14 +157,6 @@ describe('image recipes', () => {
             defaultScene.export,
         );
         expect(samplesWanted(points('a'), 'preview')).toBe(1);
-    });
-
-    it('refine as many samples a frame as the pixel budget allows, up to the cap', () => {
-        expect(samplesAt(0, SAMPLE_BUDGET, 256)).toBe(1);
-        expect(samplesAt(9, SAMPLE_BUDGET, 256)).toBe(10);
-        expect(samplesAt(0, SAMPLE_BUDGET / 4, 256)).toBe(4);
-        expect(samplesAt(1000, SAMPLE_BUDGET, 256)).toBe(256);
-        expect(samplesAt(0, SAMPLE_BUDGET * 16, 256)).toBe(1);
     });
 
     it('read a scene knob from its driver, or as set', () => {

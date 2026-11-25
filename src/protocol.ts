@@ -174,7 +174,6 @@ export type StripCommand =
     | { readonly kind: 'volume'; readonly volume: number }
     | { readonly kind: 'mute'; readonly muted: boolean };
 
-// Stamped as it leaves a process: who said it, from which store, on which clock.
 export type AppSignal = {
     readonly to: 'app';
     readonly from: ProcessId;

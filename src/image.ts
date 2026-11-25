@@ -158,8 +158,3 @@ export const samplesWanted = (image: Image, purpose: 'preview' | 'export'): numb
         (most, stage) => (stage.kind === 'traced' ? Math.max(most, stage.scene[purpose]) : most),
         1,
     );
-
-export const SAMPLE_BUDGET = 1 << 17;
-
-export const samplesAt = (frame: number, pixels: number, cap: number): number =>
-    Math.min(cap, (frame + 1) * Math.max(1, Math.floor(SAMPLE_BUDGET / Math.max(1, pixels))));

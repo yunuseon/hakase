@@ -25,7 +25,6 @@ import { buildRamp, RAMP_SIZE, type Theme } from '../model/sketch/theme.ts';
 import { themes } from '../model/sketch/themes/registry.ts';
 import {
     knobAt,
-    SAMPLE_BUDGET,
     sameImage,
     stagesOf,
     type Image,
@@ -51,6 +50,7 @@ import present from './shaders/present.frag?raw';
 import sheet from './shaders/sheet.frag?raw';
 import tonemap from './shaders/tonemap.frag?raw';
 import { createTracer, traceBatch, type Tracer } from './trace.ts';
+import { passesTo, partsOf } from './pacing.ts';
 import {
     createFloatTarget,
     createMultisampled,
@@ -127,7 +127,7 @@ type Accumulation = {
     front: Target;
     back: Target;
     readonly toned: Target | null;
-    done: number;
+    parts: number;
 };
 
 const traceSizeOf = ({ width, height, traceSide }: Moment) => {
@@ -514,6 +514,9 @@ const traceOf = (engine: Engine, key: string, code: string): Tracer | null => {
 
 const MAX_BATCH = 16;
 
+// Samples in one draw stay under this many pixel-samples, or an export at full size could stall the GPU long enough to lose it.
+const SAMPLE_BUDGET = 1 << 17;
+
 const drawTraced = (
     engine: Engine,
     entry: Entry,
@@ -549,20 +552,25 @@ const drawTraced = (
             size.width === moment.width && size.height === moment.height
                 ? null
                 : createTarget(gl, size.width, size.height),
-        done: 0,
+        parts: 0,
     };
     entry.accumulation = accumulation;
 
-    if (restart) {
-        accumulation.done = 0;
+    // Each pixel keeps its own count in alpha, so a restart must zero it, not just the colour.
+    if (restart || known === null) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, accumulation.front.framebuffer);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        accumulation.parts = 0;
     }
 
     paletteOf(engine, entry, image.theme);
     const pixels = size.width * size.height;
     const each = Math.min(MAX_BATCH, Math.max(1, Math.floor(SAMPLE_BUDGET / pixels)));
 
-    while (accumulation.done < moment.samples) {
-        const batch = Math.min(each, moment.samples - accumulation.done);
+    const wanted = partsOf(moment.samples);
+
+    passesTo(accumulation.parts, wanted, each).forEach(pass => {
         traceBatch(
             gl,
             tracer,
@@ -570,14 +578,15 @@ const drawTraced = (
             accumulation.back,
             accumulation.front,
             { unit: PALETTE_UNIT },
-            { t: moment.t, done: accumulation.done, batch },
+            moment.t,
+            pass,
             engine.vao,
         );
         const front = accumulation.back;
         accumulation.back = accumulation.front;
         accumulation.front = front;
-        accumulation.done += batch;
-    }
+    });
+    accumulation.parts = Math.max(accumulation.parts, wanted);
 
     const shader = engine.passes.tonemap;
     gl.useProgram(shader.program);
@@ -794,7 +803,9 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
             entry.cooked.dotScale === moment.dotScale &&
             sameImage(entry.cooked.image, stage);
         const fresh =
-            same && (stage.kind !== 'traced' || (entry.accumulation?.done ?? 0) >= moment.samples);
+            same &&
+            (stage.kind !== 'traced' ||
+                (entry.accumulation?.parts ?? 0) >= partsOf(moment.samples));
 
         if (!fresh) {
             if (stage.kind === 'traced') {

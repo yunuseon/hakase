@@ -11,6 +11,7 @@ import { orbitUniform } from '../model/sketch/space.ts';
 import { createProgram } from '../shared/gl/program.ts';
 import traceSource from './shaders/trace.frag?raw';
 import passSource from './shaders/pass.vert?raw';
+import type { Pass } from './pacing.ts';
 import type { Target } from './targets.ts';
 
 // The code is spliced after the prelude, so driver line numbers need rebasing.
@@ -54,7 +55,8 @@ export const traceBatch = (
     into: Target,
     previous: Target,
     palette: { readonly unit: number },
-    { t, done, batch }: { readonly t: number; readonly done: number; readonly batch: number },
+    t: number,
+    { slots, phase, count, batch }: Pass,
     vao: WebGLVertexArrayObject,
 ): void => {
     const { scene } = image;
@@ -70,8 +72,10 @@ export const traceBatch = (
     gl.uniform1f(at('uPlayhead'), t);
     gl.uniform2f(at('uResolution'), into.width, into.height);
     gl.uniform3f(at('uOrbit'), ...orbitUniform(scene.orbit));
-    gl.uniform1f(at('uDone'), done);
     gl.uniform1i(at('uBatch'), batch);
+    gl.uniform1i(at('uSlots'), slots);
+    gl.uniform1i(at('uPhase'), phase);
+    gl.uniform1i(at('uBands'), count);
     gl.uniform1i(at('uBounces'), scene.bounces);
     gl.uniform3f(at('uSun'), ...sunOf(scene.sun, scene.height));
     gl.uniform1f(at('uSunPower'), scene.light);

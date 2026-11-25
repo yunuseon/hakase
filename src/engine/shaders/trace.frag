@@ -24,8 +24,10 @@ uniform int uCount;
 uniform float uPlayhead;
 uniform vec2 uResolution;
 uniform vec3 uOrbit;
-uniform float uDone;
 uniform int uBatch;
+uniform int uSlots;
+uniform int uPhase;
+uniform int uBands;
 uniform int uBounces;
 uniform vec3 uSun;
 uniform float uSunPower;
@@ -395,6 +397,18 @@ vec3 orbited(Camera c) {
 
 void main() {
     ivec2 pixel = ivec2(gl_FragCoord.xy);
+    vec4 before = texelFetch(uPrevious, pixel, 0);
+
+    // A pass may trace a run of bands of 8 rows; the others keep what they had, their own count in alpha.
+    // Bands, not one pixel per 2x2 block: neighbouring pixels run in lockstep, so a scattered pass costs a whole one.
+    int band = (pixel.y >> 3) % uSlots;
+
+    if (uSlots > 1 && (band < uPhase || band >= uPhase + uBands)) {
+        colour = before;
+        return;
+    }
+
+    float done = before.a;
     Camera c = view(uPlayhead);
     vec3 eye = orbited(c);
     vec3 forward = normalize(c.target - eye);
@@ -409,15 +423,14 @@ void main() {
         if (i >= uBatch) break;
 
         // Seeded by the pixel, the sample's index and the moment, so sample n of a moment is always the same.
-        seed = hashed(uint(pixel.x) * 1973u + uint(pixel.y) * 9277u + uint(int(uDone) + i) * 26699u + uint(uPlayhead * 65536.0) * 3779u);
+        seed = hashed(uint(pixel.x) * 1973u + uint(pixel.y) * 9277u + uint(int(done) + i) * 26699u + uint(uPlayhead * 65536.0) * 3779u);
         vec2 jitter = vec2(random(), random());
         vec2 at = (gl_FragCoord.xy - 0.5 + jitter - uResolution * 0.5) / (shorter * 0.5);
         vec3 direction = normalize(forward + (side * at.x + up * at.y) * lens);
         sum += traced(eye, direction, uPlayhead);
     }
 
-    vec3 batch = sum / float(uBatch);
-    vec3 before = uDone > 0.0 ? texelFetch(uPrevious, pixel, 0).rgb : vec3(0.0);
-    vec3 mean = (before * uDone + batch * float(uBatch)) / (uDone + float(uBatch));
-    colour = vec4(min(mean, vec3(1000.0)), 1.0);
+    float now = done + float(uBatch);
+    vec3 mean = (before.rgb * done + sum) / now;
+    colour = vec4(min(mean, vec3(1000.0)), now);
 }

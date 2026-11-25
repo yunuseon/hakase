@@ -2320,17 +2320,39 @@ the same: a picture at a count is the same however its batches fell. A tone
 map (`tonemap.frag`, ACES) writes the stage's RGBA8 output; the ramp is
 linearised in the tracer and put back there.
 
-**Refining is a stream, not a loop.** `view$` passes every picture through
-`refined$`: a traced picture is cooked again on each animation frame with
-`samplesAt(frame)` more samples, as many per frame as `SAMPLE_BUDGET`
-pixel-samples allow, until the scene's **still** cap, and then the stream
-completes, so a converged picture costs nothing. `switchMap` restarts it on
-any change, which is why a playing clock gets one noisy sample a frame and a
-paused one refines. The readout in the corner (`128 spp`) is the image view's,
-so a pedal or Output showing a traced chain counts too. An export cooks each
-frame at the scene's **export** samples, a thumbnail at `TILE_SAMPLES`, a
-picture → level at two, and a strip of a scene settles before it redraws, as
-an evolving sketch's does.
+**Refining is a stream, not a loop, and it is paced by the frame.** `view$`
+passes every picture through `refined$`: after a first coarse frame, a traced
+picture is cooked again on each animation frame with a little more work, until
+the scene's **still** cap, and then the stream completes, so a converged
+picture costs nothing. `switchMap` restarts it on any change, which is why a
+playing clock gets one noisy sample a frame and a paused one refines. The
+readout in the corner (`128 spp`) is the image view's, so a pedal or Output
+showing a traced chain counts too. An export cooks each frame at the scene's
+**export** samples, a thumbnail at `TILE_SAMPLES`, a picture → level at two,
+and a strip of a scene settles before it redraws, as an evolving sketch's does.
+
+- **A sample is cut into 16 bands** (`SLOTS`, `engine/pacing.ts`): rows in
+  bands of 8, interleaved, so a pass may trace a run of bands while every other
+  pixel keeps what it had. Each pixel keeps its own sample count in the
+  accumulation's alpha, and is seeded by its own count, so a picture at a
+  count is exactly the full-pass picture however its work was cut. Progress
+  is counted in parts (`partsOf`), and `passesTo` sends whole samples as full
+  passes and the rest a run of bands at a time, one draw each. A restart
+  clears the accumulation, alpha included.
+- **Bands, not scattered pixels.** One pixel of every 2x2 block was tried
+  first and cost as much as a whole sample: neighbouring pixels run in
+  lockstep on the GPU, so the group waits for its one tracing pixel.
+- **The work per frame follows the frame** (`paced`, folded over the frames'
+  timestamps): one band more after every frame that kept time, half as many
+  after one that ran past 20 ms. It grows by one, not by a factor, because
+  frame times lag the GPU by a frame or two and a fast rise overshot into
+  50 ms frames. Only how fast a picture arrives depends on the machine; what
+  it is at a count does not.
+- Measured refining (with the app's other windows open): Interior went from
+  20 fps to 40, Still life from 45 to 54, Lens to 56; Interior converges about
+  a fifth slower for it (86 samples in 10 s, from 105), and still drops a
+  frame now and then, since its controller probes just past what a frame
+  holds.
 
 **A preview is traced small and upscaled.** `Moment.traceSide` caps the
 longer side a trace is drawn at (384 for windows, `null` for exports, strips

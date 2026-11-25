@@ -13,11 +13,13 @@ import {
     concatMap,
     map,
     repeat,
+    scan,
     shareReplay,
     switchMap,
     takeWhile,
 } from 'rxjs/operators';
-import { samplesAt, samplesWanted, type Image } from '../image.ts';
+import { samplesWanted, type Image } from '../image.ts';
+import { paced, SLOTS, startPace, type Pace } from './pacing.ts';
 import type { Stroke } from '../shared/stroke.ts';
 import {
     backdropOf,
@@ -76,7 +78,7 @@ const framed = (engine: Engine, image: Image, { moment, slot }: Showing): Observ
             .then((bitmap): View => ({
                 kind: 'frame',
                 bitmap,
-                samples: traces(image) ? moment.samples : null,
+                samples: traces(image) ? Math.floor(moment.samples) : null,
             }))
             .catch(failed);
     } catch (error) {
@@ -90,8 +92,7 @@ const traces = (image: Image): boolean => samplesWanted(image, 'preview') > 1;
 
 const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
     const cap = samplesWanted(image, 'preview');
-    const { width, height, traceSide } = showing.moment;
-    const pixels = Math.min(width * height, traceSide === null ? Infinity : traceSide * traceSide);
+    const { traceSide } = showing.moment;
 
     const moving: Showing = {
         ...showing,
@@ -107,7 +108,8 @@ const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
         : concat(
               from([moving]),
               animationFrames().pipe(
-                  map((_, frame) => samplesAt(frame, pixels, cap)),
+                  scan((pace: Pace, { timestamp }) => paced(pace, timestamp, cap), startPace(0)),
+                  map(({ parts }) => parts / SLOTS),
                   takeWhile(samples => samples < cap, true),
                   map(samples => ({ ...showing, moment: { ...showing.moment, samples } })),
               ),

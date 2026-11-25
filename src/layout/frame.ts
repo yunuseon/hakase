@@ -95,7 +95,6 @@ export type WindowGesture =
 
 const MIN_WIDTH = 180;
 const MIN_HEIGHT = 64;
-// The sketch's frame is its canvas size, so this caps the drawing buffer.
 const MAX_SIDE = 1280;
 
 export const moved = (frame: Frame, dx: number, dy: number): Frame => ({
