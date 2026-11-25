@@ -2457,7 +2457,12 @@ The Room's camera had to sit at z = 9: the lens is 25°, and closer it saw
 mostly back wall. Inside a room the camera cannot step back, so a scene has a
 **field of view** (`fov`, 15° to 100°, 25° by default so the sketch's framing
 and every other scene are unchanged), in the Render tab's Camera section;
-Interior uses 62°. On `paper` its walls take the theme's low end (off-white)
+Interior uses 62°. Its camera's target sits 1.2 ahead of the eye, on the line
+of sight it had: the drag orbits about the target, and with the target across
+the room a turn of a radian swung the eye out through the walls, where a
+closed room with no sun or sky is black while the counter still climbs. Near
+the eye, a drag turns the view as a head would, and every turn stays inside.
+A wheel dolly far enough can still take it out. On `paper` its walls take the theme's low end (off-white)
 and one wall its top (terracotta), which is where the colour bleeding comes
 from: tints near 1 on paper are not white.
 

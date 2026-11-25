@@ -41,7 +41,7 @@ const INTERIOR = `Hit custom(vec3 p, float t) {
 }
 
 Camera camera(float t) {
-    return Camera(vec3(0.3, 1.5, 3.0), vec3(-0.2, 0.9, -1.0), vec3(0.0, 1.0, 0.0));
+    return Camera(vec3(0.3, 1.5, 3.0), vec3(0.153, 1.323, 1.822), vec3(0.0, 1.0, 0.0));
 }
 `;
 
