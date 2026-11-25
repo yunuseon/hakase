@@ -1,5 +1,5 @@
 import { declarations } from '../declarations.ts';
-import { combineLatest, merge } from 'rxjs';
+import { combineLatest, merge, of } from 'rxjs';
 import {
     distinctUntilChanged,
     ignoreElements,
@@ -19,6 +19,7 @@ import type { SceneControlsEvent } from '../components/scene/scene.component.ts'
 import { chainShowing$, viewRatio$ } from '../engine/moment.ts';
 import { sceneChecked$, view$ } from '../engine/view.ts';
 import { SCENE_KNOBS } from '../model/scene.ts';
+import { exampleOf, sceneMenu } from '../components/scene/scene-menu.ts';
 import type { Program } from '../program.ts';
 import type { AppInput } from '../protocol.ts';
 import { chainLine } from '../why.ts';
@@ -29,11 +30,14 @@ export const sceneProgram = {
     size: { width: 560, height: 680 },
     minimum: { width: 200, height: 160 },
     launch: async () => {
-        const [{ HksImageView }, { HksSceneControls }, { HksProperties }] = await Promise.all([
-            import('../components/image-view/image-view.component.ts'),
-            import('../components/scene/scene.component.ts'),
-            import('../shared/ui/properties.component.ts'),
-        ]);
+        const [{ HksImageView }, { HksSceneControls }, { HksProperties }, { HksMenu }] =
+            await Promise.all([
+                import('../components/image-view/image-view.component.ts'),
+                import('../components/scene/scene.component.ts'),
+                import('../shared/ui/properties.component.ts'),
+                import('../shared/ui/menu.component.ts'),
+            ]);
+        const menu = new HksMenu();
         const view = new HksImageView();
         const controls = new HksSceneControls();
         const objects = new HksProperties();
@@ -46,6 +50,7 @@ export const sceneProgram = {
 
         return {
             element: view,
+            actions: menu,
             run$: ({
                 scene$,
                 image$,
@@ -133,6 +138,18 @@ export const sceneProgram = {
                         })),
                     ),
                     controls.whys$.pipe(map((input): AppInput => ({ kind: 'why', input }))),
+                    menu
+                        .connect$(of(sceneMenu(declarations.scene.icon)), 'scene actions')
+                        .pipe(ignoreElements()),
+                    menu.picks$.pipe(
+                        mergeMap(({ id }): AppInput[] => {
+                            const scene = exampleOf(id);
+
+                            return scene === null
+                                ? []
+                                : [{ kind: 'scene', command: { kind: 'load', scene } }];
+                        }),
+                    ),
                 );
             },
         };

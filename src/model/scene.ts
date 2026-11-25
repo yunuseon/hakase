@@ -157,6 +157,7 @@ export type SceneCommand =
     | { readonly kind: 'theme'; readonly theme: ThemeName }
     | { readonly kind: 'code'; readonly code: string }
     | { readonly kind: 'orbit'; readonly action: OrbitAction }
+    | { readonly kind: 'load'; readonly scene: Omit<Scene, 'sources'> }
     | { readonly kind: 'source'; readonly param: SceneKnob; readonly source: string | null };
 
 const withObject = (scene: Scene, id: string, change: (old: SceneObject) => SceneObject) => {
@@ -229,6 +230,8 @@ export const reduceScene = (
             return command.code === scene.code ? scene : { ...scene, code: command.code };
         case 'orbit':
             return { ...scene, orbit: reduceOrbit(scene.orbit, command.action) };
+        case 'load':
+            return { ...command.scene, sources: scene.sources };
         case 'source':
             return scene.sources[command.param] === command.source
                 ? scene

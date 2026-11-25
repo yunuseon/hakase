@@ -46,6 +46,25 @@ at 41% and running off the screen at 100%.
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
 
+## Pictures: one exporter, any window headless
+
+Decided after the path tracer: every picture is already drawn once by the
+shared engine and shown through `hks-image-view`, but the **sketch** still
+carries its own frame strip and export, the Output's job twice, and no
+picture window can drop its picture to be a module with controls only.
+
+- **Output is the only exporter.** The sketch's Animation tab becomes one
+  action, _Open in Output_, which places an Output wired to the sketch beside
+  it. Saved `SketchSettings.tab` and `stripLevel` migrate (an `animation` tab
+  reads as Parameters). Done when nothing outside Output imports the strip or
+  the export panel.
+- **Any picture window can hide its picture.** A view-only setting on Scene,
+  sketch and every pedal folds the stage away and leaves the controls, so a
+  patch can run as headless modules into one or more big Outputs. Gestures on
+  a picture (orbit, shift-paint, the pointer) stay on the source's own picture,
+  since an Output cannot know which stage of a chain a drag means. Done when a
+  Light show can be laid out with every stage headless and one Output.
+
 ## Typed ports and converters
 
 ### Why

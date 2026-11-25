@@ -2382,6 +2382,22 @@ the floor smoothly with its `bounds()`, and as scattered fireflies without.
 `world()` reports which object was nearest through a global, `nearest`,
 because `Hit` is the code's own struct and has no room for it.
 
+**A scene can start from an example.** `SCENE_EXAMPLES` in
+`model/scene-examples.ts` is plain data, a label, a summary and a whole scene
+each, offered in the Scene window's ⋯ as _Start from …_ (`sceneMenu`,
+`exampleOf`): **Still life** (objects only, the default), **Blobs** (three
+spheres melted with `smin` in code, k1 their softness), **Room** (a box room in
+code lit only by a ceiling panel, its camera scripted), **Lens** (a checker
+floor in code seen through a glass ball) and **Field** (one sphere repeated with
+`mod`, bobbing out of step, k1 the metal's roughness). Picking one is one
+`load` command that **carries the whole scene**, not its name, so a replay
+reads what was loaded rather than whatever the table says now, and the
+reducer needs no table; it replaces everything but `sources`, so what the
+knobs follow stays wired. A new example is one entry, and
+`scene-examples.test.ts` checks it survives a save with every value in range.
+The Room's camera had to sit at z = 9: the lens is 25°, and closer it saw
+mostly back wall.
+
 The **Still life** starter is the worked example: the default scene (a glass
 ball, a metal ring, a matte floor) with a `code` object whose `custom()` is a
 glowing orb carried round by `k1`, bounded by `bounds()`, a saw signal on
