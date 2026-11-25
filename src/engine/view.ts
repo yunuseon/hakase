@@ -18,8 +18,17 @@ import {
     switchMap,
     takeWhile,
 } from 'rxjs/operators';
-import { samplesWanted, type Image } from '../image.ts';
-import { paced, SLOTS, startPace, type Pace } from './pacing.ts';
+import { NONE, samplesWanted, type Image } from '../image.ts';
+import {
+    movedAt,
+    movingSide,
+    paced,
+    SLOTS,
+    startMoving,
+    startPace,
+    type Moving,
+    type Pace,
+} from './pacing.ts';
 import type { Stroke } from '../shared/stroke.ts';
 import {
     backdropOf,
@@ -86,11 +95,15 @@ const framed = (engine: Engine, image: Image, { moment, slot }: Showing): Observ
     }
 };
 
-const MOVING_TRACE_SIDE = 256;
+type Changed = {
+    readonly image: Image;
+    readonly showing: Showing | null;
+    readonly moving: Moving;
+};
 
 const traces = (image: Image): boolean => samplesWanted(image, 'preview') > 1;
 
-const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
+const refined$ = (image: Image, showing: Showing, side: number): Observable<Showing> => {
     const cap = samplesWanted(image, 'preview');
     const { traceSide } = showing.moment;
 
@@ -99,7 +112,7 @@ const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
         moment: {
             ...showing.moment,
             samples: 1,
-            traceSide: traceSide === null ? null : Math.min(traceSide, MOVING_TRACE_SIDE),
+            traceSide: traceSide === null ? null : Math.min(traceSide, side),
         },
     };
 
@@ -123,10 +136,19 @@ export const view$ = (image$: Observable<Image>, showing$: Observable<Showing>):
                 ? from([{ kind: 'failed', message: engine.message } as const])
                 : combineLatest([image$, showing$]).pipe(
                       auditTime(0, animationFrameScheduler),
-                      switchMap(([image, showing]) =>
-                          image.kind === 'none'
+                      map(([image, showing]) => ({ image, showing, at: performance.now() })),
+                      scan(
+                          (last: Changed, { image, showing, at }): Changed => ({
+                              image,
+                              showing,
+                              moving: movedAt(last.moving, at),
+                          }),
+                          { image: NONE, showing: null, moving: startMoving },
+                      ),
+                      switchMap(({ image, showing, moving }) =>
+                          image.kind === 'none' || showing === null
                               ? from([{ kind: 'empty' } as const])
-                              : refined$(image, showing).pipe(
+                              : refined$(image, showing, movingSide(moving)).pipe(
                                     concatMap(each => framed(engine, image, each)),
                                 ),
                       ),

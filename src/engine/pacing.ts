@@ -56,3 +56,47 @@ export const paced = (pace: Pace, now: number, cap: number): Pace => {
 
     return { parts: Math.min(partsOf(cap), pace.parts + step), step, last: now };
 };
+
+export const MOVING_SIDES = [128, 160, 192, 224, 256, 320, 384] as const;
+
+export type Moving = {
+    readonly rung: number;
+    readonly late: number;
+    readonly calm: number;
+    readonly last: number | null;
+};
+
+export const startMoving: Moving = {
+    rung: MOVING_SIDES.indexOf(256),
+    late: 0,
+    calm: 0,
+    last: null,
+};
+
+export const CALM_FRAMES = 30;
+const LATE_FRAMES = 2;
+const UNRELATED_MS = 100;
+
+export const movedAt = (moving: Moving, now: number): Moving => {
+    const gap = moving.last === null ? null : now - moving.last;
+
+    if (gap === null || gap > UNRELATED_MS) {
+        return { ...moving, late: 0, calm: 0, last: now };
+    }
+
+    if (gap > LATE_MS) {
+        const late = moving.late + 1;
+
+        return late >= LATE_FRAMES
+            ? { rung: Math.max(0, moving.rung - 1), late: 0, calm: 0, last: now }
+            : { ...moving, late, calm: 0, last: now };
+    }
+
+    const calm = gap <= ON_TIME_MS ? moving.calm + 1 : 0;
+
+    return calm >= CALM_FRAMES
+        ? { rung: Math.min(MOVING_SIDES.length - 1, moving.rung + 1), late: 0, calm: 0, last: now }
+        : { ...moving, late: 0, calm, last: now };
+};
+
+export const movingSide = ({ rung }: Moving): number => MOVING_SIDES[rung] ?? 256;

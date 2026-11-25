@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+    CALM_FRAMES,
     LATE_MS,
     MAX_STEP,
+    MOVING_SIDES,
+    movedAt,
+    movingSide,
     paced,
     passesTo,
     partsOf,
     SLOTS,
+    startMoving,
     startPace,
+    type Moving,
     type Pass,
 } from './pacing.ts';
 
@@ -63,5 +69,35 @@ describe('pacing', () => {
             partsOf(64),
         );
         expect(paced({ parts: 0, step: 1, last: 0 }, 100, 64).step).toBe(1);
+    });
+});
+
+describe('a moving picture', () => {
+    const frames = (from: Moving, gaps: readonly number[]) =>
+        gaps.reduce((moving, gap) => movedAt(moving, (moving.last ?? 0) + gap), movedAt(from, 0));
+
+    it('drops a size after two late frames in a row, not one', () => {
+        expect(movingSide(frames(startMoving, [33]))).toBe(256);
+        expect(movingSide(frames(startMoving, [33, 33]))).toBe(224);
+        expect(movingSide(frames(startMoving, [33, 16, 33]))).toBe(256);
+    });
+
+    it('climbs a size only after a run of frames on time, and stops at the top', () => {
+        const calm = Array.from({ length: CALM_FRAMES }, () => 16.7);
+
+        expect(movingSide(frames(startMoving, calm.slice(1)))).toBe(256);
+        expect(movingSide(frames(startMoving, calm))).toBe(320);
+        expect(
+            movingSide(
+                frames(
+                    startMoving,
+                    Array.from({ length: 10 * CALM_FRAMES }, () => 16.7),
+                ),
+            ),
+        ).toBe(MOVING_SIDES[MOVING_SIDES.length - 1]);
+    });
+
+    it('takes no lesson from a pause', () => {
+        expect(frames(startMoving, [33, 2000, 33]).rung).toBe(startMoving.rung);
     });
 });

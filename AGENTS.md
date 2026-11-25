@@ -2348,6 +2348,17 @@ and a strip of a scene settles before it redraws, as an evolving sketch's does.
   frame times lag the GPU by a frame or two and a fast rise overshot into
   50 ms frames. Only how fast a picture arrives depends on the machine; what
   it is at a count does not.
+- **A playing picture picks its own size** (`movedAt`, `movingSide`): every
+  change is a first, coarse frame, traced whole at one sample, and the size of
+  that frame climbs a ladder (`MOVING_SIDES`, 128 to 384, starting at 256)
+  instead of sitting at 256. Two late frames in a row step it down; thirty on
+  time step it up, so it does not flap. A gap over 100 ms is a pause or a hidden
+  tab, not the work, and teaches it nothing. The fold runs over the view's own
+  changes with each one's time stamped by a `map` before the `scan`, outside
+  `refined$`, since every change restarts that. Playing Interior went from 33
+  fps to 50, Room from 43 to 56; Still life, light enough to climb past 256,
+  plays sharper at 57 from 59. A small playing Interior is mostly noise: one
+  sample per pixel of a closed room is, at any size.
 - Measured refining (with the app's other windows open): Interior went from
   20 fps to 40, Still life from 45 to 54, Lens to 56; Interior converges about
   a fifth slower for it (86 samples in 10 s, from 105), and still drops a
