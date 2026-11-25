@@ -115,7 +115,8 @@ export const filmstrip$ = (
                                     frame,
                                     dotScale,
                                     samples: TILE_SAMPLES,
-                                    traceSide: null,
+                                    // A trace has no small dots to lose, so it skips the supersampling: 8x cost 200 ms a tile.
+                                    traceSide: Math.max(tile.width, tile.height),
                                     lane: 'strip',
                                 },
                                 now,

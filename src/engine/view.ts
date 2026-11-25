@@ -1,5 +1,6 @@
 import {
     animationFrames,
+    concat,
     animationFrameScheduler,
     combineLatest,
     EMPTY,
@@ -14,7 +15,6 @@ import {
     repeat,
     shareReplay,
     switchMap,
-    startWith,
     takeWhile,
 } from 'rxjs/operators';
 import { samplesAt, samplesWanted, type Image } from '../image.ts';
@@ -84,6 +84,8 @@ const framed = (engine: Engine, image: Image, { moment, slot }: Showing): Observ
     }
 };
 
+const MOVING_TRACE_SIDE = 256;
+
 const traces = (image: Image): boolean => samplesWanted(image, 'preview') > 1;
 
 const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
@@ -91,13 +93,24 @@ const refined$ = (image: Image, showing: Showing): Observable<Showing> => {
     const { width, height, traceSide } = showing.moment;
     const pixels = Math.min(width * height, traceSide === null ? Infinity : traceSide * traceSide);
 
+    const moving: Showing = {
+        ...showing,
+        moment: {
+            ...showing.moment,
+            samples: 1,
+            traceSide: traceSide === null ? null : Math.min(traceSide, MOVING_TRACE_SIDE),
+        },
+    };
+
     return cap <= 1
         ? from([showing])
-        : animationFrames().pipe(
-              map((_, frame) => samplesAt(frame + 1, pixels, cap)),
-              startWith(samplesAt(0, pixels, cap)),
-              takeWhile(samples => samples < cap, true),
-              map(samples => ({ ...showing, moment: { ...showing.moment, samples } })),
+        : concat(
+              from([moving]),
+              animationFrames().pipe(
+                  map((_, frame) => samplesAt(frame, pixels, cap)),
+                  takeWhile(samples => samples < cap, true),
+                  map(samples => ({ ...showing, moment: { ...showing.moment, samples } })),
+              ),
           );
 };
 

@@ -158,7 +158,7 @@ vec3 normalAt(vec3 p, float t) {
 const int STEPS = 160;
 const float FAR = 60.0;
 
-bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit found, out int which) {
+bool march(vec3 origin, vec3 direction, float t, float far, out float travelled, out Hit found, out int which) {
     travelled = 0.001;
     which = -1;
 
@@ -167,7 +167,7 @@ bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit fo
         Hit h = world(p, t);
         float d = abs(h.d);
 
-        if (d < 0.0004 * max(1.0, travelled)) {
+        if (d < 0.001 * max(1.0, travelled)) {
             found = h;
             which = nearest;
             return true;
@@ -175,7 +175,7 @@ bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit fo
 
         travelled += d * 0.9;
 
-        if (travelled > FAR) break;
+        if (travelled > far) break;
     }
 
     return false;
@@ -218,7 +218,7 @@ bool shadowed(vec3 origin, float t) {
     float travelled;
     Hit found;
     int which;
-    return march(origin, uSun, t, travelled, found, which) && found.material != GLASS;
+    return march(origin, uSun, t, FAR, travelled, found, which) && found.material != GLASS;
 }
 
 // A sphere that holds every glowing part of an object, radius 0 for none a cone can hold: a plane, or code with no bounds().
@@ -289,7 +289,7 @@ int sampleLight(vec3 origin, vec3 normal, float t, inout vec3 light, vec3 carrie
         Hit found;
         int which;
 
-        if (march(origin, direction, t, travelled, found, which) && which == chosen) {
+        if (march(origin, direction, t, away + reach, travelled, found, which) && which == chosen) {
             vec3 glow = colourAt(found.tint) * found.glow;
             light += carried * glow * facing * 2.0 * (1.0 - cosMax) * float(count);
         }
@@ -317,7 +317,7 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
         Hit h;
         int which;
 
-        if (!march(origin, direction, t, travelled, h, which)) {
+        if (!march(origin, direction, t, FAR, travelled, h, which)) {
             light += carried * (direct ? sky(direction) : sky(direction) - vec3(pow(max(dot(direction, uSun), 0.0), 600.0) * uSunPower * 40.0));
             break;
         }

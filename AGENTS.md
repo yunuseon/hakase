@@ -2326,6 +2326,23 @@ and levels): a 1024 preview at one sample a frame dropped the app to 6 fps,
 capped it refines at 30 and idles at 60. The tone map goes into a target at
 the traced size and is blitted up with a linear filter.
 
+**What it costs, measured on the GPU** (one Still life sample, timed to a
+`readPixels`): 18 ms at 384, 9.6 at 256; each bounce about 5 ms, and a
+glowing code object about half the total, since it is evaluated at every
+march step and adds a shadow ray per bounce. Two rules came out of it:
+
+- **The first frame after any change is traced at 256** (`MOVING_TRACE_SIDE`
+  in `refined$`): a playing clock throws every frame away for the next, so
+  playback costs half, and a picture that holds still goes back to 384 from
+  its next frame.
+- **A strip tile is traced at its own size** (`traceSide` in `filmstrip$`),
+  never at the 8x the strip supersamples for a sketch's small dots: a tile
+  took 177 ms that way, and the Output's strip redraws whenever it pages with
+  the playhead, so playback stalled for a second at every page. It takes 11
+  ms now.
+
+A light's shadow ray stops at the light (`march`'s `far`), not at `FAR`.
+
 **Image windows give the picture half the window.** `hks-image-view` sets
 `--stage-minimum: 50%` and its stage does not shrink, so a long list of
 objects scrolls in the controls instead of squeezing the picture to a strip.

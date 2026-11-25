@@ -54,7 +54,6 @@ export type MixStrip = {
     readonly colour: string;
     readonly volume: number;
     readonly muted: boolean;
-    // What plays its level, when something does; null while the fader is the user's.
     readonly chain: string | null;
 };
 
