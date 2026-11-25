@@ -38,7 +38,8 @@ import {
 } from '../components/sketch/export/export-panel.component.ts';
 import { DEFAULT_ASPECT, defaultExport, withExportChange } from '../model/sketch/export.ts';
 import { HksFpsCounter } from '../components/fps-counter/fps-counter.component.ts';
-import { HksPreviewError } from '../components/storybook/preview-error.component.ts';
+import { HksFailure } from '../components/failure/failure.component.ts';
+import { stopped } from '../components/failure/failure.ts';
 import { defaults, recorded, type Story } from './story.ts';
 
 const gradient = () => {
@@ -391,19 +392,30 @@ export const detailStories: readonly Story[] = [
     },
     {
         id: 'preview-failure',
-        title: 'Preview failure',
+        title: 'Failure',
         group: 'System',
         description:
-            'A failed renderer stays contained in its preview, with a clear recovery message.',
-        elements: ['hks-preview-error'],
-        variants: [{ id: 'default', title: 'Unavailable renderer' }],
+            'What stands in for a program or a preview that failed: the failure stays in its own window or preview, with its message and how to recover. A window shows it when its program throws.',
+        elements: ['hks-failure'],
+        variants: [
+            { id: 'default', title: 'Unavailable renderer' },
+            { id: 'window', title: 'A program that stopped' },
+        ],
         controls: [],
         defaults,
         height: 180,
         action: null,
-        code: "const error = new HksPreviewError('The renderer is unavailable.');\nconst lifetime$ = error.lifetime$;",
-        create: () => {
-            const element = new HksPreviewError('The renderer is unavailable in this example.');
+        code: "const failure = new HksFailure({ title: 'This preview could not start', message, advice });\nconst lifetime$ = failure.lifetime$;",
+        create: ({ variant }) => {
+            const element = new HksFailure(
+                variant === 'window'
+                    ? stopped(new Error('Failed to execute remove on Element'))
+                    : {
+                          title: 'This preview could not start',
+                          message: 'The renderer is unavailable in this example.',
+                          advice: 'Choose another example or reset to try again.',
+                      },
+            );
             return { element, run$: element.lifetime$, events$: EMPTY };
         },
     },

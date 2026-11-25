@@ -17,7 +17,6 @@ const document: Holding = { holds: 'document', sharing: 'shared' };
 const settings: Holding = { holds: 'settings', sharing: 'private' };
 const stage: Holding = { holds: 'document', sharing: 'private' };
 
-// null: the program keeps no state of its own, so its windows have nothing to bind.
 export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     formula: settings,
     theme: settings,

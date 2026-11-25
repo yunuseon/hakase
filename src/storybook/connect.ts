@@ -26,7 +26,8 @@ import { appearances, isAppearanceName } from '../appearances.ts';
 import type { AppState } from '../program.ts';
 import type { Story } from './story.ts';
 import { recorded } from './story.ts';
-import { HksPreviewError } from '../components/storybook/preview-error.component.ts';
+import { HksFailure } from '../components/failure/failure.component.ts';
+import { messageOf } from '../components/failure/failure.ts';
 import { stories } from './stories.ts';
 
 type SessionMessage =
@@ -88,8 +89,12 @@ export const connectBook$ = (
                 );
             }).pipe(
                 catchError((error: unknown) => {
-                    const message = error instanceof Error ? error.message : String(error);
-                    const element = new HksPreviewError(message);
+                    const message = messageOf(error);
+                    const element = new HksFailure({
+                        title: 'This preview could not start',
+                        message,
+                        advice: 'Choose another example or reset to try again.',
+                    });
                     return merge(
                         of<SessionMessage>({ kind: 'mount', element }),
                         of<SessionMessage>({ kind: 'event', event: recorded('error', message) }),

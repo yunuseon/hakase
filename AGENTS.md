@@ -612,6 +612,18 @@ compatibility with existing snapshots and undo records. It no longer positions
 live chrome. Do not reconnect a floating toolbar host or offer the old toolbar
 position commands; new launch and navigation actions belong to this single card.
 
+**A program that throws takes down its own window, not the app.** The app
+is one subscription, so an uncaught error anywhere ended all of it: a
+re-entrant render in one Scene's panel once blanked every window.
+`liveProcess$` wraps a program's launch and its `run$` in `contained$`, which
+catches the error, logs it and puts `hks-failure` (`stopped`, in
+`components/failure/`) in the window's body in place of the program. The
+window's own chrome keeps running, so it can still be moved, closed or
+switched to another program, which starts it again; every other window carries
+on. The same panel stands in for a Storybook preview that fails to start.
+Only the program is contained: an error in the window's chrome or in the core
+still ends the app, which is right, since those are the app.
+
 Do not "improve" this by mounting eagerly and hiding closed windows with CSS.
 The point is that a closed window holds no subscriptions at all — no `rAF` loop,
 no listeners, no GL draws — which a `display: none` window would.

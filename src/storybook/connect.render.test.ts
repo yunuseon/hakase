@@ -88,7 +88,7 @@ describe('storybook integration', () => {
         document.body.append(book);
         const running = connectBook$(book, appearance, [broken, good]).subscribe();
         const root = book.shadowRoot ?? book;
-        expect(root.querySelector('.sample hks-preview-error')?.shadowRoot?.textContent).toContain(
+        expect(root.querySelector('.sample hks-failure')?.shadowRoot?.textContent).toContain(
             'Unavailable renderer',
         );
         requireChild(root, '[data-story="select"]').click();

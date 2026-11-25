@@ -3,22 +3,26 @@ import { html } from 'lit-html';
 import { type Observable } from 'rxjs';
 import { styleSheet } from '../../lib/dom.ts';
 import { mountView } from '../../lib/lit.ts';
-import css from './preview-error.css?inline';
+import type { Failure } from './failure.ts';
+import css from './failure.css?inline';
 
 const sheet = styleSheet(css);
-export class HksPreviewError extends HTMLElement {
+
+export class HksFailure extends HTMLElement {
     readonly lifetime$: Observable<never>;
-    constructor(message: string) {
+
+    constructor({ title, message, advice }: Failure) {
         super();
         const root = this.attachShadow({ mode: 'open' });
         root.adoptedStyleSheets = [controlsSheet, sheet];
         this.lifetime$ = mountView(
             root,
             () =>
-                html`<h2>This preview could not start</h2>
-                    <p>${message}</p>
-                    <p>Choose another example or reset to try again.</p>`,
+                html`<h2>${title}</h2>
+                    <p class="message">${message}</p>
+                    <p>${advice}</p>`,
         ).lifetime$;
     }
 }
-customElements.define('hks-preview-error', HksPreviewError);
+
+customElements.define('hks-failure', HksFailure);

@@ -1,4 +1,4 @@
-import { combineLatest, defer, EMPTY, from, merge, type Observable } from 'rxjs';
+import { catchError, combineLatest, defer, EMPTY, from, merge, type Observable } from 'rxjs';
 import {
     filter,
     finalize,
@@ -15,6 +15,8 @@ import {
 } from 'rxjs/operators';
 import type { FollowGroup, StoreOption, SwitchGroup, WindowView } from './layout/frame.ts';
 import { HksWindow } from './components/window/window.component.ts';
+import { HksFailure } from './components/failure/failure.component.ts';
+import { stopped } from './components/failure/failure.ts';
 import type { AppState, Program, Self } from './program.ts';
 import type { AppSignal, ProcessId } from './protocol.ts';
 import { storeInputCommand } from './input-connections.ts';
@@ -27,6 +29,20 @@ export type ProcessSignal =
     | { readonly to: 'state-busy'; readonly id: ProcessId; readonly busy: boolean }
     | { readonly to: 'hover'; readonly id: ProcessId; readonly over: boolean }
     | AppSignal;
+
+// Caught here, not at the app's one subscription: a program that throws takes down its own window, not the app.
+export const contained$ = <T>(source$: Observable<T>, element: HTMLElement): Observable<T> =>
+    source$.pipe(
+        catchError((error: unknown) =>
+            from([{ error, failure: new HksFailure(stopped(error)) }]).pipe(
+                tap(({ error: thrown, failure }) => {
+                    element.replaceChildren(failure);
+                    console.error(thrown);
+                }),
+                switchMap(({ failure }) => failure.lifetime$),
+            ),
+        ),
+    );
 
 export const liveProcess$ = (
     program: Program,
@@ -119,15 +135,19 @@ export const liveProcess$ = (
             element.selectionToggles$.pipe(
                 map((): ProcessSignal => ({ to: 'toggle-selection', id: self.id })),
             ),
-            from(program.launch()).pipe(
-                tap(view => {
-                    element.append(view.element);
-                    if (view.actions !== undefined) {
-                        view.actions.slot = 'actions';
-                        element.append(view.actions);
-                    }
-                }),
-                switchMap(view => view.run$(state, self)),
+            contained$(
+                from(program.launch()).pipe(
+                    tap(view => {
+                        element.append(view.element);
+                        if (view.actions !== undefined) {
+                            view.actions.slot = 'actions';
+                            element.append(view.actions);
+                        }
+                    }),
+                    switchMap(view => view.run$(state, self)),
+                ),
+                element,
+            ).pipe(
                 withLatestFrom(self.store$, self.clock$),
                 map(([input, store, clock]): ProcessSignal => ({
                     to: 'app',
