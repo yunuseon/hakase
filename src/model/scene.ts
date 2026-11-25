@@ -364,6 +364,7 @@ export const objectUniforms = (objects: readonly SceneObject[]): Float32Array =>
 
 const DEFINES_CUSTOM = /\bHit\s+custom\s*\(/;
 const SCRIPTS_CAMERA = /\bCamera\s+camera\s*\(/;
+const BOUNDS_LIGHT = /\bvec4\s+bounds\s*\(/;
 
 export const definesCustom = (code: string): boolean => DEFINES_CUSTOM.test(code);
 
@@ -376,4 +377,7 @@ export const sceneAdapter = (code: string): string =>
         SCRIPTS_CAMERA.test(code)
             ? 'Camera view(float t) { return camera(t); }'
             : 'Camera view(float t) { return Camera(vec3(0.0, 2.4, 7.5), vec3(0.0, 0.5, 0.0), vec3(0.0, 1.0, 0.0)); }',
+        BOUNDS_LIGHT.test(code)
+            ? 'vec4 codeBounds(float t) { return bounds(t); }'
+            : 'vec4 codeBounds(float t) { return vec4(0.0); }',
     ].join('\n');

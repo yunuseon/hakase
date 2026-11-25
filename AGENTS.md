@@ -2281,8 +2281,8 @@ own is what the toolbox is for.
 with a place, size, turn, material (matte, gloss, metal, glass, light), a tint
 picked from the scene's theme as a formula's is, and roughness or glow only
 where the material has them. Its code may define `Hit custom(vec3 p, float t)`,
-which every `code` object calls, placed and sized by that object, and
-`Camera camera(float t)`; `sceneAdapter` detects both the way `adapterFor`
+which every `code` object calls, placed and sized by that object,
+`Camera camera(float t)`, and `vec4 bounds(float t)` (below); `sceneAdapter` detects both the way `adapterFor`
 detects a formula's hooks and appends defaults, after the code, so error lines
 match the editor. The prelude gives the code `hit`, `glowing`, `smin` and the
 `sd*` shapes, `k1`–`k4` and `t`.
@@ -2332,11 +2332,25 @@ objects scrolls in the controls instead of squeezing the picture to a strip.
 Its stage also orbits (`orbits$`: drag, wheel, double-click), which only the
 Scene reads.
 
+**Glowing objects are sampled, like the sun.** At every matte bounce the
+tracer picks one light at random and sends a shadow ray into the cone that
+holds it (`sampleLight`, `lightSphere`): a sphere, box, torus or cylinder of
+material light is held by a bounding sphere of its own size, and a `code`
+object by the sphere its code's `bounds()` returns (centre and radius in the
+object's own space), so it must hold **every** glowing part. A light so
+sampled must not glow again for the bounce that meets it next, or it would
+count twice, so `traced` remembers which one it sampled and skips that one's
+glow on the next hit; a path through glass first still adds it, since the
+shadow ray stops at glass. A light plane and code without `bounds()` are lit
+only by paths that happen to meet them. At 16 spp the Still life's orb lit
+the floor smoothly with its `bounds()`, and as scattered fireflies without.
+`world()` reports which object was nearest through a global, `nearest`,
+because `Hit` is the code's own struct and has no room for it.
+
 The **Still life** starter is the worked example: the default scene (a glass
 ball, a metal ring, a matte floor) with a `code` object whose `custom()` is a
-glowing orb carried round by `k1`, a saw signal on `k1`, and an Output.
-Lights are found only by the paths that happen to hit them (the sun alone has
-next-event estimation), so a small bright orb lights the room noisily.
+glowing orb carried round by `k1`, bounded by `bounds()`, a saw signal on
+`k1`, and an Output.
 
 ## Logic
 

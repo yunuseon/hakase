@@ -97,6 +97,7 @@ vec3 colourAt(float tint) {
 // Prototypes, not dead code: the scene's code and an adapter defining these are appended after this file.
 Hit customHit(vec3 p, float t);
 Camera view(float t);
+vec4 codeBounds(float t);
 
 vec3 turned(vec3 p, float turn) {
     float a = -turn * 2.0 * PI;
@@ -112,8 +113,12 @@ float shapeDistance(int shape, vec3 q, float size, float t) {
     return customHit(q / size, t).d * size;
 }
 
+// The object world() last found nearest; a global because Hit is the code's own struct and has no room for it.
+int nearest;
+
 Hit world(vec3 p, float t) {
     Hit best = Hit(1e9, MATTE, 0.0, 1.0, 0.0);
+    nearest = -1;
 
     for (int i = 0; i < MAX_OBJECTS; i++) {
         if (i >= uCount) break;
@@ -124,12 +129,18 @@ Hit world(vec3 p, float t) {
         vec3 q = turned(p - place.xyz, more.x);
         int shape = int(look.x + 0.5);
 
+        Hit candidate = Hit(0.0, int(look.y + 0.5), look.z, look.w, more.y);
+
         if (shape == SHAPE_CODE) {
-            Hit custom = customHit(q / place.w, t);
-            custom.d *= place.w;
-            best = closer(best, custom);
+            candidate = customHit(q / place.w, t);
+            candidate.d *= place.w;
         } else {
-            best = closer(best, Hit(shapeDistance(shape, q, place.w, t), int(look.y + 0.5), look.z, look.w, more.y));
+            candidate.d = shapeDistance(shape, q, place.w, t);
+        }
+
+        if (candidate.d < best.d) {
+            best = candidate;
+            nearest = i;
         }
     }
 
@@ -147,8 +158,9 @@ vec3 normalAt(vec3 p, float t) {
 const int STEPS = 160;
 const float FAR = 60.0;
 
-bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit found) {
+bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit found, out int which) {
     travelled = 0.001;
+    which = -1;
 
     for (int i = 0; i < STEPS; i++) {
         vec3 p = origin + direction * travelled;
@@ -157,6 +169,7 @@ bool march(vec3 origin, vec3 direction, float t, out float travelled, out Hit fo
 
         if (d < 0.0004 * max(1.0, travelled)) {
             found = h;
+            which = nearest;
             return true;
         }
 
@@ -204,7 +217,85 @@ vec3 sky(vec3 direction) {
 bool shadowed(vec3 origin, float t) {
     float travelled;
     Hit found;
-    return march(origin, uSun, t, travelled, found) && found.material != GLASS;
+    int which;
+    return march(origin, uSun, t, travelled, found, which) && found.material != GLASS;
+}
+
+// A sphere that holds every glowing part of an object, radius 0 for none a cone can hold: a plane, or code with no bounds().
+vec4 lightSphere(int i, float t) {
+    vec4 place = uObjects[i * 3];
+    vec4 look = uObjects[i * 3 + 1];
+    int shape = int(look.x + 0.5);
+
+    if (shape == SHAPE_CODE) {
+        vec4 b = codeBounds(t);
+        return vec4(place.xyz + turned(b.xyz * place.w, -uObjects[i * 3 + 2].x), b.w * place.w);
+    }
+
+    if (int(look.y + 0.5) != LIGHT) return vec4(0.0);
+    if (shape == SHAPE_SPHERE) return vec4(place.xyz, place.w);
+    if (shape == SHAPE_BOX) return vec4(place.xyz, place.w * 1.7321);
+    if (shape == SHAPE_TORUS) return vec4(place.xyz, place.w * 1.3);
+    if (shape == SHAPE_CYLINDER) return vec4(place.xyz, place.w * 1.1181);
+    return vec4(0.0);
+}
+
+bool sampleable(int i, float t) {
+    return lightSphere(i, t).w > 0.0;
+}
+
+// One light, picked at random, through the cone that bounds it; returns the one it sampled, whose glow a bounce that then meets it must not add again.
+int sampleLight(vec3 origin, vec3 normal, float t, inout vec3 light, vec3 carried) {
+    int count = 0;
+    for (int i = 0; i < MAX_OBJECTS; i++) {
+        if (i >= uCount) break;
+        if (sampleable(i, t)) count++;
+    }
+
+    if (count == 0) return -1;
+
+    int pick = min(int(random() * float(count)), count - 1);
+    int chosen = -1;
+    for (int i = 0; i < MAX_OBJECTS; i++) {
+        if (i >= uCount) break;
+        if (sampleable(i, t)) {
+            if (pick == 0) {
+                chosen = i;
+                break;
+            }
+            pick--;
+        }
+    }
+
+    vec4 sphere = lightSphere(chosen, t);
+    float reach = sphere.w;
+    vec3 toward = sphere.xyz - origin;
+    float away = length(toward);
+
+    if (away <= reach * 1.001) return -1;
+
+    float cosMax = sqrt(1.0 - (reach * reach) / (away * away));
+    float cosine = 1.0 - random() * (1.0 - cosMax);
+    float sine = sqrt(max(0.0, 1.0 - cosine * cosine));
+    float a = 2.0 * PI * random();
+    vec3 axis = toward / away;
+    vec3 side = normalize(abs(axis.y) < 0.99 ? cross(axis, vec3(0.0, 1.0, 0.0)) : cross(axis, vec3(1.0, 0.0, 0.0)));
+    vec3 other = cross(axis, side);
+    vec3 direction = normalize(axis * cosine + (side * cos(a) + other * sin(a)) * sine);
+    float facing = dot(normal, direction);
+
+    if (facing > 0.0) {
+        float travelled;
+        Hit found;
+        int which;
+
+        if (march(origin, direction, t, travelled, found, which) && which == chosen) {
+            vec3 glow = colourAt(found.tint) * found.glow;
+            light += carried * glow * facing * 2.0 * (1.0 - cosMax) * float(count);
+        }
+    }
+
+    return chosen;
 }
 
 float fresnel(float cosine, float ratio) {
@@ -217,14 +308,16 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
     vec3 light = vec3(0.0);
     vec3 carried = vec3(1.0);
     bool direct = true;
+    int sampled = -1;
 
     for (int bounce = 0; bounce < 8; bounce++) {
         if (bounce >= uBounces) break;
 
         float travelled;
         Hit h;
+        int which;
 
-        if (!march(origin, direction, t, travelled, h)) {
+        if (!march(origin, direction, t, travelled, h, which)) {
             light += carried * (direct ? sky(direction) : sky(direction) - vec3(pow(max(dot(direction, uSun), 0.0), 600.0) * uSunPower * 40.0));
             break;
         }
@@ -236,9 +329,11 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
         vec3 facing = inside ? -n : n;
 
         if (h.material == LIGHT) {
-            light += carried * albedo * h.glow;
+            if (which != sampled) light += carried * albedo * h.glow;
             break;
         }
+
+        sampled = -1;
 
         if (h.material == GLASS) {
             float ratio = inside ? 1.5 : 1.0 / 1.5;
@@ -267,6 +362,7 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
                 if (lit > 0.0 && uSunPower > 0.0 && !shadowed(origin, t)) {
                     light += carried * albedo * lit * uSunPower;
                 }
+                sampled = sampleLight(origin, facing, t, light, carried * albedo);
                 direction = cosineAround(facing);
                 carried *= albedo;
                 direct = false;

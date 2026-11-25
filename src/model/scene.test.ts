@@ -102,5 +102,7 @@ describe('a scene', () => {
         expect(sceneAdapter(code)).toContain('return custom(p, t);');
         expect(sceneAdapter('')).not.toContain('custom(p, t)');
         expect(sceneAdapter('Camera camera(float t) { }')).toContain('return camera(t);');
+        expect(sceneAdapter('vec4 bounds(float t) { }')).toContain('return bounds(t);');
+        expect(sceneAdapter('')).toContain('return vec4(0.0);');
     });
 });
