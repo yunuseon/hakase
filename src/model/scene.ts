@@ -376,7 +376,40 @@ const BOUNDS_LIGHT = /\bvec4\s+bounds\s*\(/;
 export const definesCustom = (code: string): boolean => DEFINES_CUSTOM.test(code);
 
 // Appended after the code, never before it, or every reported line number would shift.
-export const sceneAdapter = (code: string): string =>
+const SHAPE_CODE: Readonly<Record<Shape, (place: string, local: string) => string>> = {
+    sphere: place => `sdSphere(p - ${place}.xyz, ${place}.w)`,
+    box: (place, local) => `sdBox(${local}, vec3(${place}.w))`,
+    torus: (place, local) => `sdTorus(${local}, ${place}.w, ${place}.w * 0.3)`,
+    cylinder: (place, local) => `sdCylinder(${local}, ${place}.w * 0.5, ${place}.w)`,
+    plane: place => `p.y - ${place}.y`,
+    code: () => '',
+};
+
+// One block per object with its shape's own function: a loop that branches on the shape at every step cost the GPU more than the shapes did.
+export const objectsCode = (shapes: readonly Shape[]): string =>
+    [
+        'Hit objectsAt(vec3 p, float t) {',
+        '    Hit best = Hit(1e9, MATTE, 0.0, 1.0, 0.0);',
+        '    Hit each;',
+        '    nearest = -1;',
+        ...shapes.slice(0, MAX_OBJECTS).flatMap((shape, index) => {
+            const place = `uObjects[${index * OBJECT_VEC4S}]`;
+            const look = `uObjects[${index * OBJECT_VEC4S + 1}]`;
+            const more = `uObjects[${index * OBJECT_VEC4S + 2}]`;
+            const local = `turned(p - ${place}.xyz, ${more}.x)`;
+
+            return [
+                shape === 'code'
+                    ? `    each = codeAt(${local}, ${place}.w, t);`
+                    : `    each = Hit(${SHAPE_CODE[shape](place, local)}, int(${look}.y + 0.5), ${look}.z, ${look}.w, ${more}.y);`,
+                `    if (each.d < best.d) { best = each; nearest = ${index}; }`,
+            ];
+        }),
+        '    return best;',
+        '}',
+    ].join('\n');
+
+export const sceneAdapter = (code: string, shapes: readonly Shape[] = []): string =>
     [
         DEFINES_CUSTOM.test(code)
             ? 'Hit customHit(vec3 p, float t) { return custom(p, t); }'
@@ -387,4 +420,5 @@ export const sceneAdapter = (code: string): string =>
         BOUNDS_LIGHT.test(code)
             ? 'vec4 codeBounds(float t) { return bounds(t); }'
             : 'vec4 codeBounds(float t) { return vec4(0.0); }',
+        objectsCode(shapes),
     ].join('\n');

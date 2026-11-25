@@ -2299,9 +2299,17 @@ detects a formula's hooks and appends defaults, after the code, so error lines
 match the editor. The prelude gives the code `hit`, `glowing`, `smin` and the
 `sd*` shapes, `k1`–`k4` and `t`.
 
-- **The objects are uniforms, not code.** `objectUniforms` packs three `vec4`s
-  per object (place and size; shape, material, tint, rough; turn and glow) and
-  the shader loops over them, so dragging a slider never recompiles. Only an
+- **The objects' numbers are uniforms, their shapes are code.**
+  `objectUniforms` packs three `vec4`s per object (place and size; shape,
+  material, tint, rough; turn and glow), and `objectsCode` writes `objectsAt`
+  out per scene: one block per object, calling its own shape's function on
+  constant indices into that array, so dragging a slider never recompiles and
+  only adding, removing or reshaping an object does (`traceOf` keys its
+  program by the shapes and the code). The shader once looped over the array
+  and branched on each object's shape at every march step; written out, one
+  sample at 384 fell from 57 ms to 14 for Interior, 43 to 9.5 for Room, 17 to
+  3.5 for Still life and 10 to 3 for Field, the largest win the tracer has
+  had: the loop and the branches cost the GPU more than the shapes did. Only an
   edit of the code does, and the engine keeps the last program that linked
   (`traceOf`), so a broken edit keeps the last picture while `checkScene`
   shows the error in the Code tab.
@@ -2415,7 +2423,10 @@ Room to 39, Still life to 17, with no visible leak at corners or contact
 shadows. Two things were measured and dropped: a 64-step cap (cheaper, but
 rays that run out of steps lose their hit) and skipping an object whose
 bounding sphere is further than the nearest hit (85 ms: the branch splits
-neighbouring pixels on the GPU, which costs more than the shapes it skips).
+neighbouring pixels on the GPU, which costs more than the shapes it skips). Starting
+Russian roulette after the first bounce instead of the third was measured as
+noise times time, two renders of a still scene with independent seeds: faster
+per sample, but noisier by more than it saved in three scenes of four.
 
 **Image windows give the picture half the window.** `hks-image-view` sets
 `--stage-minimum: 50%` and its stage does not shrink, so a long list of

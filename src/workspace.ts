@@ -818,7 +818,6 @@ const step = (
                 return workspace;
             }
 
-            // Same place in the list, so the new window keeps the old one's depth.
             return {
                 ...workspace,
                 launched,

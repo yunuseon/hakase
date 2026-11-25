@@ -6,6 +6,7 @@ import {
     SCENE_KNOBS,
     objectUniforms,
     sceneAdapter,
+    type Shape,
 } from '../model/scene.ts';
 import { orbitUniform } from '../model/sketch/space.ts';
 import { createProgram } from '../shared/gl/program.ts';
@@ -26,8 +27,16 @@ export type TracerResult =
     | { readonly ok: true; readonly tracer: Tracer }
     | { readonly ok: false; readonly message: string };
 
-export const createTracer = (gl: WebGL2RenderingContext, code: string): TracerResult => {
-    const result = createProgram(gl, passSource, `${traceSource}\n${code}\n${sceneAdapter(code)}`);
+export const createTracer = (
+    gl: WebGL2RenderingContext,
+    code: string,
+    shapes: readonly Shape[] = [],
+): TracerResult => {
+    const result = createProgram(
+        gl,
+        passSource,
+        `${traceSource}\n${code}\n${sceneAdapter(code, shapes)}`,
+    );
 
     if (!result.ok) {
         return {

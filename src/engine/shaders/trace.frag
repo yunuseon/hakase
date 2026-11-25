@@ -107,47 +107,20 @@ vec3 turned(vec3 p, float turn) {
     return vec3(cos(a) * p.x - sin(a) * p.z, p.y, sin(a) * p.x + cos(a) * p.z);
 }
 
-float shapeDistance(int shape, vec3 q, float size, float t) {
-    if (shape == SHAPE_SPHERE) return sdSphere(q, size);
-    if (shape == SHAPE_BOX) return sdBox(q, vec3(size));
-    if (shape == SHAPE_TORUS) return sdTorus(q, size, size * 0.3);
-    if (shape == SHAPE_CYLINDER) return sdCylinder(q, size * 0.5, size);
-    if (shape == SHAPE_PLANE) return q.y;
-    return customHit(q / size, t).d * size;
+// The world's objects, written out per scene by the adapter appended after the code.
+Hit objectsAt(vec3 p, float t);
+
+Hit codeAt(vec3 q, float size, float t) {
+    Hit h = customHit(q / size, t);
+    h.d *= size;
+    return h;
 }
 
 // The object world() last found nearest; a global because Hit is the code's own struct and has no room for it.
 int nearest;
 
 Hit world(vec3 p, float t) {
-    Hit best = Hit(1e9, MATTE, 0.0, 1.0, 0.0);
-    nearest = -1;
-
-    for (int i = 0; i < MAX_OBJECTS; i++) {
-        if (i >= uCount) break;
-
-        vec4 place = uObjects[i * 3];
-        vec4 look = uObjects[i * 3 + 1];
-        vec4 more = uObjects[i * 3 + 2];
-        vec3 q = turned(p - place.xyz, more.x);
-        int shape = int(look.x + 0.5);
-
-        Hit candidate = Hit(0.0, int(look.y + 0.5), look.z, look.w, more.y);
-
-        if (shape == SHAPE_CODE) {
-            candidate = customHit(q / place.w, t);
-            candidate.d *= place.w;
-        } else {
-            candidate.d = shapeDistance(shape, q, place.w, t);
-        }
-
-        if (candidate.d < best.d) {
-            best = candidate;
-            nearest = i;
-        }
-    }
-
-    return best;
+    return objectsAt(p, t);
 }
 
 vec3 normalAt(vec3 p, float t) {

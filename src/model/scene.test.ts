@@ -7,6 +7,7 @@ import {
     OBJECT_VEC4S,
     parseScene,
     reduceScene,
+    objectsCode,
     sceneAdapter,
     type Scene,
 } from './scene.ts';
@@ -104,5 +105,19 @@ describe('a scene', () => {
         expect(sceneAdapter('Camera camera(float t) { }')).toContain('return camera(t);');
         expect(sceneAdapter('vec4 bounds(float t) { }')).toContain('return bounds(t);');
         expect(sceneAdapter('')).toContain('return vec4(0.0);');
+    });
+
+    it('writes each object out with its own shape, so the shader never branches on one', () => {
+        const code = objectsCode(['sphere', 'plane', 'code']);
+
+        expect(code).toContain('sdSphere(p - uObjects[0].xyz, uObjects[0].w)');
+        expect(code).toContain('p.y - uObjects[3].y');
+        expect(code).toContain(
+            'codeAt(turned(p - uObjects[6].xyz, uObjects[8].x), uObjects[6].w, t)',
+        );
+        expect(code).toContain('nearest = 2;');
+        expect(code).not.toContain('shape ==');
+        expect(sceneAdapter('', ['box'])).toContain('sdBox(turned(p - uObjects[0].xyz');
+        expect(sceneAdapter('')).toContain('Hit objectsAt(vec3 p, float t) {');
     });
 });

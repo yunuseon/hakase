@@ -51,6 +51,7 @@ import sheet from './shaders/sheet.frag?raw';
 import tonemap from './shaders/tonemap.frag?raw';
 import { createTracer, traceBatch, type Tracer } from './trace.ts';
 import { passesTo, partsOf } from './pacing.ts';
+import type { Shape } from '../model/scene.ts';
 import {
     createFloatTarget,
     createMultisampled,
@@ -492,14 +493,20 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
 };
 
 // A failed edit keeps the last program that linked, so the picture never blanks while code is typed.
-const traceOf = (engine: Engine, key: string, code: string): Tracer | null => {
+const traceOf = (
+    engine: Engine,
+    key: string,
+    code: string,
+    shapes: readonly Shape[],
+): Tracer | null => {
     const { gl } = engine;
     const trace = engine.traces.get(key) ?? { code: null, tracer: null };
+    const source = `${shapes.join(',')}\n${code}`;
     engine.traces.set(key, trace);
 
-    if (trace.code !== code) {
-        trace.code = code;
-        const result = createTracer(gl, code);
+    if (trace.code !== source) {
+        trace.code = source;
+        const result = createTracer(gl, code, shapes);
 
         if (result.ok) {
             if (trace.tracer !== null) {
@@ -525,7 +532,12 @@ const drawTraced = (
     restart: boolean,
 ): void => {
     const { gl } = engine;
-    const tracer = traceOf(engine, keyOf(image.store, moment.lane), image.scene.code);
+    const tracer = traceOf(
+        engine,
+        keyOf(image.store, moment.lane),
+        image.scene.code,
+        image.scene.objects.map(({ shape }) => shape),
+    );
 
     if (tracer === null) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, entry.output.framebuffer);
