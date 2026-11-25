@@ -2361,6 +2361,18 @@ takes, since one sample at 384 is the least a refining frame can add.
 
 A light's shadow ray stops at the light (`march`'s `far`), not at `FAR`.
 
+**Closed rooms cost the most**, because no ray escapes: one sample at 384 took
+65 ms for Interior and 48 for Room, against 19 for Still life. A ray skimming a
+wall into a corner takes many tiny steps, so `march` counts a hit within
+`0.003 × distance` (it was 0.001) and every new ray starts 0.006 off its
+surface (it was 0.002): the start must sit **outside** the hit threshold, or a
+ray hits its own surface at once and the saving is false. Interior fell to 50 ms,
+Room to 39, Still life to 17, with no visible leak at corners or contact
+shadows. Two things were measured and dropped: a 64-step cap (cheaper, but
+rays that run out of steps lose their hit) and skipping an object whose
+bounding sphere is further than the nearest hit (85 ms: the branch splits
+neighbouring pixels on the GPU, which costs more than the shapes it skips).
+
 **Image windows give the picture half the window.** `hks-image-view` sets
 `--stage-minimum: 50%` and its stage does not shrink, so a long list of
 objects scrolls in the controls instead of squeezing the picture to a strip.

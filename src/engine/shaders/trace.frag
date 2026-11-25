@@ -168,7 +168,7 @@ bool march(vec3 origin, vec3 direction, float t, float far, out float travelled,
         Hit h = world(p, t);
         float d = abs(h.d);
 
-        if (d < 0.001 * max(1.0, travelled)) {
+        if (d < 0.003 * max(1.0, travelled)) {
             found = h;
             which = nearest;
             return true;
@@ -343,14 +343,14 @@ vec3 traced(vec3 origin, vec3 direction, float t) {
             bool reflects = dot(bent, bent) < 0.5 || random() < fresnel(cosine, ratio);
             direction = normalize(reflects ? reflect(direction, facing) : bent);
             direction = normalize(direction + h.rough * 0.3 * (cosineAround(direction) - direction));
-            origin = p + (reflects ? facing : -facing) * 0.002;
+            origin = p + (reflects ? facing : -facing) * 0.006;
             carried *= mix(vec3(1.0), albedo, 0.35);
             direct = true;
         } else {
             bool specular =
                 h.material == METAL ||
                 (h.material == GLOSS && random() < fresnel(max(dot(-direction, facing), 0.0), 1.0 / 1.5) + 0.04);
-            origin = p + facing * 0.002;
+            origin = p + facing * 0.006;
 
             if (specular) {
                 vec3 mirrored = reflect(direction, facing);
