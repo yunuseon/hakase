@@ -46,51 +46,21 @@ at 41% and running off the screen at 100%.
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
 
-## WebGPU: one engine, formulas in WGSL
+## WebGPU: what is left
 
-Decided: the engine moves from WebGL2 to WebGPU in full, and formulas and scene
-code become WGSL. Saved GLSL formulas cannot be converted reliably, so they open
-read-only with a note asking for a rewrite; nothing is lost.
+The engine and every formula moved to WebGPU and WGSL (see "WebGPU and WGSL"
+in AGENTS.md). What is not done:
 
-**The formula language** (one spec for built-ins, guide and migration):
-
-- `fn formula(x: f32, y: f32, t: f32) -> vec3f`, or `-> vec4f` for a tint.
-- Hooks, detected as now: `fn camera(t: f32) -> Camera`,
-  `fn lattice(uv: vec2f, index: f32, count: f32) -> vec2f`,
-  `fn space(p: vec3f) -> vec3f`, `fn evolve(x: f32, y: f32, t: f32) -> vec4f`,
-  `fn initial(x: f32, y: f32) -> vec4f`; scenes `fn custom(p: vec3f, t: f32) -> Hit`
-  and `fn bounds(t: f32) -> vec4f`.
-- No preprocessor: `const STEPS = 480;` and `const WRAPS = true;` are ordinary
-  WGSL constants the app also reads, and a knob is named by a comment line,
-  `// k1: feed rate`.
-- No overloading: `paint(p: vec2f)` and `pointerDistance(p: vec3f)` stay;
-  the x, y forms become `paintAt(x, y)` and `pointerNear(x, y)`.
-- `k1`–`k4` stay plain names, each its own uniform binding, so which knobs a
-  formula reads is still asked of the compiler: a probe pipeline with an
-  automatic layout drops the bindings nothing reads.
-
-**The engine:**
-
-- One `GPUDevice`, made by the first viewer and released after the last, like
-  the WebGL context; a lost device completes `engine$` and it is made again.
-- The sketch becomes a compute pass that evaluates the formula once per
-  lattice point into a buffer, and three render pipelines that draw dots (as
-  quads: WebGPU points are one pixel), lines and surfaces from it, so a
-  surface no longer calls the formula six times per cell. A simulation step is
-  a compute dispatch over two state buffers.
-- The path tracer becomes a compute shader writing a storage texture, banded
-  and paced as now.
-- Pedals, present, downsample, sheet, tone map and ink become WGSL render
-  pipelines; recipes, the cache, `whyCooked` and pacing are unchanged.
-- Windows get bitmaps from `transferToImageBitmap` on a canvas sized to the
-  slot, so no window copies the whole canvas again.
-- Compiling is async: a new program is swapped in when its pipeline is ready,
-  the last good one draws meanwhile, and the engine announces the swap so a
-  paused window draws once more.
-
-Done looks like: every starter and example draws as before, Light show at 60
-fps, the inspector counting no redraws, and a faster sample rate on Interior,
-measured against the WebGL numbers in AGENTS.md.
+- **Measure it against WebGL**: Light show playing (it held 60 fps), Interior's
+  samples a second, the strip, and the inspector's draw counts, each against the
+  numbers in AGENTS.md, which were taken under WebGL.
+- **Look at every starter and example** with the pane visible: the checks so far
+  were probes of the tracer and each draw mode, and the app running.
+- **The canvas format**: the canvas is `rgba8unorm`, and this device prefers
+  `bgra8unorm`, which costs a copy per bitmap; the passes that draw into the
+  canvas could take the preferred format.
+- **Compute what WebGL could not**: a wavefront path tracer, picture readings
+  reduced on the GPU, particles.
 
 ## Dev experience: the next chapter
 

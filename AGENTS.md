@@ -27,27 +27,32 @@ future work goes into the backlog in the same change that makes it.
 
 A sketch is drawn by the shared engine (see "Image cables") from its store's
 recipe, whether its own window shows it, a pedal reads it, or its strip or an
-export samples it: a sketch window holds no WebGL context, and there is one
+export samples it: a sketch window holds no GPU context, and there is one
 definition of what a sketch looks like at a moment. Everything below is that
 drawing.
 
-The sketch renders with **WebGL2**, not canvas2d. A formula is GLSL, the lattice
-loop is the vertex shader, and `gl_VertexID` derives each cell's coordinates —
-there are no vertex buffers at all, just one `drawArrays`. This is worth 40x at
-`dimension: 128` (0.96ms against 38.4ms) and makes a million points viable, so do
-not reintroduce a CPU-side draw loop.
+The sketch renders with **WebGPU**, and a formula is **WGSL** (see "WebGPU and
+WGSL" for how the engine is built and what changed from WebGL). The formula runs
+in a **compute pass**, `evaluate` in `sketch.wgsl`, once per lattice point, and
+writes each point's place and tint into a storage buffer; the draws read that
+buffer. There are no vertex buffers: each vertex finds its point from its index.
+The GPU lattice was worth 40x over a CPU loop at `dimension: 128` (0.96 ms against
+38.4 ms) and makes a million points viable, so do not reintroduce one.
 
 **A draw mode changes the primitive, not the formula.** Each sketch picks `dots`,
-`lines` or `surface` in its own panel. Dots are one vertex per lattice point;
-lines are four per point (edges to the right and upper neighbours, clamped so an
-edge point's missing neighbour collapses to nothing); a surface is six per cell,
-two triangles. `latticePoint` in `sketch.vert` turns `gl_VertexID` into the corner
-it stands for, and `formula` is simply evaluated there, so every formula works in
-every mode and none of them knows which one it is in. `DRAW_MODES`' order is the
-`uMode` integer, matched by `MODE_*` defines in both stages.
+`lines` or `surface` in its own panel. Dots are one instanced quad per lattice
+point (WebGPU draws points a pixel wide, so a dot of any size is a quad); lines
+are four vertices per point (edges to the right and upper neighbours, clamped so
+an edge point's missing neighbour collapses to nothing); a surface is six per
+cell, two triangles. `linePoint` and `surfacePoint` turn a vertex index into the
+point it stands for. The formula was evaluated once per point before any of them
+runs, so every formula works in every mode, none knows which one it is in, and a
+surface no longer evaluates it six times per cell as the WebGL vertex shader
+did. `DRAW_MODES`' order is the mode integer in the frame, matched by `MODE_*`
+constants in `sketch.wgsl`.
 
-**A setting exists only in the mode it affects.** Dot size and depth scale
-`gl_PointSize` and nothing else, so they belong to `dots` alone. `DrawStyle` is a
+**A setting exists only in the mode it affects.** Dot size and depth size the
+dots' quads and nothing else, so they belong to `dots` alone. `DrawStyle` is a
 union discriminated by `mode`, and only `DotStyle` carries `baseSize` and
 `depthScalar`, so reading them in lines mode is a type error rather than a dead
 slider. The panel follows the type: `panelParams` builds only the selected mode's
@@ -59,9 +64,10 @@ mode's sections list, never an optional field on all of them.
 
 **The sketch is a real 3D space.** A formula returns a point, not a screen
 position, and the camera is computed **in the shader**, because a formula may
-script it: beside `formula` it can define `Camera camera(float t)` returning
-`Camera(eye, target, up)`. `adapterFor` detects it the way it detects a `vec4`
-return and appends `Camera view(float t)` that calls it, or a default that looks
+script it: beside `formula` it can define `fn camera(t: f32) -> Camera` returning
+`Camera(eye, centre, up)` (`target` is a reserved word in WGSL). `adapterFor`
+detects it the way it detects a `vec4f` return and appends `fn view(t: f32) -> Camera`
+that calls it, or a default that looks
 straight down -z from `REFERENCE_DISTANCE` with y up — chosen so the z = 0
 plane's -1..1 square exactly fills the shorter side, which is why a flat
 formula still looks flat. Each sketch picks a **fit** for
@@ -83,18 +89,18 @@ its own `Orbit` (yaw, pitch, distance) in its settings, advanced by `reduceOrbit
 drag to turn, wheel to dolly, double-click or the **reset view** button to reset.
 The button is disabled while the orbit is already the default (`sameOrbit`). The
 orbit is saved with the window like every other setting.
-`orbited()` in `sketch.vert` applies it around the camera's target using the
+`orbited()` in `sketch.wgsl` applies it around the camera's centre using the
 camera's **own** `up` as the pole, not world y, so a scripted camera with z up
 (terrain's) orbits the right way, and the default camera with no drag is
 reproduced exactly. `eyeOf` falls back to an arbitrary side vector when the
 camera looks straight along `up`, rather than producing NaN.
 
 The **axes** switch draws x red, y green, z blue, ticks every 0.5 and the -1..1
-square at z = 0. It is a second `drawArrays` of the **same program** with
-`uPass` set to `PASS_AXES`, not a program of its own: the view comes from the
-formula's camera, so a separate program would have to be compiled per formula
-with every uniform set twice. `axisVertex` derives each line from
-`gl_VertexID`, so `AXIS_VERTICES` in `sketch-program.ts` must match its tables.
+square at z = 0. It is a draw of the **same module**, its own `axisVertex`
+entry, not a module of its own: the view comes from the formula's camera and
+the axes bend through its `space()`, so a separate module would have to be
+compiled per formula. `axisPoint` derives each line from the vertex index, so
+`AXIS_VERTICES` in `drawing.ts` must match its tables.
 
 **The axes are drawn in the formula's space, not the world's.** Every axis point
 goes through `placed()`, the same mapping the lattice's points take, so in polar
@@ -104,7 +110,7 @@ straight line is only straight at its ends, so each of the seven lines (three
 axes, four sides of the square) is drawn as `AXIS_PIECES` short pieces. In a
 wrapping space the x axis stops at ±1, because past that it would lap itself.
 
-**Lattice and space reshape a formula from either side.** The vertex shader runs
+**Lattice and space reshape a formula from either side.** The `evaluate` pass runs
 `index → sampled(uv) → formula → placed(v) → camera`, and both ends are per-sketch
 pickers with an optional formula hook, detected and appended by `adapterFor` like
 `camera()`:
@@ -113,35 +119,35 @@ pickers with an optional formula hook, detected and appended by `adapterFor` lik
   are, with **focus** as a power curve that bunches them toward the middle or the
   edges while keeping their order, so lines and surfaces stay intact. Jitter
   hashes the integer cell, so it holds still from frame to frame. A formula may
-  define `vec2 lattice(vec2 uv, float index, float count)` to place them itself;
-  `builtinLattice` reads its cell and step from globals that `main()` fills,
+  define `fn lattice(uv: vec2f, index: f32, count: f32) -> vec2f` to place them itself;
+  `builtinLattice` reads its cell and step from private globals `sampledAt` fills,
   because the hook's signature has no room for them.
 - **Space** (`SPACES`: cartesian, polar, cylindrical, spherical) reads the
   returned point in another coordinate system, with x always the coordinate that
   goes around, so a flat formula wraps without being rewritten. A formula may
-  define `vec3 space(vec3 p)` instead.
+  define `fn space(p: vec3f) -> vec3f` instead.
 
 **Wrapping closes the seam.** When x goes all the way around (a polar lattice or
 any non-cartesian space, `wraps()`), lines and triangles connect the last
-column back to the first (`uWrap`), and a surface draws one extra column of
+column back to the first (the frame's wrap flag), and a surface draws one extra column of
 cells, so `vertexCount` takes the wrap too. A custom `lattice()` or `space()` is
-not known to wrap unless the formula says so with `#define WRAPS`, which
+not known to wrap unless the formula says so with `const WRAPS = true;`, which
 `createSketch` reads into `Sketch.wraps`; without it there is no seam closing. `sunflower` and `ribbon` are the
 worked examples of the two hooks.
 
 A sketch's **lens** is `perspective` or `orthographic` (`LENSES`, its index is
-`uLens`). Orthographic has no distance to shrink with, so `lensScale()` turns the
+the frame's lens). Orthographic has no distance to shrink with, so `lensScale()` turns the
 viewer's dolly into a zoom of the picture; its rays are parallel and start under
 the cursor, which `aim()` handles; and nearness is the dolly too, not
-`uReference / w`, which would be a constant 4.5 and blow every dot up.
+the reference distance over w, which would be a constant 4.5 and blow every dot up.
 
-**Trails** fade the last frame into the backdrop instead of clearing it: a third
-pass, `PASS_FADE`, draws one viewport-covering triangle of the ramp's first
-colour at `1 - trails` alpha, with the depth test off so last frame's depth
-cannot keep it from covering. It needs the last frame kept: the engine draws
-into a target of its own that persists, and an offscreen canvas has
-`preserveDrawingBuffer`, or the browser may hand back a cleared buffer. `prepare` clears the
-colour, so changing a setting starts the trails afresh.
+**Trails** fade the last frame into the backdrop instead of clearing it: before
+the lattice, a `fadeVertex` draw covers the target with one triangle of the
+ramp's first colour at `1 - trails` alpha, with the depth test off so last
+frame's depth cannot keep it from covering. It needs the last frame kept: the
+render pass loads the multisampled colour target rather than clearing it, and
+stores it again. A prepare marks every entry `fresh`, whose next frame clears,
+so changing a setting starts the trails afresh.
 
 **Dot size has two parts that must stay apart.** Zoom scales a dot in
 proportion — `uReference / reach` in perspective, the dolly in orthographic —
@@ -174,19 +180,24 @@ up and looks across the hills.
 **A formula has more to work with than its arguments.** Three things reach it
 besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads them:
 
-- **Knobs** `k1`–`k4`, plain `float` uniforms in [0, 1], set by four sliders in
+- **Knobs** `k1`–`k4`, plain `f32` uniforms in [0, 1], set by four sliders in
   each sketch's own parameter bar. They are `PanelParams.knobs`, per process like
   every other setting, so two sketches of one formula can sit at different
-  settings. They are four uniforms rather than one `vec4` behind `#define`s,
-  because a macro named `k1` would turn a user's own `float k1` into a baffling
-  syntax error.
+  settings. Each is a uniform binding of its own (group 1, bindings 0 to 3),
+  rather than one `vec4f`, so a formula reads them by their plain names and the
+  compiler can say which it reads.
 
     **A sketch shows only the knobs its formula reads**, and it asks the compiler
-    rather than the text: the linker drops any uniform nothing reads, so
-    `knobsUsed` keeps the knobs whose location is not null. A regex over the source
-    would be fooled by comments, by a `k1` that only feeds dead code, and by a
-    local that shadows the uniform. It follows `checked$`, the engine's cached check
-    of the formula, which keeps the last knobs that linked, so a broken edit leaves
+    rather than the text: `knobsRead` builds each entry point (`evaluate`, and
+    `advance` and `seed` for a formula that evolves) with an **automatic layout**,
+    which keeps only the bindings that entry reads, and finds which of the sixteen
+    sets of knob bindings makes a valid bind group for it, one error scope each.
+    A regex over the source would be fooled by comments, by a `k1` that only feeds
+    dead code, and by a local that shadows the uniform; the probe is not (checked
+    in the browser on exactly those). The real pipelines use explicit layouts with
+    every binding, so they never depend on what a formula reads. It follows
+    `checked$`, the engine's cached check of the formula, which keeps the last
+    knobs that compiled, so a broken edit leaves
     the rows as they were, and typing `k3` into a formula brings its slider up as
     soon as the edit compiles. A hidden row keeps
     its value.
@@ -194,7 +205,7 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     **A knob can move by itself.** Each one has a motion, `CYCLES` = still, 1, 2,
     4 or 8 swings per loop, and `knobAt` sweeps it from 0 up to its slider's value
     and back. Whole numbers only, so a moving knob ends each loop where it began
-    and a loop still loops. The uniforms are set in `drawFrame`, every frame, not
+    and a loop still loops. The knob values are written in `drawFrame`, every frame, not
     in `prepare`, because a moving knob changes with the playhead rather than with
     its settings.
 
@@ -227,11 +238,11 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     in every built-in space and `lens`, `vortex` and `magnet` needed no change.
     `pointerOnGround` is 1 when the ray meets that sheet; a miss takes its
     nearest approach. A formula's own `space()` has no inverse, so the adapter's
-    `ownSpace()` keeps it on the ground point; `pointerDistance(x, y)` measures
+    `ownSpace()` keeps it on the ground point; `pointerNear(x, y)` measures
     through `placed()` in the world and works there too, at the cost of assuming
     z = 0.
 
-    These are **globals filled in `main()`**, not uniforms, and
+    These are **private globals filled by `begin()`**, not uniforms, and
     `camera()` runs before `aim()`, so a camera that reads the pointer sees it
     unset — aiming needs the camera, and that order cannot be flipped.
 
@@ -241,10 +252,10 @@ besides `x`, `y` and `t`, and all three cost a formula nothing unless it reads t
     press never also turns the camera. Moving the mouse is a fourth input to the
     frame `combineLatest`, so it redraws a paused sketch without re-preparing it.
 
-- **A tint.** A formula may be declared `vec4 formula(...)` and return a fourth
-  value that picks the theme colour by itself; depth then only sizes dots and
-  orders the surface. `sketch.vert` declares `vec4 point(...)`, and `adapterFor`
-  appends the matching definition after the formula: a `vec3` formula gets its
+- **A tint.** A formula may be declared `fn formula(...) -> vec4f` and return a
+  fourth value that picks the theme colour by itself; depth then only sizes dots
+  and orders the surface. `sketch.wgsl` calls `point(...)`, and `adapterFor`
+  appends the matching definition after the formula: a `vec3f` formula gets its
   depth copied into the tint, so every existing formula is unchanged. The
   adapter goes **after** the formula so error line numbers still match the
   editor's.
@@ -259,31 +270,31 @@ pale. The examples keep their tints in roughly 0.3 to 1 with
 `0.65 + 0.35 * sin(...)` rather than `fract(...)`, which also avoids a hard colour
 seam where the fraction wraps.
 
-**A formula can keep state.** With `vec4 evolve(x, y, t)` every lattice point
-keeps a `vec4` from one step to the next: `evolve` returns the next value from
+**A formula can keep state.** With `fn evolve(x: f32, y: f32, t: f32) -> vec4f` every
+lattice point keeps a `vec4f` from one step to the next: `evolve` returns the next value from
 `state()` and `neighbour(dx, dy)` (wrapping), `initial(x, y)` seeds it, and
 `formula` reads `state()` to place and tint the point. `tank` (the wave
 equation) and `coral` (Gray-Scott) are the worked examples.
 
-- **A step is a pass of the same program,** like the axes and the trail fade,
-  not a program of its own: it needs the whole prelude a formula can call
-  (lattice, space, pointer, camera, knobs), and a second program would mean
-  compiling every formula twice. `PASS_STEP` draws one `POINTS` vertex per
-  lattice point onto its own texel of a float state texture (`side x side`,
-  side = 2 x lattice), the vertex shader runs `evolve()` and hands the result to
-  the fragment shader through a `flat` varying, which writes it. Two textures
-  swap each step. They are created on texture unit 1: binding them on the active
-  unit put them where the palette sampler reads, and WebGL refused every draw as
-  a feedback loop.
+- **A step is an entry of the same module,** `advance` (and `seed` for the
+  start), like the axes and the trail fade, not a module of its own: it needs
+  the whole prelude a formula can call (lattice, space, pointer, camera, knobs),
+  and a second module would mean compiling every formula twice. It is a compute
+  dispatch, one invocation per lattice point, reading `stateIn` and writing
+  `stateOut`, two storage buffers of `side x side` `vec4f`s (side = 2 x lattice)
+  that swap each step by swapping bind groups. A replay goes out a few hundred
+  steps per submit (`evolve` in `drawing.ts`), each step with its own frame and
+  knob values in a ring of 256-byte uniform slots read by dynamic offset, since
+  a value written between two dispatches of one submit would reach both.
 - **Time is replayed, never accumulated.** The state at time t is `evolve`
   applied `stepAt(t, seconds, steps)` times from `initial`, at 60 steps a second
-  or a formula's `#define STEPS`. Playing steps forward; scrubbing back or
+  or a formula's `const STEPS`. Playing steps forward; scrubbing back or
   looping replays from the start (`evolutionTo`), so a moment always looks the
   same, and the strip and an export can show it. Which texture holds the state
   after a run is parity, so the plan carries it (`Evolved.front`) and the
-  textures carry no mutable index. A jump to the end of Coral's 8 s loop replays
+  buffers carry no mutable index. A jump to the end of Coral's 8 s loop replays
   about 3,800 steps in a third of a second; a loop restart is a few steps.
-- **The state textures are a resource keyed by formula and lattice size**
+- **The state buffers are a resource keyed by formula and lattice size**
   in the engine: kept across every other change, so a knob or a camera drag
   never resets the simulation, and released when either changes. The engine
   keeps one per store and **lane**: the live window and any pedal share the
@@ -303,13 +314,94 @@ equation) and `coral` (Gray-Scott) are the worked examples.
   the pointer as it is now, so what was painted is gone after a scrub back.
   Exports and thumbnails use the centre, unpressed.
 
-**Shaders live in their own files**, never in template literals: `.vert`/`.frag`
-for complete stages under `components/sketch/gl/shaders/`, `.glsl` for a formula
-body under `model/sketch/formulas/`. They are pulled in with Vite's built-in `?raw` suffix, whose
-`string` type comes from `vite/client` — no plugin and no cast. `sketch.vert`
-declares a `vec3 formula(...)` prototype and the selected formula's definition
-is concatenated after it, so the shader file stays valid on its own and the
-splice is a plain string append with no placeholder token.
+**Shaders live in their own files**, never in template literals: `.wgsl` for a
+whole module (`components/sketch/gpu/shaders/sketch.wgsl`, `engine/shaders/`,
+`shared/gpu/shaders/`) and for a formula body under `model/sketch/formulas/`. They
+are pulled in with Vite's built-in `?raw` suffix, whose `string` type comes from
+`vite/client`, no plugin and no cast. WGSL calls functions declared anywhere in
+a module, so `sketch.wgsl` calls `point`, `view`, `sampled`, `placed` and the
+rest without prototypes, and the formula and its adapter are concatenated after
+it: a plain string append with no placeholder token.
+
+## WebGPU and WGSL
+
+**One device draws everything.** `createEngine` asks for a `GPUDevice` and
+configures one offscreen canvas for it; `engine$` makes it for the first viewer
+and releases it after the last. Every engine pass, the sketch module and the
+tracer are WGSL, read with `?raw`, and every resource lives in the engine's
+caches, as it did under WebGL.
+
+**A uniform is written right before the submit that reads it.** Queue writes
+and submits run in order, but a value written twice between the commands of
+one submit reaches both, so a pass with its own settings is a submit of its own
+(`runPass`, `traceBatch`, `inked`), and a run of many (a simulation replay) puts
+each one's values in a ring of 256-byte slots read by dynamic offset. Bind groups
+are made per draw; they are cheap and keep no stale texture.
+
+**Compiling is asynchronous, and a program lands later.** A shader's errors
+come from `getCompilationInfo` and a pipeline from `create*PipelineAsync`, so
+`compiled` and `traceOf` start the build and go on drawing the last program
+that compiled. When the new one is ready, still the latest text, it replaces
+the old, the entries that showed it forget what they cooked (`recompiled`), and
+the engine dispatches `COMPILED` on its own `events`, which `view$` reads as one
+more reason to cook: a paused window draws the new program once. Checks are
+promises too (`checkFormula`, `checkScene`), cached by text, and `checked$`
+follows them with `switchMap`.
+
+**The conventions that keep it right:**
+
+- **A texture keeps its top row first**, as WebGPU renders. The passes reckon
+  with y up as before and sample through `at(uv)` in `pass.wgsl`; the tracer
+  aims a pixel's ray from its row counted up; a pen stroke's y runs down the
+  picture, so `dab.wgsl` flips once and every target agrees.
+- **Clip depth is 0 to 1.** The projection is still GL's, -1 to 1, so `clipOf`
+  in `sketch.wgsl` converts every position, once.
+- **A dot is a quad at least a pixel wide.** WebGPU draws points a pixel wide,
+  and a quad smaller than a pixel misses every sample, where GL drew a point of
+  at least one pixel; the coverage still uses the dot's true size.
+- **No scissored clear.** A slot's backdrop is a `fill` pass inside a viewport;
+  a whole target is cleared by its pass's load.
+- **The flag objects are not declared.** TypeScript's DOM lib has the WebGPU
+  types but not `GPUBufferUsage` and friends, so `lib/gpu.ts` spells the
+  spec's values (`BUFFER`, `TEXTURE`, `STAGE`, `MAP`).
+- **Windows get bitmaps from a canvas sized to the picture.** `canvasView`
+  resizes the canvas to each picture and `transferToImageBitmap` hands it over
+  whole, which a window's `bitmaprenderer` takes with no copy; under WebGL every
+  window copied the whole canvas however small its crop. An export takes the
+  same bitmaps (`Writer.add` takes a bitmap and closes it).
+- **The tracer's float targets are renderable** only so a restart can clear
+  them; the tracer writes them as storage textures and the tone map reads them
+  with `textureLoad`, since a float texture need not be filterable.
+
+**Formulas and scene code are WGSL.** The language a formula is written in:
+
+- `fn formula(x: f32, y: f32, t: f32) -> vec3f`, or `-> vec4f` with a tint;
+  hooks `fn camera(t: f32) -> Camera` (`Camera(eye, centre, up)`),
+  `fn lattice(uv: vec2f, index: f32, count: f32) -> vec2f`,
+  `fn space(p: vec3f) -> vec3f`, `fn evolve(x: f32, y: f32, t: f32) -> vec4f`,
+  `fn initial(x: f32, y: f32) -> vec4f`; a scene's
+  `fn custom(p: vec3f, t: f32) -> Hit` and `fn bounds(t: f32) -> vec4f`.
+- No preprocessor: `const STEPS = 480;` and `const WRAPS = true;` are WGSL
+  constants the app also reads, and a knob is named by a comment line,
+  `// k1: feed rate`.
+- No overloading: `paint(p: vec2f)` and `pointerDistance(p: vec3f)` stay; the
+  x, y forms are `paintAt(x, y)` and `pointerNear(x, y)`.
+- WGSL reserves `mod`, `target`, `smooth`, `pass`, `filter` and more, which is
+  why the camera's field is `centre` and the prelude gives `floorMod(x, y)`, the
+  remainder that wraps negatives as GLSL's `mod` did; WGSL's `%` truncates.
+
+**Anything saved in GLSL is kept.** A formula in the library, an edit of a
+built-in, a scene's code or a share link from before the move stays as it was
+written: `writtenInGlsl` recognises it, and the engine reports one plain message
+(`GLSL_MESSAGE`) instead of compiling it, so the editor says what happened and
+the text waits to be rewritten. A scene whose code is GLSL still draws its
+objects, its code objects as the default sphere.
+
+**Checking a picture without a window**: a module imports from any page of the
+dev server, so a probe in the browser can make an engine, cook a recipe at a
+small size, copy the texture to a buffer and print it as characters. That is
+how the tracer and every draw mode were first checked here, and it needs no
+visible pane.
 
 ## The four layers
 
@@ -507,14 +599,14 @@ applies remote text through a `ref` callback while preserving a focused draft.
 Avoid `unsafeHTML`; Prism's generated token markup is the sole HTML injection in
 a component. SVG fragments use `svg` templates so their namespace stays correct.
 Geometry measurements, focus, scroll, clipboard, popover/dialog methods and
-canvas/WebGL drawing remain explicit effects. Custom-element routing uses normal
+canvas/GPU drawing remain explicit effects. Custom-element routing uses normal
 `data-*` attributes, and editable controls use a normal `editable` attribute.
 The mount adapter upgrades disconnected subtrees before constructors query child
 controls. The renderer never derives business state; pure functions and RxJS
 still decide what a component displays and when it changes.
 
 **A component folder holds everything only that component needs**, whatever layer
-it belongs to: `components/sketch/` owns its `gl/`, its `shaders/` and its
+it belongs to: `components/sketch/` owns its `gpu/`, its `shaders/` and its
 compile stage, because nothing else imports them. What the core reads is never
 only a component's: a document's model lives in `model/` and the canvas
 workspace's pure maths in `layout/` (see "The model and the layout"), and
@@ -1978,13 +2070,13 @@ pen does not pile hundreds on one spot. Nothing is stored or rasterised ahead:
 `dabsAt(stroke, t)` is the prefix the playhead has reached, by halving, and
 whoever shows the stroke draws that many.
 
-**The dabs are drawn on the GPU, in one instanced pass** (`shared/gl/ink.ts`,
-`dab.vert`/`dab.frag`), a soft disc per instance blended
-`ONE_MINUS_DST_ALPHA, ONE`, which is the brush's own rule, ink + (1 − ink) ×
+**The dabs are drawn on the GPU, in one instanced pass** (`shared/gpu/ink.ts`,
+`dab.wgsl`), a soft disc per instance blended
+`one-minus-dst-alpha, one`, which is the brush's own rule, ink + (1 − ink) ×
 dab, in premultiplied colour and alpha alike. A dab thinner than half a pixel
 draws fainter instead of being clamped, or a size signal could not thin the
-line. Two readers share the pass, which is why it and `program.ts` live in
-`shared/gl/`:
+line. Two readers share the pass, which is why it lives in
+`shared/gpu/`:
 
 - **A sketch** draws the stroke into layer 0 of its paint texture (RGBA8,
   `INK_SIDE` = 512, through its own framebuffer) in `setMoment`, so the live
@@ -1996,7 +2088,7 @@ line. Two readers share the pass, which is why it and `program.ts` live in
   formula still reads `paint(x, y)`; it never learns which kind fed it.
 - **The window** shows a sheet the engine draws (`sheetOf`, `sheet$`): the
   whole figure into a transparent layer once per stroke, the part drawn so far
-  into another on every count, both laid onto the paper by `sheet.frag`, because
+  into another on every count, both laid onto the paper by `sheet.wgsl`, because
   the engine's canvas is opaque. The colours are the appearance's `ink` and
   `well`, read from app state as data rather than from CSS at draw time; the
   guides and the tip stay in the DOM above it.
@@ -2205,15 +2297,14 @@ object per kind for the same reason; a fresh default per read looks like an
 edit and recooks the chain. A window reads a cable as `followedImage$(input)`
 and its own store's picture as `image$`.
 
-**One engine cooks for every window** (`src/engine/`). One offscreen WebGL2
-context, `engine$`, made by the first viewer and released after the last like
+**One engine cooks for every window** (`src/engine/`). One `GPUDevice` and an
+offscreen canvas configured for it, `engine$`, made by the first viewer and released after the last like
 the audio context. `cook(engine, image, moment, now)` draws each stage into a
 target kept per store and size, and skips a stage whose recipe, `t`, `pass` and
 pointer are unchanged, so two windows showing one chain draw it once per frame.
 A points stage runs the sketch's own `prepare`, `evolve` and `drawFrame` with
 its own `SketchResources` into a multisampled target with depth, resolved to a
-texture; `prepare` runs only when the stage's settings change, and otherwise its
-palette and paint are bound back, or trails would never survive a frame. That
+texture; `prepare` runs only when the stage's settings change. That
 is why `prepare` restores whatever framebuffer was bound rather than binding the
 canvas, and why the engine rebinds its target after `evolve`, which does not.
 Targets unused for three seconds are released. `view$` hands windows bitmaps at
@@ -2224,8 +2315,9 @@ app state.
 **A pedal is a row of a table.** `PEDALS` in `src/pedals.ts` gives each kind
 its title, its image inputs, its knobs (range, step, initial) and its choices;
 `pedalProgram(kind)` makes the program, `pedalInputs(kind)` its store inputs,
-and `shaders/<kind>.frag` reads its knobs as `uKnobs[i]` in table order and its
-choice as `uChoice`, the choice's index. A new pedal is one entry and one
+and `shaders/<kind>.wgsl` reads its knobs as `knob(i)` in table order and its
+choice as `settings.choice`, the choice's index, after the shared header
+`pass.wgsl`. A new pedal is one entry and one
 shader. Pedals hold a **private document** (`HOLDING`: document, private), the
 first: two kaleidoscopes are two stages, so each window starts its own store,
 and `withMain` offers no Main for it. A driven knob plays the driver's value as
@@ -2241,8 +2333,8 @@ unkept first (`hasHistory`), and the moment's `pass` keeps that warm-up apart
 from the kept frames in the cache, which would otherwise hand back the
 warm-up's pictures. Its frame strip is the sketch's own `HksFrameStrip` and
 strip maths, with tiles cooked by the shared engine (`engine/thumbnails.ts`): a
-tile is one more size, drawn at an offset into the engine's canvas and averaged
-down in one `createImageBitmap`, and a tile whose recipe and moment are
+tile is one more size, drawn at an offset into the film and averaged
+down into the canvas, handed over as one bitmap, and a tile whose recipe and moment are
 unchanged comes from the cache.
 
 **A chain's picture has the app's aspect, not a window's.** The aspect is a
@@ -2288,7 +2380,7 @@ private stage document like a pedal's (`Scene` in `model/scene.ts`, folded by
 its frame strip, an export and picture → level with no wiring of its own. Its
 recipe is `TracedImage` (`image.ts`), assembled by `tracedIn` in the levels
 graph, and the engine draws it in `drawTraced` (`engine/trace.ts`,
-`shaders/trace.frag`). It never became a fourth draw mode of the sketch: a
+`shaders/trace.wgsl`, a compute shader). It never became a fourth draw mode of the sketch: a
 lattice and a distance field share nothing but the camera, and a stage of its
 own is what the toolbox is for.
 
@@ -2329,7 +2421,7 @@ linearly filtered float texture reads back black without an extension) when
 its recipe, `t` and size are unchanged, and starts again otherwise. Each batch
 is seeded by pixel, sample index and `t`, so sample n of a moment is always
 the same: a picture at a count is the same however its batches fell. A tone
-map (`tonemap.frag`, ACES) writes the stage's RGBA8 output; the ramp is
+map (`tonemap.wgsl`, ACES) writes the stage's RGBA8 output; the ramp is
 linearised in the tracer and put back there.
 
 **Refining is a stream, not a loop, and it is paced by the frame.** `view$`
@@ -2381,9 +2473,9 @@ and a strip of a scene settles before it redraws, as an evolving sketch's does.
 longer side a trace is drawn at (384 for windows, `null` for exports, strips
 and levels): a 1024 preview at one sample a frame dropped the app to 6 fps,
 capped it refines at 30 and idles at 60. The tone map goes into a target at
-the traced size and is blitted up with a linear filter.
+the traced size and is drawn up with a linear filter by the present pass.
 
-**What it costs, measured on the GPU** (one Still life sample, timed to a
+**What it costs, measured on the GPU under WebGL** (one Still life sample, timed to a
 `readPixels`): 18 ms at 384, 9.6 at 256; each bounce about 5 ms, and a
 glowing code object about half the total, since it is evaluated at every
 march step and adds a shadow ray per bounce. Two rules came out of it:
@@ -2695,8 +2787,9 @@ and keep their draft while focused.
   **once** at the end (`readAtlas`, `cellsOf`). Both shortcuts were measured
   and dropped: all 64 draws and reads in one go held the page for 85 to 110 ms,
   and a read per moment was worse, seven frames of about 60 ms, because every
-  synchronous `readPixels` waits for everything queued, every window's drawing
-  included. Now a read-back raises no long frame at all.
+  synchronous `readPixels` waited for everything queued, every window's drawing
+  included. That was WebGL; under WebGPU the read is `mapAsync`, which never
+  holds the page, and is still read once.
   `pictureCurve` (pure, in `converters.ts`) turns the frames into the curve,
   so changing the reading redraws nothing. It runs only when the recipe or
   the loop length changes, debounced by 250 ms like an evolving strip, never
@@ -3353,9 +3446,8 @@ and the tab is a setting like any other (`SketchSettings.tab`), saved with the
 window. Each tab holds only what is its own:
 
 - **Parameters** is the formula's own numbers and nothing else: one row per knob
-  the compiled formula reads, under the name its `#define K1 feed_rate` gives it
-  (`knobLabelsOf`, read like `STEPS` and `WRAPS`; the macro is never expanded,
-  since nothing in GLSL is spelt `K1`), with its motion beside it (a range
+  the compiled formula reads, under the name its comment line `// k1: feed rate`
+  gives it (`knobLabelsOf`, read like `STEPS` and `WRAPS`), with its motion beside it (a range
   property's `aside`), and an empty state when the formula reads none. Its
   reset is the section's action, alone in its head.
 - **Scene** is configuration, in four groups by what they change: **Sampling**
@@ -3438,7 +3530,7 @@ that grew it to 5632 x 512 made all eight windows of Light show copy 2.9
 megapixels each per frame to show 0.4 between them, and playback fell to 47 fps
 with the script idle at 1.2 ms. The tiles go into a **film** of their own
 (`filmFor`, one target per engine), and `filmed` averages it down into the
-canvas at the strip's final size with a box filter (`downsample.frag`), so the
+canvas at the strip's final size with a box filter (`downsample.wgsl`), so the
 canvas stays as small as the largest window.
 
 The film is **never resized down**. The number of visible tiles and their width
@@ -3607,7 +3699,7 @@ included, lives outside `components/`, and the core reaches neither
   `clocks`, `drums`, `focus`, `habits`, `note`, `paint`, `pen`, `voice` and
   `instruments`), the sketch's (`model/sketch/`: params, space, theme, the theme
   registry, links, the controls' fold, the export settings and the formula
-  registry with its GLSL), `plot.ts` for the plot's one setting and `reading.ts`
+  registry with its WGSL), `plot.ts` for the plot's one setting and `reading.ts`
   for what a progress bar reads. A function a view calls stays here when any
   client would want it (an orbit, a frame count, a played note).
 - **`src/layout/`** holds the canvas workspace's pure maths: frames and window
@@ -3646,8 +3738,8 @@ belongs to is read from its name instead of its path:
   shape — sliders, sketch, fps counter, window.
 - **every other file in a component folder** — pure functions and stream
   derivations. No DOM, no rendering, no GPU: `frame.ts`, `slider.ts`,
-  `slider.ts`, and the GLSL source of each formula (shader text is data).
-  Testable by calling them. `gl/` is the one exception and says so in its name.
+  `slider.ts`, and the WGSL source of each formula (shader text is data).
+  Testable by calling them. `gpu/` is the one exception and says so in its name.
 - **`*.program.ts`** — a `Program`. It lives in `src/programs/` rather than in the
   component folder, so the component never learns that it is in a window, and
   `main.ts` never names a component's inputs. This is also where a program
@@ -4053,8 +4145,8 @@ preset picker on the right.
 **The documentation is data the program hands in**, like the presets: each
 `Formula` carries a `summary`, and `FORMULA_GUIDE` in `formula.ts` explains the
 contract (`x`, `y`, `t`, the returned `.xy` and `.z`). The editor renders them
-with `guide()` and the `about$` input and still knows nothing about GLSL. The
-guide describes what `sketch.vert` passes in and reads back, so a change to that
+with `guide()` and the `about$` input and still knows nothing about WGSL. The
+guide describes what `sketch.wgsl` passes in and reads back, so a change to that
 contract is a change to the guide. Its sources are
 `changes$` (debounced text) and `selections$` (the chosen preset); `connect$`
 takes the preset text to display and the error text to show.
@@ -4062,7 +4154,7 @@ takes the preset text to display and the error text to show.
 **The picker's options are handed in, never imported.** `presets()` takes a plain
 `{ value, label }[]` and `formula.program.ts` builds it from the registry, because
 a component reaching into `components/sketch/` would break the layering. That also
-keeps the editor a text editor: it knows nothing about GLSL formulas, only about a
+keeps the editor a text editor: it knows nothing about WGSL formulas, only about a
 list of named things it can be asked to show. `selections$` is a `defer`, so the
 initial value is read after `presets()` has filled the list rather than at
 construction, and `isFormulaName` narrows the picked string at the point `main.ts`
@@ -4270,12 +4362,12 @@ from the stores, not from windows (see "Voice"). An export snapshots its request
 the view does not stall it. With four clocks playing, script per frame went
 from 2.2 ms with 38 of 56 windows in view to 0.1 ms with none.
 
-The other limit is the browser's: a page keeps at most **16 WebGL contexts**
-and silently loses the oldest past that (measured). That is why sketch windows
-and their strips, and pen windows, draw through the one engine: it is the only
-`getContext('webgl2')` in the app, and an export makes a second one only while
-it runs. **The engine recovers from a lost context**: `engine$`
-completes when its canvas reports the loss and `repeat` makes a fresh one, and
+The other limit was the browser's: a page kept at most **16 WebGL contexts**
+and silently lost the oldest past that (measured), which is why every window
+draws through the one engine. WebGPU has no such cap, but one device still
+shares every cache, and an export makes a second one only while it runs.
+**The engine recovers from a lost device**: `engine$` completes when
+`device.lost` resolves and `repeat` makes a fresh one, and
 because every picture is a recipe and time is replayed, every window simply
 draws again, simulations included. Forcing the loss with sixteen throwaway
 contexts left every window drawing.
