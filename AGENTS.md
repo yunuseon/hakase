@@ -343,8 +343,14 @@ come from `getCompilationInfo` and a pipeline from `create*PipelineAsync`, so
 `compiled` and `traceOf` start the build and go on drawing the last program
 that compiled. When the new one is ready, still the latest text, it replaces
 the old, the entries that showed it forget what they cooked (`recompiled`), and
-the engine dispatches `COMPILED` on its own `events`, which `view$` reads as one
-more reason to cook: a paused window draws the new program once. Checks are
+the engine dispatches `COMPILED` on its own `events`, which `view$` and the strip
+read as one more reason to cook: a paused window draws the new program once.
+**An engine that has compiled nothing yet draws blank**, which an export, with an
+engine of its own, would write into its first frames, so the export and a
+picture reading wait on `readyFor(engine, image, lane)`, a promise that every
+program the recipe needs has been built. A source or a trace is kept three
+seconds after it was last asked for, entries or not, so one made ready is still
+there when its first frame is cooked. Checks are
 promises too (`checkFormula`, `checkScene`), cached by text, and `checked$`
 follows them with `switchMap`.
 

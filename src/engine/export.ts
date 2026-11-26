@@ -10,7 +10,7 @@ import { messageOf, pngOf, writer$, type ExportEvent } from '../components/sketc
 import { centre } from '../model/sketch/params.ts';
 import type { Size } from '../layout/frame.ts';
 import { hasHistory, samplesWanted, type Image } from '../image.ts';
-import { cook, createEngine, presented, releaseEngine, type Engine } from './engine.ts';
+import { cook, createEngine, presented, readyFor, releaseEngine, type Engine } from './engine.ts';
 
 export type ImageExport = {
     readonly image: Image;
@@ -32,6 +32,11 @@ const ownEngine$: Observable<Engine> = defer(() => from(createEngine())).pipe(
             }),
     ),
 );
+
+const readyEngine$ = (image: Image): Observable<Engine> =>
+    ownEngine$.pipe(
+        switchMap(engine => from(readyFor(engine, image, 'export')).pipe(map(() => engine))),
+    );
 
 const frameAt = (
     engine: Engine,
@@ -72,7 +77,7 @@ export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
         hasHistory(request.image),
     );
 
-    return ownEngine$.pipe(
+    return readyEngine$(request.image).pipe(
         switchMap(engine =>
             writer$(pixels, request.settings).pipe(
                 switchMap(writer =>
@@ -122,7 +127,7 @@ export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
 export const imageStill$ = (request: ImageExport, t: number): Observable<ExportEvent> => {
     const pixels = exportPixels(request.size, request.settings.size);
 
-    return ownEngine$.pipe(
+    return readyEngine$(request.image).pipe(
         switchMap(engine =>
             defer(() => from(frameAt(engine, request, pixels, t, 1, true))).pipe(
                 concatMap(bitmap => (bitmap === null ? of(new Blob()) : from(pngOf(bitmap)))),

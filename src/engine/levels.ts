@@ -12,7 +12,7 @@ import {
 import { concatMap, debounceTime, ignoreElements, map, switchMap, tap } from 'rxjs/operators';
 import { centre } from '../model/sketch/params.ts';
 import { hasHistory, type Image } from '../image.ts';
-import { averagedInto, cook, readAtlas, type Engine } from './engine.ts';
+import { averagedInto, cook, readAtlas, readyFor, type Engine } from './engine.ts';
 import { engine$ } from './view.ts';
 
 const SIDE = 128;
@@ -116,7 +116,11 @@ export const pictureFrames$: PictureFrames = (image$, seconds$) =>
                 : combineLatest([image$, seconds$]).pipe(
                       debounceTime(SETTLE_MS),
                       switchMap(([image, seconds]) =>
-                          image.kind === 'none' ? of(null) : framesOf$(engine, image, seconds),
+                          image.kind === 'none'
+                              ? of(null)
+                              : from(readyFor(engine, image, 'level')).pipe(
+                                    switchMap(() => framesOf$(engine, image, seconds)),
+                                ),
                       ),
                   ),
         ),

@@ -111,6 +111,8 @@ type Source = {
         | null;
     evolved: Evolved | null;
     side: number;
+    pending: Promise<void>;
+    used: number;
 };
 
 type Cooked = {
@@ -145,7 +147,7 @@ const traceSizeOf = ({ width, height, traceSide }: Moment) => {
     };
 };
 
-type Trace = { code: string | null; tracer: Tracer | null };
+type Trace = { code: string | null; tracer: Tracer | null; pending: Promise<void>; used: number };
 
 type Palette = { readonly texture: GPUTexture; readonly view: GPUTextureView; theme: Theme | null };
 
@@ -391,6 +393,8 @@ const sourceOf = (engine: Engine, key: string): Source => {
         prepared: null,
         evolved: null,
         side: 0,
+        pending: Promise.resolve(),
+        used: performance.now(),
     };
     engine.sources.set(key, made);
 
@@ -399,9 +403,11 @@ const sourceOf = (engine: Engine, key: string): Source => {
 
 // A failed edit keeps the last program that compiled, so the picture never blanks while code is typed.
 const compiled = (engine: Engine, key: string, source: Source, text: string): Sketch | null => {
+    source.used = performance.now();
+
     if (source.text !== text) {
         source.text = text;
-        void createSketch(engine.device, engine.layouts, text).then(result => {
+        source.pending = createSketch(engine.device, engine.layouts, text).then(result => {
             if (result.ok && source.text === text) {
                 source.sketch = result.sketch;
                 source.prepared = null;
@@ -684,13 +690,19 @@ const traceOf = (
     code: string,
     shapes: readonly Shape[],
 ): Tracer | null => {
-    const trace = engine.traces.get(key) ?? { code: null, tracer: null };
+    const trace = engine.traces.get(key) ?? {
+        code: null,
+        tracer: null,
+        pending: Promise.resolve(),
+        used: 0,
+    };
     const source = `${shapes.join(',')}\n${code}`;
     engine.traces.set(key, trace);
+    trace.used = performance.now();
 
     if (trace.code !== source) {
         trace.code = source;
-        void createTracer(engine.device, engine.tracing, code, shapes).then(result => {
+        trace.pending = createTracer(engine.device, engine.tracing, code, shapes).then(result => {
             if (result.ok && trace.code === source) {
                 trace.tracer = result.tracer;
                 recompiled(engine, key);
@@ -700,6 +712,38 @@ const traceOf = (
 
     return trace.tracer;
 };
+
+const tracerOf = (engine: Engine, image: TracedImage, lane: string): Tracer | null =>
+    traceOf(
+        engine,
+        keyOf(image.store, lane),
+        // Code saved in GLSL is set aside, not the scene: its objects still draw while the Code tab says why.
+        writtenInGlsl(image.scene.code) ? '' : image.scene.code,
+        image.scene.objects.map(({ shape }) => shape),
+    );
+
+// An engine that has compiled nothing yet would draw its first frames blank: an export or a reading waits for its programs first.
+export const readyFor = (engine: Engine, image: Image, lane: string): Promise<void> =>
+    Promise.all(
+        stagesOf(image).map(stage => {
+            const key = keyOf(stage.store, lane);
+
+            if (stage.kind === 'points') {
+                const source = sourceOf(engine, key);
+                compiled(engine, key, source, stage.source);
+
+                return source.pending;
+            }
+
+            if (stage.kind === 'traced') {
+                tracerOf(engine, stage, lane);
+
+                return engine.traces.get(key)?.pending ?? Promise.resolve();
+            }
+
+            return Promise.resolve();
+        }),
+    ).then(() => undefined);
 
 const MAX_BATCH = 16;
 
@@ -749,13 +793,7 @@ const drawTraced = (
     restart: boolean,
 ): void => {
     const { device } = engine;
-    const tracer = traceOf(
-        engine,
-        keyOf(image.store, moment.lane),
-        // Code saved in GLSL is set aside, not the scene: its objects still draw while the Code tab says why.
-        writtenInGlsl(image.scene.code) ? '' : image.scene.code,
-        image.scene.objects.map(({ shape }) => shape),
-    );
+    const tracer = tracerOf(engine, image, moment.lane);
 
     if (tracer === null) {
         clearTarget(engine, entry.output.view, [0, 0, 0, 1]);
@@ -937,13 +975,19 @@ const forget = (engine: Engine, now: number): void => {
             engine.films.delete(key);
         }
     });
-    engine.traces.forEach((_trace, key) => {
-        if (![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))) {
+    engine.traces.forEach((trace, key) => {
+        if (
+            now - trace.used > FORGET_MS &&
+            ![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))
+        ) {
             engine.traces.delete(key);
         }
     });
     engine.sources.forEach((source, key) => {
-        if (![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))) {
+        if (
+            now - source.used > FORGET_MS &&
+            ![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))
+        ) {
             releaseSketchResources(source.resources);
             engine.sources.delete(key);
         }

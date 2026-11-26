@@ -1,12 +1,29 @@
-import { animationFrameScheduler, combineLatest, EMPTY, from, merge, type Observable } from 'rxjs';
-import { auditTime, concatMap, debounceTime, filter, map, share, switchMap } from 'rxjs/operators';
+import {
+    animationFrameScheduler,
+    combineLatest,
+    EMPTY,
+    from,
+    fromEvent,
+    merge,
+    type Observable,
+} from 'rxjs';
+import {
+    auditTime,
+    concatMap,
+    debounceTime,
+    filter,
+    map,
+    share,
+    startWith,
+    switchMap,
+} from 'rxjs/operators';
 import { fitted, supersampleFor, type StripLayout } from '../components/sketch/animation.ts';
 import { evolves } from '../components/sketch/gpu/sketch-program.ts';
 import { centre } from '../model/sketch/params.ts';
 import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
 import type { Size } from '../layout/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
-import { backdropOf, cook, filmed, filmFor, framedIn, textureLimit } from './engine.ts';
+import { backdropOf, COMPILED, cook, filmed, filmFor, framedIn, textureLimit } from './engine.ts';
 import { engine$ } from './view.ts';
 
 const TILE_SAMPLES = 1;
@@ -41,7 +58,14 @@ export const filmstrip$ = (
                 return EMPTY;
             }
 
-            const scene$ = combineLatest([image$, framing$, seconds$, ratio$, layout$]).pipe(
+            const scene$ = combineLatest([
+                image$,
+                framing$,
+                seconds$,
+                ratio$,
+                layout$,
+                fromEvent(engine.events, COMPILED).pipe(startWith(null)),
+            ]).pipe(
                 map(([image, framing, seconds, ratio, layout]): Scene => ({
                     image: stillOf(image),
                     framing,
