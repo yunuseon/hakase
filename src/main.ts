@@ -4,6 +4,7 @@ import { browserPorts } from './browser-ports.ts';
 import { chime$ } from './chime.ts';
 import { console$ } from './console-client.ts';
 import { coreOf } from './core.ts';
+import { diagnosticsOf } from './graph/diagnostics.graph.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
 import { connectChrome$, mountChrome } from './graph/chrome.graph.ts';
@@ -25,8 +26,9 @@ const bootstrap = () => {
     // The cycle: windows open from the history their own output folds. Every back edge is read lazily, here and nowhere else.
     const signals$ = defer(() => windows.signals$);
     const inputs$ = defer(() => windows.inputs$);
+    const ports = browserPorts();
     const core = coreOf({
-        ports: browserPorts(),
+        ports,
         inputs$,
         workspaceActions$: defer(() => workspaceActions),
         documentActions$: defer(() => documentActions),
@@ -38,8 +40,14 @@ const bootstrap = () => {
     const stateMode = stateModeOf({ ...chrome, ...core, signals$ });
     const previews = previewsOf({ ...chrome, ...stateMode, ...core });
     const sound = soundOf({ ...chrome, inputs$ });
-    const scoped = scopedOf({ ...core, ...sound, inputs$ });
+    const scoped = scopedOf({
+        ...core,
+        ...sound,
+        inputs$,
+        report$: defer(() => diagnostics.report$),
+    });
     const windows = windowsOf({ ...chrome, ...core, ...selection, ...stateMode, scoped });
+    const diagnostics = diagnosticsOf({ ...core.watched, windows: windows.signals$ }, ports);
 
     const workspaceActions = workspaceActions$({
         ...chrome,
@@ -62,7 +70,7 @@ const bootstrap = () => {
         chime$(core.timers$, core.plans$),
         sound$(core, sound.listening$, sound.soloed$),
         core.persisted$,
-        import.meta.env.DEV ? console$(core.diagnostics, core.history$) : EMPTY,
+        import.meta.env.DEV ? console$(diagnostics, core.history$) : EMPTY,
         connectChrome$({
             ...chrome,
             ...intents,

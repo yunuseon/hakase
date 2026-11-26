@@ -4304,15 +4304,21 @@ per-window selectors) was right in kind and wrong in size.
 
 ## Debugging, for agents
 
-**The core watches its own streams, and any client can read what it saw.**
-`diagnosticsOf` (`graph/diagnostics.graph.ts`, built in `coreOf`) subscribes
-to a list of named core streams like any other reader, so naming one changes
-nothing about how it runs. Only streams that are **shared** may be named
+**The core names the streams worth watching, and a client watches them.**
+`coreOf` returns `watched`, a record of named core streams; the browser adds
+the windows' own output (`windows`, every signal a window sends, with its
+`from`) and hands both to `diagnosticsOf` (`graph/diagnostics.graph.ts`),
+which subscribes like any other reader, so naming one changes nothing about
+how it runs. The Streams window reads that report, so `scopedOf` takes
+`report$` deferred, a back edge `main.ts` closes like the others. Only streams that are **shared** may be named
 (`history$` and what is mapped from it, the clocks, timers and plans, the
 windows' `inputs$`): a second subscription to a cold stream runs it twice,
 which is why the document and workspace actions are not named but read back
 out of the log (`newestAction`, the action with the highest sequence and the
-step it joined, with how many steps an undo stepped back over).
+step it made, with how many steps an undo stepped back over). An action that
+makes no step (a raise, the camera, a view-only setting) is logged with the
+step before it, so its `step` is null: reporting that step's label made an
+orbit drag read as an edit of the signal touched before it.
 
 - **A turn is everything one event caused before the next microtask**:
   emissions are buffered until `debounceTime(0, asapScheduler)` fires. The

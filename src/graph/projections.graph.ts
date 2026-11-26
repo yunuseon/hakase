@@ -2,7 +2,7 @@ import type { Observable } from 'rxjs';
 import { distinctUntilChanged, map, shareReplay } from 'rxjs/operators';
 import type { Appearance } from '../appearance.ts';
 import { appearances, type AppearanceName } from '../appearances.ts';
-import { linkedOf, loopsOf, workspaceOf, type History } from '../documents.ts';
+import { linkedOf, loopsOf, sameLinked, workspaceOf, type History } from '../documents.ts';
 import type { ProcessId, Written } from '../protocol.ts';
 import { sameStructure, type Workspace } from '../workspace.ts';
 
@@ -139,6 +139,15 @@ export const projectionsOf = (history$: Observable<History>) => {
             boxes: documents.boxes,
             names: new Map([...documents.gates].map(([id, gate]) => [id, gate.name])),
         })),
+        // A knob turned on a pedal is a new pedal but the same wiring; every reader of the links only reads sources.
+        distinctUntilChanged(
+            (a, b) =>
+                sameLinked(a.linked, b.linked) &&
+                sameLinked(a.loops, b.loops) &&
+                a.boxes === b.boxes &&
+                a.names.size === b.names.size &&
+                [...a.names].every(([id, name]) => b.names.get(id) === name),
+        ),
         shareReplay({ bufferSize: 1, refCount: true }),
     );
     const linked$ = links$.pipe(map(({ linked }) => linked));

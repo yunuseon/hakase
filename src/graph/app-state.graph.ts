@@ -1,4 +1,4 @@
-import type { Diagnostics } from './diagnostics.graph.ts';
+import type { Report } from '../diagnostics.ts';
 import { combineLatest, EMPTY, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
@@ -87,10 +87,10 @@ type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
         readonly inputs$: Observable<AppSignal>;
     } & Levels &
     Pick<Mix, 'strips$' | 'meterIn'> &
-    SoundState & { readonly diagnostics: Diagnostics };
+    SoundState & { readonly report$: Observable<Report> };
 
 export const scopedOf = ({
-    diagnostics,
+    report$,
     history$,
     workspace$,
     stores$,
@@ -257,7 +257,7 @@ export const scopedOf = ({
         library$,
         blueprints$,
         inspect$: (id: string) => inspected$(id),
-        report$: diagnostics.report$,
+        report$,
         graph$: combineLatest([workspace$, held$, linked$]).pipe(
             map(([workspace, held, signals]) =>
                 graphOf(workspace, inputsFor, declarationOf, held, signals),

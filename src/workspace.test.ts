@@ -138,6 +138,18 @@ describe('moving a selection', () => {
         expect(next.processes.map(p => p.id)).toEqual([...ids.slice(2), second, first]);
     });
 
+    it('keeps the same workspace for a raise that changes nothing, so no reader runs again', () => {
+        const raised = reduceWorkspace(
+            workspace,
+            { kind: 'raise', id: first, selected },
+            inputsFor,
+        );
+
+        expect(reduceWorkspace(raised, { kind: 'raise', id: first, selected }, inputsFor)).toBe(
+            raised,
+        );
+    });
+
     it('moves an unselected window independently', () => {
         const next = frames(reduceWorkspace(workspace, { ...move, id: third }, inputsFor));
         expect(next[first]).toEqual(frames(workspace)[first]);

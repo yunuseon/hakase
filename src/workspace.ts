@@ -1037,14 +1037,16 @@ const step = (
                   };
         }
         // A drag starts with a raise, so the last drag's drift never carries into this one.
-        case 'raise':
-            return workspace.processes.some(({ id }) => id === action.id)
-                ? {
-                      ...workspace,
-                      drift: null,
-                      processes: raisedGroup(workspace, action.id, action.selected ?? []),
-                  }
-                : workspace;
+        case 'raise': {
+            const processes = raisedGroup(workspace, action.id, action.selected ?? []);
+            const same =
+                workspace.drift === null &&
+                processes.every((process, index) => process === workspace.processes[index]);
+
+            return !workspace.processes.some(({ id }) => id === action.id) || same
+                ? workspace
+                : { ...workspace, drift: null, processes };
+        }
         case 'move': {
             const { zoom } = workspace.camera;
 

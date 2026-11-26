@@ -310,6 +310,23 @@ export const linkedOf = ({
         ...sketchLinks,
     ]);
 
+const sameSources = (a: Linked['sources'], b: Linked['sources']): boolean => {
+    const keys = Object.keys(a);
+
+    return keys.length === Object.keys(b).length && keys.every(key => a[key] === b[key]);
+};
+
+export const sameLinked = (
+    a: ReadonlyMap<StoreId, Linked>,
+    b: ReadonlyMap<StoreId, Linked>,
+): boolean =>
+    a.size === b.size &&
+    [...a].every(([id, { sources }]) => {
+        const other = b.get(id);
+
+        return other !== undefined && sameSources(sources, other.sources);
+    });
+
 export const loopsOf = (documents: Parameters<typeof linkedOf>[0]) =>
     new Map<StoreId, Linked>([
         ...linkedOf(documents),

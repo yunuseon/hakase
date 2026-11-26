@@ -133,20 +133,29 @@ describe('what the console shows', () => {
 
     it('finds the newest logged action and the step it joined', () => {
         expect(
-            newestAction({
-                cursor: 1,
-                steps: [
-                    { label: 'Moved', actions: [{ seq: 4, action: 'a' }] },
-                    {
-                        label: 'Added',
-                        actions: [
-                            { seq: 6, action: 'c' },
-                            { seq: 5, action: 'b' },
-                        ],
-                    },
-                ],
-            }),
-        ).toEqual({ seq: 6, step: 'Added', action: 'c', undone: 1 });
-        expect(newestAction({ steps: [], cursor: 0 })).toBeNull();
+            newestAction(
+                {
+                    cursor: 1,
+                    steps: [
+                        { label: 'Moved', actions: [{ seq: 4, action: 'a' }] },
+                        {
+                            label: 'Added',
+                            actions: [
+                                { seq: 6, action: 'c' },
+                                { seq: 5, action: 'b' },
+                            ],
+                        },
+                    ],
+                },
+                action => action !== 'c',
+            ),
+        ).toEqual({ seq: 6, step: null, action: 'c', undone: 1 });
+        expect(
+            newestAction(
+                { cursor: 1, steps: [{ label: 'Added', actions: [{ seq: 2, action: 'b' }] }] },
+                () => true,
+            )?.step,
+        ).toBe('Added');
+        expect(newestAction({ steps: [], cursor: 0 }, () => true)).toBeNull();
     });
 });

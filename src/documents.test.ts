@@ -1,6 +1,7 @@
 import { defaultTickets, ticketsIn } from './shared/tickets.ts';
 import { describe, expect, it } from 'vitest';
 import {
+    sameLinked,
     fromWorkspace,
     documentsKit,
     reduceHistory,
@@ -96,6 +97,13 @@ describe('one log for every document', () => {
 
         expect(frameOf(run(once, [{ kind: 'undo' }]), 'sketch-2')).toEqual(before);
         expect(twice.steps).toHaveLength(2);
+        expect(
+            run(start, [
+                ...drag('sketch-2', 5),
+                act({ kind: 'raise', id: 'sketch-2' }),
+                ...drag('sketch-2', 5),
+            ]).steps,
+        ).toHaveLength(2);
         expect(frameOf(run(twice, [{ kind: 'undo' }]), 'sketch-2')).toEqual(
             frameOf(run(start, drag('sketch-2', 5)), 'sketch-2'),
         );
@@ -733,5 +741,20 @@ describe('complete ticket creation', () => {
                 run(created, [{ kind: 'undo' }]).present.tickets.get('tickets') ?? defaultTickets,
             ),
         ).toEqual([]);
+    });
+});
+
+describe('the links', () => {
+    it('are the same while only a value moved, and change when a source does', () => {
+        const before = new Map([['echo', { sources: { in: 'knot', decay: null }, decay: 0.2 }]]);
+        const turned = new Map([['echo', { sources: { in: 'knot', decay: null }, decay: 0.8 }]]);
+        const rewired = new Map([['echo', { sources: { in: 'vortex', decay: null } }]]);
+
+        expect(sameLinked(before, turned)).toBe(true);
+        expect(sameLinked(before, rewired)).toBe(false);
+        expect(sameLinked(before, new Map())).toBe(false);
+        expect(
+            sameLinked(before, new Map([['other', before.get('echo') ?? { sources: {} }]])),
+        ).toBe(false);
     });
 });

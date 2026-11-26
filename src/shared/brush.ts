@@ -81,7 +81,6 @@ export const averageAround = (frame: Frame, side: number, px: number, py: number
     return total / Math.max(count, 1);
 };
 
-// One soft disc, centred in pixels; a working copy so a stroke rounds once, at its end.
 const stamped = (
     ink: number[],
     before: Frame,

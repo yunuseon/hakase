@@ -176,26 +176,29 @@ export const reportOf = (log: Log, names: readonly string[], now: number): Repor
     };
 };
 
-type Logged = { readonly seq: number; readonly action: unknown };
-type Stepped = { readonly label: string; readonly actions: readonly Logged[] };
+type Logged<A> = { readonly seq: number; readonly action: A };
+type Stepped<A> = { readonly label: string; readonly actions: readonly Logged<A>[] };
 
 export type Newest = {
     readonly seq: number;
-    readonly step: string;
+    readonly step: string | null;
     readonly action: unknown;
     readonly undone: number;
 };
 
-type Logbook = { readonly steps: readonly Stepped[]; readonly cursor: number };
+type Logbook<A> = { readonly steps: readonly Stepped<A>[]; readonly cursor: number };
 
 // Read from the log, not from the action streams: those may be cold, and a second subscription would run them twice.
-export const newestAction = ({ steps, cursor }: Logbook): Newest | null =>
+export const newestAction = <A>(
+    { steps, cursor }: Logbook<A>,
+    makesStep: (action: A) => boolean,
+): Newest | null =>
     steps
         .slice(-2)
         .flatMap(({ label, actions }) =>
             actions.map(({ seq, action }) => ({
                 seq,
-                step: label,
+                step: makesStep(action) ? label : null,
                 action,
                 undone: steps.length - cursor,
             })),
@@ -215,7 +218,7 @@ const counted = (pulses: readonly Pulse[]): readonly (readonly [string, readonly
     ),
 ];
 
-const SPOKEN = ['inputs', 'actions'];
+const SPOKEN = ['inputs', 'actions', 'windows'];
 
 export const lineOf = ({ at, pulses }: Turn): string => {
     const streams = counted(pulses);
