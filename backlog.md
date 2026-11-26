@@ -16,16 +16,6 @@ done:
   GPU (see "Path tracing"). What compute could still do: picture readings
   reduced on the GPU instead of read back, particles.
 
-## Dev experience: per-window streams
-
-Recording, replay, `hakase.run` and cascades are done (see "Debugging, for
-agents"). What is left: name a window's `AppState` streams too, so a report
-can say which window ran twice, not only that a core stream did. It must not
-subscribe a window's cold pipelines a second time, which is why windows are
-watched by their rewrites today. Done looks like a double in one window's
-pipeline named by window and stream, with no extra work when the inspector
-is not read.
-
 ## Pictures: one exporter, any window headless
 
 Decided after the path tracer: every picture is already drawn once by the

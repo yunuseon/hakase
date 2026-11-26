@@ -85,7 +85,6 @@ export type WindowGesture =
           readonly store: string;
       }
     | { readonly kind: 'unfollow'; readonly input: string }
-    // The window echoes what it was offered: it does not know what a program is.
     | {
           readonly kind: 'replace';
           readonly program: string;

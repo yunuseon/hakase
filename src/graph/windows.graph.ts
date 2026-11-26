@@ -15,6 +15,7 @@ import type { FollowGroup, StoreOption, SwitchGroup, SwitchItem } from '../layou
 import { inputGroups } from '../input-connections.ts';
 import { followedStores, playbackBinding, type Bindings, type PlaybackBinding } from '../inputs.ts';
 import { liveProcess$, type ProcessSignal } from '../process.ts';
+import { pulsedBy } from '../window-pulses.ts';
 import { windowZ, wiredCount } from '../state-mode.ts';
 import { type Slot } from '../program.ts';
 import { CATEGORIES, type ProcessId } from '../protocol.ts';
@@ -275,7 +276,13 @@ export const windowsOf = ({
                               distinctUntilChanged(),
                           ),
                       },
-                      scoped(store$, clock$, followsOf(entry$), shownOf(entry$)),
+                      scoped(
+                          store$,
+                          clock$,
+                          followsOf(entry$),
+                          shownOf(entry$),
+                          import.meta.env.DEV ? pulsedBy(process.id) : undefined,
+                      ),
                       canvas,
                       storeOptions$(process),
                       switches$.pipe(

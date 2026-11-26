@@ -89,6 +89,8 @@ type Reads = Omit<Projections, 'ids$' | 'focusLinks$' | 'sketchLinks$'> &
     Pick<Mix, 'strips$' | 'meterIn'> &
     SoundState & { readonly report$: Observable<Report> };
 
+export type Named = <T>(name: string, source: Observable<T>) => Observable<T>;
+
 export const scopedOf = ({
     report$,
     history$,
@@ -368,6 +370,7 @@ export const scopedOf = ({
         playback$: Observable<PlaybackBinding | null>,
         follows$: Observable<Bindings>,
         shown$: Observable<boolean> = of(true),
+        named: Named = (_, source) => source,
     ): AppState => {
         // A source read on a clock of its own is shown on it, or its window would mark a moment nobody reads.
         const clock$ = combineLatest([
@@ -406,139 +409,188 @@ export const scopedOf = ({
 
         return {
             ...state,
-            reading$: followed$('source').pipe(
-                switchMap(
-                    (binding): Observable<Reading> =>
-                        (binding === null ? null : readingOf(binding, sources)) ??
-                        of({ kind: 'none', title: 'Nothing followed' }),
-                ),
-                shareReplay({ bufferSize: 1, refCount: true }),
-            ),
-            playhead$: clock$.pipe(
-                switchMap(binding => (binding === null ? of(0) : clock.pipe(map(({ at }) => at)))),
-                distinctUntilChanged(),
-            ),
-            playing$: clock.pipe(
-                map(({ playing }) => playing),
-                distinctUntilChanged(),
-            ),
-            looping$: clock.pipe(
-                map(({ looping }) => looping),
-                distinctUntilChanged(),
-            ),
-            clock$: clock,
-            duration$: clock.pipe(
-                map(({ duration }) => duration),
-                distinctUntilChanged(),
-            ),
-            ticks$: clock.pipe(
-                map(({ ticks }) => ticks),
-                distinctUntilChanged(),
-            ),
-            tickets$: narrowed(ticketsIn),
-            notes$: narrowed(notesIn),
-            focus$: narrowed(timerIn),
-            plan$: narrowed(planIn),
-            agenda$: narrowed(agendaIn),
-            habits$: narrowed(habitsIn),
-            clocks$: narrowed(clocksIn),
-            bookmarks$: narrowed(bookmarksIn),
-            signal$: narrowed(signalIn),
-            wave$: store$.pipe(switchMap(store => waveIn(store, pace$))),
-            linkedDriver$: param => store$.pipe(switchMap(store => driverIn(store, param, pace$))),
-            picture$: narrowed(pictureIn),
-            drawing$: store$.pipe(switchMap(store => drawingIn(store, pace$))),
-            sounding$: store$.pipe(switchMap(store => soundingIn(store, pace$))),
-            kit$: store$.pipe(switchMap(store => kitIn(store, pace$))),
-            pedal$: narrowed(pedalIn),
-            scene$: narrowed(sceneIn),
-            gate$: narrowed(gateIn),
-            conversion$: store$.pipe(switchMap(store => conversionIn(store, pace$))),
-            bits$: combineLatest([store$, pace$]).pipe(
-                switchMap(([store, { ticks, seconds }]) =>
-                    tableOf(ticks, seconds).pipe(
-                        map(table => table.get(store) ?? new Uint8Array(ticks)),
+            reading$: named(
+                'reading',
+                followed$('source').pipe(
+                    switchMap(
+                        (binding): Observable<Reading> =>
+                            (binding === null ? null : readingOf(binding, sources)) ??
+                            of({ kind: 'none', title: 'Nothing followed' }),
                     ),
-                ),
-                distinctUntilChanged(),
-            ),
-            box$: combineLatest([store$, pace$]).pipe(
-                switchMap(([store, { ticks, seconds }]) =>
-                    combineLatest([
-                        boxes$.pipe(
-                            map(all => all.get(store) ?? EMPTY_BOX),
-                            distinctUntilChanged(),
-                        ),
-                        circuit$,
-                        tableOf(ticks, seconds),
-                    ]).pipe(map(([box, gates, table]) => boxReading(box, gates, table, ticks))),
+                    shareReplay({ bufferSize: 1, refCount: true }),
                 ),
             ),
-            image$: store$.pipe(switchMap(store => imageIn(store, pace$))),
-            linkedName$: param =>
-                store$.pipe(
-                    switchMap(store => linkIn(store, param)),
+            playhead$: named(
+                'playhead',
+                clock$.pipe(
                     switchMap(binding =>
-                        binding === null
-                            ? of(null)
-                            : stores$.pipe(
-                                  map(
-                                      stores =>
-                                          stores.find(({ id }) => id === binding.store)?.name ??
-                                          binding.store,
-                                  ),
-                              ),
+                        binding === null ? of(0) : clock.pipe(map(({ at }) => at)),
                     ),
                     distinctUntilChanged(),
                 ),
-            chains$: combineLatest([store$, linked$, stores$]).pipe(
-                map(([store, linked, stores]) =>
-                    chainsOf(
-                        linked,
-                        store,
-                        id =>
-                            stores.find(entry => entry.id === id)?.name ??
-                            (isProgramId(id) ? MAIN : id),
-                    ),
-                ),
-                distinctUntilChanged(sameChains),
             ),
-            linkedPicture$: param => store$.pipe(switchMap(store => sheetIn(store, param, pace$))),
-            followedImage$: input =>
-                followed$(input).pipe(
-                    switchMap(binding =>
-                        binding !== null && isImageKind(binding.kind)
-                            ? imageIn(binding.store, pace$)
-                            : of(NONE),
+            playing$: named(
+                'playing',
+                clock.pipe(
+                    map(({ playing }) => playing),
+                    distinctUntilChanged(),
+                ),
+            ),
+            looping$: named(
+                'looping',
+                clock.pipe(
+                    map(({ looping }) => looping),
+                    distinctUntilChanged(),
+                ),
+            ),
+            clock$: named('clock', clock),
+            duration$: named(
+                'duration',
+                clock.pipe(
+                    map(({ duration }) => duration),
+                    distinctUntilChanged(),
+                ),
+            ),
+            ticks$: named(
+                'ticks',
+                clock.pipe(
+                    map(({ ticks }) => ticks),
+                    distinctUntilChanged(),
+                ),
+            ),
+            tickets$: named('tickets', narrowed(ticketsIn)),
+            notes$: named('notes', narrowed(notesIn)),
+            focus$: named('focus', narrowed(timerIn)),
+            plan$: named('plan', narrowed(planIn)),
+            agenda$: named('agenda', narrowed(agendaIn)),
+            habits$: named('habits', narrowed(habitsIn)),
+            clocks$: named('clocks', narrowed(clocksIn)),
+            bookmarks$: named('bookmarks', narrowed(bookmarksIn)),
+            signal$: named('signal', narrowed(signalIn)),
+            wave$: named('wave', store$.pipe(switchMap(store => waveIn(store, pace$)))),
+            linkedDriver$: param =>
+                named(
+                    `linkedDriver(${param})`,
+                    store$.pipe(switchMap(store => driverIn(store, param, pace$))),
+                ),
+            picture$: named('picture', narrowed(pictureIn)),
+            drawing$: named('drawing', store$.pipe(switchMap(store => drawingIn(store, pace$)))),
+            sounding$: named('sounding', store$.pipe(switchMap(store => soundingIn(store, pace$)))),
+            kit$: named('kit', store$.pipe(switchMap(store => kitIn(store, pace$)))),
+            pedal$: named('pedal', narrowed(pedalIn)),
+            scene$: named('scene', narrowed(sceneIn)),
+            gate$: named('gate', narrowed(gateIn)),
+            conversion$: named(
+                'conversion',
+                store$.pipe(switchMap(store => conversionIn(store, pace$))),
+            ),
+            bits$: named(
+                'bits',
+                combineLatest([store$, pace$]).pipe(
+                    switchMap(([store, { ticks, seconds }]) =>
+                        tableOf(ticks, seconds).pipe(
+                            map(table => table.get(store) ?? new Uint8Array(ticks)),
+                        ),
+                    ),
+                    distinctUntilChanged(),
+                ),
+            ),
+            box$: named(
+                'box',
+                combineLatest([store$, pace$]).pipe(
+                    switchMap(([store, { ticks, seconds }]) =>
+                        combineLatest([
+                            boxes$.pipe(
+                                map(all => all.get(store) ?? EMPTY_BOX),
+                                distinctUntilChanged(),
+                            ),
+                            circuit$,
+                            tableOf(ticks, seconds),
+                        ]).pipe(map(([box, gates, table]) => boxReading(box, gates, table, ticks))),
                     ),
                 ),
-            followedLevel$: input =>
-                followed$(input).pipe(
-                    switchMap(binding =>
-                        binding === null
-                            ? of(null)
-                            : combineLatest([
-                                  stores$.pipe(
+            ),
+            image$: named('image', store$.pipe(switchMap(store => imageIn(store, pace$)))),
+            linkedName$: param =>
+                named(
+                    `linkedName(${param})`,
+                    store$.pipe(
+                        switchMap(store => linkIn(store, param)),
+                        switchMap(binding =>
+                            binding === null
+                                ? of(null)
+                                : stores$.pipe(
                                       map(
                                           stores =>
                                               stores.find(({ id }) => id === binding.store)?.name ??
-                                              MAIN,
+                                              binding.store,
                                       ),
-                                      distinctUntilChanged(),
                                   ),
-                                  boundIn(binding, pace$, NONE_SEEN),
-                              ]).pipe(
-                                  map(([name, driver]) =>
-                                      driver === null
-                                          ? null
-                                          : {
-                                                id: binding.store,
-                                                name,
-                                                colour: colourOf(binding.store),
-                                                driver,
-                                            },
+                        ),
+                        distinctUntilChanged(),
+                    ),
+                ),
+            chains$: named(
+                'chains',
+                combineLatest([store$, linked$, stores$]).pipe(
+                    map(([store, linked, stores]) =>
+                        chainsOf(
+                            linked,
+                            store,
+                            id =>
+                                stores.find(entry => entry.id === id)?.name ??
+                                (isProgramId(id) ? MAIN : id),
+                        ),
+                    ),
+                    distinctUntilChanged(sameChains),
+                ),
+            ),
+            linkedPicture$: param =>
+                named(
+                    `linkedPicture(${param})`,
+                    store$.pipe(switchMap(store => sheetIn(store, param, pace$))),
+                ),
+            followedImage$: input =>
+                named(
+                    `followedImage(${input})`,
+                    followed$(input).pipe(
+                        switchMap(binding =>
+                            binding !== null && isImageKind(binding.kind)
+                                ? imageIn(binding.store, pace$)
+                                : of(NONE),
+                        ),
+                    ),
+                ),
+            followedLevel$: input =>
+                named(
+                    `followedLevel(${input})`,
+                    followed$(input).pipe(
+                        switchMap(binding =>
+                            binding === null
+                                ? of(null)
+                                : combineLatest([
+                                      stores$.pipe(
+                                          map(
+                                              stores =>
+                                                  stores.find(({ id }) => id === binding.store)
+                                                      ?.name ?? MAIN,
+                                          ),
+                                          distinctUntilChanged(),
+                                      ),
+                                      boundIn(binding, pace$, NONE_SEEN),
+                                  ]).pipe(
+                                      map(([name, driver]) =>
+                                          driver === null
+                                              ? null
+                                              : {
+                                                    id: binding.store,
+                                                    name,
+                                                    colour: colourOf(binding.store),
+                                                    driver,
+                                                },
+                                      ),
                                   ),
-                              ),
+                        ),
                     ),
                 ),
         };

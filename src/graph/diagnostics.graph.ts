@@ -1,4 +1,4 @@
-import { asapScheduler, merge, timer, type Observable } from 'rxjs';
+import { asapScheduler, EMPTY, merge, timer, type Observable } from 'rxjs';
 import {
     buffer,
     connect,
@@ -24,12 +24,30 @@ import type { Ports } from '../ports.ts';
 
 export type Streams = Readonly<Record<string, Observable<unknown>>>;
 
-export const turnsOf = (streams: Streams, now: () => number): Observable<Turn> => {
+export type Announced = {
+    readonly stream: string;
+    readonly value: unknown;
+    readonly by: object;
+};
+
+export const turnsOf = (
+    streams: Streams,
+    now: () => number,
+    announced$: Observable<Announced> = EMPTY,
+): Observable<Turn> => {
     const pulses$ = merge(
         ...Object.entries(streams).map(([stream, stream$]) =>
-            stream$.pipe(map(value => ({ stream, value }))),
+            stream$.pipe(map((value): Announced | Omit<Announced, 'by'> => ({ stream, value }))),
         ),
-    ).pipe(map(({ stream, value }): Pulse => ({ stream, at: now(), digest: digestOf(value) })));
+        announced$,
+    ).pipe(
+        map((pulse): Pulse => ({
+            stream: pulse.stream,
+            at: now(),
+            digest: digestOf(pulse.value),
+            ...('by' in pulse ? { by: pulse.by } : {}),
+        })),
+    );
 
     // `connect`, not `share`: the replayed values arrive while subscribing, before a shared notifier would be listening.
     return pulses$.pipe(
@@ -41,9 +59,13 @@ export const turnsOf = (streams: Streams, now: () => number): Observable<Turn> =
 
 const REPORT_MS = 250;
 
-export const diagnosticsOf = (streams: Streams, { now }: Pick<Ports, 'now'>) => {
+export const diagnosticsOf = (
+    streams: Streams,
+    { now }: Pick<Ports, 'now'>,
+    announced$: Observable<Announced> = EMPTY,
+) => {
     const names = Object.keys(streams);
-    const turns$ = turnsOf(streams, now).pipe(share());
+    const turns$ = turnsOf(streams, now, announced$).pipe(share());
     const log$: Observable<Log> = turns$.pipe(
         scan(recordTurn, emptyLog),
         startWith(emptyLog),

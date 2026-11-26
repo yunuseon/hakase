@@ -7,6 +7,7 @@ import { console$, consoleRuns$ } from './console-client.ts';
 import { coreOf } from './core.ts';
 import { diagnosticsOf } from './graph/diagnostics.graph.ts';
 import { rewrites$ } from './rewrites.ts';
+import { windowPulses$ } from './window-pulses.ts';
 import { draws$, redraws$ } from './engine/draws.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
@@ -59,6 +60,7 @@ const bootstrap = () => {
             redraws: redraws$,
         },
         ports,
+        import.meta.env.DEV ? windowPulses$ : EMPTY,
     );
 
     const workspaceActions = workspaceActions$({

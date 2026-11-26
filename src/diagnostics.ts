@@ -4,7 +4,12 @@ import { listed, type Workspace } from './workspace.ts';
 
 const bindingsOf = (follows: Bindings): Bindings => follows;
 
-export type Pulse = { readonly stream: string; readonly at: number; readonly digest: string };
+export type Pulse = {
+    readonly stream: string;
+    readonly at: number;
+    readonly digest: string;
+    readonly by?: object;
+};
 
 export type Turn = { readonly at: number; readonly pulses: readonly Pulse[] };
 
@@ -116,14 +121,18 @@ const EVENTS = [...SPOKEN, 'draws'];
 
 const CAUSES = ['inputs', 'actions', 'windows'];
 
-type Segmented = { readonly stream: string; readonly segment: number };
+type Segmented = {
+    readonly stream: string;
+    readonly segment: number;
+    readonly by: object | undefined;
+};
 
 const segmentsOf = (pulses: readonly Pulse[]): readonly Segmented[] =>
     pulses.reduce<{ readonly segment: number; readonly out: readonly Segmented[] }>(
-        ({ segment, out }, { stream }) => {
+        ({ segment, out }, { stream, by }) => {
             const next = CAUSES.includes(stream) ? segment + 1 : segment;
 
-            return { segment: next, out: [...out, { stream, segment: next }] };
+            return { segment: next, out: [...out, { stream, segment: next, by }] };
         },
         { segment: 0, out: [] },
     ).out;
@@ -139,11 +148,17 @@ export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
         const per = segmented
             .filter(each => each.stream === stream)
             .reduce(
-                (counts, { segment }) =>
-                    new Map(counts).set(segment, (counts.get(segment) ?? 0) + 1),
-                new Map<number, number>(),
+                (counts, { segment, by }) =>
+                    new Map(counts).set(
+                        segment,
+                        new Map(counts.get(segment)).set(
+                            by,
+                            (counts.get(segment)?.get(by) ?? 0) + 1,
+                        ),
+                    ),
+                new Map<number, Map<object | undefined, number>>(),
             );
-        const times = Math.max(...per.values());
+        const times = Math.max(...[...per.values()].flatMap(bys => [...bys.values()]));
 
         return times > 1
             ? [{ at, stream, times, with: streams.filter(other => other !== stream) }]

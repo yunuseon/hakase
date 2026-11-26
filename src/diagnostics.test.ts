@@ -74,6 +74,17 @@ describe('a log of turns', () => {
         expect(cascadesOf(turn(5, ['documents', 'recipe', 'recipe']))).toEqual([]);
     });
 
+    it('counts a window stream per subscription, so two readers of one stream are not a double', () => {
+        const first = {};
+        const second = {};
+        const pulse = (by: object) => ({ stream: 'note-3 playhead', at: 5, digest: '0', by });
+
+        expect(doublesOf({ at: 5, pulses: [pulse(first), pulse(second)] })).toEqual([]);
+        expect(doublesOf({ at: 5, pulses: [pulse(first), pulse(second), pulse(first)] })).toEqual([
+            { at: 5, stream: 'note-3 playhead', times: 2, with: [] },
+        ]);
+    });
+
     it('keeps the last few seconds of turns, and every total', () => {
         const log = [
             turn(0, ['clock']),

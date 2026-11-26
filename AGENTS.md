@@ -4551,6 +4551,24 @@ every call reads the present; `listen` and `quiet` are commands, sent as a
 `hakase` event on the window and folded, not flags. An agent with a browser
 tool reads it with one `javascript_exec` and the lines with a console read.
 
+**A window's own streams are named too, by window and stream.** `scopedOf`
+takes a `named(name, source)` and wraps every stream it hands a window with it
+(`playhead`, `clock`, `followedLevel(k1)` and the rest; the global streams the
+`AppState` shares are the core's, named already). It is identity unless the
+build is a development one, where `pulsedBy(process)` (`window-pulses.ts`)
+puts one `tap` on the window's own subscription that announces each value as a
+`hakase:pulse` event, like the engine's draws, so nothing is subscribed twice
+and a production build does no work at all. The pulses reach the turns as
+`note-12 notes` or `sketch-41 playing`. **A double is counted per
+subscription**: each subscription of a wrapped stream carries an object of its
+own (`by`), because a program may read one stream in two places, and the
+timeline does read its `clock` twice in a turn, which is two readers, not two
+paths. Planted the usual way (a window's `playing$` combining its clock with
+something taken from its clock), the report named `sketch-15687 playing ×2`
+and `timeline-15688 playing ×2`, and nothing else; reverted, nothing. A
+recording replays in Node with no windows, so a window's double is found in
+the live report, not reproduced by a replay.
+
 **A double and a cascade are told apart.** A turn is cut at every new event
 (`inputs`, `actions`, `windows`): a stream that fires twice with no new event
 between is in `doubles`, the two-paths bug; one that fires again because a new
