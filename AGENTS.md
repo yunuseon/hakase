@@ -4569,6 +4569,14 @@ and `timeline-15688 playing ×2`, and nothing else; reverted, nothing. A
 recording replays in Node with no windows, so a window's double is found in
 the live report, not reproduced by a replay.
 
+What it costs, measured with the pane in view: the 46-window test profile
+fitted in view with its three clocks playing announces about 2,600 pulses a
+second, nearly all `playhead` and `clock`; one announcement through the
+inspector's listener takes about 3.6 µs, some 9.5 ms a second. The profile
+played at 30 fps (p50 33.3 ms, p95 33.9) with pulses on and at the same 30 fps
+(p95 33.6) with them switched off, so the dev server's drawing of 46 windows
+holds it there, not the pulses.
+
 **A double and a cascade are told apart.** A turn is cut at every new event
 (`inputs`, `actions`, `windows`): a stream that fires twice with no new event
 between is in `doubles`, the two-paths bug; one that fires again because a new
