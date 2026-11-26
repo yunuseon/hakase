@@ -10,4 +10,5 @@ export const browserPorts = (): Ports => ({
     wall$: wallClock$,
     viewport: viewportSize(),
     storage: { read: readStored, write: writeStored },
+    now: () => performance.now(),
 });

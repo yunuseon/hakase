@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { displayable, rowsOf, textOf, toggled } from './rows.ts';
+import { rowsOf, textOf, toggled } from './rows.ts';
+import { displayable } from '../../shared/plain.ts';
 
 describe('displayable', () => {
     it('writes maps and sets as plain data, and never loses a key', () => {

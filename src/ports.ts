@@ -11,6 +11,7 @@ export type Ports = {
     readonly wall$: Observable<number>;
     readonly viewport: { readonly width: number; readonly height: number };
     readonly storage: Storage;
+    readonly now: () => number;
 };
 
 export type PictureFrames = (

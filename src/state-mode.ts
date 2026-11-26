@@ -152,7 +152,6 @@ export const modeOf = ({ pinned, held, locks }: ModeSession) => ({
     active: pinned.active || held || locks.length > 0,
 });
 
-// Windows stack at even z and their tabs at the odd z just below, half tucked under their own frame and above the window behind.
 export const windowZ = (index: number) => (index + 1) * 2;
 
 const behindWindow = (index: number) => windowZ(index) - 1;

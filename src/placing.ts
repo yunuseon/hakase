@@ -44,7 +44,6 @@ export const reducePlacing = (placing: Placing, action: PlacingAction): Placing 
     }
 };
 
-// The section centred under the pointer, in world units and whole, so a drop lands where the ghost was drawn.
 export const footprintAt = ({ width, height }: Size, at: Point, camera: Camera): Rect => {
     const centre = worldAt(camera, at);
 

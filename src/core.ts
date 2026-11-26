@@ -1,9 +1,11 @@
 import { merge, type Observable } from 'rxjs';
-import { mergeMap } from 'rxjs/operators';
+import { distinctUntilChanged, map, mergeMap } from 'rxjs/operators';
 import { inputsFor } from './declarations.ts';
 import type { DocumentAction } from './documents.ts';
 import { begunFrom, historyOf } from './graph/history.graph.ts';
 import { levelsOf } from './graph/levels.graph.ts';
+import { diagnosticsOf } from './graph/diagnostics.graph.ts';
+import { newestAction, sameLogged } from './diagnostics.ts';
 import { mixOf } from './graph/mix.graph.ts';
 import { persisted$ } from './graph/persistence.graph.ts';
 import { projectionsOf } from './graph/projections.graph.ts';
@@ -40,12 +42,31 @@ export const coreOf = ({
     const timekeeping = timekeepingOf({ ...projected, stored, inputs$, ports });
     const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$, ports });
     const mix = mixOf({ ...projected, ...timekeeping, ...levels });
+    const diagnostics = diagnosticsOf(
+        {
+            inputs: inputs$,
+            actions: projected.history$.pipe(map(newestAction), distinctUntilChanged(sameLogged)),
+            documents: projected.documents$,
+            workspace: projected.workspace$,
+            structure: projected.structure$,
+            camera: projected.camera$,
+            settings: projected.settings$,
+            scenes: projected.scenes$,
+            signals: projected.waves$,
+            links: projected.links$,
+            clocks: timekeeping.playbacks$,
+            timers: timekeeping.timers$,
+            plans: timekeeping.plans$,
+        },
+        ports,
+    );
 
     return {
         ...projected,
         ...timekeeping,
         ...levels,
         ...mix,
+        diagnostics,
         persisted$: persisted$({ ...projected, ...timekeeping, ports }),
     };
 };

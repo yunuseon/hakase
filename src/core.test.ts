@@ -29,6 +29,7 @@ const portsWith = (storage: Ports['storage']): Ports => ({
     wall$: of(Date.UTC(2026, 10, 18, 12)),
     viewport: { width: 1400, height: 900 },
     storage,
+    now: () => 0,
 });
 
 describe('the core, with no client', () => {

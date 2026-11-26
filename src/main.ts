@@ -1,7 +1,8 @@
-import { defer, merge } from 'rxjs';
+import { defer, EMPTY, merge } from 'rxjs';
 import './styles.css';
 import { browserPorts } from './browser-ports.ts';
 import { chime$ } from './chime.ts';
+import { console$ } from './console-client.ts';
 import { coreOf } from './core.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
@@ -61,6 +62,7 @@ const bootstrap = () => {
         chime$(core.timers$, core.plans$),
         sound$(core, sound.listening$, sound.soloed$),
         core.persisted$,
+        import.meta.env.DEV ? console$(core.diagnostics, core.history$) : EMPTY,
         connectChrome$({
             ...chrome,
             ...intents,

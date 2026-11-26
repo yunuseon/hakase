@@ -15,7 +15,8 @@ import {
     throttleTime,
     withLatestFrom,
 } from 'rxjs/operators';
-import { displayable, rowsOf, toggled, type Plain } from '../components/state-map/rows.ts';
+import { rowsOf, toggled } from '../components/state-map/rows.ts';
+import { displayable, type Plain } from '../shared/plain.ts';
 import {
     focusedStores,
     layoutOf,
