@@ -1,6 +1,14 @@
 import { combineLatest, EMPTY, fromEvent, merge, type Observable } from 'rxjs';
 import { filter, finalize, ignoreElements, map, startWith, switchMap, tap } from 'rxjs/operators';
-import { keysAt, lineOf, mentions, valueAt, windowsListOf, type Report } from './diagnostics.ts';
+import {
+    forAgents,
+    keysAt,
+    lineOf,
+    mentions,
+    valueAt,
+    windowsListOf,
+    type Report,
+} from './diagnostics.ts';
 import { workspaceOf, type History } from './documents.ts';
 import type { Diagnostics } from './graph/diagnostics.graph.ts';
 import { displayable } from './shared/plain.ts';
@@ -41,7 +49,7 @@ const apiOf = ({ report, history }: Mirror) => {
 
     return {
         help: () => HELP,
-        report: () => report,
+        report: () => forAgents(report),
         windows,
         history: (count = 10) => steps(history, count),
         keys: (path = '') => keysAt(valueAt(history.present, path)),
@@ -55,7 +63,11 @@ const apiOf = ({ report, history }: Mirror) => {
             return 'quiet';
         },
         dump: () =>
-            JSON.stringify({ report, windows: windows(), history: steps(history, 20) }, null, 1),
+            JSON.stringify(
+                { report: forAgents(report), windows: windows(), history: steps(history, 20) },
+                null,
+                1,
+            ),
     };
 };
 

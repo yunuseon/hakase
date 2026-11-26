@@ -1,3 +1,4 @@
+import type { Report } from './diagnostics.ts';
 import type { Sound } from './mix.ts';
 import type { WireStyle } from './shared/connections.ts';
 import type { Image } from './image.ts';
@@ -113,6 +114,7 @@ export type AppState = {
     // Read-only, for the state map alone: any store or global, which no other program can see.
     readonly inspect$: (target: string) => Observable<unknown>;
     readonly history$: Observable<readonly HistoryEntry[]>;
+    readonly report$: Observable<Report>;
     readonly graph$: Observable<StateGraph>;
     readonly appearance$: (name: AppearanceName) => Observable<Written<Appearance>>;
 };

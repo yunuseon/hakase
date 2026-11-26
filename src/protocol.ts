@@ -88,6 +88,7 @@ export const PROGRAM_IDS = [
     'clocks',
     'bookmarks',
     'history',
+    'streams',
     'state',
     'storybook',
 ] as const;

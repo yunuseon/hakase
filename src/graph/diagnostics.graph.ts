@@ -1,6 +1,5 @@
-import { asapScheduler, merge, type Observable } from 'rxjs';
+import { asapScheduler, merge, timer, type Observable } from 'rxjs';
 import {
-    auditTime,
     buffer,
     connect,
     debounceTime,
@@ -10,6 +9,7 @@ import {
     share,
     shareReplay,
     startWith,
+    withLatestFrom,
 } from 'rxjs/operators';
 import {
     digestOf,
@@ -54,9 +54,9 @@ export const diagnosticsOf = (streams: Streams, { now }: Pick<Ports, 'now'>) => 
         names,
         turns$,
         log$,
-        report$: log$.pipe(
-            auditTime(REPORT_MS),
-            map(log => reportOf(log, names, now())),
+        report$: timer(0, REPORT_MS).pipe(
+            withLatestFrom(log$),
+            map(([, log]) => reportOf(log, names, now())),
         ),
     };
 };

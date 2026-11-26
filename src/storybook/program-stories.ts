@@ -9,6 +9,7 @@ import { focusProgram } from '../programs/focus.program.ts';
 import { formulaProgram } from '../programs/formula.program.ts';
 import { habitsProgram } from '../programs/habits.program.ts';
 import { historyProgram } from '../programs/history.program.ts';
+import { streamsProgram } from '../programs/streams.program.ts';
 import { stateProgram } from '../programs/state.program.ts';
 import { noteProgram } from '../programs/note.program.ts';
 import { playheadProgram } from '../programs/playhead.program.ts';
@@ -54,6 +55,7 @@ export const specimenPrograms: readonly Program[] = [
     blueprintsProgram,
     tasksProgram,
     historyProgram,
+    streamsProgram,
     stateProgram,
 ];
 type Spec = {
@@ -283,6 +285,14 @@ const specs: readonly Spec[] = [
         elements: ['hks-history'],
         description:
             'History entries and reversal actions. Requests are logged without changing workspace history.',
+        variants: populated,
+    },
+    {
+        program: streamsProgram,
+        title: 'Streams',
+        elements: ['hks-streams'],
+        description:
+            'Each named core stream on a lane over the last seconds, its rate and last value, the last turns, and a warning when one fired twice in a turn. Copy puts the same report on the clipboard for an agent.',
         variants: populated,
     },
     {

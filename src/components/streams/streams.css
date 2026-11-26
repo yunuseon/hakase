@@ -1,0 +1,128 @@
+:host {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    block-size: 100%;
+    min-block-size: 0;
+    min-inline-size: 0;
+    font: var(--text-sm)/1.35 var(--font-ui);
+    color: var(--ink);
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.summary {
+    color: var(--muted);
+}
+
+.warning {
+    margin: 0;
+    padding: var(--space-1-5) var(--space-2);
+    font-family: var(--font-mono);
+    color: var(--ink);
+    background: var(--well);
+    border-radius: var(--radius-lg);
+}
+
+.lanes,
+.turns {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lanes {
+    display: grid;
+    grid-template-columns:
+        max-content minmax(var(--space-16), 1fr) max-content minmax(0, 1.2fr)
+        max-content;
+    gap: var(--space-1) var(--space-2);
+    align-items: center;
+    flex: 1;
+    min-block-size: 0;
+    overflow: auto;
+}
+
+.lanes li {
+    display: contents;
+}
+
+.name {
+    font-family: var(--font-mono);
+}
+
+li[data-doubled='true'] .name {
+    color: var(--accent);
+}
+
+.lane {
+    inline-size: 100%;
+    block-size: var(--space-3);
+}
+
+.lane line {
+    stroke: var(--edge);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+}
+
+.lane rect {
+    fill: var(--ink);
+}
+
+li[data-doubled='true'] .lane rect {
+    fill: var(--accent);
+}
+
+.rate,
+.ago {
+    font-family: var(--font-mono);
+    color: var(--muted);
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+
+.last {
+    overflow: hidden;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.turns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-0-5);
+    max-block-size: 30%;
+    overflow: auto;
+    font-family: var(--font-mono);
+}
+
+.turns li {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.turns .fired {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container window (width < 22rem) {
+    .lanes {
+        grid-template-columns: max-content minmax(var(--space-12), 1fr) max-content;
+    }
+
+    .last,
+    .lanes .ago {
+        display: none;
+    }
+}

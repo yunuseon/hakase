@@ -1,6 +1,37 @@
+import { emptyLog, recordTurn, reportOf } from '../diagnostics.ts';
 import { GATE_DEFAULTS } from '../gates.ts';
 import { CONVERTER_DEFAULTS, timingCurve } from '../converters.ts';
 import { reduceAgenda, emptyAgenda } from '../model/agenda.ts';
+
+const DEMO_STREAMS = ['inputs', 'actions', 'documents', 'workspace', 'clocks', 'scenes', 'timers'];
+const DEMO_REPORT = reportOf(
+    Array.from({ length: 40 }, (_, index) => ({
+        at: index * 70,
+        pulses: [
+            {
+                stream: 'clocks',
+                at: index * 70,
+                digest: `Map(1){"timeline": {at: ${(index / 40).toFixed(3)}}}`,
+            },
+            ...(index % 9 === 0
+                ? [
+                      {
+                          stream: 'inputs',
+                          at: index * 70,
+                          digest: 'scene{command: set{field: "sun"}}',
+                      },
+                      { stream: 'documents', at: index * 70, digest: '{workspace: {…}}' },
+                      { stream: 'scenes', at: index * 70, digest: 'Map(1)' },
+                      ...(index === 27
+                          ? [{ stream: 'scenes', at: index * 70, digest: 'Map(1)' }]
+                          : []),
+                  ]
+                : []),
+        ],
+    })).reduce(recordTurn, emptyLog),
+    DEMO_STREAMS,
+    2800,
+);
 
 const DEMO_DAY = '2026-01-01';
 const DEMO_AGENDA = [
@@ -227,6 +258,7 @@ export const programDemo = (
                       driver: waveOf(new Map([['example', state.signal]]), 'example'),
                   })),
         inspect$: () => select(state => state.tickets),
+        report$: of(empty ? reportOf(emptyLog, DEMO_STREAMS, 0) : DEMO_REPORT),
         history$: of(
             empty
                 ? []

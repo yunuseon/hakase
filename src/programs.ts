@@ -9,6 +9,7 @@ import { focusProgram } from './programs/focus.program.ts';
 import { formulaProgram } from './programs/formula.program.ts';
 import { habitsProgram } from './programs/habits.program.ts';
 import { historyProgram } from './programs/history.program.ts';
+import { streamsProgram } from './programs/streams.program.ts';
 import { stateProgram } from './programs/state.program.ts';
 import { noteProgram } from './programs/note.program.ts';
 import { playheadProgram } from './programs/playhead.program.ts';
@@ -91,6 +92,7 @@ export const programs = {
     clocks: clocksProgram,
     bookmarks: bookmarksProgram,
     history: historyProgram,
+    streams: streamsProgram,
     state: stateProgram,
     storybook: storybookProgram,
 } satisfies { readonly [K in ProgramId]: Program<K> };

@@ -75,6 +75,7 @@ export const HOLDING: Readonly<Record<ProgramId, Holding | null>> = {
     clocks: document,
     bookmarks: document,
     history: null,
+    streams: null,
     state: null,
     storybook: null,
 };

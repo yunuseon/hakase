@@ -280,6 +280,13 @@ export const declarations = {
         icon: 'M4 12 A8 8 0 1 0 6.5 6.2 M4 4 V8 H8 M12 8 V12 L15 14',
         inputs: {},
     },
+    streams: {
+        id: 'streams',
+        title: 'streams',
+        category: 'system',
+        icon: 'M3 7 H21 M3 12 H21 M3 17 H21 M7 5.5 V8.5 M14 5.5 V8.5 M10 10.5 V13.5 M17 15.5 V18.5 M5 15.5 V18.5',
+        inputs: {},
+    },
     state: {
         id: 'state',
         title: 'state',

@@ -46,6 +46,24 @@ at 41% and running off the screen at 100%.
   cards, each placed with one click and the camera flown to it. Done when a
   fresh profile reaches a playing starter in two clicks.
 
+## Dev experience: the next chapter
+
+The stream inspector and `window.hakase` are its first piece (see "Debugging,
+for agents"). What would make them the way to debug this app:
+
+- **Cascades, not just turns**: which stream's emission led to which, so a
+  double names the two paths that met, not only the stream they met at.
+- **Per-window streams**: name a window's `AppState` streams too, so a
+  report can say which window ran twice, not only that a core stream did.
+- **Speaking back**: `hakase.send(input)` folding an `AppInput` like a
+  window would, so an agent can drive the app it inspects; inputs are
+  untrusted, so it goes through the same reducers and refusals.
+- **A recorded session**: the turns of a minute saved and replayed into a
+  fresh core in Node, so a bug report is a file a test can load.
+
+Done looks like an agent finding a double-firing bug from the report alone,
+and reproducing it as a test from a recording.
+
 ## Pictures: one exporter, any window headless
 
 Decided after the path tracer: every picture is already drawn once by the

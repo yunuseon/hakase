@@ -131,6 +131,7 @@ export type StreamReport = {
     readonly last: string | null;
     readonly agoMs: number | null;
     readonly doubled: number;
+    readonly firedAgoMs: readonly number[];
 };
 
 export type Report = {
@@ -145,6 +146,7 @@ export type Report = {
 };
 
 const RECENT_TURNS = 12;
+const LANE_DOTS = 120;
 
 export const reportOf = (log: Log, names: readonly string[], now: number): Report => {
     const pulses = log.turns.filter(({ at }) => now - at <= KEEP_MS).flatMap(turn => turn.pulses);
@@ -163,6 +165,7 @@ export const reportOf = (log: Log, names: readonly string[], now: number): Repor
                 last: last?.digest ?? null,
                 agoMs: last ? Math.round(now - last.at) : null,
                 doubled: log.doubles.filter(({ stream }) => stream === name).length,
+                firedAgoMs: own.slice(-LANE_DOTS).map(({ at }) => Math.round(now - at)),
             };
         }),
         doubles: log.doubles.slice(-10),
@@ -297,3 +300,24 @@ export const windowsListOf = ({ processes, stores }: Workspace): readonly Window
         front: focused,
         folded: process.folded === true,
     }));
+
+export const READING =
+    'A turn is everything one event caused before the next microtask. perSecond counts the last windowMs. ' +
+    'A stream in doubles fired more than once in one turn: usually one source reaching a combineLatest by two paths, ' +
+    'so its readers ran twice, once with a stale half.';
+
+export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) => ({
+    reading: READING,
+    at,
+    windowMs,
+    streams: streams.map(({ name, total, perSecond, last, agoMs, doubled }) => ({
+        name,
+        total,
+        perSecond,
+        last,
+        agoMs,
+        doubled,
+    })),
+    doubles,
+    recent,
+});

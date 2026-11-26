@@ -4302,6 +4302,56 @@ synchronous time per move) at 11, 71, 161 and 200 windows, and profile with the
 JS Self-Profiling API when a number surprises you: the first guess here (the
 per-window selectors) was right in kind and wrong in size.
 
+## Debugging, for agents
+
+**The core watches its own streams, and any client can read what it saw.**
+`diagnosticsOf` (`graph/diagnostics.graph.ts`, built in `coreOf`) subscribes
+to a list of named core streams like any other reader, so naming one changes
+nothing about how it runs. Only streams that are **shared** may be named
+(`history$` and what is mapped from it, the clocks, timers and plans, the
+windows' `inputs$`): a second subscription to a cold stream runs it twice,
+which is why the document and workspace actions are not named but read back
+out of the log (`newestAction`, the action with the highest sequence and the
+step it joined, with how many steps an undo stepped back over).
+
+- **A turn is everything one event caused before the next microtask**:
+  emissions are buffered until `debounceTime(0, asapScheduler)` fires. The
+  buffer runs inside `connect`, not over a `share`d source: the replayed
+  values arrive while subscribing, before a shared notifier would be
+  listening, and the first turn never closed.
+- **Every value becomes a digest** (`digestOf`): its `kind`, three levels of
+  fields, the first entries of a Map or an array, capped at 160 characters.
+  Enough to tell emissions apart; never the whole document.
+- **A stream that fired twice in one turn is flagged** (`doublesOf`, with
+  what fired beside it). That is the "reached a `combineLatest` by two paths"
+  bug the conventions warn about, caught as it happens rather than by reading
+  the code.
+- The log (`recordTurn`) keeps three seconds of turns, every total, each
+  stream's last value and the last fifty doubles; `reportOf` turns it into
+  rates and ages, and `forAgents` is what a reader outside the app gets: the
+  report without the lanes, with a sentence on how to read it. `report$`
+  ticks every 250 ms while read, so ages move while nothing fires.
+
+**The console is the second client.** In development, `console$`
+(`src/console-client.ts`, at the edge beside `chime$`) puts the app on
+`window.hakase` as plain data: `report()`, `windows()` (name, program,
+state, follows, frame, which is in front), `history(n)`, `keys(path)` and
+`inspect(path)` over the documents (`valueAt`: dots through objects, arrays
+and Maps), `dump()` for pasting, and `listen(...words)`, which logs one
+`console.info` line per turn (what started it, the step it went into, what it
+reached, and a warning if anything fired twice) until `quiet()`. `help()`
+says all of it. The object is rebuilt from the latest report and history, so
+every call reads the present; `listen` and `quiet` are commands, sent as a
+`hakase` event on the window and folded, not flags. An agent with a browser
+tool reads it with one `javascript_exec` and the lines with a console read.
+
+**The Streams window shows the same report** (`streams`, System): a lane per
+stream with a mark for each time it fired over the last three seconds, its
+rate, its last value and how long ago, the last turns, and a warning while a
+stream that fired twice is still in view. **Copy for an agent** puts
+`forAgents` on the clipboard. The view is `streamsViewOf`, pure, in
+`src/streams-view.ts`.
+
 ## Verifying UI changes
 
 The app must actually be looked at, not just compiled. Note that an embedded /
