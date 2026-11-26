@@ -10,19 +10,18 @@ import {
     type History,
     type TimeCommand,
 } from '../documents.ts';
-import type { Ports } from '../ports.ts';
 import type { AppSignal } from '../protocol.ts';
 import { restored } from '../protocol.ts';
 import { inputsFor } from '../declarations.ts';
 import type { Restored } from '../state-store.ts';
 import { startTimeline } from '../timeline.ts';
-import { defaultWorkspace, type WorkspaceAction } from '../workspace.ts';
+import { emptyWorkspace, type WorkspaceAction } from '../workspace.ts';
 
 const reduced = reduceHistory(documentsKit(inputsFor));
 
-export const begunFrom = (stored: Restored, viewport: Ports['viewport']): History => {
+export const begunFrom = (stored: Restored): History => {
     const started: Documents = {
-        ...fromWorkspace(stored.workspace ?? defaultWorkspace(viewport, inputsFor)),
+        ...fromWorkspace(stored.workspace ?? emptyWorkspace),
         settings: stored.settings,
         tickets: stored.tickets,
         notes: stored.notes,

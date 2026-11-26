@@ -533,3 +533,13 @@
         flex: 0 0 min(18rem, 40%);
     }
 }
+
+:where(.ui-footprint) {
+    fill: color-mix(in srgb, var(--ink) 22%, transparent);
+    stroke: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+:where(.ui-footprint rect) {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1;
+}

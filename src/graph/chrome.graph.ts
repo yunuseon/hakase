@@ -7,6 +7,8 @@ import type { SoundState } from './sound.graph.ts';
 import { minimapOf } from '../components/navigator/navigator.ts';
 import { HksPalette } from '../components/palette/palette.component.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
+import { HksWelcome } from '../components/welcome/welcome.component.ts';
+import { welcomeOf } from '../welcome.ts';
 import { HksSeams } from '../components/seams/seams.component.ts';
 import { HksSectionDrawing } from '../components/section-drawing/section-drawing.component.ts';
 import { HksSections } from '../components/sections/sections.component.ts';
@@ -23,7 +25,7 @@ import { programList } from '../programs.ts';
 import { selectionView } from '../selection.ts';
 import { canBox } from '../boxes.ts';
 import { zoomLabel } from '../shared/camera.ts';
-import { blueprintIn } from '../starters.ts';
+import { blueprintIn, STARTERS } from '../starters.ts';
 import { boxOf, seamsOf } from '../workspace.ts';
 import type { Intents } from './intents.graph.ts';
 import type { Projections } from './projections.graph.ts';
@@ -71,6 +73,10 @@ export const mountChrome = () => {
     placement.slot = 'chrome';
     canvas.append(placement);
 
+    const welcome = new HksWelcome();
+    welcome.slot = 'chrome';
+    canvas.append(welcome);
+
     return {
         canvas,
         toolbar,
@@ -83,6 +89,7 @@ export const mountChrome = () => {
         selection,
         sectionDrawing,
         placement,
+        welcome,
     };
 };
 
@@ -111,6 +118,7 @@ export const connectChrome$ = ({
     selection,
     sectionDrawing,
     placement,
+    welcome,
     paletteOpen$,
     drawing$,
     workspace$,
@@ -138,6 +146,9 @@ export const connectChrome$ = ({
             mode$.pipe(map(mode => mode.active)),
         ),
         toolbar.connect$(),
+        welcome.connect$(
+            workspace$.pipe(map(({ processes }) => welcomeOf(processes.length, STARTERS))),
+        ),
         sectionDrawing.connect$(drawing$),
         selection.connect$(
             combineLatest([selectedIds$, workspace$, clipboard$]).pipe(

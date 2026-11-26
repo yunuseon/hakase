@@ -9,7 +9,6 @@ export type Storage = {
 export type Ports = {
     readonly frames$: Observable<number>;
     readonly wall$: Observable<number>;
-    readonly viewport: { readonly width: number; readonly height: number };
     readonly storage: Storage;
     readonly now: () => number;
 };

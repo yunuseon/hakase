@@ -560,10 +560,10 @@ into a `launch` action carrying that program's default `size` and the current
 visible viewport, including its offset, and the reducer places the window in screen
 coordinates before converting its position and size through the current camera.
 Every new window is centred in the visible viewport, with no cascade offset.
-The first run's layout (`defaultWorkspace`) starts at the left edge, with no
-margin for the edge toolbar that once lived there, and its editor column is
-never narrower than 320, which the timeline needs for one row of controls
-(its own minimum is 310): narrower, its readout wrapped out of the window.
+The layout the tests start from (`defaultWorkspace`, no longer a first run's)
+starts at the left edge, and its editor column is never narrower than 320,
+which the timeline needs for one row of controls (its own minimum is 310):
+narrower, its readout wrapped out of the window.
 The default size stays the same on screen at every zoom and is capped to the
 visible viewport with a 20px margin. Quitting is
 the window's own close button — ordinary window chrome, not a
@@ -913,6 +913,13 @@ without the audit noticing.
 - **A heading never repeats what selected it.** A tab's pane does not open
   with the tab's own name (Parameters was headed PARAMETERS), and a status
   with nothing to report is hidden rather than reading zero.
+- **Quiet until wanted.** Secondary affordances (close, plugs, grips, a ⋯)
+  appear on hover or focus-within with one fade, and always on a coarse
+  pointer; nothing decorative is drawn that does not carry state. The welcome
+  is the same idea for a whole canvas: it shows only while there is nothing
+  else to show.
+- **Accent is spent once per view**, on what matters most there: the playhead,
+  the selected choice, the live wire. Everything else is ink, label or muted.
 - **One focus ring**, `--focus-ring` at `--focus-offset`; the only other
   offset is an inset ring inside a scrolling list, where an outside ring
   would be clipped. The selected window's accent outline and a gate's
@@ -2941,6 +2948,19 @@ A blueprint from storage is untrusted like the rest of the snapshot:
 `storeFrom`, settings and every document with their own parsers, and placing
 keeps only windows that `ownsInputs` accepts.
 
+**An empty canvas invites.** A first run starts with no windows
+(`emptyWorkspace`; `begunFrom` needs no viewport, so the core has no viewport
+port), and while the canvas holds none, `hks-welcome` (chrome, screen space)
+offers every starter as a quiet card: its footprint (`Footprint`, the shared
+preview the Blueprints window draws too), its name and the first three lines of
+its summary. A card is placed in one click: `welcome.picks$` becomes a `place`
+in the placing fold, which goes straight to the `dropped` state a click on the
+ghost reaches, so the drop, the document action and the flight to the placed
+area are the ones a ghost's drop makes. One window open and the welcome steps
+aside (`welcomeOf`). From a fresh profile, a playing starter is two clicks: its
+card, then its timeline's play. `defaultWorkspace` is no longer the first run;
+it stays the layout the tests start from.
+
 **Some blueprints come with the app.** `STARTERS` in `src/starters.ts` are
 plain `Blueprint` values with a summary, for organising a day: **Today**
 (agenda, a progress bar on it, todo), **Focus session** (a fresh board, the
@@ -3679,9 +3699,9 @@ reaches for a browser:
   touches GL; without a GPU it is `() => of(null)`.
 - **`ports`** (`src/ports.ts`): `frames$`, a timestamp per frame, subscribed only
   while a clock plays; `wall$`, epoch milliseconds at least once a second;
-  `viewport`, where a first run lays out its windows; and `storage`, read and
-  write by key. `browserPorts()` in `browser-ports.ts` is the browser's:
-  `animationFrames`, `wallClock$`, the window's size and `localStorage`.
+  `storage`, read and write by key; and `now`, a clock for the diagnostics.
+  `browserPorts()` in `browser-ports.ts` is the browser's: `animationFrames`,
+  `wallClock$`, `localStorage` and `performance.now`.
 
 **What a program is splits the same way.** `declarations.ts` holds what every
 client knows of one: id, title, category, icon and inputs, in toolbar order,

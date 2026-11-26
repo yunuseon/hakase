@@ -46,18 +46,9 @@
     border-radius: var(--radius-xl);
 }
 
-.preview {
+.ui-footprint {
     inline-size: var(--space-16);
     block-size: var(--space-11);
-    fill: color-mix(in srgb, var(--ink) 22%, transparent);
-    stroke: color-mix(in srgb, var(--ink) 55%, transparent);
-    stroke-width: 6;
-    vector-effect: non-scaling-stroke;
-}
-
-.preview rect {
-    vector-effect: non-scaling-stroke;
-    stroke-width: 1;
 }
 
 .text {
@@ -141,7 +132,7 @@
     .card {
         grid-template-columns: minmax(0, 1fr) auto;
     }
-    .preview {
+    .ui-footprint {
         grid-column: 1;
     }
     .text {

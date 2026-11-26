@@ -23,7 +23,7 @@ import type { Intents } from './intents.graph.ts';
 import type { Projections } from './projections.graph.ts';
 import type { Timekeeping } from './timekeeping.graph.ts';
 
-type Reads = Pick<Chrome, 'canvas' | 'placement'> &
+type Reads = Pick<Chrome, 'canvas' | 'placement' | 'welcome'> &
     Pick<Intents, 'drawing$' | 'selectionCommands$' | 'toolRequests$'> &
     Pick<Projections, 'workspace$' | 'documents$'> &
     Pick<Timekeeping, 'playbacks$'> & {
@@ -36,6 +36,7 @@ const noSelection: readonly ProcessId[] = [];
 export const selectionOf = ({
     canvas,
     placement,
+    welcome,
     drawing$,
     selectionCommands$,
     toolRequests$,
@@ -111,6 +112,14 @@ export const selectionOf = ({
             mergeMap(([, blueprint, viewport]): PlacingAction[] =>
                 blueprint === null ? [] : [{ kind: 'start', blueprint, at: centreOf(viewport) }],
             ),
+        ),
+        welcome.picks$.pipe(
+            withLatestFrom(viewport$),
+            map(([blueprint, viewport]): PlacingAction => ({
+                kind: 'place',
+                blueprint,
+                at: centreOf(viewport),
+            })),
         ),
         toolRequests$.pipe(map((): PlacingAction => ({ kind: 'cancel' }))),
         canvas.blurs$.pipe(map((): PlacingAction => ({ kind: 'cancel' }))),

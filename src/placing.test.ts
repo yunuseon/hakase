@@ -20,6 +20,16 @@ describe('placing a blueprint', () => {
         ).toEqual({ mode: 'dropped', blueprint: 'blueprint-1', at: { x: 70, y: 80 } });
     });
 
+    it('places in one step from a welcome card, with nothing to follow first', () => {
+        expect(
+            reducePlacing(idle, {
+                kind: 'place',
+                blueprint: 'starter-canon',
+                at: { x: 400, y: 300 },
+            }),
+        ).toEqual({ mode: 'dropped', blueprint: 'starter-canon', at: { x: 400, y: 300 } });
+    });
+
     it('drops nothing that was not being placed, and a cancel lets go', () => {
         expect(run([{ kind: 'drop', at: { x: 1, y: 1 } }])).toBe(idle);
         expect(

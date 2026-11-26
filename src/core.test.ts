@@ -27,7 +27,6 @@ const said = (program: ProgramId, store: string, input: AppInput): AppSignal => 
 const portsWith = (storage: Ports['storage']): Ports => ({
     frames$: of(0, 400, 800),
     wall$: of(Date.UTC(2026, 10, 18, 12)),
-    viewport: { width: 1400, height: 900 },
     storage,
     now: () => 0,
 });
@@ -68,6 +67,19 @@ describe('the core, with no client', () => {
         await new Promise(resolve => setTimeout(resolve, 300));
         saving.unsubscribe();
         expect(JSON.stringify(kept.get('hakase.state'))).toContain('water the plants');
+    });
+
+    it('starts a first run with no windows, so the starters can invite', async () => {
+        const { storage } = memory();
+        const core = coreOf({
+            ports: portsWith(storage),
+            inputs$: EMPTY,
+            documentActions$: EMPTY,
+            workspaceActions$: EMPTY,
+            pictureFrames$: () => of(null),
+        });
+
+        expect((await firstValueFrom(core.workspace$)).processes).toEqual([]);
     });
 
     it('restores what it saved', async () => {

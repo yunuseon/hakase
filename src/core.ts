@@ -32,7 +32,7 @@ export const coreOf = ({
 }: Drives) => {
     const stored = restoreState(inputsFor, ports.storage);
     const history$ = historyOf(
-        begunFrom(stored, ports.viewport),
+        begunFrom(stored),
         workspaceActions$,
         merge(documentActions$, inputs$.pipe(mergeMap(documentActionsOf))),
         inputs$,

@@ -5,47 +5,6 @@ says what done looks like. When an item lands, delete it here and describe the
 result in `AGENTS.md`, which says how the app _is_; this file says what is
 next. An idea that is not decided yet belongs in a conversation, not here.
 
-## The finish
-
-The app gained a lot of capability and too little finish. The goal now is
-subtle minimalism with one strong design language that every interaction
-speaks, and the friction found while building the converters, attacked in
-that language. An audit found the gaps: no motion vocabulary (eight
-transitions, five durations, two easings, reduced motion honoured in two
-places), no elevation system (about twenty hand-written shadows), four kinds
-of focus ring, and the state menu drawn inside the zoomed canvas, microscopic
-at 41% and running off the screen at 100%.
-
-### The language
-
-1. **Nothing hangs off a window at another scale.** What belongs to a
-   window is part of the window and zooms with it: its menus, its pins, its
-   tabs. The glass (screen-space, top layer) is only for what belongs to no
-   window: the navigator, the palette, a select's list. To read a window, you
-   come close to it.
-2. **Quiet until wanted.** Secondary affordances (close, plugs, grips, the
-   chip's menu) appear on hover or focus-within, with one fade; a coarse
-   pointer shows them always. Nothing decorative is drawn that does not
-   carry state.
-3. **One motion vocabulary.** An easing and three durations as tokens:
-   quick for hover and press, base for anything that opens, slow for what
-   moves the canvas. Things enter by fading and settling a few pixels, and
-   leave faster than they came. `prefers-reduced-motion` takes every
-   duration to zero through the tokens alone.
-4. **Four elevations, no others**: control (a thumb, a selected choice),
-   surface (a window, the navigator), raised (a menu, a picker, a hint) and
-   overlay (the palette, a dialog). A shadow written by hand is a bug.
-5. **One focus ring**, as a token, and one pressed state.
-6. **Accent is spent once per view**, on what matters most there: the
-   playhead, the selected choice, the live wire. Everything else is ink,
-   label or muted.
-
-### In order
-
-- **A first run that invites.** An empty canvas offers the starters as quiet
-  cards, each placed with one click and the camera flown to it. Done when a
-  fresh profile reaches a playing starter in two clicks.
-
 ## WebGPU: what is left
 
 The engine and every formula moved to WebGPU and WGSL (see "WebGPU and WGSL"

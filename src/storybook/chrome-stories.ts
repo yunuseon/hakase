@@ -27,6 +27,9 @@ import {
     type DrawingAction,
 } from '../components/section-drawing/section-drawing.ts';
 import { HksPlacement } from '../components/placement/placement.component.ts';
+import { HksWelcome } from '../components/welcome/welcome.component.ts';
+import { STARTERS } from '../starters.ts';
+import { welcomeOf } from '../welcome.ts';
 import { HksStateWiring } from '../components/state-wiring/state-wiring.component.ts';
 import { HksStateTraces } from '../components/state-traces/state-traces.component.ts';
 import { wiresOf, type WiringView } from '../components/state-wiring/wiring.ts';
@@ -457,6 +460,33 @@ export const chromeStories: readonly Story[] = [
                 element,
                 run$: element.connect$(view$),
                 events$: events$.pipe(map(command => recorded(command, command))),
+            };
+        },
+    },
+    {
+        id: 'welcome',
+        title: 'Welcome',
+        group: 'Workspace',
+        description:
+            'What an empty canvas offers: every starter as a quiet card, placed with one click at the centre of the view and the camera flown to it. It steps aside as soon as a window is open. Picks are logged here.',
+        elements: ['hks-welcome'],
+        variants: [
+            { id: 'empty', title: 'Empty canvas' },
+            { id: 'windows', title: 'Windows open' },
+        ],
+        controls: [],
+        defaults,
+        height: 560,
+        action: null,
+        code: 'const welcome = new HksWelcome();\nconst lifetime$ = welcome.connect$(workspace$.pipe(map(({ processes }) => welcomeOf(processes.length, STARTERS))));\nconst picks$ = welcome.picks$;',
+        create: ({ variant }) => {
+            const element = new HksWelcome();
+            const events$ = element.picks$.pipe(share());
+
+            return {
+                element,
+                run$: element.connect$(of(welcomeOf(variant === 'windows' ? 1 : 0, STARTERS))),
+                events$: events$.pipe(map(id => recorded('place', id))),
             };
         },
     },

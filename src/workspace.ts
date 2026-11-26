@@ -182,6 +182,19 @@ export type WorkspaceAction =
 
 const FLOATING_AT = 96;
 
+export const emptyWorkspace: Workspace = {
+    processes: [],
+    launched: 0,
+    camera: IDENTITY,
+    toolbar: { kind: 'docked', edge: 'left', retracted: false },
+    minimap: false,
+    sections: [],
+    links: [],
+    stores: [],
+    made: 0,
+    drift: null,
+};
+
 export const defaultWorkspace = ({ width, height }: Extent, inputsFor: InputsFor): Workspace => {
     const gutter = 16;
     const left = 2 * gutter;

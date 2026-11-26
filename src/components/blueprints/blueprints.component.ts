@@ -1,5 +1,6 @@
+import { Footprint } from '../../shared/ui/icon.component.ts';
 import { controlsSheet } from '../../shared/ui/controls.component.ts';
-import { svg, html } from 'lit-html';
+import { html } from 'lit-html';
 import { repeat } from 'lit-html/directives/repeat.js';
 import { withValue } from '../../lib/lit.ts';
 import { ifDefined } from 'lit-html/directives/if-defined.js';
@@ -36,19 +37,7 @@ const TEMPLATE = (cards: readonly BlueprintCard[]) =>
                                 data-card=${ifDefined(id)}
                                 data-builtin=${ifDefined(card.summary !== null ? '' : undefined)}
                             >
-                                <svg
-                                    class="preview"
-                                    aria-hidden="true"
-                                    preserveAspectRatio="xMidYMid meet"
-                                    viewBox=${ifDefined(`0 0 ${card.size.width} ${card.size.height}`)}
-                                >
-                                    ${repeat(
-                                        card.windows,
-                                        (_item, index) => index,
-                                        window =>
-                                            svg`<rect x=${ifDefined(window.x)} y=${ifDefined(window.y)} width=${ifDefined(window.width)} height=${ifDefined(window.height)} rx=${ifDefined(Math.min(window.width, window.height) * 0.06)}></rect>`,
-                                    )}
-                                </svg>
+                                ${Footprint(card)}
                                 <div class="text">
                                     <input
                                         class="ui-field name"

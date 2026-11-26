@@ -23,6 +23,11 @@ export type PlacingAction =
           readonly blueprint: string | Blueprint;
           readonly at: Point;
       }
+    | {
+          readonly kind: 'place';
+          readonly blueprint: string | Blueprint;
+          readonly at: Point;
+      }
     | { readonly kind: 'move'; readonly at: Point }
     | { readonly kind: 'drop'; readonly at: Point }
     | { readonly kind: 'cancel' };
@@ -33,6 +38,8 @@ export const reducePlacing = (placing: Placing, action: PlacingAction): Placing 
     switch (action.kind) {
         case 'start':
             return { mode: 'placing', blueprint: action.blueprint, at: action.at };
+        case 'place':
+            return { mode: 'dropped', blueprint: action.blueprint, at: action.at };
         case 'move':
             return placing.mode === 'placing' ? { ...placing, at: action.at } : placing;
         case 'drop':
