@@ -1857,8 +1857,12 @@ replays exactly. Three choices hold it together:
 **A wave's parameters are drivers, not waves.** A `Wave` is a signal with a
 `Driver` per followed parameter, a wave or a curve, so anything that makes a
 level stands in for one; `waveAt` evaluates it through `driverAt`, and
-`sameWave`/`sameDriver` compare by each signal's and curve's reference, so an
-edit elsewhere does not re-prepare a sketch. It is resolved by `waveIn` in
+`sameWave`/`sameDriver` compare each signal by reference, so an edit elsewhere
+does not re-prepare a sketch, and each curve by its samples: a curve is built
+inside every reader's own subscription (a gate's `bitCurve`, a converter's
+reading), so two readers of one stage held equal curves that were never the
+same object, and the engine redrew that stage for each of them every frame.
+There is one `sameDriver`; `image.ts` kept a copy of the old one. It is resolved by `waveIn` in
 `levels.graph.ts`, one `drivenIn` per parameter, and pens, voices and drum
 machines are resolved the same way (`drawingIn`, `soundingIn`, `kitIn`), so
 their store inputs take a gate or a converter too, and a bit gates a sound.
@@ -4352,6 +4356,26 @@ names its window by `data-process`, which `liveProcess$` puts on every
 `hks-window`, the place (`hks-properties > span.value > output`) and every
 value it held. `windows`, `inputs`, `actions` and `rewrites` are events, so
 two in one turn is not a double; only state streams can fire twice.
+
+**The engine's draws are counted too.** A picture drawn twice never touches
+the DOM, so `cook` says why it draws each stage (`whyCooked`: `new`, a new
+`recipe`, `moment`, `pass`, `pointer`, `frame`, `dots` or `samples`) and
+announces what it drew as one `hakase:cooked` event on the window, with the
+stage's cache entry, its lane and the animation frame's own time
+(`document.timeline.currentTime`). It announces rather than returns because
+the inspector must not hold the engine open: subscribing `engine$` would keep
+a GL context alive with no picture window. `draws$` and `redraws$`
+(`engine/draws.ts`) adapt the event; `reduceDraws` groups by **frame, not
+turn**, since the windows of one frame can draw in separate callbacks, and
+names an entry drawn again in the same frame with why each time. Only the
+live lane counts: a strip, a picture reading and an export draw every moment
+into one entry on purpose, which is why an export now has a lane of its own
+(`'export'`), and a draw that only adds samples to a trace throws nothing
+away. Its first find: Light show's Grade, the colour map at the end of the
+chain, was drawn twice every frame, playing or paused, because its window and
+the Output each built their own gate curve for its amount and the recipes
+never compared equal; at rest the app drew 31 stages a second, and after the
+fix under one.
 
 **What it found the first time.** Turning a pedal's knob rebuilt the links
 record on every frame, though no link changed (`sameLinked` now dedupes it

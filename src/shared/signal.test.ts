@@ -9,6 +9,7 @@ import {
     reachedFrom,
     reduceSignal,
     resampled,
+    sameDriver,
     SHAPES,
     signalAt,
     stepAt,
@@ -242,5 +243,21 @@ describe('dependentsOf', () => {
                 expect(looping.has(source)).toBe(closesLoop(all, target, source));
             });
         });
+    });
+});
+
+describe('a driver', () => {
+    it('is the same curve when its samples are, though each reader built its own', () => {
+        const gate = Float32Array.of(0, 1, 1, 0);
+
+        expect(
+            sameDriver({ samples: Float32Array.from(gate) }, { samples: Float32Array.from(gate) }),
+        ).toBe(true);
+        expect(sameDriver({ samples: gate }, { samples: Float32Array.of(0, 1, 0, 0) })).toBe(false);
+        expect(sameDriver({ samples: gate }, { samples: Float32Array.of(0, 1, 1) })).toBe(false);
+        expect(sameDriver({ samples: gate }, waveOf(new Map([['s', defaultSignal]]), 's'))).toBe(
+            false,
+        );
+        expect(sameDriver(null, { samples: gate })).toBe(false);
     });
 });

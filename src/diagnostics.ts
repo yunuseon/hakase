@@ -97,7 +97,8 @@ export const digestOf = (value: unknown, depth = 3): string => {
     return line.length > DIGEST_CHARS ? `${line.slice(0, DIGEST_CHARS)}…` : line;
 };
 
-const SPOKEN = ['inputs', 'actions', 'windows', 'rewrites'];
+const SPOKEN = ['inputs', 'actions', 'windows', 'rewrites', 'redraws'];
+const EVENTS = [...SPOKEN, 'draws'];
 
 export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
     const counts = pulses.reduce(
@@ -107,7 +108,7 @@ export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
     const streams = [...counts.keys()];
 
     return [...counts]
-        .filter(([stream, times]) => times > 1 && !SPOKEN.includes(stream))
+        .filter(([stream, times]) => times > 1 && !EVENTS.includes(stream))
         .map(([stream, times]) => ({
             at,
             stream,
@@ -226,13 +227,13 @@ export const lineOf = ({ at, pulses }: Turn): string => {
         .filter(([stream]) => SPOKEN.includes(stream))
         .map(
             ([stream, own]) =>
-                `${stream === 'rewrites' ? '⚠ rendered twice' : stream} ${own.map(({ digest }) => digest).join(' | ')}`,
+                `${stream === 'rewrites' ? '⚠ rendered twice' : stream === 'redraws' ? '⚠ drawn twice in a frame' : stream} ${own.map(({ digest }) => digest).join(' | ')}`,
         );
     const reached = streams
         .filter(([stream]) => !SPOKEN.includes(stream))
         .map(([stream, own]) => (own.length > 1 ? `${stream} ×${own.length}` : stream));
     const doubled = streams
-        .filter(([stream, own]) => own.length > 1 && !SPOKEN.includes(stream))
+        .filter(([stream, own]) => own.length > 1 && !EVENTS.includes(stream))
         .map(([stream]) => stream);
 
     return [
@@ -313,7 +314,9 @@ export const READING =
     'A turn is everything one event caused before the next microtask. perSecond counts the last windowMs. ' +
     'A stream in doubles fired more than once in one turn: usually one source reaching a combineLatest by two paths, ' +
     'so its readers ran twice, once with a stale half. rewrites are the same in a window: one place in its DOM ' +
-    'written more than once in one turn, with every value it held, so a view rendered twice and the first was stale.';
+    'written more than once in one turn, with every value it held, so a view rendered twice and the first was stale. ' +
+    'draws counts each stage the engine drew; redraws is a stage drawn more than once in one animation frame, ' +
+    'with why each time (recipe, moment, pass, pointer, frame, dots, samples): GPU work thrown away, or two viewers fighting over one entry.';
 
 export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) => ({
     reading: READING,
@@ -355,3 +358,52 @@ export const rewritesOf = <T>(writes: readonly Write<T>[]): readonly Rewritten<T
                   );
         }, [])
         .filter(({ olds }) => olds.length > 1);
+
+export type Drawing = {
+    readonly entry: string;
+    readonly lane: string;
+    readonly kind: string;
+    readonly why: string;
+    readonly frame: number | null;
+};
+
+export type Redraw = {
+    readonly entry: string;
+    readonly kind: string;
+    readonly whys: readonly string[];
+};
+
+export type Draws = {
+    readonly frame: number | null;
+    readonly seen: ReadonlyMap<string, readonly string[]>;
+    readonly redrawn: readonly Redraw[];
+};
+
+export const startDraws: Draws = { frame: null, seen: new Map(), redrawn: [] };
+
+export const reduceDraws = (last: Draws, drawings: readonly Drawing[]): Draws => {
+    const batch = drawings.filter(({ lane }) => lane === '');
+    const frame = batch[0]?.frame ?? null;
+    const start =
+        frame !== null && frame === last.frame ? last.seen : new Map<string, readonly string[]>();
+    const seen = batch.reduce(
+        (all, { entry, why }) => new Map(all).set(entry, [...(all.get(entry) ?? []), why]),
+        start,
+    );
+
+    return {
+        frame,
+        seen,
+        redrawn: batch
+            .filter(
+                ({ entry, why }, index) =>
+                    why !== 'samples' &&
+                    ((start.get(entry)?.length ?? 0) > 0 ||
+                        batch.slice(0, index).some(each => each.entry === entry)),
+            )
+            .filter(
+                ({ entry }, index, all) => all.findIndex(each => each.entry === entry) === index,
+            )
+            .map(({ entry, kind }) => ({ entry, kind, whys: seen.get(entry) ?? [] })),
+    };
+};

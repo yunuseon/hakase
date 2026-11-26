@@ -6,6 +6,7 @@ import { console$ } from './console-client.ts';
 import { coreOf } from './core.ts';
 import { diagnosticsOf } from './graph/diagnostics.graph.ts';
 import { rewrites$ } from './rewrites.ts';
+import { draws$, redraws$ } from './engine/draws.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
 import { connectChrome$, mountChrome } from './graph/chrome.graph.ts';
@@ -49,7 +50,13 @@ const bootstrap = () => {
     });
     const windows = windowsOf({ ...chrome, ...core, ...selection, ...stateMode, scoped });
     const diagnostics = diagnosticsOf(
-        { ...core.watched, windows: windows.signals$, rewrites: rewrites$(document.body) },
+        {
+            ...core.watched,
+            windows: windows.signals$,
+            rewrites: rewrites$(document.body),
+            draws: draws$,
+            redraws: redraws$,
+        },
         ports,
     );
 

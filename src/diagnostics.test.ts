@@ -9,6 +9,8 @@ import {
     mentions,
     newestAction,
     recordTurn,
+    reduceDraws,
+    startDraws,
     rewritesOf,
     valueAt,
     reportOf,
@@ -176,5 +178,49 @@ describe('a rewrite', () => {
                 { target: text, name: '#text', old: '0.32' },
             ]),
         ).toEqual([{ target: text, name: '#text', olds: ['0.31', '0.32'] }]);
+    });
+});
+
+describe('the draws of a frame', () => {
+    const drew = (entry: string, why: string, frame: number | null, lane = '') => ({
+        entry,
+        lane,
+        kind: 'pedal',
+        why,
+        frame,
+    });
+
+    it('names a stage drawn twice in one frame, with why each time', () => {
+        const first = reduceDraws(startDraws, [
+            drew('echo@512x512', 'moment', 16),
+            drew('knot@512x512', 'moment', 16),
+        ]);
+        const second = reduceDraws(first, [drew('echo@512x512', 'dots', 16)]);
+
+        expect(first.redrawn).toEqual([]);
+        expect(second.redrawn).toEqual([
+            { entry: 'echo@512x512', kind: 'pedal', whys: ['moment', 'dots'] },
+        ]);
+    });
+
+    it('forgets the last frame, and never joins draws outside one', () => {
+        const first = reduceDraws(startDraws, [drew('echo@512x512', 'moment', 16)]);
+
+        expect(reduceDraws(first, [drew('echo@512x512', 'moment', 33)]).redrawn).toEqual([]);
+        expect(
+            reduceDraws(reduceDraws(startDraws, [drew('a', 'new', null)]), [
+                drew('a', 'moment', null),
+            ]).redrawn,
+        ).toEqual([]);
+        expect(
+            reduceDraws(startDraws, [drew('a', 'new', 5, 'strip'), drew('a', 'moment', 5, 'strip')])
+                .redrawn,
+        ).toEqual([]);
+        expect(
+            reduceDraws(startDraws, [drew('a', 'new', 5), drew('a', 'samples', 5)]).redrawn,
+        ).toEqual([]);
+        expect(
+            reduceDraws(startDraws, [drew('a', 'new', 5), drew('a', 'moment', 5)]).redrawn,
+        ).toEqual([{ entry: 'a', kind: 'pedal', whys: ['new', 'moment'] }]);
     });
 });

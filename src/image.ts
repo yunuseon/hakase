@@ -3,8 +3,7 @@ import { sameOrbit, type Orbit } from './model/sketch/space.ts';
 import { sameTheme, type Theme } from './model/sketch/theme.ts';
 import { PEDALS, valueOf, type Pedal } from './pedals.ts';
 import { type Driver } from './shared/curve.ts';
-import { driverAt } from './shared/signal.ts';
-import { sameWave } from './shared/signal.ts';
+import { driverAt, sameDriver } from './shared/signal.ts';
 import type { Sheet } from './shared/stroke.ts';
 import { SCENE_KNOBS, type Scene, type SceneKnob } from './model/scene.ts';
 
@@ -41,13 +40,6 @@ export type Stage = PointsImage | PedalImage | TracedImage;
 export type Image = { readonly kind: 'none' } | Stage;
 
 export const NONE: Image = { kind: 'none' };
-
-const sameDriver = (a: Driver | null, b: Driver | null): boolean =>
-    a === null || b === null
-        ? a === b
-        : 'samples' in a || 'samples' in b
-          ? a === b
-          : sameWave(a, b);
 
 export const sameImage = (a: Image, b: Image): boolean => {
     if (a === b) {

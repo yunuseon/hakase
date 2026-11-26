@@ -47,7 +47,7 @@ const frameAt = (
             pass,
             frame: framed ? size : null,
             dotScale: 1,
-            lane: '',
+            lane: 'export',
             samples: samplesWanted(image, 'export'),
             traceSide: null,
         },

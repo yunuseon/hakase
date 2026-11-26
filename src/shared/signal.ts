@@ -235,12 +235,19 @@ export const stepAt = ({ signal, mods }: Wave, t: number) =>
               ) * signal.steps.length,
           ) % signal.steps.length;
 
-// By reference on each signal and curve: the folds make a new one only when it changed.
 export const sameWave = (a: Wave, b: Wave): boolean =>
     a.signal === b.signal && PARAMS.every(param => sameDriver(a.mods[param], b.mods[param]));
 
+const sameSamples = (a: Float32Array, b: Float32Array): boolean =>
+    a === b || (a.length === b.length && a.every((value, index) => value === b[index]));
+
+// A signal by reference, since its fold makes a new one only when it changed; a curve by its samples, since each reader builds its own.
 export const sameDriver = (a: Driver | null, b: Driver | null): boolean =>
-    a === null || b === null || 'samples' in a || 'samples' in b ? a === b : sameWave(a, b);
+    a === null || b === null
+        ? a === b
+        : 'samples' in a || 'samples' in b
+          ? 'samples' in a && 'samples' in b && sameSamples(a.samples, b.samples)
+          : sameWave(a, b);
 
 export type Linked = { readonly sources: Readonly<Record<string, string | null>> };
 

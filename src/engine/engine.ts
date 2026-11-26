@@ -339,8 +339,11 @@ const releaseSource = (gl: WebGL2RenderingContext, source: Source): void => {
     }
 };
 
+const entryKey = (stage: Stage, moment: Moment): string =>
+    `${keyOf(stage.store, moment.lane)}@${moment.width}x${moment.height}`;
+
 const entryOf = (engine: Engine, stage: Stage, moment: Moment): Entry => {
-    const key = `${keyOf(stage.store, moment.lane)}@${moment.width}x${moment.height}`;
+    const key = entryKey(stage, moment);
     const known = engine.entries.get(key);
 
     if (known !== undefined) {
@@ -803,58 +806,109 @@ const forget = (engine: Engine, now: number): void => {
 const sameFrame = (a: Size | null, b: Size | null): boolean =>
     a === null || b === null ? a === b : a.width === b.width && a.height === b.height;
 
+export type Why = 'new' | 'recipe' | 'moment' | 'pass' | 'pointer' | 'frame' | 'dots' | 'samples';
+
+export const whyCooked = (
+    cooked: Cooked | null,
+    stage: Stage,
+    moment: Moment,
+    parts: number,
+): Why | null =>
+    cooked === null
+        ? 'new'
+        : !sameImage(cooked.image, stage)
+          ? 'recipe'
+          : cooked.t !== moment.t
+            ? 'moment'
+            : cooked.pass !== moment.pass
+              ? 'pass'
+              : !samePointer(cooked.pointer, moment.pointer)
+                ? 'pointer'
+                : !sameFrame(cooked.frame, moment.frame)
+                  ? 'frame'
+                  : cooked.dotScale !== moment.dotScale
+                    ? 'dots'
+                    : stage.kind === 'traced' && parts < partsOf(moment.samples)
+                      ? 'samples'
+                      : null;
+
+export const COOKED = 'hakase:cooked';
+
+export type Drawn = {
+    readonly entry: string;
+    readonly lane: string;
+    readonly kind: Stage['kind'];
+    readonly why: Why;
+    readonly frame: number | null;
+};
+
 export const cook = (engine: Engine, image: Image, moment: Moment, now: number): Picture | null => {
-    const drawn = stagesOf(image).reduce((pictures, stage) => {
-        const entry = entryOf(engine, stage, moment);
-        const same =
-            entry.cooked !== null &&
-            entry.cooked.t === moment.t &&
-            entry.cooked.pass === moment.pass &&
-            samePointer(entry.cooked.pointer, moment.pointer) &&
-            sameFrame(entry.cooked.frame, moment.frame) &&
-            entry.cooked.dotScale === moment.dotScale &&
-            sameImage(entry.cooked.image, stage);
-        const fresh =
-            same &&
-            (stage.kind !== 'traced' ||
-                (entry.accumulation?.parts ?? 0) >= partsOf(moment.samples));
+    const frameTime = document.timeline.currentTime;
+    const { pictures: drawn, draws } = stagesOf(image).reduce(
+        ({ pictures, draws: before }, stage) => {
+            const entry = entryOf(engine, stage, moment);
+            const why = whyCooked(entry.cooked, stage, moment, entry.accumulation?.parts ?? 0);
+            const same = why === null || why === 'samples';
 
-        if (!fresh) {
-            if (stage.kind === 'traced') {
-                drawTraced(engine, entry, stage, moment, !same);
-            } else if (stage.kind === 'points') {
-                drawPoints(engine, entry, stage, moment);
-            } else {
-                drawPedal(
-                    engine,
-                    entry,
-                    stage,
-                    stage.inputs.map(input =>
-                        input.kind === 'none' ? null : (pictures.get(input.store)?.texture ?? null),
-                    ),
-                    moment,
-                );
+            if (why !== null) {
+                if (stage.kind === 'traced') {
+                    drawTraced(engine, entry, stage, moment, !same);
+                } else if (stage.kind === 'points') {
+                    drawPoints(engine, entry, stage, moment);
+                } else {
+                    drawPedal(
+                        engine,
+                        entry,
+                        stage,
+                        stage.inputs.map(input =>
+                            input.kind === 'none'
+                                ? null
+                                : (pictures.get(input.store)?.texture ?? null),
+                        ),
+                        moment,
+                    );
+                }
+                entry.cooked = {
+                    image: stage,
+                    t: moment.t,
+                    pass: moment.pass,
+                    pointer: moment.pointer,
+                    frame: moment.frame,
+                    dotScale: moment.dotScale,
+                };
             }
-            entry.cooked = {
-                image: stage,
-                t: moment.t,
-                pass: moment.pass,
-                pointer: moment.pointer,
-                frame: moment.frame,
-                dotScale: moment.dotScale,
+
+            entry.used = now;
+
+            return {
+                pictures: new Map(pictures).set(stage.store, {
+                    texture: entry.output.texture,
+                    width: moment.width,
+                    height: moment.height,
+                }),
+                draws:
+                    why === null
+                        ? before
+                        : [
+                              ...before,
+                              {
+                                  entry: entryKey(stage, moment),
+                                  lane: moment.lane,
+                                  kind: stage.kind,
+                                  why,
+                                  frame: typeof frameTime === 'number' ? frameTime : null,
+                              },
+                          ],
             };
-        }
-
-        entry.used = now;
-
-        return new Map(pictures).set(stage.store, {
-            texture: entry.output.texture,
-            width: moment.width,
-            height: moment.height,
-        });
-    }, new Map<string, Picture>());
+        },
+        { pictures: new Map<string, Picture>(), draws: new Array<Drawn>() },
+    );
 
     forget(engine, now);
+    // Announced, not returned: the inspector counts every engine's draws without holding one open.
+    if (draws.length > 0) {
+        dispatchEvent(new CustomEvent(COOKED, { detail: draws }));
+    }
 
     return image.kind === 'none' ? null : (drawn.get(image.store) ?? null);
 };

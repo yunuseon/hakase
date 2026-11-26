@@ -467,7 +467,6 @@ export const levelsOf = ({
     type Read = { readonly driver: Driver | null; readonly items: readonly ConverterItem[] };
     const LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    // The items a converter can pick between come from what it reads, so they arrive with its driver.
     const pickedIn = (store: StoreId, { kind, choice, item }: Converter): Observable<Read> =>
         linkIn(store, 'in').pipe(
             switchMap((binding): Observable<Read> => {
