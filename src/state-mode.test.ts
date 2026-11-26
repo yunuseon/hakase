@@ -10,6 +10,8 @@ import {
     modeOf,
     reduceEngaged,
     disengaged,
+    peekedOf,
+    REACH,
     type EngageAction,
     type Engaged,
 } from './state-mode.ts';
@@ -80,7 +82,9 @@ describe('state mode', () => {
             'read on',
         ]);
         mine.forEach(socket => {
-            expect(anchorOf(socket, 1).x).toBe(socket.end.kind === 'store' ? x + width : x);
+            expect(anchorOf(socket, 1).x).toBe(
+                socket.end.kind === 'store' ? x + width + REACH : x - REACH,
+            );
         });
     });
 
@@ -141,7 +145,9 @@ describe('state mode', () => {
                 )?.frame;
                 if (frame === undefined) throw new Error('Missing window');
                 const jack = anchorOf(socket, 1);
-                expect(jack.x).toBe(socket.side === 'left' ? frame.x : frame.x + frame.width);
+                expect(jack.x).toBe(
+                    socket.side === 'left' ? frame.x - REACH : frame.x + frame.width + REACH,
+                );
                 expect(socket.side).toBe(socket.end.kind === 'store' ? 'right' : 'left');
                 expect(socket.y).toBeGreaterThanOrEqual(frame.y + 36);
             });
@@ -317,7 +323,7 @@ describe('tracing why a control moves', () => {
             new Map(),
             new Map(),
             'curves',
-            { hovered: 'timeline-3', focused: 'timeline-3' },
+            { hovered: 'timeline-3', peeking: true },
             traced,
         );
 
@@ -341,27 +347,25 @@ describe('tabs outside state mode', () => {
         expect(wiringOf(run(), new Map(), inputsFor, defaultSession, 1)).toBeNull();
     });
 
-    it('peeks the own tabs of a hovered window and draws none of its wires', () => {
-        const view = wiringOf(
-            run(),
-            new Map(),
-            inputsFor,
-            defaultSession,
-            1,
-            false,
-            new Map(),
-            new Map(),
-            new Map(),
-            'curves',
-            { hovered: 'sketch-2', focused: null },
-        );
-
-        expect(keysOf(view)).toEqual(['sketch-2']);
-        expect(view?.wires).toEqual([]);
-        expect(view?.all).toBe(false);
+    it('draws nothing for a window only hovered, without Shift', () => {
+        expect(
+            wiringOf(
+                run(),
+                new Map(),
+                inputsFor,
+                defaultSession,
+                1,
+                false,
+                new Map(),
+                new Map(),
+                new Map(),
+                'curves',
+                { hovered: 'sketch-2', peeking: false },
+            ),
+        ).toBeNull();
     });
 
-    it('wires a focused window to its neighbours, showing only the tabs its wires land on', () => {
+    it('with Shift, wires the hovered window to its neighbours, showing only the tabs its wires land on', () => {
         const view = wiringOf(
             run(),
             new Map(),
@@ -373,7 +377,7 @@ describe('tabs outside state mode', () => {
             new Map(),
             new Map(),
             'curves',
-            { hovered: null, focused: 'sketch-2' },
+            { hovered: 'sketch-2', peeking: true },
         );
 
         expect(keysOf(view)).toEqual(['sketch-2', 'timeline-3']);
@@ -383,16 +387,45 @@ describe('tabs outside state mode', () => {
         expect(view?.wires.map(({ from, to }) => [from, to])).toEqual([
             ['timeline-3:output', 'sketch-2:input:playback'],
         ]);
+        expect(view?.all).toBe(false);
     });
 
-    it('folds hover and presses, and lets go of a window that closed', () => {
-        const engaged = [
+    it('sets every jack clear of its frame, inputs to the left and outputs to the right', () => {
+        const workspace = run();
+        const view = wiringOf(
+            workspace,
+            new Map(),
+            inputsFor,
+            defaultSession,
+            1,
+            false,
+            new Map(),
+            new Map(),
+            new Map(),
+            'curves',
+            { hovered: 'sketch-2', peeking: true },
+        );
+        const sketch = workspace.processes.find(({ id }) => id === 'sketch-2');
+        const timeline = workspace.processes.find(({ id }) => id === 'timeline-3');
+        const input = view?.sockets.find(({ key }) => key === 'sketch-2:input:playback');
+        const output = view?.sockets.find(({ key }) => key === 'timeline-3:output');
+
+        expect(input && anchorOf(input, 1).x).toBe((sketch?.frame.x ?? 0) - REACH);
+        expect(output && anchorOf(output, 1).x).toBe(
+            (timeline?.frame.x ?? 0) + (timeline?.frame.width ?? 0) + REACH,
+        );
+    });
+
+    it('holds a peek while Shift is down, so the pointer can leave the window for its tabs', () => {
+        const actions = [
             { kind: 'hover', id: 'a', over: true },
-            { kind: 'press', id: 'b' },
-            { kind: 'hover', id: 'c', over: false },
-            { kind: 'windows', ids: ['b'] },
+            { kind: 'shift', held: true },
+            { kind: 'hover', id: 'a', over: false },
+            { kind: 'hover', id: 'b', over: true },
+            { kind: 'shift', held: false },
+            { kind: 'hover', id: 'b', over: false },
         ] satisfies EngageAction[];
-        const steps = engaged.reduce(
+        const steps = actions.reduce(
             (seen: Engaged[], action) => [
                 ...seen,
                 reduceEngaged(seen.at(-1) ?? disengaged, action),
@@ -400,15 +433,10 @@ describe('tabs outside state mode', () => {
             [],
         );
 
-        expect(steps).toEqual([
-            { hovered: 'a', focused: null },
-            { hovered: 'a', focused: 'b' },
-            { hovered: 'a', focused: 'b' },
-            { hovered: null, focused: 'b' },
-        ]);
-        expect(reduceEngaged(steps[3] ?? disengaged, { kind: 'press', id: null })).toEqual(
-            disengaged,
-        );
+        expect(steps.map(peekedOf)).toEqual([null, 'a', 'a', 'b', null, null]);
+        expect(
+            reduceEngaged({ hovered: 'a', peeking: true }, { kind: 'windows', ids: ['b'] }),
+        ).toEqual({ hovered: null, peeking: true });
     });
 });
 

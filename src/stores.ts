@@ -85,7 +85,6 @@ export type StoreEntry = {
     readonly name: string;
     // False only for a store a launch made for one window; it goes when no window uses it.
     readonly kept: boolean;
-    // The store this one was split off from, so its content can be copied in once.
     readonly copy: StoreId | null;
     // A clock placed from a blueprint: its loop as it was saved, since the clock it was saved from may be gone.
     readonly clock: ClockSeed | null;

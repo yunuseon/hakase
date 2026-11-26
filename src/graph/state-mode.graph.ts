@@ -87,14 +87,10 @@ export const stateModeOf = ({
     const engaged$ = merge(
         signals$.pipe(
             mergeMap((signal): EngageAction[] =>
-                signal.to === 'hover'
-                    ? [{ kind: 'hover', id: signal.id, over: signal.over }]
-                    : signal.to === 'workspace' && signal.action.kind === 'raise'
-                      ? [{ kind: 'press', id: signal.action.id }]
-                      : [],
+                signal.to === 'hover' ? [{ kind: 'hover', id: signal.id, over: signal.over }] : [],
             ),
         ),
-        canvas.grounds$.pipe(map((): EngageAction => ({ kind: 'press', id: null }))),
+        canvas.shifts$.pipe(map((held): EngageAction => ({ kind: 'shift', held }))),
         ids$.pipe(map((ids): EngageAction => ({ kind: 'windows', ids }))),
     ).pipe(scan(reduceEngaged, disengaged), startWith(disengaged), distinctUntilChanged());
 

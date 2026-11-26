@@ -2919,28 +2919,36 @@ the matching row afterwards, or a click on a group line would drop the
 keyboard's place.
 
 **Wiring lives on tabs at a window's edges.** Every window's inputs are tabs
-on its left edge and its outputs on its right, each a jack on the frame with
-its label running outward, away from the window (`side` on a socket and a
-group; `anchorOf` reads the jack from it). A tab stacks just below its own
-window, so half its jack is tucked under the frame and only the outer half
-pokes out; it slides out by a few pixels as it appears (`@starting-style`),
+on its left edge and its outputs on its right, each a jack beside the frame
+with its label running outward, away from the window (`side` on a socket and a
+group; `anchorOf` reads the jack from it). The jack's centre sits `REACH` (18
+units) clear of the frame, so all of it is outside the window: half tucked
+under the frame, as it first was, it poked out too little to find or grab. A
+tab slides out by a few pixels as it appears (`@starting-style`),
 and its label shows only on hover, while a wire could land on it, or in state
 mode (`all` on the view). Its choices open in place below it, zooming with the
 window. A tab layer was chosen over turning windows over onto a back face,
 which was built and dropped: it hid what each window was while wiring it.
 
-**Only engaged windows show tabs.** `reduceEngaged` folds what is engaged: the
-hovered window (each window reports `hovers$`, pointer enter and leave) and the
-focused one, the window last pressed (its `raise`), let go by a press on the
-ground (the canvas's `grounds$`) or by closing. `wiringOf` then lays out:
+**Tabs come out on Shift.** Hovering a window shows nothing; holding Shift
+over one brings its tabs out. `reduceEngaged` folds the hovered window (each
+window reports `hovers$`, pointer enter and leave) and whether Shift is held
+(the canvas's `shifts$`, Shift's own keydown and keyup, never one typed inside
+an editable field, so a capital letter does not pop tabs out, and blur lets
+go), and `peekedOf` is the hovered window while Shift is down. While it is,
+leaving the window keeps it peeked, because its tabs sit outside its frame and
+the pointer has to get to them; entering another window moves the peek there.
+Tabs once came out on plain hover and for the window last pressed, which put
+them in the way of ordinary work. `wiringOf` then lays out:
 
 - **in state mode**, every window, every wire, and content recedes (`receded`
   on each window's view: dimmed and greyed over the base duration);
-- **otherwise**, the hovered window's tabs and the focused window's, and on the
-  focused window's **neighbours** only the tabs its wires land on (`readsFrom`:
-  a window's follows and its store's links, so neighbours are found without
-  laying every window out), and only the focused window's wires. Nothing
-  engaged lays out nothing, which keeps a drag elsewhere cheap.
+- **otherwise**, the peeked window's tabs, and on its **neighbours** only the
+  tabs its wires land on (`readsFrom`: a window's follows and its store's
+  links, so neighbours are found without laying every window out), and only
+  its wires. Nothing peeked lays out nothing, which keeps a drag elsewhere
+  cheap. Grabbing a jack starts a drag, which starts the mode, so releasing
+  Shift mid-wire keeps every target out.
 
 **Only a drag may start the mode.** The mode stays on while a lock holds (an
 open selector, a drag), which is how releasing W mid-drag keeps the wire; with

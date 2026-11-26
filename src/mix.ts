@@ -15,7 +15,6 @@ export type Strip = {
     readonly clock: StoreId;
 };
 
-// The clock its first window plays on, so a patch that put its band on a clock of its own keeps its tempo.
 const clockOf = ({ processes }: Workspace, store: StoreId): StoreId => {
     const window = processes.find(process => process.store === store);
     const binding = window === undefined ? null : followedBy(window.follows, 'playback');

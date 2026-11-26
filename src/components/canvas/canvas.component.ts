@@ -46,6 +46,7 @@ export class HksCanvas extends HTMLElement {
     readonly steps$: Observable<KeyStep>;
     readonly selects$: Observable<PointerPhase>;
     readonly grounds$: Observable<void>;
+    readonly shifts$: Observable<boolean>;
 
     private readonly ground: HTMLElement;
     private readonly world: HTMLElement;
@@ -85,6 +86,21 @@ export class HksCanvas extends HTMLElement {
         this.escapes$ = fromDocumentEvent$('keydown').pipe(
             mergeMap(event => (event.key === 'Escape' ? of(undefined) : EMPTY)),
         );
+
+        // Not while typing: a capital letter in a window's text field would otherwise pop its tabs out.
+        this.shifts$ = merge(
+            fromDocumentEvent$('keydown').pipe(
+                filter(
+                    event => event.key === 'Shift' && !isEditable(event.composedPath()[0] ?? null),
+                ),
+                map(() => true),
+            ),
+            fromDocumentEvent$('keyup').pipe(
+                filter(event => event.key === 'Shift'),
+                map(() => false),
+            ),
+            this.blurs$.pipe(map(() => false)),
+        ).pipe(distinctUntilChanged());
         this.ground = requireChild(shadow, '.ground');
         this.world = requireChild(shadow, '.world');
         this.selects$ = pointerGesture$(this.ground, event => notTouch(event) && event.shiftKey);

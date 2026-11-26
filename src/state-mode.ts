@@ -116,34 +116,35 @@ export const reduceSession = (session: ModeSession, action: ModeAction): ModeSes
     }
 };
 
-export type Engaged = { readonly hovered: string | null; readonly focused: string | null };
+export type Engaged = { readonly hovered: string | null; readonly peeking: boolean };
 
 export type EngageAction =
     | { readonly kind: 'hover'; readonly id: string; readonly over: boolean }
-    | { readonly kind: 'press'; readonly id: string | null }
+    | { readonly kind: 'shift'; readonly held: boolean }
     | { readonly kind: 'windows'; readonly ids: readonly string[] };
 
-export const disengaged: Engaged = { hovered: null, focused: null };
+export const disengaged: Engaged = { hovered: null, peeking: false };
+
+export const peekedOf = ({ hovered, peeking }: Engaged): string | null =>
+    peeking ? hovered : null;
 
 export const reduceEngaged = (engaged: Engaged, action: EngageAction): Engaged => {
     switch (action.kind) {
         case 'hover':
+            // Leaving a window keeps it while Shift is held: its tabs stick out past its edge, and the pointer must reach them.
             return action.over
-                ? { ...engaged, hovered: action.id }
-                : engaged.hovered === action.id
+                ? engaged.hovered === action.id
+                    ? engaged
+                    : { ...engaged, hovered: action.id }
+                : engaged.hovered === action.id && !engaged.peeking
                   ? { ...engaged, hovered: null }
                   : engaged;
-        case 'press':
-            return engaged.focused === action.id ? engaged : { ...engaged, focused: action.id };
-        case 'windows': {
-            const open = (id: string | null) =>
-                id !== null && action.ids.includes(id) ? id : null;
-
-            return open(engaged.hovered) === engaged.hovered &&
-                open(engaged.focused) === engaged.focused
+        case 'shift':
+            return action.held === engaged.peeking ? engaged : { ...engaged, peeking: action.held };
+        case 'windows':
+            return engaged.hovered === null || action.ids.includes(engaged.hovered)
                 ? engaged
-                : { hovered: open(engaged.hovered), focused: open(engaged.focused) };
-        }
+                : { ...engaged, hovered: null };
     }
 };
 
@@ -179,6 +180,8 @@ const readsFrom = (
 
 const INDENT = 14;
 
+export const REACH = 18;
+
 type Row =
     | { readonly kind: 'input'; readonly name: string; readonly group: string | null }
     | {
@@ -210,10 +213,9 @@ export const wiringOf = (
     const mode = modeOf(session);
     const { processes, stores } = workspace;
     const tracing = mode.active ? null : traced;
+    const peeked = peekedOf(engaged);
     const focused =
-        mode.active || tracing !== null
-            ? undefined
-            : processes.find(({ id }) => id === engaged.focused);
+        mode.active || tracing !== null ? undefined : processes.find(({ id }) => id === peeked);
     const sources = focused === undefined ? new Set<string>() : readsFrom(signals, focused);
     const near = (process: (typeof processes)[number]) =>
         tracing !== null
@@ -222,8 +224,7 @@ export const wiringOf = (
               process.id !== focused.id &&
               (sources.has(process.store) || readsFrom(signals, process).has(focused.store));
     const whole = (process: (typeof processes)[number]) =>
-        mode.active ||
-        (tracing === null && (process.id === engaged.hovered || process.id === engaged.focused));
+        mode.active || (tracing === null && process.id === peeked);
     const onPath = (process: (typeof processes)[number], socket: Socket) =>
         tracing !== null &&
         (socket.end.kind === 'store'
@@ -298,9 +299,12 @@ export const wiringOf = (
         const rowAt = (row: number) =>
             folded ? frame.y + (frame.height - rowHeight) / 2 : frame.y + clearance + row * pitch;
         const menu = { above: false, height: 160 * unit };
-        const inputAt = (index: number) => ({ x: frame.x - width + 10 * unit, y: rowAt(index) });
+        const inputAt = (index: number) => ({
+            x: frame.x - width - (REACH - 10) * unit,
+            y: rowAt(index),
+        });
         const outputAt = (index: number) => ({
-            x: frame.x + frame.width - 10 * unit,
+            x: frame.x + frame.width + (REACH - 10) * unit,
             y: rowAt(index),
         });
         const output: Socket[] = !owned
@@ -551,8 +555,8 @@ export const wiringOf = (
             wire =>
                 mode.active ||
                 tracing !== null ||
-                windowOf.get(wire.from) === engaged.focused ||
-                windowOf.get(wire.to) === engaged.focused,
+                windowOf.get(wire.from) === peeked ||
+                windowOf.get(wire.to) === peeked,
         ),
     };
 };
