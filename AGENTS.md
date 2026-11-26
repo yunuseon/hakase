@@ -4590,6 +4590,13 @@ not have, which the recording's typecheck caught. Time is not recorded: the
 replay's frames never tick and its wall clock stands at the recording's start,
 so clocks and timers stand still.
 
+**The loop was proven with a planted bug.** `camera$` was made to combine the
+workspace with a count taken from it, the two-paths shape. The live report
+named `camera` in `doubles` beside `workspace` on the first launch, with the
+launch's own cascade kept apart; the recording saved from that session failed
+its Node test with `camera`; the plant reverted, the same recording passed. It
+stays as `src/recordings/camera-once.ts`, a guard.
+
 **The Streams window shows the same report** (`streams`, System): a lane per
 stream with a mark for each time it fired over the last three seconds, its
 rate, its last value and how long ago, the last turns, and a warning while a
