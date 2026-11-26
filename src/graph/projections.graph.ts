@@ -10,7 +10,10 @@ const sameIds = (a: readonly ProcessId[], b: readonly ProcessId[]): boolean =>
     a.length === b.length && a.every((id, index) => id === b[index]);
 
 export const projectionsOf = (history$: Observable<History>) => {
-    const documents$ = history$.pipe(map(({ present }) => present));
+    const documents$ = history$.pipe(
+        map(({ present }) => present),
+        distinctUntilChanged(),
+    );
 
     // One stream for both parts, or a launch, which changes both, would reach a reader twice.
     const workspace$: Observable<Workspace> = documents$.pipe(
