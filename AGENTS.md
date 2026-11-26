@@ -4338,6 +4338,30 @@ orbit drag read as an edit of the signal touched before it.
   report without the lanes, with a sentence on how to read it. `report$`
   ticks every 250 ms while read, so ages move while nothing fires.
 
+**Windows are watched from outside, by what they write.** Naming a window's
+own streams would subscribe them a second time, which runs cold pipelines
+twice or wakes streams a program never reads, so `rewrites$`
+(`src/rewrites.ts`) watches the symptom instead: one `MutationObserver`
+(`mutations$` in `lib/rx.ts`) over the document and every shadow root, each
+observed as it is added, since an observer stops at a shadow boundary. lit
+only writes a binding whose value changed, so one text node or attribute
+written twice in one batch means its view rendered twice in that turn, the
+first time stale: `rewritesOf` pairs those writes, ignoring `style` and
+`class`, which are written a property or a token at a time. Each rewrite
+names its window by `data-process`, which `liveProcess$` puts on every
+`hks-window`, the place (`hks-properties > span.value > output`) and every
+value it held. `windows`, `inputs`, `actions` and `rewrites` are events, so
+two in one turn is not a double; only state streams can fire twice.
+
+**What it found the first time.** Turning a pedal's knob rebuilt the links
+record on every frame, though no link changed (`sameLinked` now dedupes it
+by sources); a press on the window already in front built a new workspace
+(a raise that moves nothing keeps it, and the log still ends the step); and
+`documents$` passed on the log's every emission, including one that changed
+only `joining`. No state stream fired twice in a turn, and no window rendered
+twice, over Light show playing, a Scene edited, a focus timer, tickets, undo
+and scrubbing.
+
 **The console is the second client.** In development, `console$`
 (`src/console-client.ts`, at the edge beside `chime$`) puts the app on
 `window.hakase` as plain data: `report()`, `windows()` (name, program,

@@ -49,6 +49,49 @@ export const observeResize$ = (...elements: Element[]): Observable<void> =>
         };
     });
 
+const rootsWithin = (scope: ParentNode): readonly ShadowRoot[] =>
+    [...scope.querySelectorAll('*')].flatMap(element =>
+        element.shadowRoot ? [element.shadowRoot, ...rootsWithin(element.shadowRoot)] : [],
+    );
+
+const shadowRootsIn = (node: Node): readonly ShadowRoot[] =>
+    node instanceof Element
+        ? [
+              ...(node.shadowRoot ? [node.shadowRoot, ...rootsWithin(node.shadowRoot)] : []),
+              ...rootsWithin(node),
+          ]
+        : node instanceof Document || node instanceof DocumentFragment
+          ? rootsWithin(node)
+          : [];
+
+const WATCHED: MutationObserverInit = {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    characterData: true,
+    attributeOldValue: true,
+    characterDataOldValue: true,
+};
+
+// A MutationObserver stops at every shadow root, so each one is observed as it arrives.
+export const mutations$ = (root: Node): Observable<readonly MutationRecord[]> =>
+    new Observable<readonly MutationRecord[]>(subscriber => {
+        const observer = new MutationObserver(records => {
+            records
+                .flatMap(record => [...record.addedNodes])
+                .flatMap(shadowRootsIn)
+                .forEach(shadow => observer.observe(shadow, WATCHED));
+            subscriber.next(records);
+        });
+
+        observer.observe(root, WATCHED);
+        shadowRootsIn(root).forEach(shadow => observer.observe(shadow, WATCHED));
+
+        return () => {
+            observer.disconnect();
+        };
+    });
+
 // defer is load-bearing: it resolves the self-reference, which re-arms the query.
 export const devicePixelRatio$: Observable<number> = defer(() => {
     const ratio = window.devicePixelRatio;

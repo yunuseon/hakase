@@ -5,6 +5,7 @@ import { chime$ } from './chime.ts';
 import { console$ } from './console-client.ts';
 import { coreOf } from './core.ts';
 import { diagnosticsOf } from './graph/diagnostics.graph.ts';
+import { rewrites$ } from './rewrites.ts';
 import { scopedOf } from './graph/app-state.graph.ts';
 import { pictureFrames$ } from './engine/levels.ts';
 import { connectChrome$, mountChrome } from './graph/chrome.graph.ts';
@@ -47,7 +48,10 @@ const bootstrap = () => {
         report$: defer(() => diagnostics.report$),
     });
     const windows = windowsOf({ ...chrome, ...core, ...selection, ...stateMode, scoped });
-    const diagnostics = diagnosticsOf({ ...core.watched, windows: windows.signals$ }, ports);
+    const diagnostics = diagnosticsOf(
+        { ...core.watched, windows: windows.signals$, rewrites: rewrites$(document.body) },
+        ports,
+    );
 
     const workspaceActions = workspaceActions$({
         ...chrome,

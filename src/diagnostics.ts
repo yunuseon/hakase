@@ -97,6 +97,8 @@ export const digestOf = (value: unknown, depth = 3): string => {
     return line.length > DIGEST_CHARS ? `${line.slice(0, DIGEST_CHARS)}…` : line;
 };
 
+const SPOKEN = ['inputs', 'actions', 'windows', 'rewrites'];
+
 export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
     const counts = pulses.reduce(
         (seen, { stream }) => new Map(seen).set(stream, (seen.get(stream) ?? 0) + 1),
@@ -105,7 +107,7 @@ export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
     const streams = [...counts.keys()];
 
     return [...counts]
-        .filter(([, times]) => times > 1)
+        .filter(([stream, times]) => times > 1 && !SPOKEN.includes(stream))
         .map(([stream, times]) => ({
             at,
             stream,
@@ -218,17 +220,20 @@ const counted = (pulses: readonly Pulse[]): readonly (readonly [string, readonly
     ),
 ];
 
-const SPOKEN = ['inputs', 'actions', 'windows'];
-
 export const lineOf = ({ at, pulses }: Turn): string => {
     const streams = counted(pulses);
     const said = streams
         .filter(([stream]) => SPOKEN.includes(stream))
-        .map(([stream, own]) => `${stream} ${own.map(({ digest }) => digest).join(' | ')}`);
+        .map(
+            ([stream, own]) =>
+                `${stream === 'rewrites' ? '⚠ rendered twice' : stream} ${own.map(({ digest }) => digest).join(' | ')}`,
+        );
     const reached = streams
         .filter(([stream]) => !SPOKEN.includes(stream))
         .map(([stream, own]) => (own.length > 1 ? `${stream} ×${own.length}` : stream));
-    const doubled = streams.filter(([, own]) => own.length > 1).map(([stream]) => stream);
+    const doubled = streams
+        .filter(([stream, own]) => own.length > 1 && !SPOKEN.includes(stream))
+        .map(([stream]) => stream);
 
     return [
         `hakase ${Math.round(at)}ms`,
@@ -307,7 +312,8 @@ export const windowsListOf = ({ processes, stores }: Workspace): readonly Window
 export const READING =
     'A turn is everything one event caused before the next microtask. perSecond counts the last windowMs. ' +
     'A stream in doubles fired more than once in one turn: usually one source reaching a combineLatest by two paths, ' +
-    'so its readers ran twice, once with a stale half.';
+    'so its readers ran twice, once with a stale half. rewrites are the same in a window: one place in its DOM ' +
+    'written more than once in one turn, with every value it held, so a view rendered twice and the first was stale.';
 
 export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) => ({
     reading: READING,
@@ -324,3 +330,28 @@ export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) =>
     doubles,
     recent,
 });
+
+export type Write<T> = { readonly target: T; readonly name: string; readonly old: string | null };
+
+export type Rewritten<T> = {
+    readonly target: T;
+    readonly name: string;
+    readonly olds: readonly (string | null)[];
+};
+
+const PIECEWISE = ['style', 'class'];
+
+export const rewritesOf = <T>(writes: readonly Write<T>[]): readonly Rewritten<T>[] =>
+    writes
+        .filter(({ name }) => !PIECEWISE.includes(name))
+        .reduce<readonly Rewritten<T>[]>((grouped, { target, name, old }) => {
+            const found = grouped.findIndex(each => each.target === target && each.name === name);
+            const group = grouped[found];
+
+            return group === undefined
+                ? [...grouped, { target, name, olds: [old] }]
+                : grouped.map((each, index) =>
+                      index === found ? { ...each, olds: [...each.olds, old] } : each,
+                  );
+        }, [])
+        .filter(({ olds }) => olds.length > 1);

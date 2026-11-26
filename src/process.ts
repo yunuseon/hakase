@@ -59,6 +59,7 @@ export const liveProcess$ = (
 ): Observable<ProcessSignal> =>
     defer(() => {
         const element = new HksWindow().label(program.title, program.icon);
+        element.dataset['process'] = self.id;
         host.append(element);
         const removed$ = closing$.pipe(take(1), shareReplay({ bufferSize: 1, refCount: true }));
 

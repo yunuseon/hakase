@@ -25,7 +25,9 @@ const HELP = `hakase, from the console. Every call returns plain data.
   hakase.quiet()         stop logging
   hakase.dump()          report, windows and history as one JSON string, to paste
 A turn is everything one event caused before the next microtask. A stream fired twice in one turn is the
-"reached a combineLatest by two paths" bug AGENTS.md warns about.`;
+"reached a combineLatest by two paths" bug AGENTS.md warns about. The rewrites stream is its symptom in a
+window: one place in its DOM written more than once in a turn, so it rendered twice and once was stale.
+Windows carry data-process, the id windows() lists.`;
 
 type Listening = readonly string[] | null;
 

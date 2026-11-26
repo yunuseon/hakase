@@ -50,6 +50,23 @@ describe('the streams window', () => {
         expect(view.warning).toBe('scenes fired 2× in one turn, with documents');
         expect(streamsViewOf({ ...report, at: 9000 }).warning).toBeNull();
         expect(view.summary).toBe('1 of 2 firing · last 3 s');
+        expect(
+            streamsViewOf({
+                ...report,
+                doubles: [],
+                streams: [
+                    {
+                        name: 'rewrites',
+                        total: 1,
+                        perSecond: 0.3,
+                        last: '{window: "sketch-2"}',
+                        agoMs: 200,
+                        doubled: 0,
+                        firedAgoMs: [200],
+                    },
+                ],
+            }).warning,
+        ).toBe('rendered twice: {window: "sketch-2"}');
     });
 
     it('lists the last turns newest first, counting repeats', () => {

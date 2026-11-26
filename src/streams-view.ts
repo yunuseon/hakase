@@ -25,6 +25,7 @@ export const streamsViewOf = ({ at, windowMs, streams, doubles, recent }: Report
     const fresh = doubles.filter(double => at - double.at <= windowMs);
     const firing = streams.filter(({ perSecond }) => perSecond > 0).length;
     const newest = fresh.at(-1);
+    const rewrite = streams.find(({ name }) => name === 'rewrites');
 
     return {
         lanes: streams.map(({ name, total, perSecond, last, agoMs, doubled, firedAgoMs }) => ({
@@ -46,10 +47,12 @@ export const streamsViewOf = ({ at, windowMs, streams, doubles, recent }: Report
             })),
         summary: `${firing} of ${streams.length} firing · last ${windowMs / 1000} s`,
         warning:
-            newest === undefined
-                ? null
-                : `${newest.stream} fired ${newest.times}× in one turn${
+            newest !== undefined
+                ? `${newest.stream} fired ${newest.times}× in one turn${
                       newest.with.length > 0 ? `, with ${newest.with.join(', ')}` : ''
-                  }`,
+                  }`
+                : rewrite?.last && rewrite.agoMs !== null && rewrite.agoMs <= windowMs
+                  ? `rendered twice: ${rewrite.last}`
+                  : null,
     };
 };

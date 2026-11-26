@@ -10,7 +10,6 @@ export const curveOf = (at: (t: number) => number): Curve => ({
     samples: Float32Array.from({ length: CURVE_SAMPLES }, (_, index) => at(index / CURVE_SAMPLES)),
 });
 
-// Read between samples, the last easing back into the first, so a curve loops like a signal does.
 export const curveAt = ({ samples }: Curve, t: number) => {
     const position = (((t % 1) + 1) % 1) * samples.length;
     const index = Math.floor(position);

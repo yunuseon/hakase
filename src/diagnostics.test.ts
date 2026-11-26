@@ -9,6 +9,7 @@ import {
     mentions,
     newestAction,
     recordTurn,
+    rewritesOf,
     valueAt,
     reportOf,
     type Turn,
@@ -57,6 +58,7 @@ describe('a log of turns', () => {
             { at: 5, stream: 'recipe', times: 2, with: ['documents', 'cook'] },
         ]);
         expect(doublesOf(turn(5, ['documents', 'recipe']))).toEqual([]);
+        expect(doublesOf(turn(5, ['windows', 'windows', 'rewrites', 'rewrites']))).toEqual([]);
     });
 
     it('keeps the last few seconds of turns, and every total', () => {
@@ -157,5 +159,22 @@ describe('what the console shows', () => {
             )?.step,
         ).toBe('Added');
         expect(newestAction({ steps: [], cursor: 0 }, () => true)).toBeNull();
+    });
+});
+
+describe('a rewrite', () => {
+    it('is a place written more than once in one batch, with every value it held', () => {
+        const label = { id: 'label' };
+        const text = { id: 'text' };
+
+        expect(
+            rewritesOf([
+                { target: label, name: 'aria-label', old: 'a' },
+                { target: text, name: '#text', old: '0.31' },
+                { target: label, name: 'style', old: '' },
+                { target: label, name: 'style', old: 'x' },
+                { target: text, name: '#text', old: '0.32' },
+            ]),
+        ).toEqual([{ target: text, name: '#text', olds: ['0.31', '0.32'] }]);
     });
 });
