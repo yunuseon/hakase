@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './drift.glsl?raw';
+import source from './drift.wgsl?raw';
 
 export const drift: Formula = {
     label: 'Drift',

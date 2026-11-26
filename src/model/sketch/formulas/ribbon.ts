@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './ribbon.glsl?raw';
+import source from './ribbon.wgsl?raw';
 
 export const ribbon: Formula = {
     label: 'Ribbon',

@@ -122,17 +122,17 @@ const BAND = { playback: { kind: 'playback', store: 'band' } } as const;
 
 const STUDIO = { playback: { kind: 'playback', store: 'studio' } } as const;
 
-const ORB = `vec3 orb() {
-    float a = k1 * 6.2832;
-    return vec3(cos(a) * 1.6, 0.4, sin(a) * 1.6);
+const ORB = `fn orb() -> vec3f {
+    let a = k1 * 6.2832;
+    return vec3f(cos(a) * 1.6, 0.4, sin(a) * 1.6);
 }
 
-Hit custom(vec3 p, float t) {
+fn custom(p: vec3f, t: f32) -> Hit {
     return glowing(sdSphere(p - orb(), 0.22), 0.95, 9.0);
 }
 
-vec4 bounds(float t) {
-    return vec4(orb(), 0.22);
+fn bounds(t: f32) -> vec4f {
+    return vec4f(orb(), 0.22);
 }
 `;
 

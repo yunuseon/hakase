@@ -12,7 +12,8 @@ export type ExportEvent =
     | { readonly kind: 'failed'; readonly message: string };
 
 export type Writer = {
-    readonly add: (canvas: OffscreenCanvas, index: number) => Promise<void>;
+    // Takes the frame over and closes it.
+    readonly add: (frame: ImageBitmap, index: number) => Promise<void>;
     readonly finish: () => Promise<Blob>;
     readonly close: () => void;
     readonly extension: string;
@@ -74,14 +75,15 @@ const videoWriter = async (pixels: Size, { fps, quality }: ExportSettings): Prom
 
     return {
         extension: 'webm',
-        add: (canvas, index) => {
-            const frame = new VideoFrame(canvas, {
+        add: (bitmap, index) => {
+            const frame = new VideoFrame(bitmap, {
                 timestamp: Math.round((index * 1e6) / fps),
                 duration: Math.round(1e6 / fps),
             });
             // A key frame every two seconds: each starts a cluster a player can seek to.
             encoder.encode(frame, { keyFrame: index % (2 * fps) === 0 });
             frame.close();
+            bitmap.close();
 
             return drained(encoder);
         },
@@ -106,8 +108,8 @@ const imageWriter = (): Writer => {
 
     return {
         extension: 'zip',
-        add: async (canvas, index) => {
-            const png = await canvas.convertToBlob({ type: 'image/png' });
+        add: async (bitmap, index) => {
+            const png = await pngOf(bitmap);
             entries.push(
                 zipEntry(
                     `frame-${String(index + 1).padStart(5, '0')}.png`,
@@ -118,6 +120,13 @@ const imageWriter = (): Writer => {
         finish: () => Promise.resolve(new Blob([...zip(entries)], { type: 'application/zip' })),
         close: () => undefined,
     };
+};
+
+export const pngOf = (bitmap: ImageBitmap): Promise<Blob> => {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext('bitmaprenderer')?.transferFromImageBitmap(bitmap);
+
+    return canvas.convertToBlob({ type: 'image/png' });
 };
 
 export const writer$ = (pixels: Size, settings: ExportSettings): Observable<Writer> =>

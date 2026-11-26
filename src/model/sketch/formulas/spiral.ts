@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './spiral.glsl?raw';
+import source from './spiral.wgsl?raw';
 
 export const spiral: Formula = {
     label: 'Spiral',

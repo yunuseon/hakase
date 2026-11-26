@@ -369,16 +369,15 @@ export const objectUniforms = (objects: readonly SceneObject[]): Float32Array =>
             ]),
     );
 
-const DEFINES_CUSTOM = /\bHit\s+custom\s*\(/;
-const SCRIPTS_CAMERA = /\bCamera\s+camera\s*\(/;
-const BOUNDS_LIGHT = /\bvec4\s+bounds\s*\(/;
+const DEFINES_CUSTOM = /\bfn\s+custom\s*\(/;
+const SCRIPTS_CAMERA = /\bfn\s+camera\s*\(/;
+const BOUNDS_LIGHT = /\bfn\s+bounds\s*\(/;
 
 export const definesCustom = (code: string): boolean => DEFINES_CUSTOM.test(code);
 
-// Appended after the code, never before it, or every reported line number would shift.
 const SHAPE_CODE: Readonly<Record<Shape, (place: string, local: string) => string>> = {
     sphere: place => `sdSphere(p - ${place}.xyz, ${place}.w)`,
-    box: (place, local) => `sdBox(${local}, vec3(${place}.w))`,
+    box: (place, local) => `sdBox(${local}, vec3f(${place}.w))`,
     torus: (place, local) => `sdTorus(${local}, ${place}.w, ${place}.w * 0.3)`,
     cylinder: (place, local) => `sdCylinder(${local}, ${place}.w * 0.5, ${place}.w)`,
     plane: place => `p.y - ${place}.y`,
@@ -388,20 +387,20 @@ const SHAPE_CODE: Readonly<Record<Shape, (place: string, local: string) => strin
 // One block per object with its shape's own function: a loop that branches on the shape at every step cost the GPU more than the shapes did.
 export const objectsCode = (shapes: readonly Shape[]): string =>
     [
-        'Hit objectsAt(vec3 p, float t) {',
-        '    Hit best = Hit(1e9, MATTE, 0.0, 1.0, 0.0);',
-        '    Hit each;',
+        'fn objectsAt(p: vec3f, t: f32) -> Hit {',
+        '    var best = Hit(1e9, MATTE, 0.0, 1.0, 0.0);',
+        '    var each: Hit;',
         '    nearest = -1;',
         ...shapes.slice(0, MAX_OBJECTS).flatMap((shape, index) => {
-            const place = `uObjects[${index * OBJECT_VEC4S}]`;
-            const look = `uObjects[${index * OBJECT_VEC4S + 1}]`;
-            const more = `uObjects[${index * OBJECT_VEC4S + 2}]`;
+            const place = `objects[${index * OBJECT_VEC4S}]`;
+            const look = `objects[${index * OBJECT_VEC4S + 1}]`;
+            const more = `objects[${index * OBJECT_VEC4S + 2}]`;
             const local = `turned(p - ${place}.xyz, ${more}.x)`;
 
             return [
                 shape === 'code'
                     ? `    each = codeAt(${local}, ${place}.w, t);`
-                    : `    each = Hit(${SHAPE_CODE[shape](place, local)}, int(${look}.y + 0.5), ${look}.z, ${look}.w, ${more}.y);`,
+                    : `    each = Hit(${SHAPE_CODE[shape](place, local)}, i32(${look}.y + 0.5), ${look}.z, ${look}.w, ${more}.y);`,
                 `    if (each.d < best.d) { best = each; nearest = ${index}; }`,
             ];
         }),
@@ -409,16 +408,17 @@ export const objectsCode = (shapes: readonly Shape[]): string =>
         '}',
     ].join('\n');
 
+// Appended after the code, never before it, or every reported line number would shift.
 export const sceneAdapter = (code: string, shapes: readonly Shape[] = []): string =>
     [
         DEFINES_CUSTOM.test(code)
-            ? 'Hit customHit(vec3 p, float t) { return custom(p, t); }'
-            : 'Hit customHit(vec3 p, float t) { return hit(sdSphere(p, 1.0), MATTE, 0.6, 0.5); }',
+            ? 'fn customHit(p: vec3f, t: f32) -> Hit { return custom(p, t); }'
+            : 'fn customHit(p: vec3f, t: f32) -> Hit { return hit(sdSphere(p, 1.0), MATTE, 0.6, 0.5); }',
         SCRIPTS_CAMERA.test(code)
-            ? 'Camera view(float t) { return camera(t); }'
-            : 'Camera view(float t) { return Camera(vec3(0.0, 2.4, 7.5), vec3(0.0, 0.5, 0.0), vec3(0.0, 1.0, 0.0)); }',
+            ? 'fn view(t: f32) -> Camera { return camera(t); }'
+            : 'fn view(t: f32) -> Camera { return Camera(vec3f(0.0, 2.4, 7.5), vec3f(0.0, 0.5, 0.0), vec3f(0.0, 1.0, 0.0)); }',
         BOUNDS_LIGHT.test(code)
-            ? 'vec4 codeBounds(float t) { return bounds(t); }'
-            : 'vec4 codeBounds(float t) { return vec4(0.0); }',
+            ? 'fn codeBounds(t: f32) -> vec4f { return bounds(t); }'
+            : 'fn codeBounds(t: f32) -> vec4f { return vec4f(0.0); }',
         objectsCode(shapes),
     ].join('\n');

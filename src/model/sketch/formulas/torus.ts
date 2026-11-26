@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './torus.glsl?raw';
+import source from './torus.wgsl?raw';
 
 export const torus: Formula = {
     label: 'Torus',

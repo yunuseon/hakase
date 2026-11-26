@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './sunflower.glsl?raw';
+import source from './sunflower.wgsl?raw';
 
 export const sunflower: Formula = {
     label: 'Sunflower',

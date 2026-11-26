@@ -8,31 +8,31 @@ export type SceneExample = {
     readonly scene: SceneContent;
 };
 
-const BLOBS = `Hit custom(vec3 p, float t) {
-    float a = t * 6.2832;
-    float soft = 0.2 + 0.4 * k1;
-    float d = sdSphere(p - vec3(0.6 * sin(a), 0.0, 0.0), 0.45);
-    d = smin(d, sdSphere(p - vec3(-0.5 * cos(a), 0.35 * sin(2.0 * a), 0.2), 0.38), soft);
-    d = smin(d, sdSphere(p - vec3(0.0, 0.45 * cos(a), -0.4 * sin(a)), 0.32), soft);
+const BLOBS = `fn custom(p: vec3f, t: f32) -> Hit {
+    let a = t * 6.2832;
+    let soft = 0.2 + 0.4 * k1;
+    var d = sdSphere(p - vec3f(0.6 * sin(a), 0.0, 0.0), 0.45);
+    d = smin(d, sdSphere(p - vec3f(-0.5 * cos(a), 0.35 * sin(2.0 * a), 0.2), 0.38), soft);
+    d = smin(d, sdSphere(p - vec3f(0.0, 0.45 * cos(a), -0.4 * sin(a)), 0.32), soft);
     return hit(d, GLOSS, 0.75, 0.15);
 }
 `;
 
-const ROOM = `Hit custom(vec3 p, float t) {
-    Hit room = hit(p.y, MATTE, 0.6, 1.0);
+const ROOM = `fn custom(p: vec3f, t: f32) -> Hit {
+    var room = hit(p.y, MATTE, 0.6, 1.0);
     room = closer(room, hit(3.0 - p.y, MATTE, 0.6, 1.0));
     room = closer(room, hit(p.z + 1.5, MATTE, 0.6, 1.0));
     room = closer(room, hit(p.x + 1.5, MATTE, 0.95, 1.0));
     return closer(room, hit(1.5 - p.x, MATTE, 0.3, 1.0));
 }
 
-Camera camera(float t) {
-    return Camera(vec3(0.0, 1.5, 9.0), vec3(0.0, 1.3, 0.0), vec3(0.0, 1.0, 0.0));
+fn camera(t: f32) -> Camera {
+    return Camera(vec3f(0.0, 1.5, 9.0), vec3f(0.0, 1.3, 0.0), vec3f(0.0, 1.0, 0.0));
 }
 `;
 
-const INTERIOR = `Hit custom(vec3 p, float t) {
-    Hit room = hit(p.y, GLOSS, 0.45, 0.35);
+const INTERIOR = `fn custom(p: vec3f, t: f32) -> Hit {
+    var room = hit(p.y, GLOSS, 0.45, 0.35);
     room = closer(room, hit(3.0 - p.y, MATTE, 0.0, 1.0));
     room = closer(room, hit(p.z + 3.2, MATTE, 0.08, 1.0));
     room = closer(room, hit(3.2 - p.z, MATTE, 0.08, 1.0));
@@ -40,22 +40,22 @@ const INTERIOR = `Hit custom(vec3 p, float t) {
     return closer(room, hit(2.5 - p.x, MATTE, 0.08, 1.0));
 }
 
-Camera camera(float t) {
-    return Camera(vec3(0.3, 1.5, 3.0), vec3(0.153, 1.323, 1.822), vec3(0.0, 1.0, 0.0));
+fn camera(t: f32) -> Camera {
+    return Camera(vec3f(0.3, 1.5, 3.0), vec3f(0.153, 1.323, 1.822), vec3f(0.0, 1.0, 0.0));
 }
 `;
 
-const CHECKER = `Hit custom(vec3 p, float t) {
-    float check = mod(floor(p.x * 2.0) + floor(p.z * 2.0), 2.0);
+const CHECKER = `fn custom(p: vec3f, t: f32) -> Hit {
+    let check = floorMod(floor(p.x * 2.0) + floor(p.z * 2.0), 2.0);
     return hit(p.y, MATTE, 0.3 + 0.6 * check, 1.0);
 }
 `;
 
-const FIELD = `Hit custom(vec3 p, float t) {
-    vec2 cell = floor((p.xz + 1.0) / 2.0);
-    vec3 q = vec3(mod(p.x + 1.0, 2.0) - 1.0, p.y, mod(p.z + 1.0, 2.0) - 1.0);
-    float bob = 0.25 * sin(6.2832 * t + cell.x * 1.3 + cell.y * 0.7);
-    return hit(sdSphere(q - vec3(0.0, 0.6 + bob, 0.0), 0.45), METAL, 0.7, 0.05 + 0.4 * k1);
+const FIELD = `fn custom(p: vec3f, t: f32) -> Hit {
+    let cell = floor((p.xz + 1.0) / 2.0);
+    let q = vec3f(floorMod(p.x + 1.0, 2.0) - 1.0, p.y, floorMod(p.z + 1.0, 2.0) - 1.0);
+    let bob = 0.25 * sin(6.2832 * t + cell.x * 1.3 + cell.y * 0.7);
+    return hit(sdSphere(q - vec3f(0.0, 0.6 + bob, 0.0), 0.45), METAL, 0.7, 0.05 + 0.4 * k1);
 }
 `;
 

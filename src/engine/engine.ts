@@ -1,26 +1,24 @@
 import { fitted } from '../components/sketch/animation.ts';
 import { evolutionTo, stepAt, type Evolved } from '../components/sketch/evolution.ts';
-import { panelParams, samePointer, type Pointer } from '../model/sketch/params.ts';
-import {
-    createSketch,
-    drawFrame,
-    knobsUsed,
-    prepare,
-    type Sketch,
-} from '../components/sketch/gl/sketch-program.ts';
-import {
-    bindState,
-    createSimulation,
-    evolve,
-    releaseSimulation,
-    type Simulation,
-} from '../components/sketch/gl/simulation.ts';
 import {
     createSketchResources,
-    PAINT_UNIT,
+    drawFrame,
+    evolve,
+    prepare,
     releaseSketchResources,
+    type Prepared,
+    type Samplers,
     type SketchResources,
-} from '../components/sketch/gl/surface.ts';
+} from '../components/sketch/gpu/drawing.ts';
+import {
+    createSketch,
+    createSketchLayouts,
+    knobsUsed,
+    writtenInGlsl,
+    type Sketch,
+    type SketchLayouts,
+} from '../components/sketch/gpu/sketch-program.ts';
+import { panelParams, samePointer, type Pointer } from '../model/sketch/params.ts';
 import { buildRamp, RAMP_SIZE, type Theme } from '../model/sketch/theme.ts';
 import { themes } from '../model/sketch/themes/registry.ts';
 import {
@@ -36,28 +34,42 @@ import {
 import { PEDALS, type PedalKind } from '../pedals.ts';
 import type { Size } from '../layout/frame.ts';
 import type { Rgb } from '../lib/color.ts';
-import { createInkPass, inked, loadStroke, type InkPass } from '../shared/gl/ink.ts';
+import { BUFFER, MAP, STAGE, TEXTURE } from '../lib/gpu.ts';
+import {
+    createInkPass,
+    inked,
+    loadStroke,
+    releaseInkPass,
+    type InkPass,
+} from '../shared/gpu/ink.ts';
 import { dabCount, type Stroke } from '../shared/stroke.ts';
-import { createProgram } from '../shared/gl/program.ts';
-import blur from './shaders/blur.frag?raw';
-import colourmap from './shaders/colourmap.frag?raw';
-import feedback from './shaders/feedback.frag?raw';
-import kaleido from './shaders/kaleido.frag?raw';
-import mix from './shaders/mix.frag?raw';
-import pass from './shaders/pass.vert?raw';
-import downsample from './shaders/downsample.frag?raw';
-import present from './shaders/present.frag?raw';
-import sheet from './shaders/sheet.frag?raw';
-import tonemap from './shaders/tonemap.frag?raw';
-import { createTracer, traceBatch, type Tracer } from './trace.ts';
-import { passesTo, partsOf } from './pacing.ts';
 import type { Shape } from '../model/scene.ts';
+import blur from './shaders/blur.wgsl?raw';
+import colourmap from './shaders/colourmap.wgsl?raw';
+import downsample from './shaders/downsample.wgsl?raw';
+import feedback from './shaders/feedback.wgsl?raw';
+import fill from './shaders/fill.wgsl?raw';
+import kaleido from './shaders/kaleido.wgsl?raw';
+import mix from './shaders/mix.wgsl?raw';
+import header from './shaders/pass.wgsl?raw';
+import present from './shaders/present.wgsl?raw';
+import sheet from './shaders/sheet.wgsl?raw';
+import tonemap from './shaders/tonemap.wgsl?raw';
+import {
+    createTracer,
+    createTracing,
+    releaseTracing,
+    traceBatch,
+    type Tracer,
+    type Tracing,
+} from './trace.ts';
+import { passesTo, partsOf } from './pacing.ts';
 import {
     createFloatTarget,
     createMultisampled,
     createTarget,
+    FORMAT,
     releaseTarget,
-    resolve,
     type Multisampled,
     type Target,
 } from './targets.ts';
@@ -85,28 +97,20 @@ export type FormulaCheck =
     | { readonly ok: true; readonly knobs: ReturnType<typeof knobsUsed> }
     | { readonly ok: false; readonly message: string };
 
-type Pass = {
-    readonly program: WebGLProgram;
-    readonly at: (name: string) => WebGLUniformLocation | null;
-};
-
-type Prepared = {
-    readonly sketch: Sketch;
-    readonly image: PointsImage;
-    readonly width: number;
-    readonly height: number;
-    readonly scale: number;
-    readonly dotScale: number;
-    readonly backdrop: readonly [number, number, number];
-};
-
 type Source = {
     readonly resources: SketchResources;
-    source: string | null;
+    text: string | null;
     sketch: Sketch | null;
-    prepared: Prepared | null;
-    simulation: Simulation | null;
+    prepared:
+        | (Prepared & {
+              readonly image: PointsImage;
+              readonly width: number;
+              readonly height: number;
+              readonly backdrop: readonly [number, number, number];
+          })
+        | null;
     evolved: Evolved | null;
+    side: number;
 };
 
 type Cooked = {
@@ -119,7 +123,8 @@ type Cooked = {
 };
 
 export type Picture = {
-    readonly texture: WebGLTexture;
+    readonly texture: GPUTexture;
+    readonly view: GPUTextureView;
     readonly width: number;
     readonly height: number;
 };
@@ -142,40 +147,28 @@ const traceSizeOf = ({ width, height, traceSide }: Moment) => {
 
 type Trace = { code: string | null; tracer: Tracer | null };
 
+type Palette = { readonly texture: GPUTexture; readonly view: GPUTextureView; theme: Theme | null };
+
 type Entry = {
     output: Target;
     accumulation: Accumulation | null;
     readonly samples: Multisampled | null;
     spare: Target | null;
-    palette: { readonly texture: WebGLTexture; theme: Theme | null } | null;
+    palette: Palette | null;
     cooked: Cooked | null;
+    fresh: boolean;
     used: number;
 };
 
-export type Engine = {
-    readonly canvas: OffscreenCanvas;
-    readonly gl: WebGL2RenderingContext;
-    readonly vao: WebGLVertexArrayObject;
-    readonly blank: WebGLTexture;
-    readonly passes: Readonly<Record<PassKind, Pass>>;
-    readonly ink: InkPass;
-    readonly sheets: Map<string, Sheet>;
-    readonly films: Map<'strip' | 'level' | 'level-cell', Film>;
-    readonly sources: Map<string, Source>;
-    readonly entries: Map<string, Entry>;
-    readonly checks: Map<string, FormulaCheck>;
-    readonly traces: Map<string, Trace>;
-    readonly sceneChecks: Map<string, SceneCheck>;
+type PassKind = PedalKind | 'present' | 'sheet' | 'downsample' | 'fill';
+
+type Passes = {
+    readonly layout: GPUBindGroupLayout;
+    readonly pipelines: Readonly<Record<PassKind, GPURenderPipeline>>;
+    readonly settings: GPUBuffer;
+    readonly tonemap: GPURenderPipeline;
+    readonly exposure: GPUBuffer;
 };
-
-type PassKind = PedalKind | 'present' | 'sheet' | 'downsample' | 'tonemap';
-
-const REFERENCE_SIDE = 640;
-const INPUT_UNIT = 3;
-const PALETTE_UNIT = 5;
-const PREVIOUS_UNIT = 6;
-const KNOB_SLOTS = 8;
-const FORGET_MS = 3000;
 
 type Sheet = {
     readonly whole: Target;
@@ -184,9 +177,37 @@ type Sheet = {
     used: number;
 };
 
-export const SHEET_SIDE = 768;
-
 type Film = { readonly target: Target; used: number };
+
+export type Engine = {
+    readonly device: GPUDevice;
+    readonly canvas: OffscreenCanvas;
+    readonly context: GPUCanvasContext;
+    // Announces a program that finished compiling, so a paused window draws once more with it.
+    readonly events: EventTarget;
+    readonly samplers: Samplers;
+    readonly layouts: SketchLayouts;
+    readonly passes: Passes;
+    readonly tracing: Tracing;
+    readonly blank: Target;
+    readonly ink: InkPass;
+    readonly sheets: Map<string, Sheet>;
+    readonly films: Map<'strip' | 'level' | 'level-cell', Film>;
+    readonly sources: Map<string, Source>;
+    readonly entries: Map<string, Entry>;
+    readonly checks: Map<string, Promise<FormulaCheck>>;
+    readonly traces: Map<string, Trace>;
+    readonly sceneChecks: Map<string, Promise<SceneCheck>>;
+};
+
+export const COMPILED = 'compiled';
+
+const REFERENCE_SIDE = 640;
+const KNOB_SLOTS = 8;
+const FORGET_MS = 3000;
+const PASS_BYTES = 80;
+
+export const SHEET_SIDE = 768;
 
 const FRAGMENTS: Readonly<Record<PassKind, string>> = {
     colourmap,
@@ -197,54 +218,103 @@ const FRAGMENTS: Readonly<Record<PassKind, string>> = {
     present,
     sheet,
     downsample,
-    tonemap,
+    fill,
 };
 
-const passOf = (gl: WebGL2RenderingContext, fragment: string): Pass => {
-    const result = createProgram(gl, pass, fragment);
-
-    if (!result.ok) {
-        throw new Error(`An engine pass did not compile: ${result.message}`);
-    }
-
-    return { program: result.program, at: name => gl.getUniformLocation(result.program, name) };
-};
-
-export const createEngine = (): Engine => {
-    const canvas = new OffscreenCanvas(1, 1);
-    const gl = canvas.getContext('webgl2', {
-        alpha: false,
-        antialias: false,
-        preserveDrawingBuffer: true,
+const createPasses = (device: GPUDevice): Passes => {
+    const layout = device.createBindGroupLayout({
+        entries: [
+            {
+                binding: 0,
+                visibility: STAGE.VERTEX | STAGE.FRAGMENT,
+                buffer: { type: 'uniform' },
+            },
+            ...[1, 2, 3, 4].map(binding => ({
+                binding,
+                visibility: STAGE.FRAGMENT,
+                texture: { sampleType: 'float' as const },
+            })),
+            { binding: 5, visibility: STAGE.FRAGMENT, sampler: { type: 'filtering' } },
+            { binding: 6, visibility: STAGE.FRAGMENT, sampler: { type: 'filtering' } },
+        ],
     });
+    const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] });
+    const pipelineOf = (fragment: string) => {
+        const module = device.createShaderModule({ code: `${header}\n${fragment}` });
 
-    if (!(gl instanceof WebGL2RenderingContext)) {
-        throw new Error('This browser does not support WebGL2');
-    }
-
-    const blank = createTarget(gl, 1, 1);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, blank.framebuffer);
-    gl.clearColor(0, 0, 0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: { module, entryPoint: 'fullscreen' },
+            fragment: { module, entryPoint: 'main', targets: [{ format: FORMAT }] },
+        });
+    };
+    const toneModule = device.createShaderModule({ code: tonemap });
 
     return {
-        canvas,
-        gl,
-        vao: gl.createVertexArray(),
-        blank: blank.texture,
-        passes: {
-            colourmap: passOf(gl, FRAGMENTS.colourmap),
-            kaleido: passOf(gl, FRAGMENTS.kaleido),
-            feedback: passOf(gl, FRAGMENTS.feedback),
-            mix: passOf(gl, FRAGMENTS.mix),
-            blur: passOf(gl, FRAGMENTS.blur),
-            present: passOf(gl, FRAGMENTS.present),
-            sheet: passOf(gl, FRAGMENTS.sheet),
-            downsample: passOf(gl, FRAGMENTS.downsample),
-            tonemap: passOf(gl, FRAGMENTS.tonemap),
+        layout,
+        pipelines: {
+            colourmap: pipelineOf(FRAGMENTS.colourmap),
+            kaleido: pipelineOf(FRAGMENTS.kaleido),
+            feedback: pipelineOf(FRAGMENTS.feedback),
+            mix: pipelineOf(FRAGMENTS.mix),
+            blur: pipelineOf(FRAGMENTS.blur),
+            present: pipelineOf(FRAGMENTS.present),
+            sheet: pipelineOf(FRAGMENTS.sheet),
+            downsample: pipelineOf(FRAGMENTS.downsample),
+            fill: pipelineOf(FRAGMENTS.fill),
         },
-        ink: createInkPass(gl),
+        settings: device.createBuffer({
+            size: PASS_BYTES,
+            usage: BUFFER.UNIFORM | BUFFER.COPY_DST,
+        }),
+        tonemap: device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module: toneModule, entryPoint: 'fullscreen' },
+            fragment: { module: toneModule, entryPoint: 'main', targets: [{ format: FORMAT }] },
+        }),
+        exposure: device.createBuffer({ size: 16, usage: BUFFER.UNIFORM | BUFFER.COPY_DST }),
+    };
+};
+
+export const createEngine = async (): Promise<Engine> => {
+    const adapter = await navigator.gpu?.requestAdapter();
+
+    if (adapter === null || adapter === undefined) {
+        throw new Error('This browser does not support WebGPU');
+    }
+
+    const device = await adapter.requestDevice();
+    const canvas = new OffscreenCanvas(1, 1);
+    const context = canvas.getContext('webgpu');
+
+    if (!(context instanceof GPUCanvasContext)) {
+        throw new Error('This browser cannot draw WebGPU into a canvas');
+    }
+
+    context.configure({ device, format: FORMAT, alphaMode: 'opaque' });
+
+    const blank = createTarget(device, 1, 1);
+    device.queue.writeTexture(
+        { texture: blank.texture },
+        Uint8Array.of(0, 0, 0, 255),
+        { bytesPerRow: 4 },
+        { width: 1, height: 1 },
+    );
+
+    return {
+        device,
+        canvas,
+        context,
+        events: new EventTarget(),
+        samplers: {
+            nearest: device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' }),
+            bilinear: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
+        },
+        layouts: createSketchLayouts(device),
+        passes: createPasses(device),
+        tracing: createTracing(device),
+        blank,
+        ink: createInkPass(device, FORMAT),
         sheets: new Map(),
         films: new Map(),
         sources: new Map(),
@@ -255,88 +325,93 @@ export const createEngine = (): Engine => {
     };
 };
 
+export const releaseEngine = (engine: Engine): void => {
+    releaseInkPass(engine.ink);
+    releaseTracing(engine.tracing);
+    engine.device.destroy();
+};
+
 const CHECKS_KEPT = 16;
 
-export const checkFormula = (engine: Engine, text: string): FormulaCheck => {
-    const known = engine.checks.get(text);
+const kept = <T>(cache: Map<string, T>, key: string, make: () => T): T => {
+    const known = cache.get(key);
 
     if (known !== undefined) {
         return known;
     }
 
-    const result = createSketch(engine.gl, text);
-    const check: FormulaCheck = result.ok
-        ? { ok: true, knobs: knobsUsed(result.sketch) }
-        : { ok: false, message: result.message };
+    const made = make();
+    [...cache.keys()]
+        .slice(0, Math.max(0, cache.size - CHECKS_KEPT + 1))
+        .forEach(old => cache.delete(old));
+    cache.set(key, made);
 
-    if (result.ok) {
-        engine.gl.deleteProgram(result.sketch.program);
-    }
-
-    [...engine.checks.keys()]
-        .slice(0, Math.max(0, engine.checks.size - CHECKS_KEPT + 1))
-        .forEach(old => engine.checks.delete(old));
-    engine.checks.set(text, check);
-
-    return check;
+    return made;
 };
 
-export const checkScene = (engine: Engine, code: string): SceneCheck => {
-    const known = engine.sceneChecks.get(code);
+export const checkFormula = (engine: Engine, text: string): Promise<FormulaCheck> =>
+    kept(engine.checks, text, () =>
+        createSketch(engine.device, engine.layouts, text).then((result): FormulaCheck =>
+            result.ok
+                ? { ok: true, knobs: knobsUsed(result.sketch) }
+                : { ok: false, message: result.message },
+        ),
+    );
 
-    if (known !== undefined) {
-        return known;
-    }
-
-    const result = createTracer(engine.gl, code);
-    const check: SceneCheck = result.ok ? { ok: true } : { ok: false, message: result.message };
-
-    if (result.ok) {
-        engine.gl.deleteProgram(result.tracer.program);
-    }
-
-    [...engine.sceneChecks.keys()]
-        .slice(0, Math.max(0, engine.sceneChecks.size - CHECKS_KEPT + 1))
-        .forEach(old => engine.sceneChecks.delete(old));
-    engine.sceneChecks.set(code, check);
-
-    return check;
-};
-
-export const releaseEngine = ({ gl }: Engine): void => {
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
-};
+export const checkScene = (engine: Engine, code: string): Promise<SceneCheck> =>
+    kept(engine.sceneChecks, code, () =>
+        createTracer(engine.device, engine.tracing, code).then((result): SceneCheck =>
+            result.ok ? { ok: true } : { ok: false, message: result.message },
+        ),
+    );
 
 const keyOf = (store: string, lane: string): string => (lane === '' ? store : `${store}#${lane}`);
 
-const sourceOf = (engine: Engine, store: string): Source => {
-    const known = engine.sources.get(store);
+// A program that lands later must be drawn: every entry that showed the old one draws again.
+const recompiled = (engine: Engine, key: string): void => {
+    engine.entries.forEach((entry, entryKey) => {
+        if (entryKey.startsWith(`${key}@`)) {
+            entry.cooked = null;
+        }
+    });
+    engine.events.dispatchEvent(new Event(COMPILED));
+};
+
+const sourceOf = (engine: Engine, key: string): Source => {
+    const known = engine.sources.get(key);
 
     if (known !== undefined) {
         return known;
     }
 
     const made: Source = {
-        resources: createSketchResources(engine.gl),
-        source: null,
+        resources: createSketchResources(engine.device),
+        text: null,
         sketch: null,
         prepared: null,
-        simulation: null,
         evolved: null,
+        side: 0,
     };
-    engine.sources.set(store, made);
+    engine.sources.set(key, made);
 
     return made;
 };
 
-const releaseSource = (gl: WebGL2RenderingContext, source: Source): void => {
-    releaseSketchResources(gl, source.resources);
-    if (source.sketch !== null) {
-        gl.deleteProgram(source.sketch.program);
+// A failed edit keeps the last program that compiled, so the picture never blanks while code is typed.
+const compiled = (engine: Engine, key: string, source: Source, text: string): Sketch | null => {
+    if (source.text !== text) {
+        source.text = text;
+        void createSketch(engine.device, engine.layouts, text).then(result => {
+            if (result.ok && source.text === text) {
+                source.sketch = result.sketch;
+                source.prepared = null;
+                source.evolved = null;
+                recompiled(engine, key);
+            }
+        });
     }
-    if (source.simulation !== null) {
-        releaseSimulation(gl, source.simulation);
-    }
+
+    return source.sketch;
 };
 
 const entryKey = (stage: Stage, moment: Moment): string =>
@@ -350,20 +425,21 @@ const entryOf = (engine: Engine, stage: Stage, moment: Moment): Entry => {
         return known;
     }
 
-    const { gl } = engine;
+    const { device } = engine;
     const samples =
-        stage.kind === 'points' ? createMultisampled(gl, moment.width, moment.height) : null;
+        stage.kind === 'points' ? createMultisampled(device, moment.width, moment.height) : null;
     const made: Entry = {
-        output: samples ?? createTarget(gl, moment.width, moment.height),
+        output: samples ?? createTarget(device, moment.width, moment.height),
         accumulation: null,
         samples,
         spare:
             stage.kind === 'pedal' &&
             (stage.pedal.kind === 'feedback' || stage.pedal.kind === 'blur')
-                ? createTarget(gl, moment.width, moment.height)
+                ? createTarget(device, moment.width, moment.height)
                 : null,
         palette: null,
         cooked: null,
+        fresh: true,
         used: 0,
     };
     engine.entries.set(key, made);
@@ -371,152 +447,255 @@ const entryOf = (engine: Engine, stage: Stage, moment: Moment): Entry => {
     return made;
 };
 
-const samePrepared = (prepared: Prepared | null, next: Omit<Prepared, 'backdrop'>): boolean =>
+type PassSettings = {
+    readonly knobs?: readonly number[];
+    readonly resolution?: readonly [number, number];
+    readonly direction?: readonly [number, number];
+    readonly paper?: readonly [number, number, number, number];
+    readonly choice?: number;
+    readonly factor?: number;
+};
+
+// Must match struct Settings in pass.wgsl, field for field.
+const passData = ({
+    knobs,
+    resolution,
+    direction,
+    paper,
+    choice,
+    factor,
+}: PassSettings): ArrayBuffer => {
+    const bytes = new ArrayBuffer(PASS_BYTES);
+    const floats = new Float32Array(bytes);
+    const ints = new Int32Array(bytes);
+
+    floats.set(knobs ?? [], 0);
+    floats.set(resolution ?? [1, 1], 8);
+    floats.set(direction ?? [0, 0], 10);
+    floats.set(paper ?? [0, 0, 0, 0], 12);
+    ints.set([choice ?? 0, factor ?? 1], 16);
+
+    return bytes;
+};
+
+type Inputs = {
+    readonly in0?: GPUTextureView;
+    readonly in1?: GPUTextureView;
+    readonly previous?: GPUTextureView;
+    readonly palette?: GPUTextureView;
+};
+
+type Area = {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+};
+
+// One pass per submit: its settings are written just before, and the next pass writes over them.
+const runPass = (
+    engine: Engine,
+    kind: PassKind,
+    into: GPUTextureView,
+    settings: PassSettings,
+    inputs: Inputs,
+    {
+        area = null,
+        clear = [0, 0, 0],
+    }: {
+        readonly area?: Area | null;
+        readonly clear?: readonly [number, number, number] | null;
+    } = {},
+): void => {
+    const { device, passes, blank, samplers } = engine;
+    device.queue.writeBuffer(passes.settings, 0, passData(settings));
+
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [
+            {
+                view: into,
+                loadOp: clear === null ? 'load' : 'clear',
+                clearValue: { r: clear?.[0] ?? 0, g: clear?.[1] ?? 0, b: clear?.[2] ?? 0, a: 1 },
+                storeOp: 'store',
+            },
+        ],
+    });
+    pass.setPipeline(passes.pipelines[kind]);
+    pass.setBindGroup(
+        0,
+        device.createBindGroup({
+            layout: passes.layout,
+            entries: [
+                { binding: 0, resource: { buffer: passes.settings } },
+                { binding: 1, resource: inputs.in0 ?? blank.view },
+                { binding: 2, resource: inputs.in1 ?? blank.view },
+                { binding: 3, resource: inputs.previous ?? blank.view },
+                { binding: 4, resource: inputs.palette ?? blank.view },
+                { binding: 5, resource: samplers.bilinear },
+                { binding: 6, resource: samplers.nearest },
+            ],
+        }),
+    );
+
+    if (area !== null) {
+        pass.setViewport(area.x, area.y, Math.max(area.width, 1), Math.max(area.height, 1), 0, 1);
+    }
+
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+};
+
+const clearTarget = (
+    engine: Engine,
+    into: GPUTextureView,
+    colour: readonly [number, number, number, number],
+): void => {
+    const encoder = engine.device.createCommandEncoder();
+    encoder
+        .beginRenderPass({
+            colorAttachments: [
+                {
+                    view: into,
+                    loadOp: 'clear',
+                    clearValue: { r: colour[0], g: colour[1], b: colour[2], a: colour[3] },
+                    storeOp: 'store',
+                },
+            ],
+        })
+        .end();
+    engine.device.queue.submit([encoder.finish()]);
+};
+
+const samePrepared = (
+    prepared: Source['prepared'],
+    next: {
+        readonly sketch: Sketch;
+        readonly image: PointsImage;
+        readonly width: number;
+        readonly height: number;
+        readonly scale: number;
+        readonly dotScale: number;
+    },
+): boolean =>
     prepared !== null &&
     prepared.sketch === next.sketch &&
     prepared.width === next.width &&
     prepared.height === next.height &&
-    prepared.scale === next.scale &&
+    prepared.pixelRatio === next.scale &&
     prepared.dotScale === next.dotScale &&
     prepared.image.panel === next.image.panel &&
     prepared.image.theme === next.image.theme &&
     prepared.image.sheet === next.image.sheet;
 
-const compiled = (gl: WebGL2RenderingContext, source: Source, text: string): Sketch | null => {
-    if (source.source === text) {
-        return source.sketch;
-    }
-
-    source.source = text;
-    const result = createSketch(gl, text);
-
-    if (result.ok) {
-        if (source.sketch !== null) {
-            gl.deleteProgram(source.sketch.program);
-        }
-        if (source.simulation !== null) {
-            releaseSimulation(gl, source.simulation);
-        }
-        source.sketch = result.sketch;
-        source.prepared = null;
-        source.simulation = null;
-        source.evolved = null;
-    }
-
-    return source.sketch;
-};
-
 const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Moment): void => {
-    const { gl, canvas } = engine;
-    const { width, height, t, seconds, pointer } = moment;
+    const { width, height, t, seconds, pointer, dotScale } = moment;
     const scale =
         moment.frame === null
             ? Math.max(width, height) / REFERENCE_SIDE
             : width / Math.max(moment.frame.width, 1);
-    const { dotScale } = moment;
-    const target = entry.output;
-    const source = sourceOf(engine, keyOf(image.store, moment.lane));
-    const sketch = compiled(gl, source, image.source);
+    const key = keyOf(image.store, moment.lane);
+    const source = sourceOf(engine, key);
+    const sketch = compiled(engine, key, source, image.source);
     const { samples } = entry;
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, samples?.samples ?? target.framebuffer);
-    gl.viewport(0, 0, width, height);
-    gl.bindVertexArray(null);
+    if (sketch === null || samples === null) {
+        clearTarget(engine, entry.output.view, [0, 0, 0, 1]);
+        return;
+    }
 
-    if (sketch === null) {
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-    } else {
-        const params = {
-            width: width / scale,
-            height: height / scale,
-            ...panelParams(image.panel, image.drivers, image.sheet),
-            theme: image.theme,
+    const params = {
+        width: width / scale,
+        height: height / scale,
+        ...panelParams(image.panel, image.drivers, image.sheet),
+        theme: image.theme,
+    };
+
+    if (!samePrepared(source.prepared, { sketch, image, width, height, scale, dotScale })) {
+        const ramp = buildRamp(image.theme);
+        source.prepared = {
+            ...prepare(source.resources, sketch, params, ramp, scale, dotScale),
+            image,
+            width,
+            height,
+            backdrop: [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255],
         };
-        const surface = { canvas, gl, ...source.resources };
-
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-
-        if (!samePrepared(source.prepared, { sketch, image, width, height, scale, dotScale })) {
-            const ramp = buildRamp(image.theme);
-            prepare(surface, sketch, params, ramp, scale, dotScale);
-            source.prepared = {
-                sketch,
-                image,
-                width,
-                height,
-                scale,
-                dotScale,
-                backdrop: [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255],
-            };
-        } else {
-            // Another sketch was drawn in between, so this one's own textures go back where it reads them.
-            const [r, g, b] = source.prepared?.backdrop ?? [0, 0, 0];
-            gl.useProgram(sketch.program);
-            gl.activeTexture(gl.TEXTURE0 + PAINT_UNIT);
-            gl.bindTexture(gl.TEXTURE_2D_ARRAY, source.resources.paint);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, source.resources.palette);
-            gl.clearColor(r, g, b, 1);
-            gl.enable(gl.DEPTH_TEST);
-        }
-
-        if (sketch.evolves) {
-            const side = 2 * image.panel.dimension;
-
-            if (source.simulation?.side !== side) {
-                if (source.simulation !== null) {
-                    releaseSimulation(gl, source.simulation);
-                }
-                source.simulation = createSimulation(gl, side);
-                source.evolved = null;
-            }
-
-            const evolution = evolutionTo(source.evolved, stepAt(t, seconds, sketch.steps));
-            evolve(surface, sketch, source.simulation, evolution, {
-                params,
-                seconds,
-                pointer,
-                orbit: image.orbit,
-            });
-            bindState(gl, sketch, source.simulation, evolution.end.front);
-            source.evolved = evolution.end;
-            // Evolving leaves the canvas bound, not this target.
-            gl.bindFramebuffer(gl.FRAMEBUFFER, samples?.samples ?? target.framebuffer);
-            gl.viewport(0, 0, width, height);
-        }
-
-        drawFrame(surface, sketch, params, t, pointer, image.orbit);
+        engine.entries.forEach(each => {
+            each.fresh = true;
+        });
     }
 
-    if (samples !== null) {
-        resolve(gl, samples);
+    const prepared = source.prepared;
+
+    if (prepared === null) {
+        return;
     }
+
+    const side = 2 * image.panel.dimension;
+
+    if (source.side !== side) {
+        source.side = side;
+        source.evolved = null;
+    }
+
+    const evolution = sketch.evolves
+        ? evolutionTo(source.evolved, stepAt(t, seconds, sketch.steps))
+        : null;
+
+    if (evolution !== null) {
+        evolve(source.resources, engine.layouts, engine.samplers, prepared, evolution, {
+            params,
+            seconds,
+            pointer,
+            orbit: image.orbit,
+            width,
+            height,
+        });
+        source.evolved = evolution.end;
+    }
+
+    drawFrame(
+        source.resources,
+        engine.layouts,
+        engine.samplers,
+        prepared,
+        params,
+        t,
+        pointer,
+        image.orbit,
+        evolution === null ? null : evolution.end.front,
+        {
+            colour: samples.colourView,
+            resolve: samples.view,
+            depth: samples.depthView,
+            backdrop: prepared.backdrop,
+            fresh: entry.fresh,
+        },
+        { width, height },
+    );
+    entry.fresh = false;
 };
 
-// A failed edit keeps the last program that linked, so the picture never blanks while code is typed.
+// A failed edit keeps the last program that compiled, so the picture never blanks while code is typed.
 const traceOf = (
     engine: Engine,
     key: string,
     code: string,
     shapes: readonly Shape[],
 ): Tracer | null => {
-    const { gl } = engine;
     const trace = engine.traces.get(key) ?? { code: null, tracer: null };
     const source = `${shapes.join(',')}\n${code}`;
     engine.traces.set(key, trace);
 
     if (trace.code !== source) {
         trace.code = source;
-        const result = createTracer(gl, code, shapes);
-
-        if (result.ok) {
-            if (trace.tracer !== null) {
-                gl.deleteProgram(trace.tracer.program);
+        void createTracer(engine.device, engine.tracing, code, shapes).then(result => {
+            if (result.ok && trace.code === source) {
+                trace.tracer = result.tracer;
+                recompiled(engine, key);
             }
-            trace.tracer = result.tracer;
-        }
+        });
     }
 
     return trace.tracer;
@@ -524,8 +703,43 @@ const traceOf = (
 
 const MAX_BATCH = 16;
 
-// Samples in one draw stay under this many pixel-samples, or an export at full size could stall the GPU long enough to lose it.
+// Samples in one dispatch stay under this many pixel-samples, or an export at full size could stall the GPU long enough to lose it.
 const SAMPLE_BUDGET = 1 << 17;
+
+const releaseAccumulation = (accumulation: Accumulation): void => {
+    releaseTarget(accumulation.front);
+    releaseTarget(accumulation.back);
+    if (accumulation.toned !== null) {
+        releaseTarget(accumulation.toned);
+    }
+};
+
+const paletteOf = (engine: Engine, entry: Entry, theme: Theme): GPUTextureView => {
+    const palette =
+        entry.palette ??
+        (() => {
+            const texture = engine.device.createTexture({
+                size: { width: RAMP_SIZE, height: 1 },
+                format: 'rgba8unorm',
+                usage: TEXTURE.TEXTURE_BINDING | TEXTURE.COPY_DST,
+            });
+
+            return { texture, view: texture.createView(), theme: null };
+        })();
+    entry.palette = palette;
+
+    if (palette.theme !== theme) {
+        engine.device.queue.writeTexture(
+            { texture: palette.texture },
+            buildRamp(theme),
+            { bytesPerRow: RAMP_SIZE * 4 },
+            { width: RAMP_SIZE, height: 1 },
+        );
+        palette.theme = theme;
+    }
+
+    return palette.view;
+};
 
 const drawTraced = (
     engine: Engine,
@@ -534,18 +748,17 @@ const drawTraced = (
     moment: Moment,
     restart: boolean,
 ): void => {
-    const { gl } = engine;
+    const { device } = engine;
     const tracer = traceOf(
         engine,
         keyOf(image.store, moment.lane),
-        image.scene.code,
+        // Code saved in GLSL is set aside, not the scene: its objects still draw while the Code tab says why.
+        writtenInGlsl(image.scene.code) ? '' : image.scene.code,
         image.scene.objects.map(({ shape }) => shape),
     );
 
     if (tracer === null) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, entry.output.framebuffer);
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        clearTarget(engine, entry.output.view, [0, 0, 0, 1]);
         return;
     }
 
@@ -557,45 +770,42 @@ const drawTraced = (
             : null;
 
     if (known === null && entry.accumulation !== null) {
-        releaseAccumulation(gl, entry.accumulation);
+        releaseAccumulation(entry.accumulation);
     }
 
     const accumulation = known ?? {
-        front: createFloatTarget(gl, size.width, size.height),
-        back: createFloatTarget(gl, size.width, size.height),
+        front: createFloatTarget(device, size.width, size.height),
+        back: createFloatTarget(device, size.width, size.height),
         toned:
             size.width === moment.width && size.height === moment.height
                 ? null
-                : createTarget(gl, size.width, size.height),
+                : createTarget(device, size.width, size.height),
         parts: 0,
     };
     entry.accumulation = accumulation;
 
     // Each pixel keeps its own count in alpha, so a restart must zero it, not just the colour.
     if (restart || known === null) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, accumulation.front.framebuffer);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        clearTarget(engine, accumulation.front.view, [0, 0, 0, 0]);
         accumulation.parts = 0;
     }
 
-    paletteOf(engine, entry, image.theme);
+    const palette = paletteOf(engine, entry, image.theme);
     const pixels = size.width * size.height;
     const each = Math.min(MAX_BATCH, Math.max(1, Math.floor(SAMPLE_BUDGET / pixels)));
-
     const wanted = partsOf(moment.samples);
 
     passesTo(accumulation.parts, wanted, each).forEach(pass => {
         traceBatch(
-            gl,
+            device,
+            engine.tracing,
             tracer,
             image,
             accumulation.back,
             accumulation.front,
-            { unit: PALETTE_UNIT },
+            { view: palette, sampler: engine.samplers.nearest },
             moment.t,
             pass,
-            engine.vao,
         );
         const front = accumulation.back;
         accumulation.back = accumulation.front;
@@ -603,202 +813,139 @@ const drawTraced = (
     });
     accumulation.parts = Math.max(accumulation.parts, wanted);
 
-    const shader = engine.passes.tonemap;
-    gl.useProgram(shader.program);
-    bindInput(engine, 0, accumulation.front.texture);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.uniform1f(shader.at('uExposure'), image.scene.exposure);
-    drawPass(engine, accumulation.toned ?? entry.output);
-    gl.activeTexture(gl.TEXTURE0);
+    const toned = accumulation.toned ?? entry.output;
+    device.queue.writeBuffer(
+        engine.passes.exposure,
+        0,
+        Float32Array.of(image.scene.exposure, 0, 0, 0),
+    );
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [{ view: toned.view, loadOp: 'clear', storeOp: 'store' }],
+    });
+    pass.setPipeline(engine.passes.tonemap);
+    pass.setBindGroup(
+        0,
+        device.createBindGroup({
+            layout: engine.passes.tonemap.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: engine.passes.exposure } },
+                { binding: 1, resource: accumulation.front.view },
+            ],
+        }),
+    );
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
 
     if (accumulation.toned !== null) {
-        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, accumulation.toned.framebuffer);
-        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, entry.output.framebuffer);
-        gl.blitFramebuffer(
-            0,
-            0,
-            size.width,
-            size.height,
-            0,
-            0,
-            moment.width,
-            moment.height,
-            gl.COLOR_BUFFER_BIT,
-            gl.LINEAR,
-        );
-        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        runPass(engine, 'present', entry.output.view, {}, { in0: accumulation.toned.view });
     }
-};
-
-const releaseAccumulation = (gl: WebGL2RenderingContext, accumulation: Accumulation): void => {
-    releaseTarget(gl, accumulation.front);
-    releaseTarget(gl, accumulation.back);
-    if (accumulation.toned !== null) {
-        releaseTarget(gl, accumulation.toned);
-    }
-};
-
-const bindInput = (engine: Engine, slot: number, texture: WebGLTexture | null): void => {
-    const { gl } = engine;
-    gl.activeTexture(gl.TEXTURE0 + INPUT_UNIT + slot);
-    gl.bindTexture(gl.TEXTURE_2D, texture ?? engine.blank);
-};
-
-const paletteOf = (engine: Engine, entry: Entry, theme: Theme): WebGLTexture => {
-    const { gl } = engine;
-    const palette = entry.palette ?? { texture: gl.createTexture(), theme: null };
-    entry.palette = palette;
-
-    gl.activeTexture(gl.TEXTURE0 + PALETTE_UNIT);
-    gl.bindTexture(gl.TEXTURE_2D, palette.texture);
-
-    if (palette.theme !== theme) {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA,
-            RAMP_SIZE,
-            1,
-            0,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            buildRamp(theme),
-        );
-        palette.theme = theme;
-    }
-
-    return palette.texture;
-};
-
-const drawPass = (engine: Engine, into: Target): void => {
-    const { gl } = engine;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, into.framebuffer);
-    gl.viewport(0, 0, into.width, into.height);
-    gl.bindVertexArray(engine.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
 };
 
 const drawPedal = (
     engine: Engine,
     entry: Entry,
     image: PedalImage,
-    inputs: readonly (WebGLTexture | null)[],
+    inputs: readonly (GPUTextureView | null)[],
     { t, width, height }: Moment,
 ): void => {
-    const { gl } = engine;
     const { kind } = image.pedal;
     const spec = PEDALS[kind];
-    const shader = engine.passes[kind];
     const knobs = Array.from({ length: KNOB_SLOTS }, (_, index) => {
         const knob = spec.knobs[index];
 
         return knob === undefined ? 0 : knobAt(image, knob.name, t);
     });
-
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.useProgram(shader.program);
-    gl.uniform1fv(shader.at('uKnobs'), knobs);
-    gl.uniform1i(
-        shader.at('uChoice'),
-        Math.max(
+    const settings: PassSettings = {
+        knobs,
+        resolution: [width, height],
+        choice: Math.max(
             0,
             spec.choices.findIndex(choice => choice === image.pedal.choice),
         ),
-    );
-    gl.uniform2f(shader.at('uResolution'), width, height);
-    bindInput(engine, 0, inputs[0] ?? null);
-    bindInput(engine, 1, inputs[1] ?? null);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.uniform1i(shader.at('uIn1'), INPUT_UNIT + 1);
+    };
+    const given: Inputs = {
+        in0: inputs[0] ?? engine.blank.view,
+        in1: inputs[1] ?? engine.blank.view,
+    };
 
     switch (kind) {
         case 'colourmap':
-            paletteOf(engine, entry, image.theme ?? themes.paper);
-            gl.uniform1i(shader.at('uPalette'), PALETTE_UNIT);
-            drawPass(engine, entry.output);
+            runPass(engine, kind, entry.output.view, settings, {
+                ...given,
+                palette: paletteOf(engine, entry, image.theme ?? themes.paper),
+            });
             break;
         case 'feedback': {
             const spare = entry.spare ?? entry.output;
-            gl.activeTexture(gl.TEXTURE0 + PREVIOUS_UNIT);
-            gl.bindTexture(gl.TEXTURE_2D, entry.output.texture);
-            gl.uniform1i(shader.at('uPrevious'), PREVIOUS_UNIT);
-            // A new stage has no past: its first frame is the picture itself, not a fade from black.
-            if (entry.cooked === null) {
-                gl.uniform1fv(shader.at('uKnobs'), [0, ...knobs.slice(1)]);
-            }
-            drawPass(engine, spare);
+            runPass(
+                engine,
+                kind,
+                spare.view,
+                // A new stage has no past: its first frame is the picture itself, not a fade from black.
+                entry.cooked === null ? { ...settings, knobs: [0, ...knobs.slice(1)] } : settings,
+                { ...given, previous: entry.output.view },
+            );
             entry.spare = entry.output;
             entry.output = spare;
             break;
         }
         case 'blur': {
             const spare = entry.spare ?? entry.output;
-            gl.uniform2f(shader.at('uDirection'), 1, 0);
-            drawPass(engine, spare);
-            bindInput(engine, 0, spare.texture);
-            gl.uniform2f(shader.at('uDirection'), 0, 1);
-            drawPass(engine, entry.output);
+            runPass(engine, kind, spare.view, { ...settings, direction: [1, 0] }, given);
+            runPass(
+                engine,
+                kind,
+                entry.output.view,
+                { ...settings, direction: [0, 1] },
+                { in0: spare.view },
+            );
             break;
         }
         case 'kaleido':
         case 'mix':
-            drawPass(engine, entry.output);
+            runPass(engine, kind, entry.output.view, settings, given);
             break;
     }
-
-    gl.activeTexture(gl.TEXTURE0);
 };
 
 const forget = (engine: Engine, now: number): void => {
-    const { gl } = engine;
-
     engine.entries.forEach((entry, key) => {
         if (now - entry.used > FORGET_MS) {
-            releaseTarget(gl, entry.samples ?? entry.output);
+            releaseTarget(entry.samples ?? entry.output);
             if (entry.spare !== null) {
-                releaseTarget(gl, entry.spare);
+                releaseTarget(entry.spare);
             }
-            if (entry.palette !== null) {
-                gl.deleteTexture(entry.palette.texture);
-            }
+            entry.palette?.texture.destroy();
             if (entry.accumulation !== null) {
-                releaseAccumulation(gl, entry.accumulation);
+                releaseAccumulation(entry.accumulation);
             }
             engine.entries.delete(key);
         }
     });
     engine.sheets.forEach((sheet, key) => {
         if (now - sheet.used > FORGET_MS) {
-            releaseTarget(gl, sheet.whole);
-            releaseTarget(gl, sheet.now);
+            releaseTarget(sheet.whole);
+            releaseTarget(sheet.now);
             engine.sheets.delete(key);
         }
     });
     engine.films.forEach((film, key) => {
         if (now - film.used > FORGET_MS) {
-            releaseTarget(gl, film.target);
+            releaseTarget(film.target);
             engine.films.delete(key);
         }
     });
-    engine.traces.forEach((trace, store) => {
-        if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
-            if (trace.tracer !== null) {
-                gl.deleteProgram(trace.tracer.program);
-            }
-            engine.traces.delete(store);
+    engine.traces.forEach((_trace, key) => {
+        if (![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))) {
+            engine.traces.delete(key);
         }
     });
-    engine.sources.forEach((source, store) => {
-        if (![...engine.entries.keys()].some(key => key.startsWith(`${store}@`))) {
-            releaseSource(gl, source);
-            engine.sources.delete(store);
+    engine.sources.forEach((source, key) => {
+        if (![...engine.entries.keys()].some(each => each.startsWith(`${key}@`))) {
+            releaseSketchResources(source.resources);
+            engine.sources.delete(key);
         }
     });
 };
@@ -863,7 +1010,7 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
                         stage.inputs.map(input =>
                             input.kind === 'none'
                                 ? null
-                                : (pictures.get(input.store)?.texture ?? null),
+                                : (pictures.get(input.store)?.view ?? null),
                         ),
                         moment,
                     );
@@ -883,6 +1030,7 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
             return {
                 pictures: new Map(pictures).set(stage.store, {
                     texture: entry.output.texture,
+                    view: entry.output.view,
                     width: moment.width,
                     height: moment.height,
                 }),
@@ -913,16 +1061,6 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
     return image.kind === 'none' ? null : (drawn.get(image.store) ?? null);
 };
 
-// Exactly what is drawn: an export writes the whole canvas out, so it must be the picture's size.
-const grown = (engine: Engine, width: number, height: number): void => {
-    const { canvas } = engine;
-
-    if (canvas.width < width || canvas.height < height) {
-        canvas.width = Math.max(canvas.width, width);
-        canvas.height = Math.max(canvas.height, height);
-    }
-};
-
 const GROWTH = 512;
 
 const grownSide = (current: number, needed: number, limit: number): number =>
@@ -930,15 +1068,12 @@ const grownSide = (current: number, needed: number, limit: number): number =>
         ? current
         : Math.min(limit, Math.ceil(Math.max(needed, current * 1.5) / GROWTH) * GROWTH);
 
-// A strip draws into a target of its own, never the canvas: every bitmap a window takes copies the whole canvas, however small its crop.
+export const textureLimit = (engine: Engine): number => engine.device.limits.maxTextureDimension2D;
+
+// A strip draws into a target of its own: a window's bitmap is the whole canvas, so the canvas is only ever as large as one picture.
 // Growing clears it, so a strip reserves its whole width before its first tile; by half at least, or every pinch reallocates.
 export const filmFor = (engine: Engine, width: number, height: number, now: number): Target => {
-    const { gl } = engine;
-    const dimensions: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
-    const limit = Math.min(
-        dimensions instanceof Int32Array ? (dimensions[0] ?? 4096) : 4096,
-        Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 4096,
-    );
+    const limit = textureLimit(engine);
     const known = engine.films.get('strip');
     const next = {
         width: grownSide(known?.target.width ?? 0, width, limit),
@@ -949,10 +1084,10 @@ export const filmFor = (engine: Engine, width: number, height: number, now: numb
         known.target.width === next.width &&
         known.target.height === next.height
             ? known
-            : { target: createTarget(gl, next.width, next.height), used: now };
+            : { target: createTarget(engine.device, next.width, next.height), used: now };
 
     if (known !== undefined && film !== known) {
-        releaseTarget(gl, known.target);
+        releaseTarget(known.target);
     }
 
     film.used = now;
@@ -962,15 +1097,14 @@ export const filmFor = (engine: Engine, width: number, height: number, now: numb
 };
 
 const filmOf = (engine: Engine, key: 'level' | 'level-cell', side: number, now: number): Target => {
-    const { gl } = engine;
     const known = engine.films.get(key);
     const film =
         known !== undefined && known.target.width === side
             ? known
-            : { target: createTarget(gl, side, side), used: now };
+            : { target: createTarget(engine.device, side, side), used: now };
 
     if (known !== undefined && film !== known) {
-        releaseTarget(gl, known.target);
+        releaseTarget(known.target);
     }
 
     film.used = now;
@@ -988,81 +1122,68 @@ export const averagedInto = (
     atlas: number,
     now: number,
 ): void => {
-    const { gl } = engine;
-    const shader = engine.passes.downsample;
     const scratch = filmOf(engine, 'level-cell', cell, now);
     const into = filmOf(engine, 'level', atlas, now);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.framebuffer);
-    gl.viewport(0, 0, cell, cell);
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.useProgram(shader.program);
-    bindInput(engine, 0, picture?.texture ?? engine.blank);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.uniform1i(shader.at('uFactor'), Math.max(1, Math.round((picture?.width ?? cell) / cell)));
-    gl.bindVertexArray(engine.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, scratch.framebuffer);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, into.framebuffer);
-    gl.blitFramebuffer(
-        0,
-        0,
-        cell,
-        cell,
-        at.x,
-        at.y,
-        at.x + cell,
-        at.y + cell,
-        gl.COLOR_BUFFER_BIT,
-        gl.NEAREST,
+    runPass(
+        engine,
+        'downsample',
+        scratch.view,
+        { factor: Math.max(1, Math.round((picture?.width ?? cell) / cell)) },
+        { in0: picture?.view ?? engine.blank.view },
     );
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    const encoder = engine.device.createCommandEncoder();
+    encoder.copyTextureToTexture(
+        { texture: scratch.texture },
+        { texture: into.texture, origin: { x: at.x, y: at.y } },
+        { width: cell, height: cell },
+    );
+    engine.device.queue.submit([encoder.finish()]);
 };
 
-export const readAtlas = (engine: Engine, atlas: number, now: number): Uint8Array => {
-    const { gl } = engine;
-    const pixels = new Uint8Array(atlas * atlas * 4);
+export const readAtlas = async (
+    engine: Engine,
+    atlas: number,
+    now: number,
+): Promise<Uint8Array> => {
+    const { device } = engine;
+    const bytesPerRow = Math.ceil((atlas * 4) / 256) * 256;
+    const buffer = device.createBuffer({
+        size: bytesPerRow * atlas,
+        usage: BUFFER.MAP_READ | BUFFER.COPY_DST,
+    });
+    const encoder = device.createCommandEncoder();
+    encoder.copyTextureToBuffer(
+        { texture: filmOf(engine, 'level', atlas, now).texture },
+        { buffer, bytesPerRow, rowsPerImage: atlas },
+        { width: atlas, height: atlas },
+    );
+    device.queue.submit([encoder.finish()]);
+    await buffer.mapAsync(MAP.READ);
+    const rows = new Uint8Array(buffer.getMappedRange());
+    const pixels = Uint8Array.from({ length: atlas * atlas * 4 }, (_, index) => {
+        const row = Math.floor(index / (atlas * 4));
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, filmOf(engine, 'level', atlas, now).framebuffer);
-    gl.readPixels(0, 0, atlas, atlas, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return rows[row * bytesPerRow + (index % (atlas * 4))] ?? 0;
+    });
+    buffer.unmap();
+    buffer.destroy();
 
     return pixels;
 };
 
-export const drawn = (
-    engine: Engine,
-    texture: WebGLTexture | null,
-    width: number,
-    height: number,
-    x = 0,
-    y = 0,
-    into: Target | null = null,
-): void => {
-    const { gl } = engine;
-    const shader = engine.passes.present;
+// The canvas is sized to each picture: a window's bitmap takes the whole canvas, and handing it over costs nothing.
+const canvasView = (engine: Engine, width: number, height: number): GPUTextureView => {
+    const { canvas } = engine;
 
-    if (into === null) {
-        grown(engine, x + width, y + height);
+    if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, into?.framebuffer ?? null);
-    gl.viewport(x, y, width, height);
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.useProgram(shader.program);
-    bindInput(engine, 0, texture);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.bindVertexArray(engine.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.activeTexture(gl.TEXTURE0);
+
+    return engine.context.getCurrentTexture().createView();
 };
 
-// A tile's slot takes the picture's backdrop, then the picture fitted inside it, the way the window frames it.
 export const backdropOf = (image: Image): readonly [number, number, number] => {
     if (image.kind !== 'points' && image.kind !== 'traced') {
         return [0, 0, 0];
@@ -1073,33 +1194,43 @@ export const backdropOf = (image: Image): readonly [number, number, number] => {
     return [(ramp[0] ?? 0) / 255, (ramp[1] ?? 0) / 255, (ramp[2] ?? 0) / 255];
 };
 
-// The picture fitted into its slot, the backdrop around it: a chain's picture has the app's aspect, not the window's.
 export const framedIn = (
     engine: Engine,
-    into: Target | null,
+    into: GPUTextureView,
     picture: Picture | null,
     slot: { readonly x: number; readonly width: number; readonly height: number },
     backdrop: readonly [number, number, number],
+    clearing: boolean,
 ): void => {
-    const { gl } = engine;
     const box =
         picture === null
             ? { x: 0, y: 0, width: slot.width, height: slot.height }
             : fitted(slot, picture);
 
-    if (into === null) {
-        grown(engine, slot.x + slot.width, slot.height);
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, into?.framebuffer ?? null);
-    gl.enable(gl.SCISSOR_TEST);
-    gl.scissor(slot.x, 0, slot.width, slot.height);
-    gl.clearColor(...backdrop, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.disable(gl.SCISSOR_TEST);
-    drawn(engine, picture?.texture ?? null, box.width, box.height, slot.x + box.x, box.y, into);
+    runPass(
+        engine,
+        'fill',
+        into,
+        { paper: [...backdrop, 0] },
+        {},
+        {
+            area: { x: slot.x, y: 0, width: slot.width, height: slot.height },
+            clear: clearing ? backdrop : null,
+        },
+    );
+    runPass(
+        engine,
+        'present',
+        into,
+        {},
+        { in0: picture?.view ?? engine.blank.view },
+        {
+            area: { x: slot.x + box.x, y: box.y, width: box.width, height: box.height },
+            clear: null,
+        },
+    );
 };
 
-// The film's bottom rows, averaged factor x factor into the canvas at the strip's own size.
 export const filmed = (
     engine: Engine,
     film: Target,
@@ -1107,24 +1238,15 @@ export const filmed = (
     height: number,
     factor: number,
 ): Promise<ImageBitmap> => {
-    const { gl } = engine;
-    const shader = engine.passes.downsample;
+    runPass(
+        engine,
+        'downsample',
+        canvasView(engine, width, height),
+        { factor },
+        { in0: film.view },
+    );
 
-    grown(engine, width, height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.useProgram(shader.program);
-    bindInput(engine, 0, film.texture);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.uniform1i(shader.at('uFactor'), factor);
-    gl.bindVertexArray(engine.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.activeTexture(gl.TEXTURE0);
-
-    return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
+    return Promise.resolve(engine.canvas.transferToImageBitmap());
 };
 
 export const presented = (
@@ -1134,30 +1256,20 @@ export const presented = (
     height: number,
     backdrop: readonly [number, number, number],
 ): Promise<ImageBitmap> => {
-    framedIn(engine, null, picture, { x: 0, width, height }, backdrop);
+    framedIn(
+        engine,
+        canvasView(engine, width, height),
+        picture,
+        { x: 0, width, height },
+        backdrop,
+        true,
+    );
 
-    return createImageBitmap(engine.canvas, 0, engine.canvas.height - height, width, height);
-};
-
-const inkedInto = (engine: Engine, into: Target, stroke: Stroke, count: number, ink: Rgb): void => {
-    const { gl } = engine;
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, into.framebuffer);
-    gl.viewport(0, 0, into.width, into.height);
-    gl.disable(gl.DEPTH_TEST);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    inked(engine.ink, stroke, count, {
-        side: SHEET_SIDE,
-        colour: [ink.r, ink.g, ink.b],
-        flip: -1,
-    });
-    gl.disable(gl.BLEND);
+    return Promise.resolve(engine.canvas.transferToImageBitmap());
 };
 
 const sameRgb = (a: Rgb, b: Rgb): boolean => a.r === b.r && a.g === b.g && a.b === b.b;
 
-// A pen's sheet: its whole figure drawn once per stroke, the line so far on every count, laid on the paper here because the canvas is opaque.
 export const sheetOf = (
     engine: Engine,
     key: string,
@@ -1166,10 +1278,10 @@ export const sheetOf = (
     { ink, paper, faint }: { readonly ink: Rgb; readonly paper: Rgb; readonly faint: number },
     now: number,
 ): Promise<ImageBitmap> => {
-    const { gl } = engine;
+    const { device } = engine;
     const sheet = engine.sheets.get(key) ?? {
-        whole: createTarget(gl, SHEET_SIDE, SHEET_SIDE),
-        now: createTarget(gl, SHEET_SIDE, SHEET_SIDE),
+        whole: createTarget(device, SHEET_SIDE, SHEET_SIDE),
+        now: createTarget(device, SHEET_SIDE, SHEET_SIDE),
         drawn: null,
         used: now,
     };
@@ -1177,36 +1289,30 @@ export const sheetOf = (
     sheet.used = now;
 
     loadStroke(engine.ink, stroke);
+    const colour = [ink.r, ink.g, ink.b] as const;
 
     if (sheet.drawn?.stroke !== stroke || !sameRgb(sheet.drawn.ink, ink)) {
-        inkedInto(engine, sheet.whole, stroke, dabCount(stroke), ink);
+        const encoder = device.createCommandEncoder();
+        inked(engine.ink, encoder, sheet.whole.view, stroke, dabCount(stroke), {
+            side: SHEET_SIDE,
+            colour,
+        });
+        device.queue.submit([encoder.finish()]);
         sheet.drawn = { stroke, ink };
     }
 
-    inkedInto(engine, sheet.now, stroke, count, ink);
+    const encoder = device.createCommandEncoder();
+    inked(engine.ink, encoder, sheet.now.view, stroke, count, { side: SHEET_SIDE, colour });
+    device.queue.submit([encoder.finish()]);
 
-    const shader = engine.passes.sheet;
-    grown(engine, SHEET_SIDE, SHEET_SIDE);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, SHEET_SIDE, SHEET_SIDE);
-    gl.useProgram(shader.program);
-    bindInput(engine, 0, sheet.whole.texture);
-    bindInput(engine, 1, sheet.now.texture);
-    gl.uniform1i(shader.at('uIn0'), INPUT_UNIT);
-    gl.uniform1i(shader.at('uIn1'), INPUT_UNIT + 1);
-    gl.uniform3f(shader.at('uPaper'), paper.r, paper.g, paper.b);
-    gl.uniform1f(shader.at('uFaint'), faint);
-    gl.bindVertexArray(engine.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.activeTexture(gl.TEXTURE0);
+    runPass(
+        engine,
+        'sheet',
+        canvasView(engine, SHEET_SIDE, SHEET_SIDE),
+        { paper: [paper.r, paper.g, paper.b, faint] },
+        { in0: sheet.whole.view, in1: sheet.now.view },
+    );
     forget(engine, now);
 
-    return createImageBitmap(
-        engine.canvas,
-        0,
-        engine.canvas.height - SHEET_SIDE,
-        SHEET_SIDE,
-        SHEET_SIDE,
-    );
+    return Promise.resolve(engine.canvas.transferToImageBitmap());
 };

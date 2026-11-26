@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './rose.glsl?raw';
+import source from './rose.wgsl?raw';
 
 export const rose: Formula = {
     label: 'Rose',

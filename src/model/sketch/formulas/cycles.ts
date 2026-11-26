@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './cycles.glsl?raw';
+import source from './cycles.wgsl?raw';
 
 export const cycles: Formula = {
     label: 'Cycles',

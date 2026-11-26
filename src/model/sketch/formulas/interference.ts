@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './interference.glsl?raw';
+import source from './interference.wgsl?raw';
 
 export const interference: Formula = {
     label: 'Interference',

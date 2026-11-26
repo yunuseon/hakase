@@ -1,12 +1,12 @@
 import { animationFrameScheduler, combineLatest, EMPTY, from, merge, type Observable } from 'rxjs';
 import { auditTime, concatMap, debounceTime, filter, map, share, switchMap } from 'rxjs/operators';
 import { fitted, supersampleFor, type StripLayout } from '../components/sketch/animation.ts';
-import { evolves } from '../components/sketch/gl/sketch-program.ts';
+import { evolves } from '../components/sketch/gpu/sketch-program.ts';
 import { centre } from '../model/sketch/params.ts';
 import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
 import type { Size } from '../layout/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
-import { backdropOf, cook, filmed, filmFor, framedIn } from './engine.ts';
+import { backdropOf, cook, filmed, filmFor, framedIn, textureLimit } from './engine.ts';
 import { engine$ } from './view.ts';
 
 const TILE_SAMPLES = 1;
@@ -71,8 +71,7 @@ export const filmstrip$ = (
                         return EMPTY;
                     }
 
-                    const dimensions: unknown = engine.gl.getParameter(engine.gl.MAX_VIEWPORT_DIMS);
-                    const limit = dimensions instanceof Int32Array ? (dimensions[0] ?? 4096) : 4096;
+                    const limit = textureLimit(engine);
                     const supersample = supersampleFor(
                         {
                             width: count * geometry.tileWidth * ratio,
@@ -123,10 +122,11 @@ export const filmstrip$ = (
                             );
                             framedIn(
                                 engine,
-                                film,
+                                film.view,
                                 picture,
                                 { x: at * slot.width, ...slot },
                                 backdrop,
+                                false,
                             );
                         },
                     );

@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './bloom.glsl?raw';
+import source from './bloom.wgsl?raw';
 
 export const bloom: Formula = {
     label: 'Bloom',

@@ -97,27 +97,25 @@ describe('a scene', () => {
     });
 
     it('uses the code’s own hooks only when it defines them', () => {
-        const code = 'Hit custom(vec3 p, float t) { return hit(p.y, MATTE, 0.5, 1.0); }';
+        const code = 'fn custom(p: vec3f, t: f32) -> Hit { return hit(p.y, MATTE, 0.5, 1.0); }';
 
         expect(definesCustom(code)).toBe(true);
         expect(sceneAdapter(code)).toContain('return custom(p, t);');
         expect(sceneAdapter('')).not.toContain('custom(p, t)');
-        expect(sceneAdapter('Camera camera(float t) { }')).toContain('return camera(t);');
-        expect(sceneAdapter('vec4 bounds(float t) { }')).toContain('return bounds(t);');
-        expect(sceneAdapter('')).toContain('return vec4(0.0);');
+        expect(sceneAdapter('fn camera(t: f32) -> Camera { }')).toContain('return camera(t);');
+        expect(sceneAdapter('fn bounds(t: f32) -> vec4f { }')).toContain('return bounds(t);');
+        expect(sceneAdapter('')).toContain('return vec4f(0.0);');
     });
 
     it('writes each object out with its own shape, so the shader never branches on one', () => {
         const code = objectsCode(['sphere', 'plane', 'code']);
 
-        expect(code).toContain('sdSphere(p - uObjects[0].xyz, uObjects[0].w)');
-        expect(code).toContain('p.y - uObjects[3].y');
-        expect(code).toContain(
-            'codeAt(turned(p - uObjects[6].xyz, uObjects[8].x), uObjects[6].w, t)',
-        );
+        expect(code).toContain('sdSphere(p - objects[0].xyz, objects[0].w)');
+        expect(code).toContain('p.y - objects[3].y');
+        expect(code).toContain('codeAt(turned(p - objects[6].xyz, objects[8].x), objects[6].w, t)');
         expect(code).toContain('nearest = 2;');
         expect(code).not.toContain('shape ==');
-        expect(sceneAdapter('', ['box'])).toContain('sdBox(turned(p - uObjects[0].xyz');
-        expect(sceneAdapter('')).toContain('Hit objectsAt(vec3 p, float t) {');
+        expect(sceneAdapter('', ['box'])).toContain('sdBox(turned(p - objects[0].xyz');
+        expect(sceneAdapter('')).toContain('fn objectsAt(p: vec3f, t: f32) -> Hit {');
     });
 });

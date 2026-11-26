@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './magnet.glsl?raw';
+import source from './magnet.wgsl?raw';
 
 export const magnet: Formula = {
     label: 'Magnet',

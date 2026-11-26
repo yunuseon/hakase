@@ -1,5 +1,9 @@
 import {
     animationFrames,
+    defer,
+    fromEvent,
+    NEVER,
+    of,
     concat,
     animationFrameScheduler,
     combineLatest,
@@ -10,11 +14,13 @@ import {
 } from 'rxjs';
 import {
     auditTime,
+    catchError,
     concatMap,
     map,
     repeat,
     scan,
     shareReplay,
+    startWith,
     switchMap,
     takeWhile,
 } from 'rxjs/operators';
@@ -34,6 +40,7 @@ import {
     backdropOf,
     checkFormula,
     checkScene,
+    COMPILED,
     cook,
     sheetOf,
     createEngine,
@@ -52,27 +59,28 @@ export type View =
 
 const RECREATE_MS = 100;
 
-// A lost context completes this engine and repeat makes a fresh one; every picture is a recipe, so it simply draws again.
-export const engine$ = new Observable<Engine | Error>(subscriber => {
-    try {
-        const engine = createEngine();
-        const lost = (event: Event) => {
-            event.preventDefault();
-            subscriber.complete();
-        };
-        engine.canvas.addEventListener('webglcontextlost', lost);
-        subscriber.next(engine);
+// Made by the first viewer and released after the last; a lost device completes it and repeat makes a fresh one, and every picture is a recipe, so it simply draws again.
+export const engine$: Observable<Engine | Error> = defer(() => from(createEngine())).pipe(
+    switchMap(
+        engine =>
+            new Observable<Engine>(subscriber => {
+                subscriber.next(engine);
+                void engine.device.lost.then(() => {
+                    subscriber.complete();
+                });
 
-        return () => {
-            engine.canvas.removeEventListener('webglcontextlost', lost);
-            releaseEngine(engine);
-        };
-    } catch (error) {
-        subscriber.next(error instanceof Error ? error : new Error(String(error)));
-
-        return undefined;
-    }
-}).pipe(repeat({ delay: RECREATE_MS }), shareReplay({ bufferSize: 1, refCount: true }));
+                return () => {
+                    releaseEngine(engine);
+                };
+            }),
+    ),
+    // No WebGPU is not a loss to recover from: it says so once and waits.
+    catchError((error: unknown) =>
+        concat(of(error instanceof Error ? error : new Error(String(error))), NEVER),
+    ),
+    repeat({ delay: RECREATE_MS }),
+    shareReplay({ bufferSize: 1, refCount: true }),
+);
 
 const failed = (error: unknown): View => ({
     kind: 'failed',
@@ -134,7 +142,11 @@ export const view$ = (image$: Observable<Image>, showing$: Observable<Showing>):
         switchMap(engine =>
             engine instanceof Error
                 ? from([{ kind: 'failed', message: engine.message } as const])
-                : combineLatest([image$, showing$]).pipe(
+                : combineLatest([
+                      image$,
+                      showing$,
+                      fromEvent(engine.events, COMPILED).pipe(startWith(null)),
+                  ]).pipe(
                       auditTime(0, animationFrameScheduler),
                       map(([image, showing]) => ({ image, showing, at: performance.now() })),
                       scan(
@@ -161,7 +173,7 @@ export const checked$ = (text$: Observable<string>): Observable<FormulaCheck> =>
         switchMap(engine =>
             engine instanceof Error
                 ? from([{ ok: false, message: engine.message } as const])
-                : text$.pipe(map(text => checkFormula(engine, text))),
+                : text$.pipe(switchMap(text => from(checkFormula(engine, text)))),
         ),
     );
 
@@ -170,7 +182,7 @@ export const sceneChecked$ = (code$: Observable<string>): Observable<SceneCheck>
         switchMap(engine =>
             engine instanceof Error
                 ? from([{ ok: false, message: engine.message } as const])
-                : code$.pipe(map(code => checkScene(engine, code))),
+                : code$.pipe(switchMap(code => from(checkScene(engine, code)))),
         ),
     );
 

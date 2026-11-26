@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './flow.glsl?raw';
+import source from './flow.wgsl?raw';
 
 export const flow: Formula = {
     label: 'Flow',

@@ -1,5 +1,10 @@
-import { readableLog } from '../components/sketch/gl/sketch-program.ts';
+import {
+    GLSL_MESSAGE,
+    readableMessages,
+    writtenInGlsl,
+} from '../components/sketch/gpu/sketch-program.ts';
 import { sceneKnobAt, type TracedImage } from '../image.ts';
+import { BUFFER, STAGE } from '../lib/gpu.ts';
 import {
     MAX_OBJECTS,
     OBJECT_VEC4S,
@@ -9,45 +14,101 @@ import {
     type Shape,
 } from '../model/scene.ts';
 import { orbitUniform } from '../model/sketch/space.ts';
-import { createProgram } from '../shared/gl/program.ts';
-import traceSource from './shaders/trace.frag?raw';
-import passSource from './shaders/pass.vert?raw';
-import type { Pass } from './pacing.ts';
+import traceSource from './shaders/trace.wgsl?raw';
 import type { Target } from './targets.ts';
+import type { Pass } from './pacing.ts';
 
-// The code is spliced after the prelude, so driver line numbers need rebasing.
-const PRELUDE_LINES = traceSource.split('\n').length;
+const PRELUDE = traceSource.trimEnd();
+// The code is spliced after the prelude, so compiler line numbers need rebasing.
+const PRELUDE_LINES = PRELUDE.split('\n').length;
 
-export type Tracer = {
-    readonly program: WebGLProgram;
-    readonly at: (name: string) => WebGLUniformLocation | null;
+export type Tracing = {
+    readonly layout: GPUBindGroupLayout;
+    readonly pipelines: GPUPipelineLayout;
+    readonly settings: GPUBuffer;
+    readonly objects: GPUBuffer;
 };
+
+const TRACE_BYTES = 112;
+const OBJECT_BYTES = MAX_OBJECTS * OBJECT_VEC4S * 16;
+
+export const createTracing = (device: GPUDevice): Tracing => {
+    const layout = device.createBindGroupLayout({
+        entries: [
+            { binding: 0, visibility: STAGE.COMPUTE, buffer: { type: 'uniform' } },
+            { binding: 1, visibility: STAGE.COMPUTE, buffer: { type: 'uniform' } },
+            { binding: 2, visibility: STAGE.COMPUTE, texture: { sampleType: 'float' } },
+            { binding: 3, visibility: STAGE.COMPUTE, sampler: { type: 'filtering' } },
+            {
+                binding: 4,
+                visibility: STAGE.COMPUTE,
+                texture: { sampleType: 'unfilterable-float' },
+            },
+            {
+                binding: 5,
+                visibility: STAGE.COMPUTE,
+                storageTexture: { access: 'write-only', format: 'rgba32float' },
+            },
+        ],
+    });
+
+    return {
+        layout,
+        pipelines: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+        settings: device.createBuffer({
+            size: TRACE_BYTES,
+            usage: BUFFER.UNIFORM | BUFFER.COPY_DST,
+        }),
+        objects: device.createBuffer({
+            size: OBJECT_BYTES,
+            usage: BUFFER.UNIFORM | BUFFER.COPY_DST,
+        }),
+    };
+};
+
+export const releaseTracing = ({ settings, objects }: Tracing): void => {
+    settings.destroy();
+    objects.destroy();
+};
+
+export type Tracer = { readonly pipeline: GPUComputePipeline };
 
 export type TracerResult =
     | { readonly ok: true; readonly tracer: Tracer }
     | { readonly ok: false; readonly message: string };
 
-export const createTracer = (
-    gl: WebGL2RenderingContext,
+export const createTracer = async (
+    device: GPUDevice,
+    tracing: Tracing,
     code: string,
     shapes: readonly Shape[] = [],
-): TracerResult => {
-    const result = createProgram(
-        gl,
-        passSource,
-        `${traceSource}\n${code}\n${sceneAdapter(code, shapes)}`,
-    );
-
-    if (!result.ok) {
-        return {
-            ok: false,
-            message: readableLog(result.message, result.stage === 'fragment' ? PRELUDE_LINES : 0),
-        };
+): Promise<TracerResult> => {
+    if (writtenInGlsl(code)) {
+        return { ok: false, message: GLSL_MESSAGE };
     }
 
-    const { program } = result;
+    const module = device.createShaderModule({
+        code: `${PRELUDE}\n${code}\n${sceneAdapter(code, shapes)}`,
+    });
+    const errors = readableMessages((await module.getCompilationInfo()).messages, PRELUDE_LINES);
 
-    return { ok: true, tracer: { program, at: name => gl.getUniformLocation(program, name) } };
+    if (errors !== '') {
+        return { ok: false, message: errors };
+    }
+
+    try {
+        return {
+            ok: true,
+            tracer: {
+                pipeline: await device.createComputePipelineAsync({
+                    layout: tracing.pipelines,
+                    compute: { module, entryPoint: 'main' },
+                }),
+            },
+        };
+    } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
 };
 
 const sunOf = (turn: number, height: number): readonly [number, number, number] => {
@@ -57,52 +118,67 @@ const sunOf = (turn: number, height: number): readonly [number, number, number] 
     return [Math.cos(up) * Math.sin(around), Math.sin(up), Math.cos(up) * Math.cos(around)];
 };
 
+// Must match struct Trace in trace.wgsl, field for field.
+const traceData = (
+    image: TracedImage,
+    into: Target,
+    t: number,
+    { slots, phase, count, batch }: Pass,
+): ArrayBuffer => {
+    const { scene } = image;
+    const bytes = new ArrayBuffer(TRACE_BYTES);
+    const floats = new Float32Array(bytes);
+    const ints = new Int32Array(bytes);
+
+    floats.set([into.width, into.height, t, scene.light], 0);
+    floats.set([...orbitUniform(scene.orbit), 0], 4);
+    floats.set([...sunOf(scene.sun, scene.height), scene.sky], 8);
+    floats.set(
+        SCENE_KNOBS.map(knob => sceneKnobAt(image, knob, t)),
+        12,
+    );
+    ints.set([Math.min(MAX_OBJECTS, scene.objects.length), batch, slots, phase], 16);
+    ints.set([count, scene.bounces, 0, 0], 20);
+    floats.set([scene.fov, 0, 0, 0], 24);
+
+    return bytes;
+};
+
+// One batch per submit: its settings are written just before, and the next batch writes over them.
 export const traceBatch = (
-    gl: WebGL2RenderingContext,
+    device: GPUDevice,
+    tracing: Tracing,
     tracer: Tracer,
     image: TracedImage,
     into: Target,
     previous: Target,
-    palette: { readonly unit: number },
+    palette: { readonly view: GPUTextureView; readonly sampler: GPUSampler },
     t: number,
-    { slots, phase, count, batch }: Pass,
-    vao: WebGLVertexArrayObject,
+    pass: Pass,
 ): void => {
-    const { scene } = image;
-    const { at } = tracer;
-    const objects = objectUniforms(scene.objects);
+    const objects = new Float32Array(OBJECT_BYTES / 4);
+    objects.set(objectUniforms(image.scene.objects));
+    device.queue.writeBuffer(tracing.settings, 0, traceData(image, into, t, pass));
+    device.queue.writeBuffer(tracing.objects, 0, objects);
 
-    gl.useProgram(tracer.program);
-    gl.uniform4fv(
-        at('uObjects'),
-        objects.length === 0 ? new Float32Array(OBJECT_VEC4S * 4) : objects,
+    const encoder = device.createCommandEncoder();
+    const compute = encoder.beginComputePass();
+    compute.setPipeline(tracer.pipeline);
+    compute.setBindGroup(
+        0,
+        device.createBindGroup({
+            layout: tracing.layout,
+            entries: [
+                { binding: 0, resource: { buffer: tracing.settings } },
+                { binding: 1, resource: { buffer: tracing.objects } },
+                { binding: 2, resource: palette.view },
+                { binding: 3, resource: palette.sampler },
+                { binding: 4, resource: previous.view },
+                { binding: 5, resource: into.view },
+            ],
+        }),
     );
-    gl.uniform1i(at('uCount'), Math.min(MAX_OBJECTS, scene.objects.length));
-    gl.uniform1f(at('uPlayhead'), t);
-    gl.uniform2f(at('uResolution'), into.width, into.height);
-    gl.uniform3f(at('uOrbit'), ...orbitUniform(scene.orbit));
-    gl.uniform1i(at('uBatch'), batch);
-    gl.uniform1i(at('uSlots'), slots);
-    gl.uniform1i(at('uPhase'), phase);
-    gl.uniform1i(at('uBands'), count);
-    gl.uniform1i(at('uBounces'), scene.bounces);
-    gl.uniform3f(at('uSun'), ...sunOf(scene.sun, scene.height));
-    gl.uniform1f(at('uSunPower'), scene.light);
-    gl.uniform1f(at('uSky'), scene.sky);
-    gl.uniform1f(at('uFov'), scene.fov);
-    SCENE_KNOBS.forEach(knob => {
-        gl.uniform1f(at(knob), sceneKnobAt(image, knob, t));
-    });
-    gl.uniform1i(at('uPalette'), palette.unit);
-    gl.uniform1i(at('uPrevious'), palette.unit + 1);
-    gl.activeTexture(gl.TEXTURE0 + palette.unit + 1);
-    gl.bindTexture(gl.TEXTURE_2D, previous.texture);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, into.framebuffer);
-    gl.viewport(0, 0, into.width, into.height);
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.bindVertexArray(vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.activeTexture(gl.TEXTURE0);
+    compute.dispatchWorkgroups(Math.ceil(into.width / 8), Math.ceil(into.height / 8));
+    compute.end();
+    device.queue.submit([encoder.finish()]);
 };

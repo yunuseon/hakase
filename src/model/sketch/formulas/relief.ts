@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './relief.glsl?raw';
+import source from './relief.wgsl?raw';
 
 export const relief: Formula = {
     label: 'Relief',

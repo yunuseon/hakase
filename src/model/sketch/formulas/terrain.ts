@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './terrain.glsl?raw';
+import source from './terrain.wgsl?raw';
 
 export const terrain: Formula = {
     label: 'Terrain',

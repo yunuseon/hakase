@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './lens.glsl?raw';
+import source from './lens.wgsl?raw';
 
 export const lens: Formula = {
     label: 'Lens',

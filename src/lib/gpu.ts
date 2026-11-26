@@ -15,3 +15,5 @@ export const TEXTURE = {
     STORAGE_BINDING: 8,
     RENDER_ATTACHMENT: 16,
 } as const;
+
+export const MAP = { READ: 1, WRITE: 2 } as const;

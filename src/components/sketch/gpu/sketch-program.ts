@@ -18,6 +18,15 @@ const NAMES_KNOB = /^\s*\/\/\s*k([1-4])\s*:\s*(\S.*?)\s*$/gm;
 
 export const evolves = (formula: string): boolean => EVOLVES.test(formula);
 
+const IN_GLSL =
+    /(^\s*#define\b)|\b(vec[234]|float|void|Hit|Camera)\s+(formula|custom|camera|evolve|initial|lattice|space|bounds)\s*\(/m;
+
+// Saved before formulas moved to WGSL: kept as written, and said so, rather than buried under WGSL's errors.
+export const writtenInGlsl = (code: string): boolean => IN_GLSL.test(code.replace(/\/\/.*$/gm, ''));
+
+export const GLSL_MESSAGE =
+    'This was written in GLSL, before formulas moved to WGSL. Your text is kept as it was: rewrite it in WGSL and it runs again. The guide above shows the differences, and every built-in formula is an example.';
+
 export const knobLabelsOf = (formula: string): Readonly<Record<Knob, string>> => {
     const named = new Map(
         [...formula.matchAll(NAMES_KNOB)].map(([, digit, name]) => [`k${digit ?? ''}`, name ?? '']),
@@ -276,6 +285,10 @@ export const createSketch = async (
     layouts: SketchLayouts,
     formula: string,
 ): Promise<SketchResult> => {
+    if (writtenInGlsl(formula)) {
+        return { ok: false, message: GLSL_MESSAGE };
+    }
+
     const module = device.createShaderModule({ code: moduleFor(formula) });
     const { messages } = await module.getCompilationInfo();
     const errors = readableMessages(messages, PRELUDE_LINES);
@@ -350,7 +363,11 @@ export const createSketch = async (
                     'triangle-list',
                     false,
                 ),
-                knobsRead(device, module, stepping ? ['evaluate', 'advance'] : ['evaluate']),
+                knobsRead(
+                    device,
+                    module,
+                    stepping ? ['evaluate', 'advance', 'seed'] : ['evaluate'],
+                ),
             ]);
 
         return {

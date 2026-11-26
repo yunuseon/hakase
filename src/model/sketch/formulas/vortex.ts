@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './vortex.glsl?raw';
+import source from './vortex.wgsl?raw';
 
 export const vortex: Formula = {
     label: 'Vortex',

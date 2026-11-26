@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './peaks.glsl?raw';
+import source from './peaks.wgsl?raw';
 
 export const peaks: Formula = {
     label: 'Peaks',

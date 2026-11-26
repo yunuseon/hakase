@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './canon.glsl?raw';
+import source from './canon.wgsl?raw';
 
 export const canon: Formula = {
     label: 'Canon',

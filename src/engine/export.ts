@@ -6,11 +6,11 @@ import {
     frameCount,
     type ExportSettings,
 } from '../model/sketch/export.ts';
-import { messageOf, writer$, type ExportEvent } from '../components/sketch/export/export.ts';
+import { messageOf, pngOf, writer$, type ExportEvent } from '../components/sketch/export/export.ts';
 import { centre } from '../model/sketch/params.ts';
 import type { Size } from '../layout/frame.ts';
 import { hasHistory, samplesWanted, type Image } from '../image.ts';
-import { cook, createEngine, drawn, releaseEngine, type Engine } from './engine.ts';
+import { cook, createEngine, presented, releaseEngine, type Engine } from './engine.ts';
 
 export type ImageExport = {
     readonly image: Image;
@@ -20,14 +20,18 @@ export type ImageExport = {
     readonly framed: boolean;
 };
 
-const ownEngine$ = new Observable<Engine>(subscriber => {
-    const engine = createEngine();
-    subscriber.next(engine);
+const ownEngine$: Observable<Engine> = defer(() => from(createEngine())).pipe(
+    switchMap(
+        engine =>
+            new Observable<Engine>(subscriber => {
+                subscriber.next(engine);
 
-    return () => {
-        releaseEngine(engine);
-    };
-});
+                return () => {
+                    releaseEngine(engine);
+                };
+            }),
+    ),
+);
 
 const frameAt = (
     engine: Engine,
@@ -35,7 +39,9 @@ const frameAt = (
     pixels: Size,
     t: number,
     pass: number,
-) => {
+    // A warm-up frame is drawn for its trail and never shown.
+    keep: boolean,
+): Promise<ImageBitmap | null> => {
     const picture = cook(
         engine,
         image,
@@ -53,7 +59,10 @@ const frameAt = (
         },
         performance.now(),
     );
-    drawn(engine, picture?.texture ?? null, pixels.width, pixels.height);
+
+    return keep
+        ? presented(engine, picture, pixels.width, pixels.height, [0, 0, 0])
+        : Promise.resolve(null);
 };
 
 export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
@@ -70,13 +79,23 @@ export const imageExport$ = (request: ImageExport): Observable<ExportEvent> => {
                     concat(
                         from(frames).pipe(
                             concatMap((frame, step) =>
-                                defer(() => {
-                                    frameAt(engine, request, pixels, frame.t, step + 1);
-
-                                    return frame.index === null
-                                        ? of(undefined)
-                                        : from(writer.add(engine.canvas, frame.index));
-                                }).pipe(
+                                defer(() =>
+                                    from(
+                                        frameAt(
+                                            engine,
+                                            request,
+                                            pixels,
+                                            frame.t,
+                                            step + 1,
+                                            frame.index !== null,
+                                        ),
+                                    ),
+                                ).pipe(
+                                    concatMap(bitmap =>
+                                        bitmap === null || frame.index === null
+                                            ? of(undefined)
+                                            : from(writer.add(bitmap, frame.index)),
+                                    ),
                                     map((): ExportEvent => ({
                                         kind: 'progress',
                                         done: (step + 1) / frames.length,
@@ -105,11 +124,9 @@ export const imageStill$ = (request: ImageExport, t: number): Observable<ExportE
 
     return ownEngine$.pipe(
         switchMap(engine =>
-            defer(() => {
-                frameAt(engine, request, pixels, t, 1);
-
-                return from(engine.canvas.convertToBlob({ type: 'image/png' }));
-            }),
+            defer(() => from(frameAt(engine, request, pixels, t, 1, true))).pipe(
+                concatMap(bitmap => (bitmap === null ? of(new Blob()) : from(pngOf(bitmap)))),
+            ),
         ),
         map((blob): ExportEvent => ({ kind: 'file', blob, extension: 'png' })),
         takeWhile(event => event.kind === 'progress', true),

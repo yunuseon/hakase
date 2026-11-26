@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './trefoil.glsl?raw';
+import source from './trefoil.wgsl?raw';
 
 export const trefoil: Formula = {
     label: 'Trefoil',

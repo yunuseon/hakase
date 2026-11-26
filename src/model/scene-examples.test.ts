@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultScene, parseScene, reduceScene } from './scene.ts';
+import { defaultScene, definesCustom, parseScene, reduceScene } from './scene.ts';
 import { SCENE_EXAMPLE_NAMES, SCENE_EXAMPLES } from './scene-examples.ts';
 
 describe('example scenes', () => {
@@ -26,8 +26,7 @@ describe('example scenes', () => {
             const { scene } = SCENE_EXAMPLES[name];
 
             expect(
-                !scene.objects.some(({ shape }) => shape === 'code') ||
-                    scene.code.includes('Hit custom('),
+                !scene.objects.some(({ shape }) => shape === 'code') || definesCustom(scene.code),
             ).toBe(true);
         });
     });

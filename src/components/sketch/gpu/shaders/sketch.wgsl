@@ -524,7 +524,8 @@ fn dotVertex(@builtin(vertex_index) corner: u32, @builtin(instance_index) instan
     // Capped: a camera skimming the ground would otherwise blow its nearest dots up to fill the canvas.
     let size = frame.sizes.x * frame.view.w * zoom * min(pow(nearness, 3.0 * frame.sizes.y), 3.0);
     let local = vec2f(f32(corner & 1u), f32(corner >> 1u)) * 2.0 - 1.0;
-    let offset = local * size / frame.view.xy * clip.w;
+    // At least a pixel, as GL drew a point, or a tiny dot would miss every sample; its coverage still knows its size.
+    let offset = local * max(size, 1.0) / frame.view.xy * clip.w;
 
     return Shown(vec4f(clip.xy + offset, clip.zw), local, here.w, size, here.xyz, vec4f(0.0));
 }

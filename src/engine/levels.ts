@@ -9,7 +9,7 @@ import {
     scheduled,
     type Observable,
 } from 'rxjs';
-import { concatMap, debounceTime, ignoreElements, switchMap, tap } from 'rxjs/operators';
+import { concatMap, debounceTime, ignoreElements, map, switchMap, tap } from 'rxjs/operators';
 import { centre } from '../model/sketch/params.ts';
 import { hasHistory, type Image } from '../image.ts';
 import { averagedInto, cook, readAtlas, type Engine } from './engine.ts';
@@ -103,7 +103,9 @@ const framesOf$ = (engine: Engine, image: Image, seconds: number): Observable<Ui
             }),
             ignoreElements(),
         ),
-        defer(() => of(cellsOf(readAtlas(engine, ATLAS, performance.now()), ACROSS, CELL))),
+        defer(() => from(readAtlas(engine, ATLAS, performance.now()))).pipe(
+            map(atlas => cellsOf(atlas, ACROSS, CELL)),
+        ),
     );
 
 export const pictureFrames$: PictureFrames = (image$, seconds$) =>

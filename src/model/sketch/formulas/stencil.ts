@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './stencil.glsl?raw';
+import source from './stencil.wgsl?raw';
 
 export const stencil: Formula = {
     label: 'Stencil',

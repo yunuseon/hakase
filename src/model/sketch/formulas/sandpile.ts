@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './sandpile.glsl?raw';
+import source from './sandpile.wgsl?raw';
 
 export const sandpile: Formula = {
     label: 'Sandpile',

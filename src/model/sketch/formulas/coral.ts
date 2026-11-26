@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './coral.glsl?raw';
+import source from './coral.wgsl?raw';
 
 export const coral: Formula = {
     label: 'Coral',

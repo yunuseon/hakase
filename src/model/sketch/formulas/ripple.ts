@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './ripple.glsl?raw';
+import source from './ripple.wgsl?raw';
 
 export const ripple: Formula = {
     label: 'Ripple',

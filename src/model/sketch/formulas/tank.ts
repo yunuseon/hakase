@@ -1,5 +1,5 @@
 import type { Formula } from './formula.ts';
-import source from './tank.glsl?raw';
+import source from './tank.wgsl?raw';
 
 export const tank: Formula = {
     label: 'Tank',
