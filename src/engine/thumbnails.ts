@@ -23,7 +23,16 @@ import { centre } from '../model/sketch/params.ts';
 import type { Filmstrip } from '../components/sketch/strip/filmstrip.ts';
 import type { Size } from '../layout/frame.ts';
 import { stagesOf, stillOf, type Image } from '../image.ts';
-import { backdropOf, COMPILED, cook, filmed, filmFor, framedIn, textureLimit } from './engine.ts';
+import {
+    backdropOf,
+    COMPILED,
+    cook,
+    filmed,
+    filmFor,
+    framedIn,
+    into,
+    textureLimit,
+} from './engine.ts';
 import { engine$ } from './view.ts';
 
 const TILE_SAMPLES = 1;
@@ -146,7 +155,7 @@ export const filmstrip$ = (
                             );
                             framedIn(
                                 engine,
-                                film.view,
+                                into(film),
                                 picture,
                                 { x: at * slot.width, ...slot },
                                 backdrop,

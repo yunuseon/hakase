@@ -164,9 +164,13 @@ type Entry = {
 
 type PassKind = PedalKind | 'present' | 'sheet' | 'downsample' | 'fill';
 
+export type Into = { readonly view: GPUTextureView; readonly format: GPUTextureFormat };
+
+export const into = (target: Target): Into => ({ view: target.view, format: FORMAT });
+
 type Passes = {
     readonly layout: GPUBindGroupLayout;
-    readonly pipelines: Readonly<Record<PassKind, GPURenderPipeline>>;
+    readonly pipelines: (kind: PassKind, format: GPUTextureFormat) => GPURenderPipeline;
     readonly settings: GPUBuffer;
     readonly tonemap: GPURenderPipeline;
     readonly exposure: GPUBuffer;
@@ -241,30 +245,34 @@ const createPasses = (device: GPUDevice): Passes => {
         ],
     });
     const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [layout] });
-    const pipelineOf = (fragment: string) => {
-        const module = device.createShaderModule({ code: `${header}\n${fragment}` });
+    const modules = new Map<PassKind, GPUShaderModule>();
+    const built = new Map<string, GPURenderPipeline>();
+    const pipelines = (kind: PassKind, format: GPUTextureFormat): GPURenderPipeline => {
+        const key = `${kind}:${format}`;
+        const known = built.get(key);
 
-        return device.createRenderPipeline({
+        if (known !== undefined) {
+            return known;
+        }
+
+        const module =
+            modules.get(kind) ??
+            device.createShaderModule({ code: `${header}\n${FRAGMENTS[kind]}` });
+        modules.set(kind, module);
+        const pipeline = device.createRenderPipeline({
             layout: pipelineLayout,
             vertex: { module, entryPoint: 'fullscreen' },
-            fragment: { module, entryPoint: 'main', targets: [{ format: FORMAT }] },
+            fragment: { module, entryPoint: 'main', targets: [{ format }] },
         });
+        built.set(key, pipeline);
+
+        return pipeline;
     };
     const toneModule = device.createShaderModule({ code: tonemap });
 
     return {
         layout,
-        pipelines: {
-            colourmap: pipelineOf(FRAGMENTS.colourmap),
-            kaleido: pipelineOf(FRAGMENTS.kaleido),
-            feedback: pipelineOf(FRAGMENTS.feedback),
-            mix: pipelineOf(FRAGMENTS.mix),
-            blur: pipelineOf(FRAGMENTS.blur),
-            present: pipelineOf(FRAGMENTS.present),
-            sheet: pipelineOf(FRAGMENTS.sheet),
-            downsample: pipelineOf(FRAGMENTS.downsample),
-            fill: pipelineOf(FRAGMENTS.fill),
-        },
+        pipelines,
         settings: device.createBuffer({
             size: PASS_BYTES,
             usage: BUFFER.UNIFORM | BUFFER.COPY_DST,
@@ -293,7 +301,11 @@ export const createEngine = async (): Promise<Engine> => {
         throw new Error('This browser cannot draw WebGPU into a canvas');
     }
 
-    context.configure({ device, format: FORMAT, alphaMode: 'opaque' });
+    context.configure({
+        device,
+        format: navigator.gpu.getPreferredCanvasFormat(),
+        alphaMode: 'opaque',
+    });
 
     const blank = createTarget(device, 1, 1);
     device.queue.writeTexture(
@@ -369,12 +381,10 @@ export const checkScene = (engine: Engine, code: string): Promise<SceneCheck> =>
 
 const keyOf = (store: string, lane: string): string => (lane === '' ? store : `${store}#${lane}`);
 
-// A program that lands later must be drawn: every entry that showed the old one draws again.
-const recompiled = (engine: Engine, key: string): void => {
-    engine.entries.forEach((entry, entryKey) => {
-        if (entryKey.startsWith(`${key}@`)) {
-            entry.cooked = null;
-        }
+// A program that lands later is drawn by every stage, not only its own: a feedback's past was built on frames that had no picture yet.
+const recompiled = (engine: Engine): void => {
+    engine.entries.forEach(entry => {
+        entry.cooked = null;
     });
     engine.events.dispatchEvent(new Event(COMPILED));
 };
@@ -402,7 +412,7 @@ const sourceOf = (engine: Engine, key: string): Source => {
 };
 
 // A failed edit keeps the last program that compiled, so the picture never blanks while code is typed.
-const compiled = (engine: Engine, key: string, source: Source, text: string): Sketch | null => {
+const compiled = (engine: Engine, source: Source, text: string): Sketch | null => {
     source.used = performance.now();
 
     if (source.text !== text) {
@@ -412,7 +422,7 @@ const compiled = (engine: Engine, key: string, source: Source, text: string): Sk
                 source.sketch = result.sketch;
                 source.prepared = null;
                 source.evolved = null;
-                recompiled(engine, key);
+                recompiled(engine);
             }
         });
     }
@@ -502,7 +512,7 @@ type Area = {
 const runPass = (
     engine: Engine,
     kind: PassKind,
-    into: GPUTextureView,
+    target: Into,
     settings: PassSettings,
     inputs: Inputs,
     {
@@ -520,14 +530,14 @@ const runPass = (
     const pass = encoder.beginRenderPass({
         colorAttachments: [
             {
-                view: into,
+                view: target.view,
                 loadOp: clear === null ? 'load' : 'clear',
                 clearValue: { r: clear?.[0] ?? 0, g: clear?.[1] ?? 0, b: clear?.[2] ?? 0, a: 1 },
                 storeOp: 'store',
             },
         ],
     });
-    pass.setPipeline(passes.pipelines[kind]);
+    pass.setPipeline(passes.pipelines(kind, target.format));
     pass.setBindGroup(
         0,
         device.createBindGroup({
@@ -603,7 +613,7 @@ const drawPoints = (engine: Engine, entry: Entry, image: PointsImage, moment: Mo
             : width / Math.max(moment.frame.width, 1);
     const key = keyOf(image.store, moment.lane);
     const source = sourceOf(engine, key);
-    const sketch = compiled(engine, key, source, image.source);
+    const sketch = compiled(engine, source, image.source);
     const { samples } = entry;
 
     if (sketch === null || samples === null) {
@@ -705,7 +715,7 @@ const traceOf = (
         trace.pending = createTracer(engine.device, engine.tracing, code, shapes).then(result => {
             if (result.ok && trace.code === source) {
                 trace.tracer = result.tracer;
-                recompiled(engine, key);
+                recompiled(engine);
             }
         });
     }
@@ -730,7 +740,7 @@ export const readyFor = (engine: Engine, image: Image, lane: string): Promise<vo
 
             if (stage.kind === 'points') {
                 const source = sourceOf(engine, key);
-                compiled(engine, key, source, stage.source);
+                compiled(engine, source, stage.source);
 
                 return source.pending;
             }
@@ -877,7 +887,7 @@ const drawTraced = (
     device.queue.submit([encoder.finish()]);
 
     if (accumulation.toned !== null) {
-        runPass(engine, 'present', entry.output.view, {}, { in0: accumulation.toned.view });
+        runPass(engine, 'present', into(entry.output), {}, { in0: accumulation.toned.view });
     }
 };
 
@@ -910,7 +920,7 @@ const drawPedal = (
 
     switch (kind) {
         case 'colourmap':
-            runPass(engine, kind, entry.output.view, settings, {
+            runPass(engine, kind, into(entry.output), settings, {
                 ...given,
                 palette: paletteOf(engine, entry, image.theme ?? themes.paper),
             });
@@ -920,7 +930,7 @@ const drawPedal = (
             runPass(
                 engine,
                 kind,
-                spare.view,
+                into(spare),
                 // A new stage has no past: its first frame is the picture itself, not a fade from black.
                 entry.cooked === null ? { ...settings, knobs: [0, ...knobs.slice(1)] } : settings,
                 { ...given, previous: entry.output.view },
@@ -931,11 +941,11 @@ const drawPedal = (
         }
         case 'blur': {
             const spare = entry.spare ?? entry.output;
-            runPass(engine, kind, spare.view, { ...settings, direction: [1, 0] }, given);
+            runPass(engine, kind, into(spare), { ...settings, direction: [1, 0] }, given);
             runPass(
                 engine,
                 kind,
-                entry.output.view,
+                into(entry.output),
                 { ...settings, direction: [0, 1] },
                 { in0: spare.view },
             );
@@ -943,7 +953,7 @@ const drawPedal = (
         }
         case 'kaleido':
         case 'mix':
-            runPass(engine, kind, entry.output.view, settings, given);
+            runPass(engine, kind, into(entry.output), settings, given);
             break;
     }
 };
@@ -1180,19 +1190,19 @@ export const averagedInto = (
     now: number,
 ): void => {
     const scratch = filmOf(engine, 'level-cell', cell, now);
-    const into = filmOf(engine, 'level', atlas, now);
+    const cells = filmOf(engine, 'level', atlas, now);
 
     runPass(
         engine,
         'downsample',
-        scratch.view,
+        into(scratch),
         { factor: Math.max(1, Math.round((picture?.width ?? cell) / cell)) },
         { in0: picture?.view ?? engine.blank.view },
     );
     const encoder = engine.device.createCommandEncoder();
     encoder.copyTextureToTexture(
         { texture: scratch.texture },
-        { texture: into.texture, origin: { x: at.x, y: at.y } },
+        { texture: cells.texture, origin: { x: at.x, y: at.y } },
         { width: cell, height: cell },
     );
     engine.device.queue.submit([encoder.finish()]);
@@ -1230,7 +1240,7 @@ export const readAtlas = async (
 };
 
 // The canvas is sized to each picture: a window's bitmap takes the whole canvas, and handing it over costs nothing.
-const canvasView = (engine: Engine, width: number, height: number): GPUTextureView => {
+const canvasView = (engine: Engine, width: number, height: number): Into => {
     const { canvas } = engine;
 
     if (canvas.width !== width || canvas.height !== height) {
@@ -1238,7 +1248,9 @@ const canvasView = (engine: Engine, width: number, height: number): GPUTextureVi
         canvas.height = height;
     }
 
-    return engine.context.getCurrentTexture().createView();
+    const texture = engine.context.getCurrentTexture();
+
+    return { view: texture.createView(), format: texture.format };
 };
 
 export const backdropOf = (image: Image): readonly [number, number, number] => {
@@ -1253,7 +1265,7 @@ export const backdropOf = (image: Image): readonly [number, number, number] => {
 
 export const framedIn = (
     engine: Engine,
-    into: GPUTextureView,
+    target: Into,
     picture: Picture | null,
     slot: { readonly x: number; readonly width: number; readonly height: number },
     backdrop: readonly [number, number, number],
@@ -1267,7 +1279,7 @@ export const framedIn = (
     runPass(
         engine,
         'fill',
-        into,
+        target,
         { paper: [...backdrop, 0] },
         {},
         {
@@ -1278,7 +1290,7 @@ export const framedIn = (
     runPass(
         engine,
         'present',
-        into,
+        target,
         {},
         { in0: picture?.view ?? engine.blank.view },
         {

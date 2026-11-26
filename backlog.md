@@ -49,17 +49,13 @@ at 41% and running off the screen at 100%.
 ## WebGPU: what is left
 
 The engine and every formula moved to WebGPU and WGSL (see "WebGPU and WGSL"
-in AGENTS.md). What is not done:
+in AGENTS.md), and every starter and example was looked at drawing. What is not
+done:
 
 - **Compute beyond the tracer.** The tracer is faster than under WebGL now,
   through the light list, and a wavefront tracer was measured slower on this
   GPU (see "Path tracing"). What compute could still do: picture readings
   reduced on the GPU instead of read back, particles.
-- **Look at every starter and example** with the pane visible: the checks so far
-  were probes of the tracer and each draw mode, and the app running.
-- **The canvas format**: the canvas is `rgba8unorm`, and this device prefers
-  `bgra8unorm`, which costs a copy per bitmap; the passes that draw into the
-  canvas could take the preferred format.
 
 ## Dev experience: the next chapter
 

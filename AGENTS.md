@@ -342,7 +342,9 @@ are made per draw; they are cheap and keep no stale texture.
 come from `getCompilationInfo` and a pipeline from `create*PipelineAsync`, so
 `compiled` and `traceOf` start the build and go on drawing the last program
 that compiled. When the new one is ready, still the latest text, it replaces
-the old, the entries that showed it forget what they cooked (`recompiled`), and
+the old, **every** entry forgets what it cooked (`recompiled`), not only the
+program's own (a feedback stage downstream built its past on frames whose input
+had no picture yet, and paused, it stayed black), and
 the engine dispatches `COMPILED` on its own `events`, which `view$` and the strip
 read as one more reason to cook: a paused window draws the new program once.
 **An engine that has compiled nothing yet draws blank**, which an export, with an
@@ -370,6 +372,10 @@ follows them with `switchMap`.
 - **The flag objects are not declared.** TypeScript's DOM lib has the WebGPU
   types but not `GPUBufferUsage` and friends, so `lib/gpu.ts` spells the
   spec's values (`BUFFER`, `TEXTURE`, `STAGE`, `MAP`).
+- **The canvas takes the device's preferred format** (`bgra8unorm` on this Mac),
+  or every bitmap costs a copy; every texture stays `rgba8unorm`. So a pass is a
+  pipeline per target format, made when first asked for, and what it draws into
+  is an `Into`, a view with its format (`into(target)`, or `canvasView`).
 - **Windows get bitmaps from a canvas sized to the picture.** `canvasView`
   resizes the canvas to each picture and `transferToImageBitmap` hands it over
   whole, which a window's `bitmaprenderer` takes with no copy; under WebGL every
