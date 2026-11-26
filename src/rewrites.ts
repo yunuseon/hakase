@@ -59,11 +59,14 @@ const placeOf = (node: Node): string => {
 export const rewrites$ = (root: Node): Observable<Rewrite> =>
     mutations$(root).pipe(
         mergeMap(records =>
-            rewritesOf(records.flatMap(writeOf)).map(({ target, name, olds }) => ({
-                window: windowOf(target),
-                at: placeOf(target),
-                name,
-                values: [...olds, valueOf(target, name)],
-            })),
+            rewritesOf(records.flatMap(writeOf))
+                .map(({ target, name, olds }) => ({
+                    window: windowOf(target),
+                    at: placeOf(target),
+                    name,
+                    values: [...olds, valueOf(target, name)],
+                }))
+                // The same value written again shows nothing stale: only a place that held two values rendered twice.
+                .filter(({ values }) => values.some(value => value !== values[0])),
         ),
     );

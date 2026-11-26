@@ -953,7 +953,8 @@ const forget = (engine: Engine, now: number): void => {
 const sameFrame = (a: Size | null, b: Size | null): boolean =>
     a === null || b === null ? a === b : a.width === b.width && a.height === b.height;
 
-export type Why = 'new' | 'recipe' | 'moment' | 'pass' | 'pointer' | 'frame' | 'dots' | 'samples';
+export type Why =
+    'new' | 'recipe' | 'moment' | 'pass' | 'pointer' | 'frame' | 'dots' | 'samples' | 'input';
 
 export const whyCooked = (
     cooked: Cooked | null,
@@ -994,7 +995,19 @@ export const cook = (engine: Engine, image: Image, moment: Moment, now: number):
     const { pictures: drawn, draws } = stagesOf(image).reduce(
         ({ pictures, draws: before }, stage) => {
             const entry = entryOf(engine, stage, moment);
-            const why = whyCooked(entry.cooked, stage, moment, entry.accumulation?.parts ?? 0);
+            // A picture is its inputs' too: one that refined or recompiled leaves the same recipe and the same moment.
+            const why =
+                whyCooked(entry.cooked, stage, moment, entry.accumulation?.parts ?? 0) ??
+                (stage.kind === 'pedal' &&
+                stage.inputs.some(
+                    input =>
+                        input.kind !== 'none' &&
+                        before.some(
+                            ({ entry: drawnEntry }) => drawnEntry === entryKey(input, moment),
+                        ),
+                )
+                    ? 'input'
+                    : null);
             const same = why === null || why === 'samples';
 
             if (why !== null) {

@@ -51,9 +51,13 @@ at 41% and running off the screen at 100%.
 The engine and every formula moved to WebGPU and WGSL (see "WebGPU and WGSL"
 in AGENTS.md). What is not done:
 
-- **Measure it against WebGL**: Light show playing (it held 60 fps), Interior's
-  samples a second, the strip, and the inspector's draw counts, each against the
-  numbers in AGENTS.md, which were taken under WebGL.
+- **The tracer is not faster yet.** Measured on WebGPU, one sample at 384 px:
+  Still life 4.1 ms, Field 3.7, Room 12.9, Interior 16.9, against 3.5, 3, 9.5
+  and 14 under WebGL: a straight port of a fragment shader to compute is 15 to
+  35% slower, and the workgroup's shape moves it by a millisecond. The gain was
+  always meant to come from compute: a wavefront tracer, where rays that end
+  stop costing their neighbours. Light show plays at 60 fps (median frame 16.7
+  ms, p95 17.4), about ten draws a frame, one per stage, and no redraws.
 - **Look at every starter and example** with the pane visible: the checks so far
   were probes of the tracer and each draw mode, and the app running.
 - **The canvas format**: the canvas is `rgba8unorm`, and this device prefers

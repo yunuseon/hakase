@@ -397,6 +397,13 @@ written: `writtenInGlsl` recognises it, and the engine reports one plain message
 the text waits to be rewritten. A scene whose code is GLSL still draws its
 objects, its code objects as the default sphere.
 
+**A stage is redrawn when its input was.** A pedal's cached picture is its
+inputs' too, and an input can redraw with no change to the pedal's recipe or
+moment: a program that compiled late, a traced scene that refined. `cook` gives
+such a stage the reason `input` and draws it again; before, a pedal kept the
+picture its input had when it last drew, which under WebGL meant a chain
+behind a refining scene showed its first coarse sample.
+
 **Checking a picture without a window**: a module imports from any page of the
 dev server, so a probe in the browser can make an engine, cook a recipe at a
 small size, copy the texture to a buffer and print it as characters. That is
@@ -4443,7 +4450,9 @@ observed as it is added, since an observer stops at a shadow boundary. lit
 only writes a binding whose value changed, so one text node or attribute
 written twice in one batch means its view rendered twice in that turn, the
 first time stale: `rewritesOf` pairs those writes, ignoring `style` and
-`class`, which are written a property or a token at a time. Each rewrite
+`class`, which are written a property or a token at a time, and a place
+written again with the value it already had, which shows nothing stale (the
+window chrome sets its store field's `value` that way on every update). Each rewrite
 names its window by `data-process`, which `liveProcess$` puts on every
 `hks-window`, the place (`hks-properties > span.value > output`) and every
 value it held. `windows`, `inputs`, `actions` and `rewrites` are events, so
