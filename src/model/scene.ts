@@ -410,7 +410,6 @@ export const objectsCode = (shapes: readonly Shape[]): string =>
 
 const SAMPLED_SHAPES: readonly Shape[] = ['sphere', 'box', 'torus', 'cylinder'];
 
-// What a shadow ray can aim at: a glowing solid, or a code object whose code says where its glow is with bounds().
 export const lightsOf = ({ objects, code }: Pick<Scene, 'objects' | 'code'>): readonly number[] =>
     objects
         .slice(0, MAX_OBJECTS)
