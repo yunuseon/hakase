@@ -408,6 +408,19 @@ export const objectsCode = (shapes: readonly Shape[]): string =>
         '}',
     ].join('\n');
 
+const SAMPLED_SHAPES: readonly Shape[] = ['sphere', 'box', 'torus', 'cylinder'];
+
+// What a shadow ray can aim at: a glowing solid, or a code object whose code says where its glow is with bounds().
+export const lightsOf = ({ objects, code }: Pick<Scene, 'objects' | 'code'>): readonly number[] =>
+    objects
+        .slice(0, MAX_OBJECTS)
+        .flatMap((each, index) =>
+            (each.material === 'light' && SAMPLED_SHAPES.includes(each.shape)) ||
+            (each.shape === 'code' && BOUNDS_LIGHT.test(code))
+                ? [index]
+                : [],
+        );
+
 // Appended after the code, never before it, or every reported line number would shift.
 export const sceneAdapter = (code: string, shapes: readonly Shape[] = []): string =>
     [

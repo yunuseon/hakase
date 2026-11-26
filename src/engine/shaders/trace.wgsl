@@ -25,10 +25,12 @@ struct Trace {
     knobs: vec4f,
     // objects, samples in this batch, bands in all, first band
     counts: vec4i,
-    // bands traced now, bounces, unused, unused
+    // bands traced now, bounces, lights, unused
     more: vec4i,
     // field of view in degrees
     lens: vec4f,
+    // The objects a shadow ray can aim at, found before the GPU runs: picking one is a lookup, not two loops over every object.
+    lights: array<vec4i, 4>,
 };
 
 @group(0) @binding(0) var<uniform> trace: Trace;
@@ -250,43 +252,16 @@ fn lightSphere(i: i32, t: f32) -> vec4f {
     }
 }
 
-fn sampleable(i: i32, t: f32) -> bool {
-    return lightSphere(i, t).w > 0.0;
-}
-
 // One light, picked at random, through the cone that bounds it; returns the one it sampled, whose glow a bounce that then meets it must not add again.
 fn sampleLight(origin: vec3f, normal: vec3f, t: f32, light: ptr<function, vec3f>, carried: vec3f) -> i32 {
-    let total = trace.counts.x;
-    var count = 0;
-
-    for (var i = 0; i < MAX_OBJECTS; i++) {
-        if (i >= total) {
-            break;
-        }
-        if (sampleable(i, t)) {
-            count++;
-        }
-    }
+    let count = trace.more.z;
 
     if (count == 0) {
         return -1;
     }
 
-    var pick = min(i32(random() * f32(count)), count - 1);
-    var chosen = -1;
-
-    for (var i = 0; i < MAX_OBJECTS; i++) {
-        if (i >= total) {
-            break;
-        }
-        if (sampleable(i, t)) {
-            if (pick == 0) {
-                chosen = i;
-                break;
-            }
-            pick--;
-        }
-    }
+    let pick = min(i32(random() * f32(count)), count - 1);
+    let chosen = trace.lights[pick / 4][pick % 4];
 
     let sphere = lightSphere(chosen, t);
     let reach = sphere.w;

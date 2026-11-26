@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     defaultScene,
     definesCustom,
+    lightsOf,
+    sceneObject,
     MAX_OBJECTS,
     objectUniforms,
     OBJECT_VEC4S,
@@ -117,5 +119,19 @@ describe('a scene', () => {
         expect(code).not.toContain('shape ==');
         expect(sceneAdapter('', ['box'])).toContain('sdBox(turned(p - objects[0].xyz');
         expect(sceneAdapter('')).toContain('fn objectsAt(p: vec3f, t: f32) -> Hit {');
+    });
+
+    it('lists the objects a shadow ray can aim at, before the GPU runs', () => {
+        const objects = [
+            sceneObject('floor', 'plane', 'light', {}),
+            sceneObject('lamp', 'box', 'light', {}),
+            sceneObject('ball', 'sphere', 'glass', {}),
+            sceneObject('orb', 'code', 'matte', {}),
+        ];
+
+        expect(lightsOf({ objects, code: '' })).toEqual([1]);
+        expect(
+            lightsOf({ objects, code: 'fn bounds(t: f32) -> vec4f { return vec4f(0.0); }' }),
+        ).toEqual([1, 3]);
     });
 });

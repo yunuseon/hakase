@@ -9,6 +9,7 @@ import {
     MAX_OBJECTS,
     OBJECT_VEC4S,
     SCENE_KNOBS,
+    lightsOf,
     objectUniforms,
     sceneAdapter,
     type Shape,
@@ -29,7 +30,7 @@ export type Tracing = {
     readonly objects: GPUBuffer;
 };
 
-const TRACE_BYTES = 112;
+const TRACE_BYTES = 176;
 const OBJECT_BYTES = MAX_OBJECTS * OBJECT_VEC4S * 16;
 
 export const createTracing = (device: GPUDevice): Tracing => {
@@ -138,8 +139,10 @@ const traceData = (
         12,
     );
     ints.set([Math.min(MAX_OBJECTS, scene.objects.length), batch, slots, phase], 16);
-    ints.set([count, scene.bounces, 0, 0], 20);
+    const lights = lightsOf(scene);
+    ints.set([count, scene.bounces, lights.length, 0], 20);
     floats.set([scene.fov, 0, 0, 0], 24);
+    ints.set(lights.slice(0, 16), 28);
 
     return bytes;
 };

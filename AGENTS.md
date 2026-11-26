@@ -2543,6 +2543,25 @@ objects scrolls in the controls instead of squeezing the picture to a strip.
 Its stage also orbits (`orbits$`: drag, wheel, double-click), which only the
 Scene reads.
 
+**The lights are listed before the GPU runs.** Which objects a shadow ray can
+aim at (a glowing sphere, box, torus or cylinder, or a code object whose code
+defines `bounds()`) is known from the scene, so `lightsOf` lists them and the
+tracer's settings carry the list: a matte bounce picks one with a single
+lookup. It used to loop over every object twice at every matte bounce, once to
+count the lights and once to find the one it picked, and that was a third of
+Interior's time. Measured under WebGPU, one sample at 384 px, before and after:
+Interior 16.9 to 12.6 ms, Room 12.9 to 9.7, Still life 4.1 to 2.9, Field 3.7 to
+2.2, which is faster than WebGL was (14, 9.5, 3.5 and 3).
+
+**A wavefront tracer was built and measured, and dropped.** Paths in buffers
+between kernels (generate, march, shade, and shadow rays marched by a kernel of
+their own), each bounce dispatched over a queue of only the live paths, drew
+the same picture to the last bit but ran slower on every scene: Interior 17.3
+ms against 12.6, Lens 3.3 against 1.6. Writing a path's state out and back at
+every bounce, and some forty dispatches a sample, cost more than the divergence
+it removed; this GPU (Apple's) runs divergent lanes well enough that compaction
+does not pay. Measure again before building it on other hardware.
+
 **Glowing objects are sampled, like the sun.** At every matte bounce the
 tracer picks one light at random and sends a shadow ray into the cone that
 holds it (`sampleLight`, `lightSphere`): a sphere, box, torus or cylinder of
