@@ -4551,6 +4551,45 @@ every call reads the present; `listen` and `quiet` are commands, sent as a
 `hakase` event on the window and folded, not flags. An agent with a browser
 tool reads it with one `javascript_exec` and the lines with a console read.
 
+**A double and a cascade are told apart.** A turn is cut at every new event
+(`inputs`, `actions`, `windows`): a stream that fires twice with no new event
+between is in `doubles`, the two-paths bug; one that fires again because a new
+event arrived in the same turn is in `cascades`, with the events it ran
+`through`. Launching a window is the usual cascade: the launch changes the
+documents, the window mounts and sends its first settings, and the documents
+change again before the turn ends. It is the app reacting to itself, through
+the one cycle, not a combine reached twice, and it was reported as a double
+until this split.
+
+**The console speaks the palette's language.** `hakase.commands(word)` lists
+what the palette offers now and `hakase.run(id, text)` runs one as if it were
+picked (`launch:note`, `capture:todo:tickets` with its text), checked by
+`pickedOf` first. It is a `hakase:run` event merged into `intents`' picks
+beside the palette's, so it goes through the same routing and refusals and
+adds no path of its own. Every method reads the latest report when called, not
+when the object was made: an agent's `const h = hakase` went stale at once
+otherwise.
+
+**A session can be recorded and replayed in Node.** `hakase.record()` takes
+the state as it stands (`snapshot$`, the very combine persistence saves, and
+`serialised`) and then every turn of what the core receives (`received$`:
+inputs, document actions and workspace actions, each tagged), grouped into
+turns as the diagnostics group them. `hakase.stop(name)` writes it through a
+dev-only Vite middleware as `src/recordings/<name>.ts`, a **module, not JSON**
+(`recordingSource`, `literalOf` writing Maps, Sets and typed arrays as their
+constructors), so it is type-checked against today's actions: a stale
+recording fails typecheck rather than replaying something else. The
+middleware takes only POSTs from loopback (the server listens on every
+interface) and names of lowercase, digits and dashes. `replayed(recording)`
+(`src/replay.ts`) seeds a fresh core's storage with the start, feeds each turn
+in a macrotask of its own with its events together, and resolves with the
+diagnostics log and the history, so a test asserts on `doubles`, `cascades`
+and the documents. Its first find was in the recording itself: a launch's
+viewport carried the visible viewport's `layoutHeight`, a field its type does
+not have, which the recording's typecheck caught. Time is not recorded: the
+replay's frames never tick and its wall clock stands at the recording's start,
+so clocks and timers stand still.
+
 **The Streams window shows the same report** (`streams`, System): a lane per
 stream with a mark for each time it fired over the last three seconds, its
 rate, its last value and how long ago, the last turns, and a warning while a

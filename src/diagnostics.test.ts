@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     digestOf,
+    cascadesOf,
     doublesOf,
     emptyLog,
     keysAt,
@@ -61,6 +62,16 @@ describe('a log of turns', () => {
         ]);
         expect(doublesOf(turn(5, ['documents', 'recipe']))).toEqual([]);
         expect(doublesOf(turn(5, ['windows', 'windows', 'rewrites', 'rewrites']))).toEqual([]);
+    });
+
+    it('tells a cascade, a new event between, from two paths meeting', () => {
+        const launched = turn(5, ['documents', 'actions', 'windows', 'inputs', 'documents']);
+
+        expect(doublesOf(launched)).toEqual([]);
+        expect(cascadesOf(launched)).toEqual([
+            { at: 5, stream: 'documents', times: 2, through: ['actions', 'windows', 'inputs'] },
+        ]);
+        expect(cascadesOf(turn(5, ['documents', 'recipe', 'recipe']))).toEqual([]);
     });
 
     it('keeps the last few seconds of turns, and every total', () => {

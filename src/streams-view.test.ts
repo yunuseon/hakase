@@ -29,6 +29,7 @@ describe('the streams window', () => {
             { at: 1000, stream: 'old', times: 2, with: [] },
             { at: 4800, stream: 'scenes', times: 2, with: ['documents'] },
         ],
+        cascades: [],
         recent: [
             { at: 4000, fired: ['documents', 'scenes', 'scenes'] },
             { at: 4990, fired: ['clocks'] },

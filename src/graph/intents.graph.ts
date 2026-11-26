@@ -1,4 +1,4 @@
-import { EMPTY, merge, of } from 'rxjs';
+import { EMPTY, merge, of, type Observable } from 'rxjs';
 import {
     distinctUntilChanged,
     filter,
@@ -22,18 +22,21 @@ import { programOf } from '../programs.ts';
 import type { WorkspaceAction } from '../workspace.ts';
 import type { Chrome } from './chrome.graph.ts';
 
-export const intentsOf = ({
-    canvas,
-    toolbar,
-    navigator,
-    palette,
-    selection,
-    sectionDrawing,
-}: Pick<
-    Chrome,
-    'canvas' | 'toolbar' | 'navigator' | 'palette' | 'selection' | 'sectionDrawing'
->) => {
-    const picked$ = palette.picks$.pipe(
+export const intentsOf = (
+    {
+        canvas,
+        toolbar,
+        navigator,
+        palette,
+        selection,
+        sectionDrawing,
+    }: Pick<
+        Chrome,
+        'canvas' | 'toolbar' | 'navigator' | 'palette' | 'selection' | 'sectionDrawing'
+    >,
+    runs$: Observable<{ readonly id: string; readonly text: string | null }>,
+) => {
+    const picked$ = merge(palette.picks$, runs$).pipe(
         mergeMap(({ id, text }) => {
             const picked = pickedOf(id, text);
 
@@ -61,11 +64,11 @@ export const intentsOf = ({
             return program === undefined ? EMPTY : of(program);
         }),
         withLatestFrom(visibleViewport$),
-        map(([program, viewport]): WorkspaceAction => ({
+        map(([program, { left, top, width, height }]): WorkspaceAction => ({
             kind: 'launch',
             program: program.id,
             size: program.size,
-            viewport,
+            viewport: { left, top, width, height },
         })),
     );
 

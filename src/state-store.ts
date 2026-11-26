@@ -47,7 +47,7 @@ import {
 } from './model/sketch/links.ts';
 import { emptyBlueprints, parseBlueprints, type Blueprints } from './blueprints.ts';
 
-const KEY = 'hakase.state';
+export const STATE_KEY = 'hakase.state';
 const VERSION = 1;
 // Read only when hakase.state is absent, so a first run after the upgrade keeps its windows and look.
 const LEGACY_WORKSPACE = 'hakase.workspace';
@@ -402,9 +402,9 @@ const parsedSnapshot = (stored: unknown, inputsFor: InputsFor): Restored => {
 };
 
 export const restoreState = (inputsFor: InputsFor, storage: Storage): Restored =>
-    parseSnapshot(storage.read(KEY), inputsFor) ?? legacy(inputsFor, storage);
+    parseSnapshot(storage.read(STATE_KEY), inputsFor) ?? legacy(inputsFor, storage);
 
-const serialised = (snapshot: Snapshot): unknown => {
+export const serialised = (snapshot: Snapshot): unknown => {
     const { stores } = snapshot.workspace;
     const live = new Set([
         ...snapshot.workspace.processes.map(({ id }) => id),
@@ -459,7 +459,7 @@ export const persistState$ = (
     snapshot$.pipe(
         debounceTime(SETTLE_MS),
         tap(snapshot => {
-            storage.write(KEY, serialised(snapshot));
+            storage.write(STATE_KEY, serialised(snapshot));
         }),
         map(() => undefined),
     );

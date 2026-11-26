@@ -15,14 +15,28 @@ export type Doubled = {
     readonly with: readonly string[];
 };
 
+export type Cascade = {
+    readonly at: number;
+    readonly stream: string;
+    readonly times: number;
+    readonly through: readonly string[];
+};
+
 export type Log = {
     readonly turns: readonly Turn[];
     readonly totals: ReadonlyMap<string, number>;
     readonly lasts: ReadonlyMap<string, Pulse>;
     readonly doubles: readonly Doubled[];
+    readonly cascades: readonly Cascade[];
 };
 
-export const emptyLog: Log = { turns: [], totals: new Map(), lasts: new Map(), doubles: [] };
+export const emptyLog: Log = {
+    turns: [],
+    totals: new Map(),
+    lasts: new Map(),
+    doubles: [],
+    cascades: [],
+};
 
 export const KEEP_MS = 3000;
 const KEEP_DOUBLES = 50;
@@ -100,21 +114,65 @@ export const digestOf = (value: unknown, depth = 3): string => {
 const SPOKEN = ['inputs', 'actions', 'windows', 'rewrites', 'redraws'];
 const EVENTS = [...SPOKEN, 'draws'];
 
-export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
-    const counts = pulses.reduce(
-        (seen, { stream }) => new Map(seen).set(stream, (seen.get(stream) ?? 0) + 1),
-        new Map<string, number>(),
-    );
-    const streams = [...counts.keys()];
+const CAUSES = ['inputs', 'actions', 'windows'];
 
-    return [...counts]
-        .filter(([stream, times]) => times > 1 && !EVENTS.includes(stream))
-        .map(([stream, times]) => ({
-            at,
-            stream,
-            times,
-            with: streams.filter(other => other !== stream),
-        }));
+type Segmented = { readonly stream: string; readonly segment: number };
+
+const segmentsOf = (pulses: readonly Pulse[]): readonly Segmented[] =>
+    pulses.reduce<{ readonly segment: number; readonly out: readonly Segmented[] }>(
+        ({ segment, out }, { stream }) => {
+            const next = CAUSES.includes(stream) ? segment + 1 : segment;
+
+            return { segment: next, out: [...out, { stream, segment: next }] };
+        },
+        { segment: 0, out: [] },
+    ).out;
+
+const repeated = (pulses: readonly Pulse[]) =>
+    [...new Set(pulses.map(({ stream }) => stream))].filter(stream => !EVENTS.includes(stream));
+
+export const doublesOf = ({ at, pulses }: Turn): readonly Doubled[] => {
+    const segmented = segmentsOf(pulses);
+    const streams = [...new Set(pulses.map(({ stream }) => stream))];
+
+    return repeated(pulses).flatMap(stream => {
+        const per = segmented
+            .filter(each => each.stream === stream)
+            .reduce(
+                (counts, { segment }) =>
+                    new Map(counts).set(segment, (counts.get(segment) ?? 0) + 1),
+                new Map<number, number>(),
+            );
+        const times = Math.max(...per.values());
+
+        return times > 1
+            ? [{ at, stream, times, with: streams.filter(other => other !== stream) }]
+            : [];
+    });
+};
+
+export const cascadesOf = ({ at, pulses }: Turn): readonly Cascade[] => {
+    const segmented = segmentsOf(pulses);
+
+    return repeated(pulses).flatMap(stream => {
+        const own = segmented.filter(each => each.stream === stream);
+        const first = own[0]?.segment ?? 0;
+        const last = own[own.length - 1]?.segment ?? 0;
+        const through = [
+            ...new Set(
+                segmented
+                    .filter(
+                        each =>
+                            CAUSES.includes(each.stream) &&
+                            each.segment > first &&
+                            each.segment <= last,
+                    )
+                    .map(each => each.stream),
+            ),
+        ];
+
+        return last > first ? [{ at, stream, times: own.length, through }] : [];
+    });
 };
 
 export const recordTurn = (log: Log, turn: Turn): Log => ({
@@ -125,6 +183,7 @@ export const recordTurn = (log: Log, turn: Turn): Log => ({
     ),
     lasts: turn.pulses.reduce((lasts, pulse) => new Map(lasts).set(pulse.stream, pulse), log.lasts),
     doubles: [...log.doubles, ...doublesOf(turn)].slice(-KEEP_DOUBLES),
+    cascades: [...log.cascades, ...cascadesOf(turn)].slice(-KEEP_DOUBLES),
 });
 
 export type StreamReport = {
@@ -142,6 +201,7 @@ export type Report = {
     readonly windowMs: number;
     readonly streams: readonly StreamReport[];
     readonly doubles: readonly Doubled[];
+    readonly cascades: readonly Cascade[];
     readonly recent: readonly {
         readonly at: number;
         readonly fired: readonly string[];
@@ -172,6 +232,7 @@ export const reportOf = (log: Log, names: readonly string[], now: number): Repor
             };
         }),
         doubles: log.doubles.slice(-10),
+        cascades: log.cascades.slice(-10),
         recent: log.turns.slice(-RECENT_TURNS).map(({ at, pulses: fired }) => ({
             at: Math.round(at),
             fired: fired.map(({ stream }) => stream),
@@ -221,7 +282,8 @@ const counted = (pulses: readonly Pulse[]): readonly (readonly [string, readonly
     ),
 ];
 
-export const lineOf = ({ at, pulses }: Turn): string => {
+export const lineOf = (turn: Turn): string => {
+    const { at, pulses } = turn;
     const streams = counted(pulses);
     const said = streams
         .filter(([stream]) => SPOKEN.includes(stream))
@@ -232,15 +294,17 @@ export const lineOf = ({ at, pulses }: Turn): string => {
     const reached = streams
         .filter(([stream]) => !SPOKEN.includes(stream))
         .map(([stream, own]) => (own.length > 1 ? `${stream} ×${own.length}` : stream));
-    const doubled = streams
-        .filter(([stream, own]) => own.length > 1 && !EVENTS.includes(stream))
-        .map(([stream]) => stream);
+    const doubled = doublesOf(turn).map(({ stream }) => stream);
+    const cascaded = cascadesOf(turn).map(
+        ({ stream, through }) => `${stream} (through ${through.join(', ')})`,
+    );
 
     return [
         `hakase ${Math.round(at)}ms`,
         ...said,
         reached.length > 0 ? `→ ${reached.join(', ')}` : '',
         doubled.length > 0 ? `⚠ fired twice in one turn: ${doubled.join(', ')}` : '',
+        cascaded.length > 0 ? `↻ cascaded: ${cascaded.join(', ')}` : '',
     ]
         .filter(part => part !== '')
         .join('  ');
@@ -312,13 +376,15 @@ export const windowsListOf = ({ processes, stores }: Workspace): readonly Window
 
 export const READING =
     'A turn is everything one event caused before the next microtask. perSecond counts the last windowMs. ' +
-    'A stream in doubles fired more than once in one turn: usually one source reaching a combineLatest by two paths, ' +
-    'so its readers ran twice, once with a stale half. rewrites are the same in a window: one place in its DOM ' +
+    'A stream in doubles fired more than once in one turn with no new event between: usually one source reaching a ' +
+    'combineLatest by two paths, so its readers ran twice, once with a stale half. A stream in cascades fired again ' +
+    'because a new event arrived in the same turn (through: a window answered, an input or an action was logged): the ' +
+    'app reacting to itself, usually a window mounting and sending its first settings; not the two-paths bug. rewrites are the same in a window: one place in its DOM ' +
     'written more than once in one turn, with every value it held, so a view rendered twice and the first was stale. ' +
     'draws counts each stage the engine drew; redraws is a stage drawn more than once in one animation frame, ' +
     'with why each time (recipe, moment, pass, pointer, frame, dots, samples): GPU work thrown away, or two viewers fighting over one entry.';
 
-export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) => ({
+export const forAgents = ({ at, windowMs, streams, doubles, cascades, recent }: Report) => ({
     reading: READING,
     at,
     windowMs,
@@ -331,6 +397,7 @@ export const forAgents = ({ at, windowMs, streams, doubles, recent }: Report) =>
         doubled,
     })),
     doubles,
+    cascades,
     recent,
 });
 

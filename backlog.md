@@ -16,23 +16,15 @@ done:
   GPU (see "Path tracing"). What compute could still do: picture readings
   reduced on the GPU instead of read back, particles.
 
-## Dev experience: the next chapter
+## Dev experience: per-window streams
 
-The stream inspector and `window.hakase` are its first piece (see "Debugging,
-for agents"). What would make them the way to debug this app:
-
-- **Cascades, not just turns**: which stream's emission led to which, so a
-  double names the two paths that met, not only the stream they met at.
-- **Per-window streams**: name a window's `AppState` streams too, so a
-  report can say which window ran twice, not only that a core stream did.
-- **Speaking back**: `hakase.send(input)` folding an `AppInput` like a
-  window would, so an agent can drive the app it inspects; inputs are
-  untrusted, so it goes through the same reducers and refusals.
-- **A recorded session**: the turns of a minute saved and replayed into a
-  fresh core in Node, so a bug report is a file a test can load.
-
-Done looks like an agent finding a double-firing bug from the report alone,
-and reproducing it as a test from a recording.
+Recording, replay, `hakase.run` and cascades are done (see "Debugging, for
+agents"). What is left: name a window's `AppState` streams too, so a report
+can say which window ran twice, not only that a core stream did. It must not
+subscribe a window's cold pipelines a second time, which is why windows are
+watched by their rewrites today. Done looks like a double in one window's
+pipeline named by window and stream, with no extra work when the inspector
+is not read.
 
 ## Pictures: one exporter, any window headless
 

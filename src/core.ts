@@ -6,11 +6,12 @@ import { begunFrom, historyOf } from './graph/history.graph.ts';
 import { levelsOf } from './graph/levels.graph.ts';
 import { newestAction, sameLogged } from './diagnostics.ts';
 import { mixOf } from './graph/mix.graph.ts';
-import { persisted$ } from './graph/persistence.graph.ts';
+import { persisted$, snapshotOf } from './graph/persistence.graph.ts';
 import { projectionsOf } from './graph/projections.graph.ts';
 import { timekeepingOf } from './graph/timekeeping.graph.ts';
 import { documentActionsOf } from './input-actions.ts';
 import type { PictureFrames, Ports } from './ports.ts';
+import type { Received } from './recording.ts';
 import type { AppSignal } from './protocol.ts';
 import { restoreState } from './state-store.ts';
 import type { WorkspaceAction } from './workspace.ts';
@@ -39,6 +40,12 @@ export const coreOf = ({
     );
     const projected = projectionsOf(history$);
     const timekeeping = timekeepingOf({ ...projected, stored, inputs$, ports });
+    const snapshot$ = snapshotOf({ ...projected, ...timekeeping });
+    const received$: Observable<Received> = merge(
+        inputs$.pipe(map((signal): Received => ({ kind: 'input', signal }))),
+        documentActions$.pipe(map((action): Received => ({ kind: 'document', action }))),
+        workspaceActions$.pipe(map((action): Received => ({ kind: 'workspace', action }))),
+    );
     const levels = levelsOf({ ...projected, ...timekeeping, pictureFrames$, ports });
     const mix = mixOf({ ...projected, ...timekeeping, ...levels });
     const watched = {
@@ -71,7 +78,9 @@ export const coreOf = ({
         ...levels,
         ...mix,
         watched,
-        persisted$: persisted$({ ...projected, ...timekeeping, ports }),
+        snapshot$,
+        received$,
+        persisted$: persisted$(snapshot$, ports),
     };
 };
 

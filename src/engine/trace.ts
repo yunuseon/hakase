@@ -20,7 +20,6 @@ import type { Target } from './targets.ts';
 import type { Pass } from './pacing.ts';
 
 const PRELUDE = traceSource.trimEnd();
-// The code is spliced after the prelude, so compiler line numbers need rebasing.
 const PRELUDE_LINES = PRELUDE.split('\n').length;
 
 export type Tracing = {

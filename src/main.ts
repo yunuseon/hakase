@@ -1,8 +1,9 @@
 import { defer, EMPTY, merge } from 'rxjs';
+import { share } from 'rxjs/operators';
 import './styles.css';
 import { browserPorts } from './browser-ports.ts';
 import { chime$ } from './chime.ts';
-import { console$ } from './console-client.ts';
+import { console$, consoleRuns$ } from './console-client.ts';
 import { coreOf } from './core.ts';
 import { diagnosticsOf } from './graph/diagnostics.graph.ts';
 import { rewrites$ } from './rewrites.ts';
@@ -23,7 +24,7 @@ import { workspaceActions$ } from './graph/workspace-actions.graph.ts';
 
 const bootstrap = () => {
     const chrome = mountChrome();
-    const intents = intentsOf(chrome);
+    const intents = intentsOf(chrome, import.meta.env.DEV ? consoleRuns$ : EMPTY);
 
     // The cycle: windows open from the history their own output folds. Every back edge is read lazily, here and nowhere else.
     const signals$ = defer(() => windows.signals$);
@@ -69,19 +70,19 @@ const bootstrap = () => {
         ...stateMode,
         signals$,
         inputs$,
-    });
+    }).pipe(share());
     const documentActions = documentActions$({
         ...intents,
         ...core,
         ...selection,
         ...stateMode,
-    });
+    }).pipe(share());
 
     return merge(
         chime$(core.timers$, core.plans$),
         sound$(core, sound.listening$, sound.soloed$),
         core.persisted$,
-        import.meta.env.DEV ? console$(diagnostics, core.history$) : EMPTY,
+        import.meta.env.DEV ? console$(diagnostics, core) : EMPTY,
         connectChrome$({
             ...chrome,
             ...intents,
